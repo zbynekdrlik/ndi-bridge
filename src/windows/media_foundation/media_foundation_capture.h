@@ -6,35 +6,45 @@
 #include "mf_video_capture.h"
 #include <memory>
 #include <string>
+#include <atomic>
 
 namespace ndi_bridge {
 
-// Media Foundation implementation of ICaptureDevice
+/**
+ * @brief Media Foundation implementation of ICaptureDevice
+ * 
+ * Provides video capture functionality using Windows Media Foundation.
+ * 
+ * Version: 1.0.1
+ */
 class MediaFoundationCapture : public ICaptureDevice {
 public:
     MediaFoundationCapture();
     ~MediaFoundationCapture() override;
     
     // ICaptureDevice implementation
-    std::vector<std::pair<std::string, std::string>> EnumerateDevices() override;
-    bool SelectDevice(const std::string& device_id) override;
-    bool Initialize() override;
-    void Shutdown() override;
-    bool StartCapture(FrameCallback callback) override;
-    void StopCapture() override;
-    bool IsCapturing() const override;
-    bool SetOutputFormat(int width, int height, uint32_t fps_num, uint32_t fps_den) override;
-    void GetCurrentFormat(int& width, int& height, uint32_t& fps_num, uint32_t& fps_den, uint32_t& fourcc) override;
-    bool IsDeviceValid() const override;
-    std::string GetLastError() const override;
+    std::vector<DeviceInfo> enumerateDevices() override;
+    bool startCapture(const std::string& device_name = "") override;
+    void stopCapture() override;
+    bool isCapturing() const override;
+    void setFrameCallback(FrameCallback callback) override;
+    void setErrorCallback(ErrorCallback callback) override;
+    bool hasError() const override;
+    std::string getLastError() const override;
     
 private:
+    // Initialize device by name
+    bool initializeDevice(const std::string& device_name);
+    
+    // Shutdown current device
+    void shutdownDevice();
+    
     // Helper to reinitialize on device errors
-    bool ReinitializeOnError(HRESULT hr);
+    bool reinitializeOnError(HRESULT hr);
     
     // Convert wide string to UTF-8
-    static std::string WideToUtf8(const std::wstring& wide);
-    static std::wstring Utf8ToWide(const std::string& utf8);
+    static std::string wideToUtf8(const std::wstring& wide);
+    static std::wstring utf8ToWide(const std::string& utf8);
     
 private:
     std::unique_ptr<media_foundation::MFCaptureDevice> device_manager_;
@@ -45,7 +55,12 @@ private:
     
     std::wstring selected_device_name_;
     std::string last_error_;
+    std::atomic<bool> has_error_{false};
     bool initialized_;
+    
+    // Callbacks
+    FrameCallback frame_callback_;
+    ErrorCallback error_callback_;
     
     // Retry state
     int reinit_attempts_;
