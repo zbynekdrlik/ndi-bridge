@@ -4,6 +4,7 @@
 #include <codecvt>
 #include <locale>
 #include <iostream>
+#include <chrono>
 
 namespace ndi_bridge {
 
@@ -17,47 +18,143 @@ MediaFoundationCapture::MediaFoundationCapture()
 }
 
 MediaFoundationCapture::~MediaFoundationCapture() {
-    Shutdown();
+    shutdownDevice();
 }
 
-std::vector<std::pair<std::string, std::string>> MediaFoundationCapture::EnumerateDevices() {
-    std::vector<std::pair<std::string, std::string>> result;
+std::vector<ICaptureDevice::DeviceInfo> MediaFoundationCapture::enumerateDevices() {
+    std::vector<ICaptureDevice::DeviceInfo> result;
     std::vector<media_foundation::DeviceInfo> devices;
     
     HRESULT hr = device_manager_->EnumerateDevices(devices);
     if (FAILED(hr)) {
         last_error_ = "Failed to enumerate devices: " + media_foundation::MFErrorHandler::HResultToString(hr);
+        has_error_ = true;
         return result;
     }
     
     for (const auto& device : devices) {
-        // Use friendly name as both ID and display name
-        std::string name = WideToUtf8(device.friendly_name);
-        result.push_back({name, name});
+        ICaptureDevice::DeviceInfo info;
+        info.name = wideToUtf8(device.friendly_name);
+        info.id = info.name;  // Use friendly name as ID for simplicity
+        result.push_back(info);
     }
     
     return result;
 }
 
-bool MediaFoundationCapture::SelectDevice(const std::string& device_id) {
-    selected_device_name_ = Utf8ToWide(device_id);
+bool MediaFoundationCapture::startCapture(const std::string& device_name) {
+    // Initialize device if not already done
+    if (!initialized_) {
+        if (!initializeDevice(device_name)) {
+            return false;
+        }
+    }
+    
+    // Configure output format
+    video_capture_->ConfigureOutputFormat();
+    
+    // Get negotiated format
+    HRESULT hr = video_capture_->GetNegotiatedFormat();
+    if (FAILED(hr)) {
+        last_error_ = "Failed to negotiate format";
+        has_error_ = true;
+        shutdownDevice();
+        return false;
+    }
+    
+    // Set up internal callbacks to convert to interface format
+    video_capture_->SetFrameCallback(
+        [this](const media_foundation::FrameData& mf_frame) {
+            if (frame_callback_) {
+                VideoFormat format;
+                format.width = mf_frame.width;
+                format.height = mf_frame.height;
+                format.stride = mf_frame.width * 2;  // Assuming UYVY
+                format.pixel_format = "UYVY";
+                format.fps_numerator = mf_frame.fps_numerator;
+                format.fps_denominator = mf_frame.fps_denominator;
+                
+                // Convert timestamp to nanoseconds
+                int64_t timestamp_ns = mf_frame.timestamp * 100;  // Convert from 100ns units
+                
+                frame_callback_(mf_frame.data, mf_frame.size, timestamp_ns, format);
+            }
+        }
+    );
+    
+    hr = video_capture_->StartCapture();
+    if (FAILED(hr)) {
+        last_error_ = "Failed to start capture";
+        has_error_ = true;
+        return false;
+    }
+    
+    has_error_ = false;
     return true;
 }
 
-bool MediaFoundationCapture::Initialize() {
-    if (initialized_) {
-        return true;
+void MediaFoundationCapture::stopCapture() {
+    if (video_capture_) {
+        video_capture_->StopCapture();
     }
+}
+
+bool MediaFoundationCapture::isCapturing() const {
+    return video_capture_ && video_capture_->IsCapturing();
+}
+
+void MediaFoundationCapture::setFrameCallback(FrameCallback callback) {
+    frame_callback_ = std::move(callback);
+}
+
+void MediaFoundationCapture::setErrorCallback(ErrorCallback callback) {
+    error_callback_ = std::move(callback);
+    
+    // Also set error callback on video capture
+    if (video_capture_) {
+        video_capture_->SetErrorCallback(
+            [this](const std::string& error) {
+                last_error_ = error;
+                has_error_ = true;
+                if (error_callback_) {
+                    error_callback_(error);
+                }
+            }
+        );
+    }
+}
+
+bool MediaFoundationCapture::hasError() const {
+    return has_error_ || (video_capture_ && !video_capture_->GetLastError().empty());
+}
+
+std::string MediaFoundationCapture::getLastError() const {
+    if (video_capture_ && !video_capture_->GetLastError().empty()) {
+        return video_capture_->GetLastError();
+    }
+    return last_error_;
+}
+
+bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
+    selected_device_name_ = device_name.empty() ? L"" : utf8ToWide(device_name);
     
     if (selected_device_name_.empty()) {
-        last_error_ = "No device selected";
-        return false;
+        // Use first available device
+        std::vector<media_foundation::DeviceInfo> devices;
+        HRESULT hr = device_manager_->EnumerateDevices(devices);
+        if (FAILED(hr) || devices.empty()) {
+            last_error_ = "No capture devices found";
+            has_error_ = true;
+            return false;
+        }
+        selected_device_name_ = devices[0].friendly_name;
     }
     
     // Find device by name
     HRESULT hr = device_manager_->FindDeviceByName(selected_device_name_, &current_activate_);
     if (FAILED(hr)) {
-        last_error_ = "Failed to find device: " + WideToUtf8(selected_device_name_);
+        last_error_ = "Failed to find device: " + wideToUtf8(selected_device_name_);
+        has_error_ = true;
         return false;
     }
     
@@ -65,6 +162,7 @@ bool MediaFoundationCapture::Initialize() {
     hr = device_manager_->CreateSourceReaderFromActivate(current_activate_, &current_reader_);
     if (FAILED(hr)) {
         last_error_ = "Failed to create source reader: " + media_foundation::MFErrorHandler::HResultToString(hr);
+        has_error_ = true;
         if (current_activate_) {
             current_activate_->Release();
             current_activate_ = nullptr;
@@ -76,27 +174,18 @@ bool MediaFoundationCapture::Initialize() {
     hr = video_capture_->Initialize(current_reader_);
     if (FAILED(hr)) {
         last_error_ = "Failed to initialize video capture";
-        Shutdown();
-        return false;
-    }
-    
-    // Configure output format
-    video_capture_->ConfigureOutputFormat();
-    
-    // Get negotiated format
-    hr = video_capture_->GetNegotiatedFormat();
-    if (FAILED(hr)) {
-        last_error_ = "Failed to negotiate format";
-        Shutdown();
+        has_error_ = true;
+        shutdownDevice();
         return false;
     }
     
     initialized_ = true;
     reinit_attempts_ = 0;
+    has_error_ = false;
     return true;
 }
 
-void MediaFoundationCapture::Shutdown() {
+void MediaFoundationCapture::shutdownDevice() {
     if (video_capture_) {
         video_capture_->StopCapture();
     }
@@ -114,79 +203,7 @@ void MediaFoundationCapture::Shutdown() {
     initialized_ = false;
 }
 
-bool MediaFoundationCapture::StartCapture(FrameCallback callback) {
-    if (!initialized_) {
-        last_error_ = "Not initialized";
-        return false;
-    }
-    
-    video_capture_->SetFrameCallback(callback);
-    
-    HRESULT hr = video_capture_->StartCapture();
-    if (FAILED(hr)) {
-        last_error_ = "Failed to start capture";
-        return false;
-    }
-    
-    return true;
-}
-
-void MediaFoundationCapture::StopCapture() {
-    if (video_capture_) {
-        video_capture_->StopCapture();
-    }
-}
-
-bool MediaFoundationCapture::IsCapturing() const {
-    return video_capture_ && video_capture_->IsCapturing();
-}
-
-bool MediaFoundationCapture::SetOutputFormat(int width, int height, uint32_t fps_num, uint32_t fps_den) {
-    // Media Foundation doesn't support setting specific output formats easily
-    // The format is negotiated based on device capabilities
-    // This could be enhanced in the future
-    return false;
-}
-
-void MediaFoundationCapture::GetCurrentFormat(int& width, int& height, 
-                                              uint32_t& fps_num, uint32_t& fps_den, 
-                                              uint32_t& fourcc) {
-    if (!video_capture_) {
-        width = height = 0;
-        fps_num = fps_den = 0;
-        fourcc = 0;
-        return;
-    }
-    
-    GUID subtype;
-    video_capture_->GetFormatInfo(width, height, fps_num, fps_den, subtype);
-    
-    // We always output UYVY to NDI
-    fourcc = 'UYVY';
-}
-
-bool MediaFoundationCapture::IsDeviceValid() const {
-    // Check if capture is still running without errors
-    if (!initialized_ || !video_capture_) {
-        return false;
-    }
-    
-    // If we're capturing and haven't encountered errors, device is valid
-    if (video_capture_->IsCapturing()) {
-        return video_capture_->GetLastError().empty();
-    }
-    
-    return true;
-}
-
-std::string MediaFoundationCapture::GetLastError() const {
-    if (!video_capture_->GetLastError().empty()) {
-        return video_capture_->GetLastError();
-    }
-    return last_error_;
-}
-
-bool MediaFoundationCapture::ReinitializeOnError(HRESULT hr) {
+bool MediaFoundationCapture::reinitializeOnError(HRESULT hr) {
     if (reinit_attempts_ >= kMaxReinitAttempts) {
         return false;
     }
@@ -203,16 +220,16 @@ bool MediaFoundationCapture::ReinitializeOnError(HRESULT hr) {
     }
     
     // Shutdown current session
-    Shutdown();
+    shutdownDevice();
     
     // Wait a bit
     std::this_thread::sleep_for(std::chrono::milliseconds(1000 * reinit_attempts_));
     
     // Try to initialize again
-    return Initialize();
+    return initializeDevice(wideToUtf8(selected_device_name_));
 }
 
-std::string MediaFoundationCapture::WideToUtf8(const std::wstring& wide) {
+std::string MediaFoundationCapture::wideToUtf8(const std::wstring& wide) {
     if (wide.empty()) return "";
     
     int size = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, nullptr, 0, nullptr, nullptr);
@@ -223,7 +240,7 @@ std::string MediaFoundationCapture::WideToUtf8(const std::wstring& wide) {
     return result;
 }
 
-std::wstring MediaFoundationCapture::Utf8ToWide(const std::string& utf8) {
+std::wstring MediaFoundationCapture::utf8ToWide(const std::string& utf8) {
     if (utf8.empty()) return L"";
     
     int size = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
