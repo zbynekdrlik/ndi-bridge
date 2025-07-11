@@ -15,6 +15,7 @@
 #else
 #include <termios.h>
 #include <unistd.h>
+#include <fcntl.h>
 // Linux capture implementation would go here
 #endif
 
@@ -85,8 +86,8 @@ void printUsage(const char* program_name) {
     std::cout << "Usage: " << program_name << " [options]" << std::endl;
     std::cout << std::endl;
     std::cout << "Options:" << std::endl;
-    std::cout << "  -d, --device <name>     Capture device name (default: first available)" << std::endl;
-    std::cout << "  -n, --ndi-name <name>   NDI sender name (default: 'NDI Bridge')" << std::endl;
+    std::cout << "  -d, --device <n>     Capture device name (default: first available)" << std::endl;
+    std::cout << "  -n, --ndi-name <n>   NDI sender name (default: 'NDI Bridge')" << std::endl;
     std::cout << "  -l, --list-devices      List available capture devices and exit" << std::endl;
     std::cout << "  -v, --verbose           Enable verbose logging" << std::endl;
     std::cout << "  --no-retry              Disable automatic retry on errors" << std::endl;
