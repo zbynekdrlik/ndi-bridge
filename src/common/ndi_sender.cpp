@@ -7,7 +7,6 @@
 namespace ndi_bridge {
 
 // Static member definitions
-void* NdiSender::ndi_lib_handle_ = nullptr;
 std::mutex NdiSender::lib_mutex_;
 int NdiSender::lib_ref_count_ = 0;
 
@@ -18,7 +17,7 @@ constexpr char LOG_PREFIX[] = "[NdiSender]";
 NdiSender::NdiSender(const std::string& sender_name, ErrorCallback error_callback)
     : sender_name_(sender_name)
     , error_callback_(std::move(error_callback)) {
-    std::cout << LOG_PREFIX << " NDI Sender version 1.0.0 initialized" << std::endl;
+    std::cout << LOG_PREFIX << " NDI Sender version 1.0.1 initialized" << std::endl;
 }
 
 NdiSender::~NdiSender() {
