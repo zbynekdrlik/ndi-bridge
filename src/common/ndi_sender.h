@@ -20,7 +20,7 @@ namespace ndi_bridge {
  * It handles NDI library initialization, sender creation, and frame sending with
  * proper format handling.
  * 
- * Version: 1.0.0
+ * Version: 1.0.1
  */
 class NdiSender {
 public:
@@ -150,8 +150,7 @@ private:
     // NDI handles
     NDIlib_send_instance_t ndi_send_instance_{nullptr};
     
-    // NDI library handle
-    static void* ndi_lib_handle_;
+    // NDI library management
     static std::mutex lib_mutex_;
     static int lib_ref_count_;
 };
