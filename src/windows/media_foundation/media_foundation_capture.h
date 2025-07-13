@@ -1,7 +1,7 @@
 // media_foundation_capture.h
 #pragma once
 
-#include "../../common/capture_interface.h"
+#include "common/capture_interface.h"
 #include "mf_capture_device.h"
 #include "mf_video_capture.h"
 #include <memory>
