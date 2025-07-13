@@ -26,7 +26,7 @@ MFVideoCapture::~MFVideoCapture() {
     StopCapture();
 }
 
-void MFVideoCapture::SetFrameCallback(FrameCallback callback) {
+void MFVideoCapture::SetFrameCallback(ICaptureDevice::FrameCallback callback) {
     frame_callback_ = callback;
 }
 
@@ -55,7 +55,7 @@ HRESULT MFVideoCapture::ConfigureOutputFormat() {
     pType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
     pType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_UYVY);
     
-    hr = source_reader_->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr, pType);
+    hr = source_reader_->SetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), nullptr, pType);
     pType->Release();
     
     if (FAILED(hr)) {
@@ -72,7 +72,7 @@ HRESULT MFVideoCapture::GetNegotiatedFormat() {
     }
     
     IMFMediaType* pOut = nullptr;
-    HRESULT hr = source_reader_->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, &pOut);
+    HRESULT hr = source_reader_->GetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), &pOut);
     if (MFErrorHandler::CheckFailed("GetCurrentMediaType", hr)) {
         return hr;
     }
@@ -163,7 +163,7 @@ void MFVideoCapture::CaptureLoop() {
         IMFSample* pSample = nullptr;
         
         HRESULT hr = source_reader_->ReadSample(
-            MF_SOURCE_READER_FIRST_VIDEO_STREAM, 
+            static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), 
             0,  // No flags
             &streamIndex, 
             &flags, 
@@ -216,25 +216,29 @@ HRESULT MFVideoCapture::ProcessSample(IMFSample* pSample) {
     hr = pBuffer->Lock(&pData, &cbMax, &cbCurrent);
     
     if (SUCCEEDED(hr) && pData) {
+        // Get sample timestamp
+        LONGLONG llTime = 0;
+        pSample->GetSampleTime(&llTime);
+        
         // Convert to UYVY if needed
         bool converted = FormatConverter::ConvertToUYVY(
             subtype_, pData, frame_buffer_.data(), width_, height_);
         
         if (converted && frame_callback_) {
-            // Prepare frame data
-            FrameData frame;
-            frame.data = frame_buffer_.data();
-            frame.size = frame_buffer_.size();
-            frame.width = width_;
-            frame.height = height_;
-            frame.fourcc = 'UYVY';  // NDI uses UYVY
-            frame.fps_numerator = fps_numerator_;
-            frame.fps_denominator = fps_denominator_;
-            frame.is_interlaced = (interlace_mode_ != 2);
-            frame.timestamp = llTime;
+            // Prepare format information
+            ICaptureDevice::VideoFormat format;
+            format.width = width_;
+            format.height = height_;
+            format.stride = width_ * 2;  // UYVY is 2 bytes per pixel
+            format.pixel_format = "UYVY";
+            format.fps_numerator = fps_numerator_;
+            format.fps_denominator = fps_denominator_;
             
-            // Deliver frame
-            frame_callback_(frame);
+            // Convert timestamp from 100ns units to nanoseconds
+            int64_t timestamp_ns = llTime * 100;
+            
+            // Deliver frame using the ICaptureDevice interface callback signature
+            frame_callback_(frame_buffer_.data(), frame_buffer_.size(), timestamp_ns, format);
         }
     }
     
@@ -253,7 +257,7 @@ bool MFVideoCapture::HandleCaptureError(HRESULT hr) {
         
         // Wait before signaling error
         std::this_thread::sleep_for(std::chrono::milliseconds(retry_delay_ms_));
-        retry_delay_ms_ = std::min(retry_delay_ms_ + 1000, kMaxRetryDelayMs);
+        retry_delay_ms_ = (std::min)(retry_delay_ms_ + 1000, kMaxRetryDelayMs);
         
         return true;  // Fatal error for this capture session
     }
