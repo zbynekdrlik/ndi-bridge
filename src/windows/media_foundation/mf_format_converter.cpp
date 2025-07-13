@@ -2,6 +2,7 @@
 #include "mf_format_converter.h"
 #include <mfapi.h>
 #include <wmcodecdsp.h>
+#include <windows.h>
 
 namespace ndi_bridge {
 namespace media_foundation {
@@ -107,9 +108,14 @@ std::string FormatConverter::GetFormatName(const GUID& subtype) {
     // Return GUID as string for unknown formats
     wchar_t guidStr[40] = {0};
     StringFromGUID2(subtype, guidStr, 40);
-    char mbStr[40] = {0};
-    wcstombs(mbStr, guidStr, 39);
-    return std::string(mbStr);
+    
+    // Convert wide string to multi-byte using WideCharToMultiByte
+    int size = WideCharToMultiByte(CP_UTF8, 0, guidStr, -1, nullptr, 0, nullptr, nullptr);
+    if (size <= 0) return "Unknown";
+    
+    std::string result(size - 1, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, guidStr, -1, &result[0], size, nullptr, nullptr);
+    return result;
 }
 
 } // namespace media_foundation
