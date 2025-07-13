@@ -4,6 +4,7 @@
 #include <windows.h>
 #include <mfapi.h>
 #include <cstdint>
+#include <string>
 
 namespace ndi_bridge {
 namespace media_foundation {
