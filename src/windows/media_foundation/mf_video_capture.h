@@ -2,13 +2,15 @@
 #pragma once
 
 #include <windows.h>
+#include <mfapi.h>
 #include <mfidl.h>
 #include <mfreadwrite.h>
 #include <atomic>
 #include <thread>
 #include <functional>
 #include <string>
-#include "../../../common/capture_interface.h"
+#include <vector>
+#include "common/capture_interface.h"
 
 namespace ndi_bridge {
 namespace media_foundation {
@@ -20,7 +22,7 @@ public:
     ~MFVideoCapture();
     
     // Set the frame callback
-    void SetFrameCallback(FrameCallback callback);
+    void SetFrameCallback(ICaptureDevice::FrameCallback callback);
     
     // Initialize capture with source reader
     HRESULT Initialize(IMFSourceReader* pReader);
@@ -58,7 +60,7 @@ private:
     
 private:
     IMFSourceReader* source_reader_;  // Not owned
-    FrameCallback frame_callback_;
+    ICaptureDevice::FrameCallback frame_callback_;
     
     // Format information
     int width_;
