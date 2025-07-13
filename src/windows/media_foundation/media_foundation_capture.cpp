@@ -62,25 +62,10 @@ bool MediaFoundationCapture::startCapture(const std::string& device_name) {
         return false;
     }
     
-    // Set up internal callbacks to convert to interface format
-    video_capture_->SetFrameCallback(
-        [this](const media_foundation::FrameData& mf_frame) {
-            if (frame_callback_) {
-                VideoFormat format;
-                format.width = mf_frame.width;
-                format.height = mf_frame.height;
-                format.stride = mf_frame.width * 2;  // Assuming UYVY
-                format.pixel_format = "UYVY";
-                format.fps_numerator = mf_frame.fps_numerator;
-                format.fps_denominator = mf_frame.fps_denominator;
-                
-                // Convert timestamp to nanoseconds
-                int64_t timestamp_ns = mf_frame.timestamp * 100;  // Convert from 100ns units
-                
-                frame_callback_(mf_frame.data, mf_frame.size, timestamp_ns, format);
-            }
-        }
-    );
+    // Set up frame callback - MFVideoCapture already uses the correct interface
+    if (frame_callback_) {
+        video_capture_->SetFrameCallback(frame_callback_);
+    }
     
     hr = video_capture_->StartCapture();
     if (FAILED(hr)) {
@@ -109,19 +94,6 @@ void MediaFoundationCapture::setFrameCallback(FrameCallback callback) {
 
 void MediaFoundationCapture::setErrorCallback(ErrorCallback callback) {
     error_callback_ = std::move(callback);
-    
-    // Also set error callback on video capture
-    if (video_capture_) {
-        video_capture_->SetErrorCallback(
-            [this](const std::string& error) {
-                last_error_ = error;
-                has_error_ = true;
-                if (error_callback_) {
-                    error_callback_(error);
-                }
-            }
-        );
-    }
 }
 
 bool MediaFoundationCapture::hasError() const {
