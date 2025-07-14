@@ -475,7 +475,7 @@ int main(int argc, char* argv[]) {
     
     // Create capture device based on type
 #ifdef _WIN32
-    std::unique_ptr<ICaptureDevice> capture_device;
+    std::unique_ptr<ndi_bridge::ICaptureDevice> capture_device;
     
     if (args.capture_type == CaptureType::MediaFoundation) {
         std::cout << "Using Media Foundation capture" << std::endl;
