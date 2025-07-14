@@ -4,55 +4,76 @@
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
 - [x] All compilation errors fixed in v1.0.7
 - [x] Ready for testing
-- [ ] Currently working on: Goal 8 planning only
+- [x] DeckLink reference code saved
+- [ ] Currently working on: Goal 8 updated with reference code
 - [ ] Waiting for: User to test v1.0.7
 - [ ] Blocked by: None
 
-## GOAL 8: DeckLink Integration (PLANNING ONLY)
-### Objective: Add Blackmagic DeckLink capture card support
+## GOAL 8: DeckLink Integration (UPDATED)
+### Objective: Add Blackmagic DeckLink capture card support based on reference implementation
 
 ### Status: PLANNING PHASE - NO IMPLEMENTATION YET
 
-### Planned Architecture:
-1. **DeckLink Capture Implementation**
-   - Create `src/windows/decklink/decklink_capture.h/cpp`
-   - Implement ICaptureDevice interface for DeckLink
-   - Handle DeckLink SDK initialization
-   - Support device enumeration
-   - Implement frame capture with UYVY output
+### Reference Code Available
+- ✅ Saved complete working DeckLink implementation in `docs/reference/decklink-ndi-reference.cpp`
+- This code provides:
+  - DeckLink device enumeration and selection
+  - Robust capture with error recovery
+  - Direct NDI streaming
+  - Health monitoring and auto-reconnection
+  - Format detection and handling
+  - Comprehensive logging
 
-2. **DeckLink SDK Integration**
-   - Add DeckLink SDK detection to CMakeLists.txt
-   - Make DeckLink support optional (USE_DECKLINK flag)
-   - Handle SDK path variations
-   - Add necessary COM interfaces
+### Planned Implementation Based on Reference
+1. **Adapt Reference Code to Our Architecture**
+   - Extract DeckLink capture logic into `ICaptureDevice` implementation
+   - Reuse error handling and recovery patterns
+   - Integrate with existing `AppController` framework
+   - Maintain modular design principles
 
-3. **Multi-Capture Support**
-   - Modify main.cpp to support device type selection
-   - Add `--capture-type` flag (mf/decklink/auto)
-   - Implement auto-detection logic
-   - Update device listing to show both types
+2. **Key Components to Port**
+   - `CaptureCallback` class for frame handling
+   - Device enumeration with retry logic
+   - Format detection and auto-configuration
+   - Frame processing pipeline (GetBytes interface)
+   - Health monitoring patterns
 
-4. **DeckLink-Specific Features**
-   - Support for professional formats (SDI, HDMI)
-   - Handle interlaced video properly
-   - Support for embedded audio
-   - Timecode support (if needed)
+3. **Integration Points**
+   - Use existing NDI sender module instead of direct NDI calls
+   - Integrate with AppController's retry logic
+   - Add to device factory in main.cpp
+   - Support both Media Foundation and DeckLink
+
+4. **Features from Reference to Include**
+   - Serial number tracking for device persistence
+   - Format change detection and handling
+   - Rolling FPS calculation
+   - Robust error recovery
+   - No-signal detection
+
+### Benefits of Using Reference Code
+- Proven working implementation
+- Already handles DeckLink SDK quirks
+- Robust error handling tested in production
+- Performance optimized for low latency
+- Comprehensive logging already implemented
 
 ### Documentation Created:
 - ✅ `docs/architecture/capture-devices.md` - Architecture overview
 - ✅ `docs/decklink-setup.md` - Setup and usage guide
+- ✅ `docs/reference/decklink-ndi-reference.cpp` - Complete reference implementation
 - ✅ Updated `README.md` with roadmap
 
 ### Implementation NOT Started
 - No code files created yet
 - Planning phase only
 - Will implement after v1.0.7 testing
+- Reference code will guide implementation
 
 ## Implementation Status
 - Phase: Goal 8 - DeckLink Integration Planning
-- Step: Planning Only
-- Status: GOAL_SET_PLANNING_ONLY
+- Step: Planning with Reference Code
+- Status: GOAL_SET_WITH_REFERENCE
 - Version: 1.0.7 (will bump to 1.1.0 when DeckLink implemented)
 
 ## All Features Currently Working (v1.0.7):
@@ -79,23 +100,24 @@
 ### ✅ GOAL 5: Feature Restoration (v1.0.5)
 ### ✅ GOAL 6: Fix Compilation Errors (v1.0.6)
 ### ✅ GOAL 7: Fix Windows Macro Conflicts (v1.0.7)
-### 📋 GOAL 8: DeckLink Integration (PLANNING ONLY)
+### 📋 GOAL 8: DeckLink Integration (PLANNING WITH REFERENCE)
 
-## DeckLink Requirements (For Future Implementation)
-- **DeckLink SDK**: Version 12.0 or later
-- **Hardware**: Any Blackmagic DeckLink card
-- **OS**: Windows 10/11 (initially)
+## DeckLink Requirements (From Reference Code)
+- **DeckLink SDK**: Version 12.0+ (reference uses 14.4)
+- **Hardware**: Any Blackmagic DeckLink card with input
+- **OS**: Windows 10/11
 - **Driver**: Desktop Video driver installed
+- **Dependencies**: COM, ATL, NDI SDK
 
 ## Notes
-- Goal 8 is set but NO implementation started
-- Only planning documents created
-- v1.0.7 needs testing before proceeding with DeckLink
-- DeckLink will be optional - controlled by USE_DECKLINK CMake flag
+- Goal 8 updated to use reference implementation as guide
+- Reference code provides complete working solution
+- Will adapt to our modular architecture
+- v1.0.7 needs testing before proceeding
 - Version will jump to 1.1.0 when DeckLink support is implemented
 
 ## Last User Action
-- Date/Time: 2025-07-14 21:27:00
-- Action: Reminded to only set goal, not implement
-- Result: Removed premature implementation, kept only planning
+- Date/Time: 2025-07-14 22:00:00
+- Action: Provided DeckLink reference code and requested goal update
+- Result: Reference code saved, Goal 8 updated
 - Next Required: Test v1.0.7 before DeckLink implementation
