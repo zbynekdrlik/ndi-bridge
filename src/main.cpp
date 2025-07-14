@@ -10,6 +10,7 @@
 #include <limits>
 
 #ifdef _WIN32
+#define NOMINMAX  // Prevent Windows.h from defining min/max macros
 #include <windows.h>
 #include <conio.h>
 #include "windows/media_foundation/media_foundation_capture.h"
