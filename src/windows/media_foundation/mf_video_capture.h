@@ -10,7 +10,7 @@
 #include <functional>
 #include <string>
 #include <vector>
-#include "common/capture_interface.h"
+#include "../../common/capture_interface.h"
 
 namespace ndi_bridge {
 namespace media_foundation {
