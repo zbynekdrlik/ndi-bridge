@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.0.3 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.0.4 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -81,13 +81,14 @@ endif()
 # Find NDI SDK
 if(WIN32)
     # Try multiple possible NDI SDK locations on Windows
+    # Note: NDI 6 SDK uses capitalized directory names (Include, Lib, Bin)
     find_path(NDI_INCLUDE_DIR
         NAMES Processing.NDI.Lib.h
         PATHS
             ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/include
-            $ENV{NDI_SDK_DIR}/include
+            $ENV{NDI_SDK_DIR}/Include
             "C:/Program Files/NDI/NDI 5 SDK/include"
-            "C:/Program Files/NDI/NDI 6 SDK/include"
+            "C:/Program Files/NDI/NDI 6 SDK/Include"
             "C:/Program Files/NewTek/NDI SDK/include"
     )
 
@@ -95,10 +96,21 @@ if(WIN32)
         NAMES Processing.NDI.Lib.x64
         PATHS
             ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/lib/x64
-            $ENV{NDI_SDK_DIR}/lib/x64
+            $ENV{NDI_SDK_DIR}/Lib/x64
             "C:/Program Files/NDI/NDI 5 SDK/lib/x64"
-            "C:/Program Files/NDI/NDI 6 SDK/lib/x64"
+            "C:/Program Files/NDI/NDI 6 SDK/Lib/x64"
             "C:/Program Files/NewTek/NDI SDK/lib/x64"
+    )
+    
+    # Find the DLL path - NDI 6 SDK stores DLLs in Bin directory
+    find_file(NDI_DLL
+        NAMES Processing.NDI.Lib.x64.dll
+        PATHS
+            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/bin/x64
+            $ENV{NDI_SDK_DIR}/Bin/x64
+            "C:/Program Files/NDI/NDI 5 SDK/Bin/x64"
+            "C:/Program Files/NDI/NDI 6 SDK/Bin/x64"
+            "C:/Program Files/NewTek/NDI SDK/bin/x64"
     )
 else()
     # Linux NDI SDK paths
@@ -129,9 +141,16 @@ if(NOT NDI_LIBRARY)
     message(FATAL_ERROR "NDI SDK library not found. Please install NDI SDK or set NDI_SDK_DIR environment variable.")
 endif()
 
+if(WIN32 AND NOT NDI_DLL)
+    message(FATAL_ERROR "NDI SDK DLL not found. Please install NDI SDK or set NDI_SDK_DIR environment variable.")
+endif()
+
 message(STATUS "NDI SDK found:")
 message(STATUS "  Include: ${NDI_INCLUDE_DIR}")
 message(STATUS "  Library: ${NDI_LIBRARY}")
+if(WIN32)
+    message(STATUS "  DLL: ${NDI_DLL}")
+endif()
 
 # Add NDI include directory
 include_directories(${NDI_INCLUDE_DIR})
@@ -165,11 +184,13 @@ if(PLATFORM_WINDOWS)
     )
     
     # Copy NDI runtime DLL to output directory
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${NDI_LIBRARY}/../Processing.NDI.Lib.x64.dll"
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>
-    )
+    if(NDI_DLL)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${NDI_DLL}"
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        )
+    endif()
 elseif(PLATFORM_LINUX)
     # Linux system libraries
     target_link_libraries(${PROJECT_NAME} PRIVATE
@@ -185,8 +206,8 @@ install(TARGETS ${PROJECT_NAME}
 )
 
 # Install NDI runtime on Windows
-if(PLATFORM_WINDOWS)
-    install(FILES "${NDI_LIBRARY}/../Processing.NDI.Lib.x64.dll"
+if(PLATFORM_WINDOWS AND NDI_DLL)
+    install(FILES "${NDI_DLL}"
         DESTINATION bin
     )
 endif()
