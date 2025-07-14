@@ -3,52 +3,75 @@
 ## Important Legal Notice
 The DeckLink SDK files are proprietary files owned by Blackmagic Design and cannot be redistributed in this repository due to licensing restrictions.
 
-## Obtaining the DeckLink SDK
+## Quick Setup Steps
 
-1. **Download the SDK**:
-   - Visit [Blackmagic Design Support](https://www.blackmagicdesign.com/support/)
-   - Navigate to "Latest Downloads"
-   - Find "Desktop Video Developer SDK" (currently version 14.4 or later)
-   - Download for your platform (Windows/Linux/macOS)
-   - You may need to create a free account
+1. **Download the DeckLink SDK** from [Blackmagic Design Support](https://www.blackmagicdesign.com/support/)
+   - Look for "Desktop Video Developer SDK" (version 14.4 or later)
 
-2. **Extract the SDK**:
-   - Windows: Extract the ZIP file
-   - The SDK contains IDL files that need to be compiled
+2. **Copy the IDL file to the project**:
+   ```cmd
+   copy "path\to\SDK\Win\include\DeckLinkAPI.idl" "path\to\ndi-bridge\docs\reference\"
+   ```
 
-## Generating Required Files from IDL
+3. **Generate the required files** (from VS Developer Command Prompt):
+   ```cmd
+   cd "path\to\ndi-bridge"
+   scripts\generate-decklink-api.bat
+   ```
 
-The DeckLink SDK provides IDL (Interface Definition Language) files that must be compiled to generate the C++ headers and source files.
+4. **Build the project** with DeckLink support enabled.
 
-### Method 1: Using the provided script (Recommended)
+## Detailed Instructions
 
-1. **Open Visual Studio Developer Command Prompt** (not regular cmd):
+### Step 1: Obtaining the DeckLink SDK
+
+1. Visit [Blackmagic Design Support](https://www.blackmagicdesign.com/support/)
+2. Navigate to "Latest Downloads"
+3. Find "Desktop Video Developer SDK" (currently version 14.4 or later)
+4. Download for Windows
+5. Extract the ZIP file
+
+### Step 2: Copy Required Files
+
+The DeckLink SDK provides IDL (Interface Definition Language) files that must be compiled. Copy this file to your project:
+
+```cmd
+# From the DeckLink SDK directory:
+copy "Blackmagic DeckLink SDK 14.4\Win\include\DeckLinkAPI.idl" "docs\reference\"
+```
+
+### Step 3: Generate C++ Files
+
+The IDL file must be compiled using the Microsoft IDL compiler (MIDL) to generate the C++ header and source files.
+
+#### Method 1: Using the provided script (Recommended)
+
+1. **Open Visual Studio Developer Command Prompt**:
    - Start Menu → Visual Studio 2019/2022 → Developer Command Prompt
 
-2. **Navigate to the SDK include directory**:
+2. **Navigate to your project**:
    ```cmd
-   cd "path\to\Blackmagic DeckLink SDK 14.4\Win\include"
+   cd "C:\path\to\ndi-bridge"
    ```
 
-3. **Copy and run our generation script**:
+3. **Run the generation script**:
    ```cmd
-   copy path\to\ndi-bridge\scripts\generate-decklink-api.bat .
-   generate-decklink-api.bat
+   scripts\generate-decklink-api.bat
    ```
 
-4. **Copy generated files to the project**:
-   ```cmd
-   copy DeckLinkAPI_h.h path\to\ndi-bridge\docs\reference\
-   copy DeckLinkAPI_i.c path\to\ndi-bridge\docs\reference\
-   ```
+The script will:
+- Check that you're in the Developer Command Prompt
+- Look for `DeckLinkAPI.idl` in `docs\reference\`
+- Generate `DeckLinkAPI_h.h` and `DeckLinkAPI_i.c`
+- Clean up temporary files
 
-### Method 2: Manual MIDL compilation
+#### Method 2: Manual MIDL compilation
 
 1. **Open Visual Studio Developer Command Prompt**
 
-2. **Navigate to SDK include directory**:
+2. **Navigate to the reference directory**:
    ```cmd
-   cd "path\to\Blackmagic DeckLink SDK 14.4\Win\include"
+   cd "path\to\ndi-bridge\docs\reference"
    ```
 
 3. **Run MIDL compiler**:
@@ -56,13 +79,14 @@ The DeckLink SDK provides IDL (Interface Definition Language) files that must be
    midl /h DeckLinkAPI_h.h /iid DeckLinkAPI_i.c DeckLinkAPI.idl
    ```
 
-4. **Copy generated files** to `docs/reference/`:
-   - `DeckLinkAPI_h.h` - Main header file
-   - `DeckLinkAPI_i.c` - Interface IDs/GUIDs
+### Step 4: Verify Installation
 
-## Verify Installation
+After generating the files, you should have in `docs/reference/`:
+- `DeckLinkAPI.idl` (original IDL file)
+- `DeckLinkAPI_h.h` (generated header)
+- `DeckLinkAPI_i.c` (generated interface IDs)
 
-After copying the files, verify CMake finds them:
+Build the project:
 ```bash
 mkdir build
 cd build
@@ -81,26 +105,24 @@ If you don't need DeckLink support, you can disable it:
 cmake -DUSE_DECKLINK=OFF ..
 ```
 
-This will build NDI Bridge with only Media Foundation support (Windows) or V4L2 support (Linux, when implemented).
-
 ## Troubleshooting
 
 ### "midl.exe not found"
-- Make sure you're using Visual Studio Developer Command Prompt, not regular Command Prompt
-- MIDL is included with Visual Studio C++ development tools
+- Make sure you're using **Visual Studio Developer Command Prompt**, not regular Command Prompt
+- The Developer Command Prompt has the necessary build tools in PATH
 
-### "DeckLink SDK not found" Warning
-This is normal if you haven't added the SDK files yet. The build will continue without DeckLink support.
+### "DeckLinkAPI.idl not found in docs\reference"
+- Make sure you copied the IDL file from the SDK to `docs\reference\`
+- The file should be at: `ndi-bridge\docs\reference\DeckLinkAPI.idl`
 
 ### MIDL Compilation Errors
-- Ensure you're in the correct directory with all IDL files present
-- Some warnings are normal during MIDL compilation
+- Ensure you have the correct DeckLinkAPI.idl file
+- Some warnings during MIDL compilation are normal
+- The script will clean up temporary files automatically
 
-### License Compliance
-- DO NOT commit the generated SDK files to any public repository
-- DO NOT redistribute the SDK files with your binaries
-- Users must obtain the SDK from Blackmagic Design directly
-- The SDK is free but requires acceptance of Blackmagic's license terms
+### CMake doesn't find DeckLink
+- Check that both `DeckLinkAPI_h.h` and `DeckLinkAPI_i.c` exist in `docs\reference\`
+- These files are generated by MIDL, not copied from the SDK
 
 ## Runtime Requirements
 
@@ -120,11 +142,7 @@ ndi-bridge.exe -t dl -l
 ndi-bridge.exe -t dl -d "DeckLink Mini Recorder" -n "My NDI Stream"
 ```
 
-## Alternative: Pre-generated Files
-
-If you have trouble generating the files, you might find pre-generated versions in:
-- An existing Desktop Video installation
-- Previous DeckLink SDK versions that included pre-compiled headers
-- Other DeckLink projects (ensure license compatibility)
-
-Note: Always prefer generating from the IDL files to ensure compatibility with your SDK version.
+## License Compliance
+- DO NOT commit the SDK files to any public repository
+- The `.gitignore` file is configured to exclude these files
+- Users must obtain the SDK from Blackmagic Design directly
