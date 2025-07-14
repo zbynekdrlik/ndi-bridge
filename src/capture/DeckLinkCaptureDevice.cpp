@@ -558,12 +558,12 @@ bool DeckLinkCaptureDevice::GetNextFrame(FrameData& frame) {
     
     if (queuedFrame.pixelFormat == bmdFormat8BitBGRA) {
         // BGRA format - can use directly
-        frame.format = FrameFormat::BGRA;
+        frame.format = ICaptureDevice::FrameFormat::BGRA;
         frame.stride = sourceStride;
         frame.data = std::move(queuedFrame.data);
     } else if (queuedFrame.pixelFormat == bmdFormat8BitYUV) {
         // UYVY format - convert to BGRA
-        frame.format = FrameFormat::BGRA;
+        frame.format = ICaptureDevice::FrameFormat::BGRA;
         frame.stride = queuedFrame.width * 4;
         frame.data.resize(frame.stride * frame.height);
         
