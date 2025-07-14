@@ -20,18 +20,19 @@ struct IDeckLinkAudioInputPacket;
 struct IDeckLinkInputCallback;
 struct IDeckLinkProfileAttributes;
 
-enum _BMDPixelFormat;
+// Include the actual DeckLink types instead of forward declaring enums
+#ifdef HAS_DECKLINK
+#include "DeckLinkAPI_h.h"
+#else
+// Fallback typedefs if DeckLink is not available
 typedef uint32_t BMDPixelFormat;
-enum _BMDVideoInputFlags;
 typedef uint32_t BMDVideoInputFlags;
-enum _BMDDisplayMode;
 typedef uint32_t BMDDisplayMode;
-enum _BMDVideoInputFormatChangedEvents;
 typedef uint32_t BMDVideoInputFormatChangedEvents;
-enum _BMDDetectedVideoInputFormatFlags;
 typedef uint32_t BMDDetectedVideoInputFormatFlags;
 typedef int64_t BMDTimeValue;
 typedef int64_t BMDTimeScale;
+#endif
 
 class CaptureCallback;
 
