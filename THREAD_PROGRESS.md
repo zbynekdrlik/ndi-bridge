@@ -2,42 +2,59 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Fixed version.h compilation error
-- [ ] Currently working on: Ready for second build attempt
-- [ ] Waiting for: User to build the project again
+- [x] Build successful! v1.0.4 compiled and running
+- [x] Original code saved as reference
+- [ ] Currently working on: Interactive device selection missing
+- [ ] Waiting for: Decision on restoring interactive menu
 - [ ] Blocked by: None
 
-## CURRENT GOAL 4: Configure NDI SDK Library Placement
-**Status**: CONFIGURATION COMPLETE ✅
+## DISCOVERED ISSUE: Missing Interactive Device Selection
+**Problem**: Refactored code auto-selects first device when no `-d` parameter provided
+**Original behavior**: Shows numbered menu and waits for user selection
 
-### What was done:
-- Updated CMakeLists.txt to v1.0.4
-- Fixed NDI 6 SDK paths to use capital case (Include/Lib/Bin)
-- Added proper DLL detection using find_file
-- Fixed DLL copy command to use actual found path
-- Added validation for all NDI components
-- Fixed version.h - added NDI_BRIDGE_VERSION alias
+### Original Interactive Menu Code (lines 534-547):
+```cpp
+if (!useCmdLine)
+{
+    std::wcout << L"Available Media Foundation Devices:\n";
+    for (size_t i = 0; i < devList.size(); i++)
+    {
+        std::wcout << i << L": " << devNames[i] << std::endl;
+    }
+    std::cout << "Select device index: ";
+    std::cin >> chosenIndex;
+    std::cout << "Enter NDI stream name: ";
+    std::cin >> ndiName;
+}
+```
 
-### Build Error Fixed:
-- main.cpp was looking for `NDI_BRIDGE_VERSION`
-- version.h defined `NDI_BRIDGE_VERSION_STRING`
-- Added alias: `#define NDI_BRIDGE_VERSION NDI_BRIDGE_VERSION_STRING`
-
-### Next Steps:
-1. **Build the project again**:
-   ```bash
-   # In Visual Studio:
-   - Build -> Rebuild All
-   ```
-2. **Verify build output** in `out/build/x64-Debug/bin/`
-3. **Test basic functionality**
-4. **Begin unit testing**
+### Where it was lost:
+In `MediaFoundationCapture::initializeDevice()` (media_foundation_capture.cpp:147-158):
+```cpp
+if (selected_device_name_.empty()) {
+    // Use first available device  <-- AUTO-SELECTS!
+    // ...
+    selected_device_name_ = devices[0].friendly_name;
+}
+```
 
 ## Implementation Status
-- Phase: Build and Test
-- Step: Second build attempt after version fix
-- Status: READY_TO_BUILD
+- Phase: Testing and Bug Fixes
+- Step: Interactive menu restoration
+- Status: BUILD_SUCCESS_WITH_ISSUES
 - Version: 1.0.4
+
+## Build Test Results ✅
+- **Build**: Success
+- **Version output**: "NDI Bridge version 1.0.4 starting..."
+- **NDI SDK**: 6.1.1.0 loaded correctly
+- **Device detection**: Found 5 devices (4 NDI Webcam + 1 Integrated Camera)
+- **Capture**: Successfully capturing at 1920x1080 @ 29.97 fps
+- **NDI output**: Broadcasting as "NDI Bridge"
+
+## Issues Found:
+1. **Missing interactive device selection** - auto-selects first device
+2. **No Release build configuration** in Visual Studio (only Debug available)
 
 ## Previous Goals Completed:
 ### ✅ GOAL 1: Initial Project Structure
@@ -61,28 +78,25 @@
 - Proper path handling implemented
 - DLL copy mechanism fixed
 - Version header compilation error fixed
+- **First successful build and run!**
 
 ## Testing Status Matrix
-| Component | Implemented | Compiled | Unit Tested | Integration Tested | 
-|-----------|------------|----------|-------------|--------------------|
-| capture_interface.h | ✅ v1.0.1 | 🔧 | ❌ | ❌ |
-| mf_error_handling | ✅ v1.0.0 | 🔧 | ❌ | ❌ |
-| mf_format_converter | ✅ v1.0.3 | 🔧 | ❌ | ❌ |
-| mf_capture_device | ✅ v1.0.2 | 🔧 | ❌ | ❌ |
-| mf_video_capture | ✅ v1.0.3 | 🔧 | ❌ | ❌ |
-| media_foundation_capture | ✅ v1.0.3 | 🔧 | ❌ | ❌ |
-| main application | ✅ v1.0.1 | 🔧 | ❌ | ❌ |
-| ndi_sender | ✅ v1.0.1 | 🔧 | ❌ | ❌ |
-| app_controller | ✅ v1.0.0 | 🔧 | ❌ | ❌ |
-| version.h | ✅ v1.0.4 | 🔧 | ❌ | ❌ |
-| CMakeLists.txt | ✅ v1.0.4 | 🔧 | ❌ | ❌ |
+| Component | Implemented | Compiled | Unit Tested | Integration Tested | Runtime Tested |
+|-----------|------------|----------|-------------|-------------------|----------------|
+| capture_interface.h | ✅ v1.0.1 | ✅ | ❌ | ❌ | ✅ |
+| mf_error_handling | ✅ v1.0.0 | ✅ | ❌ | ❌ | ✅ |
+| mf_format_converter | ✅ v1.0.3 | ✅ | ❌ | ❌ | ✅ |
+| mf_capture_device | ✅ v1.0.2 | ✅ | ❌ | ❌ | ✅ |
+| mf_video_capture | ✅ v1.0.3 | ✅ | ❌ | ❌ | ✅ |
+| media_foundation_capture | ✅ v1.0.3 | ✅ | ❌ | ❌ | ✅ |
+| main application | ✅ v1.0.1 | ✅ | ❌ | ❌ | ✅ |
+| ndi_sender | ✅ v1.0.1 | ✅ | ❌ | ❌ | ✅ |
+| app_controller | ✅ v1.0.0 | ✅ | ❌ | ❌ | ✅ |
+| version.h | ✅ v1.0.4 | ✅ | ❌ | ❌ | ✅ |
+| CMakeLists.txt | ✅ v1.0.4 | ✅ | ❌ | ❌ | ✅ |
 
-## Build Issues Encountered:
-1. ✅ FIXED: NDI SDK paths needed capital case for NDI 6
-2. ✅ FIXED: Version constant naming mismatch
-
-## Command-Line Options
-- `-d, --device <n>`: Capture device name (default: first available)
+## Command-Line Options (Current)
+- `-d, --device <n>`: Capture device name (default: first available) ⚠️
 - `-n, --ndi-name <n>`: NDI sender name (default: 'NDI Bridge')
 - `-l, --list-devices`: List available capture devices
 - `-v, --verbose`: Enable verbose logging
@@ -100,40 +114,22 @@
 5. ✅ Verification report created
 6. ✅ PR updated with findings
 7. ✅ Goal 3: Integration Components COMPLETE
-   - ✅ main.cpp implemented
-   - ✅ ndi_sender module implemented
-   - ✅ app_controller implemented
-   - ✅ CMakeLists.txt updated
-   - ✅ Version updated to 1.0.0
 8. ✅ Critical compilation issues fixed (v1.0.1)
-   - ✅ Interface mismatch resolved
-   - ✅ Missing headers added
-   - ✅ Unused code removed
-   - ✅ Build configuration fixed
 9. ✅ Visual Studio CMake integration issues fixed (v1.0.2)
-   - ✅ Media Foundation headers added
-   - ✅ Include paths corrected
-   - ✅ Missing headers added
 10. ✅ Additional compilation errors fixed (v1.0.3)
-    - ✅ Callback types corrected
-    - ✅ Frame data structure issues resolved
-    - ✅ Warning fixes applied
-    - ✅ Deprecated functions replaced
 11. ✅ NDI SDK configuration completed (v1.0.4)
-    - ✅ CMakeLists.txt updated for NDI 6 SDK
-    - ✅ Capital case paths fixed (Include/Lib/Bin)
-    - ✅ DLL detection and copy mechanism improved
-    - ✅ Version header constant name fixed
+12. ✅ First successful build and run!
+13. ✅ Original code saved as reference (docs/original-code-reference.cpp)
 
 ## Last User Action
-- Date/Time: 2025-07-14 19:18:00
-- Action: Reported compilation errors about NDI_BRIDGE_VERSION
-- Result: Fixed version.h by adding NDI_BRIDGE_VERSION alias
-- Next Required: Build the project again
+- Date/Time: 2025-07-14 19:31:00
+- Action: Provided original code and asked why interactive menu is missing
+- Result: Identified the issue - device selection logic moved to wrong layer
+- Next Required: Decide whether to restore interactive menu functionality
 
 ## Notes
-- All C++ code compilation errors resolved
-- Project version 1.0.4 ready for build
-- NDI 6 SDK paths properly configured
-- Version constant issue fixed
-- Ready for second build attempt
+- Project builds and runs successfully
+- NDI streaming confirmed working
+- Interactive device selection was lost during refactoring
+- Original functionality preserved in reference file
+- Architecture issue: UI logic (device selection) incorrectly placed in capture layer
