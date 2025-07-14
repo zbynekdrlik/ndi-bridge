@@ -7,6 +7,7 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+#include <limits>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -84,10 +85,11 @@ void clearInput() {
 // Print usage information
 void printUsage(const char* program_name) {
     std::cout << "Usage: " << program_name << " [options]" << std::endl;
+    std::cout << "       " << program_name << " <device_name> <ndi_name>" << std::endl;
     std::cout << std::endl;
     std::cout << "Options:" << std::endl;
-    std::cout << "  -d, --device <n>     Capture device name (default: first available)" << std::endl;
-    std::cout << "  -n, --ndi-name <n>   NDI sender name (default: 'NDI Bridge')" << std::endl;
+    std::cout << "  -d, --device <n>        Capture device name (default: interactive selection)" << std::endl;
+    std::cout << "  -n, --ndi-name <n>      NDI sender name (default: 'NDI Bridge')" << std::endl;
     std::cout << "  -l, --list-devices      List available capture devices and exit" << std::endl;
     std::cout << "  -v, --verbose           Enable verbose logging" << std::endl;
     std::cout << "  --no-retry              Disable automatic retry on errors" << std::endl;
@@ -118,7 +120,7 @@ void listDevices() {
         std::cout << "Available capture devices:" << std::endl;
         for (size_t i = 0; i < devices.size(); ++i) {
             const auto& device = devices[i];
-            std::cout << "  " << (i + 1) << ". " << device.name;
+            std::cout << "  " << i << ": " << device.name;
             if (!device.id.empty() && device.id != device.name) {
                 std::cout << " (" << device.id << ")";
             }
@@ -129,6 +131,49 @@ void listDevices() {
     CoUninitialize();
 #else
     std::cout << "Device enumeration not yet implemented for Linux." << std::endl;
+#endif
+}
+
+// Select device interactively
+std::string selectDeviceInteractive() {
+#ifdef _WIN32
+    auto capture = std::make_unique<ndi_bridge::MediaFoundationCapture>();
+    auto devices = capture->enumerateDevices();
+    
+    if (devices.empty()) {
+        std::cerr << "No capture devices found." << std::endl;
+        return "";
+    }
+    
+    std::cout << "\nAvailable Media Foundation Devices:" << std::endl;
+    for (size_t i = 0; i < devices.size(); ++i) {
+        std::cout << i << ": " << devices[i].name << std::endl;
+    }
+    
+    int chosenIndex = -1;
+    while (chosenIndex < 0 || chosenIndex >= static_cast<int>(devices.size())) {
+        std::cout << "Select device index: ";
+        
+        if (!(std::cin >> chosenIndex)) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cerr << "Invalid input. Please enter a number." << std::endl;
+            chosenIndex = -1;
+            continue;
+        }
+        
+        if (chosenIndex < 0 || chosenIndex >= static_cast<int>(devices.size())) {
+            std::cerr << "Invalid device index. Please try again." << std::endl;
+        }
+    }
+    
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n'); // Clear the input buffer
+    
+    std::cout << "Using device: " << devices[chosenIndex].name << std::endl;
+    return devices[chosenIndex].name;
+#else
+    std::cerr << "Device selection not yet implemented for Linux." << std::endl;
+    return "";
 #endif
 }
 
@@ -143,11 +188,24 @@ struct CommandLineArgs {
     bool auto_retry = true;
     int retry_delay_ms = 5000;
     int max_retries = -1;
+    bool use_positional = false;
+    bool use_interactive = false;
 };
 
 CommandLineArgs parseArgs(int argc, char* argv[]) {
     CommandLineArgs args;
     
+    // Check for positional parameters (compatibility with original)
+    if (argc == 3 && argv[1][0] != '-' && argv[2][0] != '-') {
+        args.device_name = argv[1];
+        args.ndi_name = argv[2];
+        args.use_positional = true;
+        std::cout << "Command-line mode: device name = \"" << args.device_name
+                  << "\", NDI stream name = \"" << args.ndi_name << "\"" << std::endl;
+        return args;
+    }
+    
+    // Parse option flags
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         
@@ -195,6 +253,11 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
         }
     }
     
+    // If no device specified and not showing help/version/list, use interactive mode
+    if (args.device_name.empty() && !args.show_help && !args.show_version && !args.list_devices) {
+        args.use_interactive = true;
+    }
+    
     return args;
 }
 
@@ -214,6 +277,8 @@ int main(int argc, char* argv[]) {
     
     if (args.show_version) {
         std::cout << "NDI Bridge version " << NDI_BRIDGE_VERSION << std::endl;
+        std::cout << "Build type: " << NDI_BRIDGE_BUILD_TYPE << std::endl;
+        std::cout << "Platform: " << NDI_BRIDGE_PLATFORM << std::endl;
         std::cout << "Build date: " << __DATE__ << " " << __TIME__ << std::endl;
         return 0;
     }
@@ -232,13 +297,30 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     
-    // Enable console quick edit mode to prevent accidental pausing
+    // Disable console quick edit mode to prevent accidental pausing
     HANDLE hInput = GetStdHandle(STD_INPUT_HANDLE);
     DWORD mode;
     GetConsoleMode(hInput, &mode);
     mode &= ~ENABLE_QUICK_EDIT_MODE;
     SetConsoleMode(hInput, mode);
 #endif
+    
+    // Interactive device and NDI name selection if needed
+    if (args.use_interactive) {
+        args.device_name = selectDeviceInteractive();
+        if (args.device_name.empty()) {
+            #ifdef _WIN32
+            CoUninitialize();
+            #endif
+            return 1;
+        }
+        
+        std::cout << "Enter NDI stream name: ";
+        std::getline(std::cin, args.ndi_name);
+        if (args.ndi_name.empty()) {
+            args.ndi_name = "NDI Bridge";
+        }
+    }
     
     // Set up signal handlers
     std::signal(SIGINT, signalHandler);
@@ -279,8 +361,12 @@ int main(int argc, char* argv[]) {
     g_app_controller->setCaptureDevice(std::move(capture_device));
     
     // Start the application
+    std::cout << "Starting capture pipeline..." << std::endl;
     if (!g_app_controller->start()) {
         std::cerr << "Failed to start application" << std::endl;
+        #ifdef _WIN32
+        CoUninitialize();
+        #endif
         return 1;
     }
     
@@ -332,6 +418,15 @@ int main(int argc, char* argv[]) {
     std::cout << "Stopping application..." << std::endl;
     g_app_controller->stop();
     g_app_controller.reset();
+    
+    std::cout << "Exiting." << std::endl;
+    
+    // In command-line mode (positional parameters), wait for user input before closing
+    if (args.use_positional) {
+        std::cout << "Press Enter to exit." << std::endl;
+        clearInput();
+        std::cin.get();
+    }
     
     // Cleanup
 #ifdef _WIN32
