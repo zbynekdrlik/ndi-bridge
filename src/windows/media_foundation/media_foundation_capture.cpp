@@ -110,20 +110,38 @@ std::string MediaFoundationCapture::getLastError() const {
 bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
     selected_device_name_ = device_name.empty() ? L"" : utf8ToWide(device_name);
     
+    // Re-enumerate and find device by name (for reconnection support)
+    std::vector<media_foundation::DeviceInfo> devices;
+    HRESULT hr = device_manager_->EnumerateDevices(devices);
+    if (FAILED(hr) || devices.empty()) {
+        last_error_ = "No capture devices found";
+        has_error_ = true;
+        return false;
+    }
+    
+    // If no device name specified, this should have been handled by main.cpp interactive selection
+    // But keep the fallback to first device for backward compatibility
     if (selected_device_name_.empty()) {
-        // Use first available device
-        std::vector<media_foundation::DeviceInfo> devices;
-        HRESULT hr = device_manager_->EnumerateDevices(devices);
-        if (FAILED(hr) || devices.empty()) {
-            last_error_ = "No capture devices found";
-            has_error_ = true;
-            return false;
-        }
         selected_device_name_ = devices[0].friendly_name;
     }
     
     // Find device by name
-    HRESULT hr = device_manager_->FindDeviceByName(selected_device_name_, &current_activate_);
+    bool device_found = false;
+    for (const auto& device : devices) {
+        if (device.friendly_name == selected_device_name_) {
+            device_found = true;
+            break;
+        }
+    }
+    
+    if (!device_found) {
+        last_error_ = "Device not found: " + wideToUtf8(selected_device_name_);
+        has_error_ = true;
+        return false;
+    }
+    
+    // Find device by name
+    hr = device_manager_->FindDeviceByName(selected_device_name_, &current_activate_);
     if (FAILED(hr)) {
         last_error_ = "Failed to find device: " + wideToUtf8(selected_device_name_);
         has_error_ = true;
@@ -197,7 +215,7 @@ bool MediaFoundationCapture::reinitializeOnError(HRESULT hr) {
     // Wait a bit
     std::this_thread::sleep_for(std::chrono::milliseconds(1000 * reinit_attempts_));
     
-    // Try to initialize again
+    // Try to initialize again - this will re-enumerate devices
     return initializeDevice(wideToUtf8(selected_device_name_));
 }
 
