@@ -43,15 +43,15 @@ public:
                 int b1 = (c1 + d + 128) >> 8;
                 
                 // Clamp and write BGRA
-                dstRow[0] = std::max(0, std::min(255, b0));  // B
-                dstRow[1] = std::max(0, std::min(255, g0));  // G
-                dstRow[2] = std::max(0, std::min(255, r0));  // R
-                dstRow[3] = 255;                              // A
+                dstRow[0] = static_cast<uint8_t>(std::max(0, std::min(255, b0)));  // B
+                dstRow[1] = static_cast<uint8_t>(std::max(0, std::min(255, g0)));  // G
+                dstRow[2] = static_cast<uint8_t>(std::max(0, std::min(255, r0)));  // R
+                dstRow[3] = 255;                                                    // A
                 
-                dstRow[4] = std::max(0, std::min(255, b1));  // B
-                dstRow[5] = std::max(0, std::min(255, g1));  // G
-                dstRow[6] = std::max(0, std::min(255, r1));  // R
-                dstRow[7] = 255;                              // A
+                dstRow[4] = static_cast<uint8_t>(std::max(0, std::min(255, b1)));  // B
+                dstRow[5] = static_cast<uint8_t>(std::max(0, std::min(255, g1)));  // G
+                dstRow[6] = static_cast<uint8_t>(std::max(0, std::min(255, r1)));  // R
+                dstRow[7] = 255;                                                    // A
                 
                 srcRow += 4;
                 dstRow += 8;
@@ -90,9 +90,9 @@ public:
                 int g = (c - d - uv + 128) >> 8;
                 int b = (c + d + 128) >> 8;
                 
-                dstRow[x * 4 + 0] = std::max(0, std::min(255, b));
-                dstRow[x * 4 + 1] = std::max(0, std::min(255, g));
-                dstRow[x * 4 + 2] = std::max(0, std::min(255, r));
+                dstRow[x * 4 + 0] = static_cast<uint8_t>(std::max(0, std::min(255, b)));
+                dstRow[x * 4 + 1] = static_cast<uint8_t>(std::max(0, std::min(255, g)));
+                dstRow[x * 4 + 2] = static_cast<uint8_t>(std::max(0, std::min(255, r)));
                 dstRow[x * 4 + 3] = 255;
             }
         }
@@ -129,9 +129,9 @@ public:
                 int g = (c - d - uv + 128) >> 8;
                 int b = (c + d + 128) >> 8;
                 
-                dstRow[x * 4 + 0] = std::max(0, std::min(255, b));
-                dstRow[x * 4 + 1] = std::max(0, std::min(255, g));
-                dstRow[x * 4 + 2] = std::max(0, std::min(255, r));
+                dstRow[x * 4 + 0] = static_cast<uint8_t>(std::max(0, std::min(255, b)));
+                dstRow[x * 4 + 1] = static_cast<uint8_t>(std::max(0, std::min(255, g)));
+                dstRow[x * 4 + 2] = static_cast<uint8_t>(std::max(0, std::min(255, r)));
                 dstRow[x * 4 + 3] = 255;
             }
         }
