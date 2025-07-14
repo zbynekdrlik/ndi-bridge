@@ -40,11 +40,12 @@ deps/ndi/
 deps/decklink/
 
 # DeckLink SDK files (proprietary - must not be committed)
-docs/reference/DeckLinkAPI_h.h
-docs/reference/DeckLinkAPI_i.c
-docs/reference/DeckLinkAPI.h
 docs/reference/DeckLinkAPI*.h
 docs/reference/DeckLinkAPI*.c
+docs/reference/DeckLinkAPI*.idl
+docs/reference/DeckLinkAPIVersion.h
+# But keep our generation script
+!docs/reference/generate-decklink-api.bat
 
 # OS specific
 .DS_Store
