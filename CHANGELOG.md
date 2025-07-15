@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2025-07-15
 
+### Fixed
+- **Media Foundation Device Release**: Fixed USB capture card monitor disconnection issue
+  - Added proper `IMFMediaSource::Shutdown()` call before releasing
+  - Added proper `IMFActivate::ShutdownObject()` call before releasing
+  - These calls ensure the USB device is properly released when the app exits
+  - Prevents monitor from disconnecting when using USB capture cards like NZXT Signal HD60
+
 ### Changed
 - **Major Refactoring**: DeckLinkCaptureDevice.cpp split into 5 focused components
   - DeckLinkCaptureCallback: Handles IDeckLinkInputCallback implementation (~50 lines)
@@ -16,11 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - DeckLinkDeviceInitializer: Device discovery and initialization (~90 lines)
 - Improved code organization following Single Responsibility Principle
 - Better maintainability with smaller, focused files
-- No functional changes - pure refactoring
 
 ### Technical Details
-- Original DeckLinkCaptureDevice.cpp: 677 lines
-- After refactoring: ~350 lines + 5 well-organized components
+- Media Foundation shutdown issue: USB device remained active without proper shutdown calls
+- Original DeckLinkCaptureDevice.cpp: 677 lines, now ~350 lines + 5 well-organized components
 - Each component now has a single, clear responsibility
 - Easier to unit test individual components
 - Faster compilation due to smaller translation units

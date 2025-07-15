@@ -24,8 +24,8 @@ MediaFoundationCapture::~MediaFoundationCapture() {
         stopCapture();
     }
     
-    // Clean shutdown
-    shutdownDevice();
+    // Clean shutdown - ensure device is properly released
+    shutdownDevice(true);  // true = full shutdown in destructor
 }
 
 std::vector<ICaptureDevice::DeviceInfo> MediaFoundationCapture::enumerateDevices() {
@@ -195,9 +195,9 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
     return true;
 }
 
-void MediaFoundationCapture::shutdownDevice() {
-    // This method is only called:
-    // 1. In destructor
+void MediaFoundationCapture::shutdownDevice(bool full_shutdown) {
+    // This method is called:
+    // 1. In destructor (full_shutdown = true)
     // 2. On initialization failure
     // 3. When reinitializing after error
     
@@ -207,31 +207,53 @@ void MediaFoundationCapture::shutdownDevice() {
         // Don't reset video_capture_ - we'll reuse it
     }
     
-    // Flush source reader but don't release yet
+    // Flush source reader
     if (current_reader_) {
         current_reader_->Flush(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS));
     }
     
-    // Full cleanup
+    // Release source reader
     if (current_reader_) {
         current_reader_->Release();
         current_reader_ = nullptr;
     }
     
+    // Properly shutdown media source
     if (current_source_) {
-        // NOTE: We do NOT call Stop() or Shutdown() on the media source
-        // during normal operation to keep the device active
+        if (full_shutdown) {
+            // CRITICAL: Properly shut down the media source
+            // This prevents the USB capture card from remaining active
+            HRESULT hr = current_source_->Shutdown();
+            if (FAILED(hr)) {
+                std::cerr << "Warning: Failed to shutdown media source: " 
+                          << media_foundation::MFErrorHandler::HResultToString(hr) << std::endl;
+            }
+        }
         current_source_->Release();
         current_source_ = nullptr;
     }
     
+    // Properly shutdown activate object
     if (current_activate_) {
-        // NOTE: We do NOT call ShutdownObject() to keep device accessible
+        if (full_shutdown) {
+            // CRITICAL: Shut down the activate object
+            // This ensures the device is properly released
+            HRESULT hr = current_activate_->ShutdownObject();
+            if (FAILED(hr)) {
+                std::cerr << "Warning: Failed to shutdown activate object: " 
+                          << media_foundation::MFErrorHandler::HResultToString(hr) << std::endl;
+            }
+        }
         current_activate_->Release();
         current_activate_ = nullptr;
     }
     
     initialized_ = false;
+}
+
+// Overload for backward compatibility
+void MediaFoundationCapture::shutdownDevice() {
+    shutdownDevice(false);  // Default to non-full shutdown for normal operations
 }
 
 bool MediaFoundationCapture::reinitializeOnError(HRESULT hr) {
