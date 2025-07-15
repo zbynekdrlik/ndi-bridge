@@ -1,12 +1,12 @@
-// decklink_capture.h - DeckLink capture implementation
+// decklink_capture.h - DeckLink capture interface
 #pragma once
 
 #include "../../common/capture_interface.h"
-#include "../../capture/DeckLinkCaptureDevice.h"
 #include "../../capture/DeckLinkDeviceEnumerator.h"
+#include "../../capture/DeckLinkCaptureDevice.h"
 #include <memory>
+#include <string>
 #include <mutex>
-#include <thread>
 #include <atomic>
 
 namespace ndi_bridge {
@@ -14,10 +14,10 @@ namespace ndi_bridge {
 /**
  * @brief DeckLink implementation of ICaptureDevice
  * 
- * Provides video capture functionality using Blackmagic DeckLink devices.
- * This class adapts the DeckLinkCaptureDevice to the common capture interface.
+ * This class provides video capture functionality using Blackmagic DeckLink devices.
+ * It handles device enumeration, capture control, and frame delivery.
  * 
- * Version: 1.1.2
+ * Version: 1.1.1 - Fixed frame drop issue by using direct callbacks
  */
 class DeckLinkCapture : public ICaptureDevice {
 public:
@@ -35,30 +35,25 @@ public:
     std::string getLastError() const override;
     
 private:
-    // Frame processing callback from DeckLinkCaptureDevice
-    void onFrameReceived(const FrameData& frame);
-    
-    // Convert FrameData to VideoFormat
+    // Convert internal FrameData to ICaptureDevice VideoFormat
     VideoFormat convertFrameFormat(const FrameData& frame) const;
     
-private:
-    std::unique_ptr<DeckLinkCaptureDevice> m_captureDevice;
+    // Frame received callback from DeckLinkCaptureDevice
+    void onFrameReceived(const FrameData& frame);
+    
+    // Device management
     std::unique_ptr<DeckLinkDeviceEnumerator> m_enumerator;
+    std::unique_ptr<DeckLinkCaptureDevice> m_captureDevice;
+    
+    // State
+    std::string m_currentDeviceName;
+    mutable std::mutex m_mutex;
+    std::string m_lastError;
+    std::atomic<bool> m_hasError;
     
     // Callbacks
     FrameCallback m_frameCallback;
     ErrorCallback m_errorCallback;
-    
-    // State
-    mutable std::mutex m_mutex;
-    std::string m_lastError;
-    bool m_hasError;
-    std::string m_currentDeviceName;
-    
-    // Frame processing thread
-    std::thread m_frameThread;
-    std::atomic<bool> m_threadRunning;
-    void frameProcessingThread();
 };
 
 } // namespace ndi_bridge

@@ -1,6 +1,6 @@
 # NDI Bridge
 
-[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
+[![Version](https://img.shields.io/badge/version-1.1.5-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -10,7 +10,7 @@ NDI Bridge is a high-performance, low-latency tool that bridges video capture de
 
 ## Features
 
-### Current Features (v1.1.3)
+### Current Features (v1.1.5)
 - ✅ **Media Foundation** capture support (Windows)
 - ✅ **DeckLink** capture support (Blackmagic devices)
 - ✅ **Multi-capture type selection** (`-t mf` or `-t dl`)
@@ -23,6 +23,8 @@ NDI Bridge is a high-performance, low-latency tool that bridges video capture de
 - ✅ **Professional broadcast features** (format detection, no-signal handling)
 - ✅ **Serial number tracking** for device persistence
 - ✅ **Rolling FPS calculation** and monitoring
+- ✅ **Dynamic frame rate matching** (NDI uses actual capture rate)
+- ✅ **Live statistics display** (press Enter to view)
 
 ### Planned Features
 - 📋 **Linux V4L2** support

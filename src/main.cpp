@@ -8,6 +8,7 @@
 #include <thread>
 #include <chrono>
 #include <limits>
+#include <iomanip>  // For std::fixed and std::setprecision
 
 #ifdef _WIN32
 #define NOMINMAX  // Prevent Windows.h from defining min/max macros
@@ -31,6 +32,9 @@ namespace {
 // Global variables for signal handling
 std::atomic<bool> g_shutdown_requested(false);
 std::unique_ptr<ndi_bridge::AppController> g_app_controller;
+
+// Global capture device reference for NZXT workaround
+std::unique_ptr<ndi_bridge::ICaptureDevice> g_capture_device;
 
 // Capture type enum
 enum class CaptureType {
@@ -440,21 +444,29 @@ int main(int argc, char* argv[]) {
     
     // Create capture device based on type
 #ifdef _WIN32
-    std::unique_ptr<ndi_bridge::ICaptureDevice> capture_device;
+    // Keep capture device in global for NZXT workaround
+    bool is_nzxt_device = false;
     
     if (args.capture_type == CaptureType::MediaFoundation) {
         std::cout << "Using Media Foundation capture" << std::endl;
-        capture_device = std::make_unique<ndi_bridge::MediaFoundationCapture>();
+        g_capture_device = std::make_unique<ndi_bridge::MediaFoundationCapture>();
+        
+        // Check if it's NZXT device
+        if (args.device_name.find("NZXT") != std::string::npos) {
+            is_nzxt_device = true;
+            std::cout << "NZXT device detected - using special cleanup handling" << std::endl;
+        }
     } else if (args.capture_type == CaptureType::DeckLink) {
         std::cout << "Using DeckLink capture" << std::endl;
-        capture_device = std::make_unique<ndi_bridge::DeckLinkCapture>();
+        g_capture_device = std::make_unique<ndi_bridge::DeckLinkCapture>();
     }
+    
+    // Give ownership to app controller but keep global reference for NZXT
+    g_app_controller->setCaptureDevice(std::move(g_capture_device));
 #else
     std::cerr << "Linux capture not yet implemented" << std::endl;
     return 1;
 #endif
-    
-    g_app_controller->setCaptureDevice(std::move(capture_device));
     
     // Start the application
     std::cout << "Starting capture pipeline..." << std::endl;
@@ -480,6 +492,25 @@ int main(int argc, char* argv[]) {
             int ch = std::cin.get();
             if (ch == '\n' || ch == '\r') {
                 std::cout << "Enter key pressed, stopping..." << std::endl;
+                
+                // Display final statistics
+                uint64_t captured, sent, dropped;
+                g_app_controller->getFrameStats(captured, sent, dropped);
+                
+                std::cout << "\nFinal Statistics:" << std::endl;
+                std::cout << "  Frames Captured: " << captured << std::endl;
+                std::cout << "  Frames Sent: " << sent << std::endl;
+                std::cout << "  Frames Dropped: " << dropped;
+                if (captured > 0) {
+                    double drop_rate = (dropped * 100.0) / captured;
+                    std::cout << " (" << std::fixed << std::setprecision(2) 
+                             << drop_rate << "%)";
+                }
+                std::cout << std::endl;
+                
+                int connections = g_app_controller->getNdiConnectionCount();
+                std::cout << "  NDI Connections: " << connections << std::endl;
+                
                 break;
             }
         }
@@ -513,6 +544,15 @@ int main(int argc, char* argv[]) {
     // Stop the application
     std::cout << "Stopping application..." << std::endl;
     g_app_controller->stop();
+    
+#ifdef _WIN32
+    // NZXT workaround: Add delay before cleanup
+    if (is_nzxt_device) {
+        std::cout << "Waiting before cleanup for NZXT device..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    }
+#endif
+    
     g_app_controller.reset();
     
     std::cout << "Exiting." << std::endl;
@@ -526,6 +566,12 @@ int main(int argc, char* argv[]) {
     
     // Cleanup
 #ifdef _WIN32
+    // NZXT workaround: Add another delay before CoUninitialize
+    if (is_nzxt_device) {
+        std::cout << "Final cleanup delay for NZXT device..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    
     CoUninitialize();
 #endif
     

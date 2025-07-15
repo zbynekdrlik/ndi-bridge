@@ -17,7 +17,7 @@ constexpr char LOG_PREFIX[] = "[NdiSender]";
 NdiSender::NdiSender(const std::string& sender_name, ErrorCallback error_callback)
     : sender_name_(sender_name)
     , error_callback_(std::move(error_callback)) {
-    std::cout << LOG_PREFIX << " NDI Sender version 1.0.1 initialized" << std::endl;
+    std::cout << LOG_PREFIX << " NDI Sender version 1.0.2 initialized" << std::endl;
 }
 
 NdiSender::~NdiSender() {
@@ -131,8 +131,8 @@ bool NdiSender::sendFrame(const FrameInfo& frame) {
     }
 
     // Set frame metadata
-    ndi_frame.frame_rate_N = 30000;  // 30 fps numerator
-    ndi_frame.frame_rate_D = 1000;   // 30 fps denominator
+    ndi_frame.frame_rate_N = frame.fps_numerator;    // Use actual frame rate from capture
+    ndi_frame.frame_rate_D = frame.fps_denominator;  // Use actual frame rate from capture
     ndi_frame.picture_aspect_ratio = static_cast<float>(frame.width) / frame.height;
     ndi_frame.frame_format_type = NDIlib_frame_format_type_progressive;
     ndi_frame.p_metadata = nullptr;

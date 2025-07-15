@@ -7,8 +7,7 @@
 namespace ndi_bridge {
 
 DeckLinkCapture::DeckLinkCapture()
-    : m_hasError(false)
-    , m_threadRunning(false) {
+    : m_hasError(false) {
     
     m_enumerator = std::make_unique<DeckLinkDeviceEnumerator>();
 }
@@ -79,6 +78,13 @@ bool DeckLinkCapture::startCapture(const std::string& device_name) {
             targetDevice = devices[0].name;
         }
         
+        // Set frame callback directly on the device - no polling needed!
+        m_captureDevice->SetFrameCallback(
+            [this](const FrameData& frame) {
+                onFrameReceived(frame);
+            }
+        );
+        
         // Initialize device
         if (!m_captureDevice->Initialize(targetDevice)) {
             throw std::runtime_error("Failed to initialize DeckLink device: " + targetDevice);
@@ -92,10 +98,7 @@ bool DeckLinkCapture::startCapture(const std::string& device_name) {
         m_currentDeviceName = targetDevice;
         m_hasError = false;
         
-        // Start frame processing thread
-        m_threadRunning = true;
-        m_frameThread = std::thread(&DeckLinkCapture::frameProcessingThread, this);
-        
+        // No polling thread needed - frames come via callback
         return true;
     }
     catch (const std::exception& e) {
@@ -115,15 +118,6 @@ bool DeckLinkCapture::startCapture(const std::string& device_name) {
 }
 
 void DeckLinkCapture::stopCapture() {
-    // Stop thread first
-    if (m_threadRunning) {
-        m_threadRunning = false;
-        if (m_frameThread.joinable()) {
-            m_frameThread.join();
-        }
-    }
-    
-    // Then stop device
     std::lock_guard<std::mutex> lock(m_mutex);
     if (m_captureDevice) {
         m_captureDevice->StopCapture();
@@ -157,31 +151,8 @@ std::string DeckLinkCapture::getLastError() const {
     return m_lastError;
 }
 
-void DeckLinkCapture::frameProcessingThread() {
-    while (m_threadRunning) {
-        try {
-            FrameData frame;
-            
-            // Try to get next frame
-            if (m_captureDevice && m_captureDevice->GetNextFrame(frame)) {
-                onFrameReceived(frame);
-            } else {
-                // No frame available, sleep briefly
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }
-        }
-        catch (const std::exception& e) {
-            std::lock_guard<std::mutex> lock(m_mutex);
-            m_lastError = std::string("Frame processing error: ") + e.what();
-            m_hasError = true;
-            if (m_errorCallback) {
-                m_errorCallback(m_lastError);
-            }
-        }
-    }
-}
-
 void DeckLinkCapture::onFrameReceived(const FrameData& frame) {
+    // This is called directly from DeckLink callback thread
     std::lock_guard<std::mutex> lock(m_mutex);
     
     if (!m_frameCallback) {
@@ -191,10 +162,13 @@ void DeckLinkCapture::onFrameReceived(const FrameData& frame) {
     // Convert frame format
     VideoFormat format = convertFrameFormat(frame);
     
-    // Calculate timestamp in nanoseconds
-    auto now = std::chrono::steady_clock::now();
-    auto duration = now.time_since_epoch();
-    int64_t timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+    // Use frame timestamp if available, otherwise generate one
+    int64_t timestamp = frame.timestamp.time_since_epoch().count();
+    if (timestamp == 0) {
+        auto now = std::chrono::steady_clock::now();
+        auto duration = now.time_since_epoch();
+        timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+    }
     
     // Call the callback
     m_frameCallback(frame.data.data(), frame.data.size(), timestamp, format);
@@ -228,9 +202,11 @@ ICaptureDevice::VideoFormat DeckLinkCapture::convertFrameFormat(const FrameData&
             break;
     }
     
-    // Default to 60fps for DeckLink (will be updated based on actual capture)
-    format.fps_numerator = 60000;
+    // Get actual frame rate from device
+    format.fps_numerator = 60000;  // Default
     format.fps_denominator = 1001;
+    
+    // TODO: Get actual frame rate from DeckLinkCaptureDevice
     
     return format;
 }

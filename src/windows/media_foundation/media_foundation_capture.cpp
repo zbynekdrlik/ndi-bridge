@@ -11,6 +11,7 @@ namespace ndi_bridge {
 MediaFoundationCapture::MediaFoundationCapture()
     : current_activate_(nullptr)
     , current_reader_(nullptr)
+    , current_source_(nullptr)
     , initialized_(false)
     , reinit_attempts_(0) {
     device_manager_ = std::make_unique<media_foundation::MFCaptureDevice>();
@@ -18,6 +19,12 @@ MediaFoundationCapture::MediaFoundationCapture()
 }
 
 MediaFoundationCapture::~MediaFoundationCapture() {
+    // Stop capture first
+    if (isCapturing()) {
+        stopCapture();
+    }
+    
+    // Clean shutdown
     shutdownDevice();
 }
 
@@ -82,6 +89,10 @@ void MediaFoundationCapture::stopCapture() {
     if (video_capture_) {
         video_capture_->StopCapture();
     }
+    
+    // NOTE: We do NOT shutdown the device here!
+    // The device remains initialized so we can quickly restart capture
+    // This prevents issues with devices that don't handle full shutdown well
 }
 
 bool MediaFoundationCapture::isCapturing() const {
@@ -148,15 +159,24 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
         return false;
     }
     
-    // Create source reader
-    hr = device_manager_->CreateSourceReaderFromActivate(current_activate_, &current_reader_);
+    // Create media source and keep reference
+    hr = device_manager_->CreateMediaSource(current_activate_, &current_source_);
     if (FAILED(hr)) {
-        last_error_ = "Failed to create source reader: " + media_foundation::MFErrorHandler::HResultToString(hr);
+        last_error_ = "Failed to create media source: " + media_foundation::MFErrorHandler::HResultToString(hr);
         has_error_ = true;
         if (current_activate_) {
             current_activate_->Release();
             current_activate_ = nullptr;
         }
+        return false;
+    }
+    
+    // Create source reader from media source
+    hr = device_manager_->CreateSourceReader(current_source_, &current_reader_);
+    if (FAILED(hr)) {
+        last_error_ = "Failed to create source reader: " + media_foundation::MFErrorHandler::HResultToString(hr);
+        has_error_ = true;
+        shutdownDevice();
         return false;
     }
     
@@ -176,16 +196,37 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
 }
 
 void MediaFoundationCapture::shutdownDevice() {
+    // This method is only called:
+    // 1. In destructor
+    // 2. On initialization failure
+    // 3. When reinitializing after error
+    
+    // Stop video capture first
     if (video_capture_) {
         video_capture_->StopCapture();
+        // Don't reset video_capture_ - we'll reuse it
     }
     
+    // Flush source reader but don't release yet
+    if (current_reader_) {
+        current_reader_->Flush(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS));
+    }
+    
+    // Full cleanup
     if (current_reader_) {
         current_reader_->Release();
         current_reader_ = nullptr;
     }
     
+    if (current_source_) {
+        // NOTE: We do NOT call Stop() or Shutdown() on the media source
+        // during normal operation to keep the device active
+        current_source_->Release();
+        current_source_ = nullptr;
+    }
+    
     if (current_activate_) {
+        // NOTE: We do NOT call ShutdownObject() to keep device accessible
         current_activate_->Release();
         current_activate_ = nullptr;
     }

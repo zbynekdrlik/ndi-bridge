@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <deque>
 #include <chrono>
+#include <functional>
 #include <atlbase.h>
 
 // Forward declarations for DeckLink SDK
@@ -58,6 +59,10 @@ public:
     void OnFormatChanged(BMDVideoInputFormatChangedEvents events, 
                         IDeckLinkDisplayMode* newMode,
                         BMDDetectedVideoInputFormatFlags flags);
+    
+    // Frame callback for immediate delivery (v1.1.4)
+    using FrameCallback = std::function<void(const FrameData&)>;
+    void SetFrameCallback(FrameCallback callback) { m_frameCallback = callback; }
     
 private:
     struct DeviceInfo {
@@ -114,6 +119,9 @@ private:
     // Format converter
     std::unique_ptr<IFormatConverter> m_formatConverter;
     
+    // Direct frame callback (v1.1.4)
+    FrameCallback m_frameCallback;
+    
     // Helper methods
     bool EnableVideoInput();
     bool FindBestDisplayMode();
@@ -122,4 +130,9 @@ private:
     double CalculateRollingFPS() const;
     void LogFrameStatistics();
     void ResetStatistics();
+    
+    // Process frame for callback delivery
+    void ProcessFrameForCallback(void* frameBytes, int width, int height, 
+                                BMDPixelFormat pixelFormat,
+                                std::chrono::steady_clock::time_point timestamp);
 };

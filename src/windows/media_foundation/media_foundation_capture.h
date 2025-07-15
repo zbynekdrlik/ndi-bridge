@@ -15,7 +15,7 @@ namespace ndi_bridge {
  * 
  * Provides video capture functionality using Windows Media Foundation.
  * 
- * Version: 1.0.1
+ * Version: 1.0.8
  */
 class MediaFoundationCapture : public ICaptureDevice {
 public:
@@ -52,6 +52,7 @@ private:
     
     IMFActivate* current_activate_;
     IMFSourceReader* current_reader_;
+    IMFMediaSource* current_source_;  // Keep reference for proper shutdown
     
     std::wstring selected_device_name_;
     std::string last_error_;

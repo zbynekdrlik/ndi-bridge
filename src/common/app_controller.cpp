@@ -19,7 +19,7 @@ constexpr uint32_t FOURCC_BGRX = 0x58524742;  // 'BGRX'
 
 AppController::AppController(const Config& config)
     : config_(config) {
-    std::cout << LOG_PREFIX << " Application Controller version 1.0.0 initialized" << std::endl;
+    std::cout << LOG_PREFIX << " Application Controller version 1.0.2 initialized" << std::endl;
     
     if (config_.verbose) {
         std::cout << LOG_PREFIX << " Configuration:" << std::endl;
@@ -79,8 +79,14 @@ bool AppController::start() {
     frames_sent_ = 0;
     frames_dropped_ = 0;
     
+    // Set running flag BEFORE starting thread to avoid race condition
+    running_ = true;
+    
     // Start worker thread
     worker_thread_ = std::thread(&AppController::runLoop, this);
+    
+    // Wait a bit to ensure thread has started
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     return true;
 }
@@ -166,7 +172,7 @@ bool AppController::waitForCompletion(int timeout_ms) {
 }
 
 void AppController::runLoop() {
-    running_ = true;
+    // Note: running_ is already set to true in start() to avoid race condition
     reportStatus("Application started");
     
     while (!stop_requested_) {
@@ -181,34 +187,68 @@ void AppController::runLoop() {
         // Reset retry count on successful initialization
         retry_count_ = 0;
         
+        // Monitor capture status
+        auto last_frame_check = std::chrono::steady_clock::now();
+        auto last_frame_count = frames_captured_.load();
+        
         // Run until error or restart requested
-        {
+        while (!stop_requested_ && !restart_requested_) {
             std::unique_lock<std::mutex> lock(mutex_);
-            cv_.wait(lock, [this] { 
+            
+            // Wait for condition or timeout every second to check capture health
+            cv_.wait_for(lock, std::chrono::seconds(1), [this] { 
                 return stop_requested_ || restart_requested_ || 
-                       capture_device_->hasError();
+                       (capture_device_ && capture_device_->hasError());
             });
+            
+            // Check if capture is still producing frames
+            auto now = std::chrono::steady_clock::now();
+            auto current_frame_count = frames_captured_.load();
+            
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - last_frame_check).count() >= 5) {
+                // Check if we're getting frames
+                if (current_frame_count == last_frame_count && capture_device_->isCapturing()) {
+                    // No frames in 5 seconds while supposedly capturing
+                    lock.unlock();
+                    reportError("No frames received for 5 seconds", true);
+                    restart_requested_ = true;
+                    break;
+                }
+                last_frame_check = now;
+                last_frame_count = current_frame_count;
+            }
+            
+            // Check why we woke up
+            if (stop_requested_) {
+                break;
+            }
+            
+            if (restart_requested_) {
+                lock.unlock();
+                reportStatus("Restarting capture pipeline");
+                break;
+            }
+            
+            if (capture_device_ && capture_device_->hasError()) {
+                lock.unlock();
+                reportError("Capture device error detected", true);
+                break;
+            }
         }
         
-        // Check why we woke up
         if (stop_requested_) {
             break;
-        }
-        
-        if (restart_requested_) {
-            restart_requested_ = false;
-            reportStatus("Restarting capture pipeline");
-        } else if (capture_device_->hasError()) {
-            reportError("Capture device error detected", true);
         }
         
         // Shutdown for restart or error recovery
         shutdown();
         
         // Add delay before restart if it was an error
-        if (capture_device_->hasError() && config_.retry_delay_ms > 0) {
+        if ((restart_requested_ || (capture_device_ && capture_device_->hasError())) && config_.retry_delay_ms > 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(config_.retry_delay_ms));
         }
+        
+        restart_requested_ = false;
     }
     
     shutdown();
@@ -286,6 +326,8 @@ void AppController::onFrameReceived(const void* frame_data, size_t frame_size,
     frame_info.stride = format.stride;
     frame_info.fourcc = getFourCC(format);
     frame_info.timestamp_ns = timestamp;
+    frame_info.fps_numerator = format.fps_numerator;    // Pass frame rate to NDI
+    frame_info.fps_denominator = format.fps_denominator;  // Pass frame rate to NDI
     
     // Send frame
     if (ndi_sender_->sendFrame(frame_info)) {
