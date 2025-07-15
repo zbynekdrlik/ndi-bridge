@@ -2,84 +2,69 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Created feature branch: feature/refactor-decklink-v1.2.0
-- [x] Refactored DeckLinkCaptureDevice.cpp into 5 separate components
-- [x] Updated CMakeLists.txt to include new components
-- [x] Version bumped to 1.2.0
-- [ ] Currently working on: Testing refactored code
+- [x] Created feature branch: feature/remove-enter-key-exit
+- [x] Removed Enter key handling from main.cpp
+- [x] Version bumped to 1.2.1
+- [x] PR created: #4
+- [ ] Currently working on: Testing the changes
 - [ ] Waiting for: User to compile and test
 - [ ] Blocked by: None
 
-## v1.2.0 Refactoring Progress
+## v1.2.1 24/7 Operation Improvements
 
-### Components Created:
-1. ✅ **DeckLinkCaptureCallback** (50 lines)
-   - Handles IDeckLinkInputCallback implementation
-   - Files: DeckLinkCaptureCallback.h/cpp
+### Changes Made:
+1. ✅ **Removed Enter key handling**
+   - Removed `isKeyPressed()` function
+   - Removed `clearInput()` function
+   - Updated main loop to only wait for shutdown signal
 
-2. ✅ **DeckLinkFrameQueue** (80 lines)
-   - Thread-safe frame queue management
-   - Files: DeckLinkFrameQueue.h/cpp
+2. ✅ **Updated user interface**
+   - Help text now mentions Ctrl+C instead of Enter
+   - Running message says "Press Ctrl+C to stop..."
+   - Removed "Press Enter to exit" in positional parameter mode
 
-3. ✅ **DeckLinkStatistics** (70 lines)
-   - FPS calculation and statistics tracking
-   - Files: DeckLinkStatistics.h/cpp
+3. ✅ **Cleaner shutdown**
+   - Final statistics display moved to shutdown handler
+   - Consistent shutdown behavior across all modes
 
-4. ✅ **DeckLinkFormatManager** (70 lines)
-   - Format detection and change handling
-   - Files: DeckLinkFormatManager.h/cpp
+### Testing Required:
+```bash
+cmake --build . --config Release --clean-first
+ndi-bridge.exe -t dl -l
+ndi-bridge.exe -t dl
+```
 
-5. ✅ **DeckLinkDeviceInitializer** (90 lines)
-   - Device discovery and initialization
-   - Files: DeckLinkDeviceInitializer.h/cpp
-
-### Refactoring Summary:
-- Original file: 677 lines (DeckLinkCaptureDevice.cpp)
-- After refactoring: ~350 lines + 5 focused components
-- Total improvement: Better separation of concerns
+Verify:
+- App does NOT exit when Enter is pressed
+- App ONLY exits with Ctrl+C
+- Final statistics are displayed on shutdown
+- No console input issues
 
 ## Implementation Status
-- Phase: REFACTORING
-- Step: Code refactoring complete, needs testing
+- Phase: IMPROVEMENT
+- Step: Code changes complete, needs testing
 - Status: TESTING_REQUIRED
-- Version: 1.2.0
+- Version: 1.2.1
 
 ## Testing Status Matrix
-| Component | Implemented | Compiled | Unit Tested | Integration Tested | Runtime Tested |
-|-----------|------------|----------|-------------|-------------------|----------------|
-| DeckLinkCaptureCallback | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
-| DeckLinkFrameQueue | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
-| DeckLinkStatistics | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
-| DeckLinkFormatManager | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
-| DeckLinkDeviceInitializer | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
-| DeckLinkCaptureDevice | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
-
-## Next Steps
-1. **Compile and test the refactored code**
-   ```bash
-   cmake --build . --config Release --clean-first
-   ndi-bridge.exe -t dl -l
-   ndi-bridge.exe -t dl
-   ```
-2. Verify DeckLink capture still works
-3. Check that all features function correctly
-4. Update documentation if needed
-5. Create PR when testing complete
+| Component | Implemented | Compiled | Tested | User Approved |
+|-----------|------------|----------|---------|---------------|
+| main.cpp | ✅ v1.2.1 | ❌ | ❌ | ❌ |
+| version.h | ✅ v1.2.1 | ❌ | ❌ | ❌ |
 
 ## Benefits Achieved
-- ✅ Single Responsibility Principle
-- ✅ Easier unit testing capability
-- ✅ Better maintainability
-- ✅ Faster compilation (smaller files)
-- ✅ Clearer architecture
+- ✅ Robust 24/7 operation
+- ✅ No accidental exits from Enter key
+- ✅ Cleaner code
+- ✅ Consistent shutdown behavior
 
-## Previous Status (v1.1.5)
-- All runtime issues fixed
-- Production ready
-- Merged to main
+## Previous Context
+- Previous thread was working on DeckLink refactoring (v1.2.0)
+- That work was in branch feature/refactor-decklink-v1.2.0 (not found)
+- Current task is independent improvement for 24/7 operation
 
 ## Last User Action
 - Date/Time: 2025-07-15 (current session)
-- Action: Requested DeckLink refactoring
-- Result: Refactoring complete, needs testing
-- Next Required: Compile and test
+- Action: Requested removal of Enter key handling for 24/7 operation
+- Result: Implementation complete, PR created
+- Next Required: Compile and test the changes
