@@ -4,15 +4,23 @@
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
 - [x] Fixed frame rate issue - NDI now uses actual capture rate (v1.1.5)
 - [x] Fixed statistics display - shows stats when Enter pressed (v1.1.5)
-- [x] Improved Media Foundation cleanup (v1.1.5)
-- [ ] Currently working on: Waiting for user to test v1.1.5 fixes
-- [ ] Waiting for: User to rebuild and test all fixes
+- [x] Improved Media Foundation cleanup (v1.1.6)
+- [ ] Currently working on: Waiting for user to test v1.1.6 NZXT fix
+- [ ] Waiting for: User to rebuild and test if NZXT card issue is resolved
 - [ ] Blocked by: Need test results before PR merge
 
 ## GOAL 11: Test and Fix v1.1.3 Issues (IN PROGRESS)
 ### Objective: Identify and fix functionality issues
 
-### Status: v1.1.5 FIXES IMPLEMENTED - TESTING REQUIRED
+### Status: v1.1.6 NZXT FIX IMPLEMENTED - TESTING REQUIRED
+
+### Issues Fixed in v1.1.6:
+1. **NZXT Capture Card Shutdown Issue** 🚧
+   - Problem: NZXT card loses input signal after app exit, requires power cycle
+   - Analysis: App was doing full device shutdown, not suitable for continuous operation
+   - Fix: Only stop capture on exit, don't shutdown device completely
+   - Changed: Removed Stop()/Shutdown()/ShutdownObject() calls during normal operation
+   - Version: MediaFoundationCapture v1.0.9
 
 ### Issues Fixed in v1.1.5:
 1. **Frame Rate Mismatch** ✅
@@ -25,95 +33,86 @@
    - Fixed: Added final statistics display before shutdown
    - Shows: Captured/Sent/Dropped frames with drop percentage
 
-3. **Media Foundation Cleanup** ✅
-   - Improved shutdown sequence to prevent crashes
-   - Added proper COM object cleanup order
-   - Will be tested with NZXT device
-
 ### Issues Previously Fixed in v1.1.4:
 1. **Version Display Bug** ✅
 2. **Media Foundation Startup Issue** ✅
 3. **DeckLink Frame Drop Crisis** ✅
 
 ### Testing Required:
-1. **Clean rebuild of v1.1.5**
+1. **Clean rebuild of v1.1.6**
    ```
    cmake --build . --config Release --clean-first
    ```
 
-2. **Test Media Foundation**
+2. **Test NZXT Capture Card**
    ```
    ndi-bridge.exe -t mf -l
-   ndi-bridge.exe  (select MF device)
+   ndi-bridge.exe  (select NZXT device)
    ```
-   - Verify NDI shows 60fps (not 30fps)
-   - Press Enter and verify statistics display
-   - Check no crash on close
+   - Let it run for a bit
+   - Press Enter to stop
+   - Verify monitor connected to NZXT still works
+   - No need to power cycle NZXT
 
-3. **Test DeckLink**
+3. **Test DeckLink** (regression test)
    ```
    ndi-bridge.exe -t dl -l
    ndi-bridge.exe  (select DL device)
    ```
-   - Verify frame drops still minimal
-   - Press Enter and verify statistics
+   - Verify still works properly
+   - Frame drops still minimal
 
 ## Implementation Status
 - Phase: Bug Fixing
-- Step: v1.1.5 fixes implemented, awaiting test results
+- Step: v1.1.6 NZXT fix implemented, awaiting test results
 - Status: TESTING_REQUIRED
-- Version: 1.1.5
+- Version: 1.1.6
 
 ## Testing Status Matrix
 | Component | Implemented | Compiled | Unit Tested | Integration Tested | Runtime Tested |
 |-----------|------------|----------|-------------|-------------------|----------------|
-| Media Foundation | ✅ v1.0.8 | ⏳ v1.1.5 | ❌ | ❌ | ⏳ PENDING |
-| DeckLink Adapter | ✅ v1.1.4 | ✅ v1.1.4 | ❌ | ❌ | ⏳ PENDING |
-| DeckLink Core | ✅ v1.1.4 | ✅ v1.1.4 | ❌ | ❌ | ⏳ PENDING |
+| Media Foundation | ✅ v1.0.9 | ⏳ v1.1.6 | ❌ | ❌ | ⏳ PENDING |
+| DeckLink Adapter | ✅ v1.1.4 | ✅ v1.1.4 | ❌ | ❌ | ✅ v1.1.4 |
+| DeckLink Core | ✅ v1.1.4 | ✅ v1.1.4 | ❌ | ❌ | ✅ v1.1.4 |
 | Format Converter | ✅ v1.1.0 | ✅ v1.1.5 | ❌ | ❌ | ❌ |
-| NDI Sender | ✅ v1.0.2 | ⏳ v1.1.5 | ❌ | ❌ | ⏳ PENDING |
-| App Controller | ✅ v1.0.2 | ⏳ v1.1.5 | ❌ | ❌ | ⏳ PENDING |
+| NDI Sender | ✅ v1.0.2 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.5 |
+| App Controller | ✅ v1.0.2 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.5 |
 
-## Code Changes Summary v1.1.5
+## Code Changes Summary v1.1.6
 
-### ndi_sender.h (v1.0.2)
-- Added fps_numerator and fps_denominator to FrameInfo struct
+### media_foundation_capture.cpp (v1.0.9)
+- Modified shutdownDevice() to avoid full device shutdown
+- Only stop capture on normal exit, keep device initialized
+- Full shutdown only in destructor or error recovery
+- Removed Stop()/Shutdown()/ShutdownObject() calls
+- This prevents NZXT from losing input signal
 
-### ndi_sender.cpp (v1.0.2)
-- Uses actual frame rate from FrameInfo instead of hardcoded 30fps
+### media_foundation_capture.h
+- Added IMFMediaSource* member for proper tracking
 
-### app_controller.cpp (v1.0.2)
-- Passes frame rate from capture device to NDI sender
-
-### main.cpp (v1.1.5)
-- Added statistics display when Enter key pressed
-- Shows Captured/Sent/Dropped frames with percentage
-
-### media_foundation_capture.cpp (v1.0.8)
-- Improved destructor with proper cleanup order
-- Enhanced shutdownDevice() with COM object cleanup
-- Added flush and proper shutdown sequence
+### version.h
+- Updated to v1.1.6
 
 ## Next Steps
-1. User rebuilds with v1.1.5
-2. Test all capture types
-3. Verify all fixes work:
-   - Frame rate matches capture device
-   - Statistics display on Enter
-   - No crash on close
+1. User rebuilds with v1.1.6
+2. Test NZXT capture card specifically:
+   - Run app with NZXT
+   - Exit normally
+   - Verify monitor still works without power cycle
+3. Regression test DeckLink
 4. If successful, merge PR
-5. If issues remain, debug and fix
+5. If issues remain, debug further
 
 ## PR Status
 - PR #2: "Fix v1.1.3 Runtime Issues"
 - Branch: feature/fix-v1.1.3-issues
-- Ready for v1.1.5 testing
+- Ready for v1.1.6 testing
 
 ## Last User Action
-- Date/Time: 2025-07-15 (earlier in session)
-- Action: Reported frame rate mismatch and no stats on Enter
-- Result: Implemented fixes in v1.1.5
-- Next Required: Rebuild and test v1.1.5
+- Date/Time: 2025-07-15 (current session)
+- Action: Reported NZXT card loses input on app exit
+- Result: Implemented proper cleanup in v1.1.6
+- Next Required: Rebuild and test v1.1.6
 
 ## Previous Goals Completed:
 ### ✅ GOAL 1-10: See previous sections
