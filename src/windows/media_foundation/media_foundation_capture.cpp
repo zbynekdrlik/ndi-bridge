@@ -13,8 +13,7 @@ MediaFoundationCapture::MediaFoundationCapture()
     , current_reader_(nullptr)
     , current_source_(nullptr)
     , initialized_(false)
-    , reinit_attempts_(0)
-    , is_nzxt_device_(false) {
+    , reinit_attempts_(0) {
     device_manager_ = std::make_unique<media_foundation::MFCaptureDevice>();
     video_capture_ = std::make_unique<media_foundation::MFVideoCapture>();
 }
@@ -25,14 +24,7 @@ MediaFoundationCapture::~MediaFoundationCapture() {
         stopCapture();
     }
     
-    // NZXT workaround: Don't do full shutdown for NZXT devices
-    // The OS will clean up when the process exits
-    if (is_nzxt_device_) {
-        std::cout << "NZXT device - skipping full cleanup to prevent input loss" << std::endl;
-        return;
-    }
-    
-    // Only do full shutdown for non-NZXT devices
+    // Clean shutdown
     shutdownDevice();
 }
 
@@ -100,7 +92,7 @@ void MediaFoundationCapture::stopCapture() {
     
     // NOTE: We do NOT shutdown the device here!
     // The device remains initialized so we can quickly restart capture
-    // This prevents issues with devices like NZXT that don't handle full shutdown well
+    // This prevents issues with devices that don't handle full shutdown well
 }
 
 bool MediaFoundationCapture::isCapturing() const {
@@ -129,12 +121,6 @@ std::string MediaFoundationCapture::getLastError() const {
 bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
     selected_device_name_ = device_name.empty() ? L"" : utf8ToWide(device_name);
     
-    // Check if this is an NZXT device
-    if (selected_device_name_.find(L"NZXT") != std::wstring::npos) {
-        is_nzxt_device_ = true;
-        std::cout << "NZXT device detected - special handling enabled" << std::endl;
-    }
-    
     // Re-enumerate and find device by name (for reconnection support)
     std::vector<media_foundation::DeviceInfo> devices;
     HRESULT hr = device_manager_->EnumerateDevices(devices);
@@ -148,12 +134,6 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
     // But keep the fallback to first device for backward compatibility
     if (selected_device_name_.empty()) {
         selected_device_name_ = devices[0].friendly_name;
-        
-        // Check again for NZXT
-        if (selected_device_name_.find(L"NZXT") != std::wstring::npos) {
-            is_nzxt_device_ = true;
-            std::cout << "NZXT device detected - special handling enabled" << std::endl;
-        }
     }
     
     // Find device by name
@@ -217,7 +197,7 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
 
 void MediaFoundationCapture::shutdownDevice() {
     // This method is only called:
-    // 1. In destructor (except for NZXT devices)
+    // 1. In destructor
     // 2. On initialization failure
     // 3. When reinitializing after error
     
@@ -232,33 +212,23 @@ void MediaFoundationCapture::shutdownDevice() {
         current_reader_->Flush(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS));
     }
     
-    // For NZXT-like devices, we should NOT do full shutdown during normal operation
-    // Only do full cleanup if we're in destructor or reinitializing after error
+    // Full cleanup
+    if (current_reader_) {
+        current_reader_->Release();
+        current_reader_ = nullptr;
+    }
     
-    if (reinit_attempts_ > 0 || !video_capture_) {
-        // Full cleanup only when necessary
-        
-        if (current_reader_) {
-            current_reader_->Release();
-            current_reader_ = nullptr;
-        }
-        
-        if (current_source_) {
-            // NOTE: We do NOT call Stop() or Shutdown() on the media source
-            // during normal operation to keep the device active
-            current_source_->Release();
-            current_source_ = nullptr;
-        }
-        
-        if (current_activate_) {
-            // NOTE: We do NOT call ShutdownObject() to keep device accessible
-            current_activate_->Release();
-            current_activate_ = nullptr;
-        }
-        
-        // Reset video capture for full reinit
-        video_capture_.reset();
-        video_capture_ = std::make_unique<media_foundation::MFVideoCapture>();
+    if (current_source_) {
+        // NOTE: We do NOT call Stop() or Shutdown() on the media source
+        // during normal operation to keep the device active
+        current_source_->Release();
+        current_source_ = nullptr;
+    }
+    
+    if (current_activate_) {
+        // NOTE: We do NOT call ShutdownObject() to keep device accessible
+        current_activate_->Release();
+        current_activate_ = nullptr;
     }
     
     initialized_ = false;
