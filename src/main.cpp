@@ -79,39 +79,41 @@ void listDevices(CaptureType type = CaptureType::MediaFoundation) {
         auto capture = std::make_unique<ndi_bridge::MediaFoundationCapture>();
         auto devices = capture->enumerateDevices();
         
-        std::cout << "\nMedia Foundation Devices:" << std::endl;
+        ndi_bridge::Logger::info("\nMedia Foundation Devices:");
         if (devices.empty()) {
-            std::cout << "  No Media Foundation devices found." << std::endl;
+            ndi_bridge::Logger::info("  No Media Foundation devices found.");
         } else {
             for (size_t i = 0; i < devices.size(); ++i) {
                 const auto& device = devices[i];
-                std::cout << "  " << i << ": " << device.name;
+                std::stringstream ss;
+                ss << "  " << i << ": " << device.name;
                 if (!device.id.empty() && device.id != device.name) {
-                    std::cout << " (" << device.id << ")";
+                    ss << " (" << device.id << ")";
                 }
-                std::cout << std::endl;
+                ndi_bridge::Logger::info(ss.str());
             }
         }
     } else if (type == CaptureType::DeckLink) {
         auto capture = std::make_unique<ndi_bridge::DeckLinkCapture>();
         auto devices = capture->enumerateDevices();
         
-        std::cout << "\nDeckLink Devices:" << std::endl;
+        ndi_bridge::Logger::info("\nDeckLink Devices:");
         if (devices.empty()) {
-            std::cout << "  No DeckLink devices found." << std::endl;
+            ndi_bridge::Logger::info("  No DeckLink devices found.");
         } else {
             for (size_t i = 0; i < devices.size(); ++i) {
                 const auto& device = devices[i];
-                std::cout << "  " << i << ": " << device.name;
+                std::stringstream ss;
+                ss << "  " << i << ": " << device.name;
                 if (!device.id.empty() && device.id != device.name) {
-                    std::cout << " (" << device.id << ")";
+                    ss << " (" << device.id << ")";
                 }
-                std::cout << std::endl;
+                ndi_bridge::Logger::info(ss.str());
             }
         }
     }
 #else
-    std::cout << "Device enumeration not yet implemented for Linux." << std::endl;
+    ndi_bridge::Logger::info("Device enumeration not yet implemented for Linux.");
 #endif
 }
 
@@ -161,9 +163,9 @@ std::string selectDeviceInteractive(CaptureType type) {
         return "";
     }
     
-    std::cout << "\nAvailable Devices:" << std::endl;
+    ndi_bridge::Logger::info("\nAvailable Devices:");
     for (size_t i = 0; i < devices.size(); ++i) {
-        std::cout << i << ": " << devices[i].name << std::endl;
+        ndi_bridge::Logger::info(std::to_string(i) + ": " + devices[i].name);
     }
     
     int chosenIndex = -1;
@@ -299,10 +301,7 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
 } // anonymous namespace
 
 int main(int argc, char* argv[]) {
-    // Initialize logger
-    ndi_bridge::Logger::initialize("ndi-bridge");
-    
-    // Log version on startup (per LLM instructions)
+    // Log version on startup - only place where version should be logged
     ndi_bridge::Logger::logVersion(NDI_BRIDGE_VERSION);
     ndi_bridge::Logger::info("NDI Bridge starting...");
     
