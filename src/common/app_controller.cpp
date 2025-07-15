@@ -1,12 +1,11 @@
 #include "app_controller.h"
-#include <iostream>
+#include "logger.h"
 #include <sstream>
 #include <iomanip>
 
 namespace ndi_bridge {
 
 // Constants
-constexpr char LOG_PREFIX[] = "[AppController]";
 constexpr int FRAME_QUEUE_WARNING_THRESHOLD = 10;
 constexpr auto ERROR_COOLDOWN_PERIOD = std::chrono::seconds(1);
 
@@ -19,16 +18,19 @@ constexpr uint32_t FOURCC_BGRX = 0x58524742;  // 'BGRX'
 
 AppController::AppController(const Config& config)
     : config_(config) {
-    std::cout << LOG_PREFIX << " Application Controller version 1.0.2 initialized" << std::endl;
+    Logger::initialize("AppController");
+    Logger::logVersion("1.0.3");
+    Logger::info("Application Controller initialized");
     
     if (config_.verbose) {
-        std::cout << LOG_PREFIX << " Configuration:" << std::endl;
-        std::cout << "  Device: " << (config_.device_name.empty() ? "default" : config_.device_name) << std::endl;
-        std::cout << "  NDI Name: " << config_.ndi_name << std::endl;
-        std::cout << "  Auto Retry: " << (config_.auto_retry ? "enabled" : "disabled") << std::endl;
+        Logger::setVerbose(true);
+        Logger::debug("Configuration:");
+        Logger::debug("  Device: " + (config_.device_name.empty() ? "default" : config_.device_name));
+        Logger::debug("  NDI Name: " + config_.ndi_name);
+        Logger::debug("  Auto Retry: " + std::string(config_.auto_retry ? "enabled" : "disabled"));
         if (config_.auto_retry) {
-            std::cout << "  Retry Delay: " << config_.retry_delay_ms << "ms" << std::endl;
-            std::cout << "  Max Retries: " << (config_.max_retries < 0 ? "infinite" : std::to_string(config_.max_retries)) << std::endl;
+            Logger::debug("  Retry Delay: " + std::to_string(config_.retry_delay_ms) + "ms");
+            Logger::debug("  Max Retries: " + (config_.max_retries < 0 ? "infinite" : std::to_string(config_.max_retries)));
         }
     }
 }
@@ -361,7 +363,7 @@ void AppController::onNdiError(const std::string& error) {
 }
 
 void AppController::reportStatus(const std::string& status) {
-    std::cout << LOG_PREFIX << " " << status << std::endl;
+    Logger::info(status);
     
     std::lock_guard<std::mutex> lock(mutex_);
     if (status_callback_) {
@@ -381,7 +383,7 @@ void AppController::reportError(const std::string& error, bool recoverable) {
     last_error_message_ = error;
     last_error_time_ = now;
     
-    std::cerr << LOG_PREFIX << " Error: " << error << std::endl;
+    Logger::error(error);
     
     std::lock_guard<std::mutex> lock(mutex_);
     if (error_callback_) {
