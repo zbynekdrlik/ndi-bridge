@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.2.1 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.3.0 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -101,7 +101,13 @@ if(PLATFORM_WINDOWS)
     endif()
 elseif(PLATFORM_LINUX)
     set(PLATFORM_SOURCES
-        # Linux-specific sources will be added here
+        # V4L2 capture support
+        src/linux/v4l2/v4l2_capture.h
+        src/linux/v4l2/v4l2_capture.cpp
+        src/linux/v4l2/v4l2_device_enumerator.h
+        src/linux/v4l2/v4l2_device_enumerator.cpp
+        src/linux/v4l2/v4l2_format_converter.h
+        src/linux/v4l2/v4l2_format_converter.cpp
     )
     
     # Linux compiler flags
@@ -249,7 +255,7 @@ elseif(PLATFORM_LINUX)
     target_link_libraries(${PROJECT_NAME} PRIVATE
         pthread
         dl
-        # v4l2  # TODO: Uncomment when Linux implementation is ready
+        # V4L2 is part of the kernel, no specific library needed
     )
 endif()
 
@@ -279,8 +285,10 @@ message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  Build tests: ${BUILD_TESTS}")
-message(STATUS "  DeckLink support: ${USE_DECKLINK}")
 if(PLATFORM_WINDOWS)
+    message(STATUS "  DeckLink support: ${USE_DECKLINK}")
     message(STATUS "  MSVC Version: ${MSVC_VERSION}")
+elseif(PLATFORM_LINUX)
+    message(STATUS "  V4L2 support: Enabled")
 endif()
 message(STATUS "")
