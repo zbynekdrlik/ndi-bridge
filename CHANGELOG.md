@@ -5,6 +5,50 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-07-15
+
+### Changed
+- **Simplified Logger Format**: Removed module names from log output
+  - Changed from `[module_name] [timestamp] message` to `[timestamp] message`
+  - Module names were not useful in compiled executables
+  - Cleaner, more concise log output
+
+### Fixed
+- **Single Version Logging**: Only log version once at application startup
+  - Removed redundant version logging from all components
+  - Changed wording from "Script version" to "Version" (not a script)
+- **Logger API Cleanup**: Removed `Logger::initialize()` method
+  - No longer needed without module names
+  - Simplified logger usage across all components
+
+### Technical Details
+- Removed `Logger::initialize()` calls from all components
+- Removed `Logger::logVersion()` calls from all components except main.cpp
+- Fixed remaining cout usage in device selection
+- Updated all Media Foundation components to remove logger initialization
+
+## [1.2.1] - 2025-07-15
+
+### Added
+- **Logger System**: Implemented centralized logging system per LLM instructions
+  - Format: `[module_name] [timestamp] message`
+  - Timestamps include milliseconds for precision
+  - Support for multiple log levels: INFO, WARNING, ERROR, DEBUG
+  - Version logging on startup using dedicated method
+
+### Changed
+- **Logging Format**: Standardized all logging throughout the application
+  - Replaced all cout/cerr calls with Logger methods
+  - Consistent timestamp format across all modules
+  - Module name included in every log message
+  - AppController version bumped to 1.0.3
+
+### Technical Details
+- Created Logger class in common/logger.h and common/logger.cpp
+- Updated main.cpp and app_controller.cpp to use new logger
+- Version is now logged on startup per LLM instruction requirements
+- Debug logging only shown when verbose mode is enabled
+
 ## [1.2.0] - 2025-07-15
 
 ### Fixed
@@ -236,6 +280,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.2.2]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.2.1...v1.2.2
+[1.2.1]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.5...v1.2.0
 [1.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.3...v1.1.4

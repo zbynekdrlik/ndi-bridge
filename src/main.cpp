@@ -26,6 +26,7 @@
 
 #include "common/app_controller.h"
 #include "common/version.h"
+#include "common/logger.h"
 
 namespace {
 
@@ -45,7 +46,7 @@ enum class CaptureType {
 // Signal handler
 void signalHandler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
-        std::cout << "\nShutdown requested..." << std::endl;
+        ndi_bridge::Logger::info("\nShutdown requested...");
         g_shutdown_requested = true;
         // Don't stop here - let main handle the graceful shutdown
     }
@@ -78,39 +79,41 @@ void listDevices(CaptureType type = CaptureType::MediaFoundation) {
         auto capture = std::make_unique<ndi_bridge::MediaFoundationCapture>();
         auto devices = capture->enumerateDevices();
         
-        std::cout << "\nMedia Foundation Devices:" << std::endl;
+        ndi_bridge::Logger::info("\nMedia Foundation Devices:");
         if (devices.empty()) {
-            std::cout << "  No Media Foundation devices found." << std::endl;
+            ndi_bridge::Logger::info("  No Media Foundation devices found.");
         } else {
             for (size_t i = 0; i < devices.size(); ++i) {
                 const auto& device = devices[i];
-                std::cout << "  " << i << ": " << device.name;
+                std::stringstream ss;
+                ss << "  " << i << ": " << device.name;
                 if (!device.id.empty() && device.id != device.name) {
-                    std::cout << " (" << device.id << ")";
+                    ss << " (" << device.id << ")";
                 }
-                std::cout << std::endl;
+                ndi_bridge::Logger::info(ss.str());
             }
         }
     } else if (type == CaptureType::DeckLink) {
         auto capture = std::make_unique<ndi_bridge::DeckLinkCapture>();
         auto devices = capture->enumerateDevices();
         
-        std::cout << "\nDeckLink Devices:" << std::endl;
+        ndi_bridge::Logger::info("\nDeckLink Devices:");
         if (devices.empty()) {
-            std::cout << "  No DeckLink devices found." << std::endl;
+            ndi_bridge::Logger::info("  No DeckLink devices found.");
         } else {
             for (size_t i = 0; i < devices.size(); ++i) {
                 const auto& device = devices[i];
-                std::cout << "  " << i << ": " << device.name;
+                std::stringstream ss;
+                ss << "  " << i << ": " << device.name;
                 if (!device.id.empty() && device.id != device.name) {
-                    std::cout << " (" << device.id << ")";
+                    ss << " (" << device.id << ")";
                 }
-                std::cout << std::endl;
+                ndi_bridge::Logger::info(ss.str());
             }
         }
     }
 #else
-    std::cout << "Device enumeration not yet implemented for Linux." << std::endl;
+    ndi_bridge::Logger::info("Device enumeration not yet implemented for Linux.");
 #endif
 }
 
@@ -160,9 +163,9 @@ std::string selectDeviceInteractive(CaptureType type) {
         return "";
     }
     
-    std::cout << "\nAvailable Devices:" << std::endl;
+    ndi_bridge::Logger::info("Available Devices:");
     for (size_t i = 0; i < devices.size(); ++i) {
-        std::cout << i << ": " << devices[i].name << std::endl;
+        ndi_bridge::Logger::info(std::to_string(i) + ": " + devices[i].name);
     }
     
     int chosenIndex = -1;
@@ -298,11 +301,17 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
 } // anonymous namespace
 
 int main(int argc, char* argv[]) {
-    // Log version on startup
-    std::cout << "[main] NDI Bridge version " << NDI_BRIDGE_VERSION << " starting..." << std::endl;
+    // Log version on startup - only place where version should be logged
+    ndi_bridge::Logger::logVersion(NDI_BRIDGE_VERSION);
+    ndi_bridge::Logger::info("NDI Bridge starting...");
     
     // Parse command line arguments
     CommandLineArgs args = parseArgs(argc, argv);
+    
+    // Set verbose mode if requested
+    if (args.verbose) {
+        ndi_bridge::Logger::setVerbose(true);
+    }
     
     if (args.show_help) {
         printUsage(argv[0]);
@@ -322,7 +331,9 @@ int main(int argc, char* argv[]) {
     // Initialize COM for Media Foundation and DeckLink
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(hr)) {
-        std::cerr << "Failed to initialize COM: 0x" << std::hex << hr << std::endl;
+        std::stringstream ss;
+        ss << "Failed to initialize COM: 0x" << std::hex << hr;
+        ndi_bridge::Logger::error(ss.str());
         return 1;
     }
     
@@ -387,15 +398,16 @@ int main(int argc, char* argv[]) {
     
     // Set up callbacks
     g_app_controller->setStatusCallback([](const std::string& status) {
-        std::cout << "[Status] " << status << std::endl;
+        ndi_bridge::Logger::info("[Status] " + status);
     });
     
     g_app_controller->setErrorCallback([](const std::string& error, bool recoverable) {
-        std::cerr << "[Error] " << error;
+        std::stringstream ss;
+        ss << "[Error] " << error;
         if (recoverable) {
-            std::cerr << " (recoverable)";
+            ss << " (recoverable)";
         }
-        std::cerr << std::endl;
+        ndi_bridge::Logger::error(ss.str());
     });
     
     // Create capture device based on type
@@ -404,39 +416,39 @@ int main(int argc, char* argv[]) {
     bool is_nzxt_device = false;
     
     if (args.capture_type == CaptureType::MediaFoundation) {
-        std::cout << "Using Media Foundation capture" << std::endl;
+        ndi_bridge::Logger::info("Using Media Foundation capture");
         g_capture_device = std::make_unique<ndi_bridge::MediaFoundationCapture>();
         
         // Check if it's NZXT device
         if (args.device_name.find("NZXT") != std::string::npos) {
             is_nzxt_device = true;
-            std::cout << "NZXT device detected - using special cleanup handling" << std::endl;
+            ndi_bridge::Logger::info("NZXT device detected - using special cleanup handling");
         }
     } else if (args.capture_type == CaptureType::DeckLink) {
-        std::cout << "Using DeckLink capture" << std::endl;
+        ndi_bridge::Logger::info("Using DeckLink capture");
         g_capture_device = std::make_unique<ndi_bridge::DeckLinkCapture>();
     }
     
     // Give ownership to app controller but keep global reference for NZXT
     g_app_controller->setCaptureDevice(std::move(g_capture_device));
 #else
-    std::cerr << "Linux capture not yet implemented" << std::endl;
+    ndi_bridge::Logger::error("Linux capture not yet implemented");
     return 1;
 #endif
     
     // Start the application
-    std::cout << "Starting capture pipeline..." << std::endl;
+    ndi_bridge::Logger::info("Starting capture pipeline...");
     if (!g_app_controller->start()) {
-        std::cerr << "Failed to start application" << std::endl;
+        ndi_bridge::Logger::error("Failed to start application");
         #ifdef _WIN32
         CoUninitialize();
         #endif
         return 1;
     }
     
-    std::cout << std::endl;
-    std::cout << "NDI Bridge is running. Press Ctrl+C to stop..." << std::endl;
-    std::cout << std::endl;
+    ndi_bridge::Logger::info("");
+    ndi_bridge::Logger::info("NDI Bridge is running. Press Ctrl+C to stop...");
+    ndi_bridge::Logger::info("");
     
     // Main loop - wait for shutdown signal only
     while (!g_shutdown_requested && g_app_controller->isRunning()) {
@@ -452,14 +464,15 @@ int main(int argc, char* argv[]) {
                 uint64_t captured, sent, dropped;
                 g_app_controller->getFrameStats(captured, sent, dropped);
                 
-                std::cout << "[Stats] Frames - Captured: " << captured 
-                         << ", Sent: " << sent 
-                         << ", Dropped: " << dropped;
+                std::stringstream ss;
+                ss << "[Stats] Frames - Captured: " << captured 
+                   << ", Sent: " << sent 
+                   << ", Dropped: " << dropped;
                 
                 int connections = g_app_controller->getNdiConnectionCount();
-                std::cout << ", NDI Connections: " << connections;
+                ss << ", NDI Connections: " << connections;
                 
-                std::cout << std::endl;
+                ndi_bridge::Logger::debug(ss.str());
                 
                 last_stats_time = now;
             }
@@ -470,47 +483,48 @@ int main(int argc, char* argv[]) {
     uint64_t captured, sent, dropped;
     g_app_controller->getFrameStats(captured, sent, dropped);
     
-    std::cout << "\nFinal Statistics:" << std::endl;
-    std::cout << "  Frames Captured: " << captured << std::endl;
-    std::cout << "  Frames Sent: " << sent << std::endl;
-    std::cout << "  Frames Dropped: " << dropped;
+    ndi_bridge::Logger::info("\nFinal Statistics:");
+    ndi_bridge::Logger::info("  Frames Captured: " + std::to_string(captured));
+    ndi_bridge::Logger::info("  Frames Sent: " + std::to_string(sent));
+    
+    std::stringstream ss;
+    ss << "  Frames Dropped: " << dropped;
     if (captured > 0) {
         double drop_rate = (dropped * 100.0) / captured;
-        std::cout << " (" << std::fixed << std::setprecision(2) 
-                 << drop_rate << "%)";
+        ss << " (" << std::fixed << std::setprecision(2) << drop_rate << "%)";
     }
-    std::cout << std::endl;
+    ndi_bridge::Logger::info(ss.str());
     
     int connections = g_app_controller->getNdiConnectionCount();
-    std::cout << "  NDI Connections: " << connections << std::endl;
+    ndi_bridge::Logger::info("  NDI Connections: " + std::to_string(connections));
     
     // Stop the application gracefully
-    std::cout << "Stopping application..." << std::endl;
+    ndi_bridge::Logger::info("Stopping application...");
     g_app_controller->stop();
     
 #ifdef _WIN32
     // NZXT workaround: Add delay before cleanup
     if (is_nzxt_device) {
-        std::cout << "Waiting before cleanup for NZXT device..." << std::endl;
+        ndi_bridge::Logger::info("Waiting before cleanup for NZXT device...");
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }
 #endif
     
     g_app_controller.reset();
     
-    std::cout << "Exiting." << std::endl;
+    ndi_bridge::Logger::info("Exiting.");
     
     // Cleanup
 #ifdef _WIN32
     // NZXT workaround: Add another delay before CoUninitialize
     if (is_nzxt_device) {
-        std::cout << "Final cleanup delay for NZXT device..." << std::endl;
+        ndi_bridge::Logger::info("Final cleanup delay for NZXT device...");
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     
     CoUninitialize();
 #endif
     
-    std::cout << "Application stopped successfully." << std::endl;
+    ndi_bridge::Logger::info("Application stopped successfully.");
     return 0;
 }

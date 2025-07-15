@@ -1,8 +1,9 @@
 // mf_capture_device.cpp
 #include "mf_capture_device.h"
 #include "mf_error_handling.h"
+#include "../../common/logger.h"
 #include <mfreadwrite.h>
-#include <iostream>
+#include <sstream>
 
 namespace ndi_bridge {
 namespace media_foundation {
@@ -39,7 +40,7 @@ HRESULT MFCaptureDevice::EnumerateDevices(std::vector<DeviceInfo>& devices) {
         return hr;
     }
     
-    std::cout << "Found " << count << " capture device(s)." << std::endl;
+    Logger::info("Found " + std::to_string(count) + " capture device(s).");
     
     // Process each device
     for (UINT32 i = 0; i < count; i++) {
@@ -48,7 +49,9 @@ HRESULT MFCaptureDevice::EnumerateDevices(std::vector<DeviceInfo>& devices) {
         
         // Get friendly name
         if (SUCCEEDED(GetDeviceFriendlyName(ppDevices[i], info.friendly_name))) {
-            std::wcout << L"Device " << i << L": " << info.friendly_name << std::endl;
+            // Convert wide string to UTF-8 for logging
+            std::string device_name = wideToUtf8(info.friendly_name);
+            Logger::info("Device " + std::to_string(i) + ": " + device_name);
             devices.push_back(info);
             cached_devices_.push_back(ppDevices[i]);
         } else {
@@ -77,7 +80,7 @@ HRESULT MFCaptureDevice::FindDeviceByName(const std::wstring& name, IMFActivate*
         }
     }
     
-    std::wcerr << L"Device \"" << name << L"\" not found." << std::endl;
+    Logger::error("Device \"" + wideToUtf8(name) + "\" not found.");
     return E_FAIL;
 }
 
@@ -135,7 +138,7 @@ HRESULT MFCaptureDevice::ConfigureSourceReader(IMFSourceReader* pReader) {
     // Enable only the first video stream
     pReader->SetStreamSelection((DWORD)MF_SOURCE_READER_FIRST_VIDEO_STREAM, TRUE);
     
-    std::cout << "SourceReader configured for video capture." << std::endl;
+    Logger::info("SourceReader configured for video capture.");
     return S_OK;
 }
 
@@ -183,6 +186,17 @@ void MFCaptureDevice::Cleanup() {
         attributes_->Release();
         attributes_ = nullptr;
     }
+}
+
+std::string MFCaptureDevice::wideToUtf8(const std::wstring& wide) {
+    if (wide.empty()) return "";
+    
+    int size = WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (size <= 0) return "";
+    
+    std::string result(size - 1, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wide.c_str(), -1, &result[0], size, nullptr, nullptr);
+    return result;
 }
 
 } // namespace media_foundation

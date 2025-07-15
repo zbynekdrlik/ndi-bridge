@@ -2,9 +2,10 @@
 #include "mf_video_capture.h"
 #include "mf_error_handling.h"
 #include "mf_format_converter.h"
-#include <iostream>
+#include "../../common/logger.h"
 #include <chrono>
 #include <algorithm>
+#include <sstream>
 
 namespace ndi_bridge {
 namespace media_foundation {
@@ -59,7 +60,7 @@ HRESULT MFVideoCapture::ConfigureOutputFormat() {
     pType->Release();
     
     if (FAILED(hr)) {
-        std::cerr << "Could not set UYVY output. Using device default." << std::endl;
+        Logger::info("Could not set UYVY output. Using device default.");
         // Not a fatal error - we'll convert if needed
     }
     
@@ -105,9 +106,11 @@ HRESULT MFVideoCapture::GetNegotiatedFormat() {
     double fps = (fps_denominator_ != 0) ? 
         static_cast<double>(fps_numerator_) / static_cast<double>(fps_denominator_) : 0.0;
     
-    std::cout << "Negotiated format: " << width_ << "x" << height_ 
-              << " @ " << fps << " fps"
-              << " (" << FormatConverter::GetFormatName(subtype_) << ")" << std::endl;
+    std::stringstream ss;
+    ss << "Negotiated format: " << width_ << "x" << height_ 
+       << " @ " << fps << " fps"
+       << " (" << FormatConverter::GetFormatName(subtype_) << ")";
+    Logger::info(ss.str());
     
     return S_OK;
 }
@@ -155,7 +158,7 @@ void MFVideoCapture::GetFormatInfo(int& width, int& height,
 }
 
 void MFVideoCapture::CaptureLoop() {
-    std::cout << "Capture loop started." << std::endl;
+    Logger::info("Capture loop started.");
     
     while (!should_stop_) {
         DWORD streamIndex = 0, flags = 0;
@@ -181,7 +184,7 @@ void MFVideoCapture::CaptureLoop() {
         
         // Check for end of stream
         if (flags & MF_SOURCE_READERF_ENDOFSTREAM) {
-            std::cerr << "End of stream encountered." << std::endl;
+            Logger::error("End of stream encountered.");
             if (pSample) pSample->Release();
             break;
         }
@@ -196,7 +199,7 @@ void MFVideoCapture::CaptureLoop() {
         }
     }
     
-    std::cout << "Capture loop ended." << std::endl;
+    Logger::info("Capture loop ended.");
 }
 
 HRESULT MFVideoCapture::ProcessSample(IMFSample* pSample) {
@@ -253,7 +256,7 @@ HRESULT MFVideoCapture::ProcessSample(IMFSample* pSample) {
 bool MFVideoCapture::HandleCaptureError(HRESULT hr) {
     if (MFErrorHandler::IsDeviceError(hr)) {
         last_error_ = MFErrorHandler::HResultToString(hr);
-        std::cerr << "Device error during capture: " << last_error_ << std::endl;
+        Logger::error("Device error during capture: " + last_error_);
         
         // Wait before signaling error
         std::this_thread::sleep_for(std::chrono::milliseconds(retry_delay_ms_));

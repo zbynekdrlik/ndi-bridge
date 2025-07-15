@@ -1,9 +1,10 @@
 // media_foundation_capture.cpp
 #include "media_foundation_capture.h"
+#include "../../common/logger.h"
+#include "../../common/version.h"
 #include "mf_error_handling.h"
 #include <codecvt>
 #include <locale>
-#include <iostream>
 #include <chrono>
 
 namespace ndi_bridge {
@@ -225,8 +226,8 @@ void MediaFoundationCapture::shutdownDevice(bool full_shutdown) {
             // This prevents the USB capture card from remaining active
             HRESULT hr = current_source_->Shutdown();
             if (FAILED(hr)) {
-                std::cerr << "Warning: Failed to shutdown media source: " 
-                          << media_foundation::MFErrorHandler::HResultToString(hr) << std::endl;
+                Logger::warning("Failed to shutdown media source: " + 
+                               media_foundation::MFErrorHandler::HResultToString(hr));
             }
         }
         current_source_->Release();
@@ -240,8 +241,8 @@ void MediaFoundationCapture::shutdownDevice(bool full_shutdown) {
             // This ensures the device is properly released
             HRESULT hr = current_activate_->ShutdownObject();
             if (FAILED(hr)) {
-                std::cerr << "Warning: Failed to shutdown activate object: " 
-                          << media_foundation::MFErrorHandler::HResultToString(hr) << std::endl;
+                Logger::warning("Failed to shutdown activate object: " + 
+                               media_foundation::MFErrorHandler::HResultToString(hr));
             }
         }
         current_activate_->Release();
@@ -263,8 +264,8 @@ bool MediaFoundationCapture::reinitializeOnError(HRESULT hr) {
     
     reinit_attempts_++;
     
-    std::cout << "Attempting to reinitialize (attempt " << reinit_attempts_ 
-              << "/" << kMaxReinitAttempts << ")" << std::endl;
+    Logger::info("Attempting to reinitialize (attempt " + std::to_string(reinit_attempts_) + 
+                 "/" + std::to_string(kMaxReinitAttempts) + ")");
     
     // Check if we need to reinit Media Foundation
     if (media_foundation::MFErrorHandler::RequiresMediaFoundationReinit(hr)) {

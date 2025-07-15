@@ -1,6 +1,7 @@
 #include "ndi_sender.h"
+#include "logger.h"
+#include "version.h"
 #include <Processing.NDI.Lib.h>
-#include <iostream>
 #include <chrono>
 #include <cstring>
 
@@ -12,12 +13,10 @@ int NdiSender::lib_ref_count_ = 0;
 
 // Constants
 constexpr int CONNECTION_CHECK_TIMEOUT_MS = 5000;
-constexpr char LOG_PREFIX[] = "[NdiSender]";
 
 NdiSender::NdiSender(const std::string& sender_name, ErrorCallback error_callback)
     : sender_name_(sender_name)
     , error_callback_(std::move(error_callback)) {
-    std::cout << LOG_PREFIX << " NDI Sender version 1.0.2 initialized" << std::endl;
 }
 
 NdiSender::~NdiSender() {
@@ -57,7 +56,7 @@ bool NdiSender::initialize() {
         return true;
     }
 
-    std::cout << LOG_PREFIX << " Initializing NDI sender: " << sender_name_ << std::endl;
+    Logger::info("Initializing NDI sender: " + sender_name_);
 
     // Initialize NDI library
     if (!loadNdiLibrary()) {
@@ -73,7 +72,7 @@ bool NdiSender::initialize() {
     }
 
     initialized_ = true;
-    std::cout << LOG_PREFIX << " NDI sender initialized successfully" << std::endl;
+    Logger::info("NDI sender initialized successfully");
     return true;
 }
 
@@ -84,7 +83,7 @@ void NdiSender::shutdown() {
         return;
     }
 
-    std::cout << LOG_PREFIX << " Shutting down NDI sender" << std::endl;
+    Logger::info("Shutting down NDI sender");
     cleanup();
     initialized_ = false;
 }
@@ -187,11 +186,11 @@ bool NdiSender::loadNdiLibrary() {
 
     // Initialize NDI
     if (!NDIlib_initialize()) {
-        std::cerr << LOG_PREFIX << " Failed to initialize NDI library" << std::endl;
+        Logger::error("Failed to initialize NDI library");
         return false;
     }
 
-    std::cout << LOG_PREFIX << " NDI library version: " << getNdiVersion() << std::endl;
+    Logger::info("NDI library version: " + getNdiVersion());
     
     lib_ref_count_++;
     return true;
@@ -207,11 +206,11 @@ bool NdiSender::createSender() {
     // Create the sender
     ndi_send_instance_ = NDIlib_send_create(&send_create);
     if (!ndi_send_instance_) {
-        std::cerr << LOG_PREFIX << " Failed to create NDI sender instance" << std::endl;
+        Logger::error("Failed to create NDI sender instance");
         return false;
     }
 
-    std::cout << LOG_PREFIX << " Created NDI sender: " << sender_name_ << std::endl;
+    Logger::info("Created NDI sender: " + sender_name_);
     return true;
 }
 
@@ -220,7 +219,7 @@ void NdiSender::cleanup() {
     if (ndi_send_instance_) {
         NDIlib_send_destroy(ndi_send_instance_);
         ndi_send_instance_ = nullptr;
-        std::cout << LOG_PREFIX << " Destroyed NDI sender instance" << std::endl;
+        Logger::info("Destroyed NDI sender instance");
     }
 
     // Decrement library reference count
@@ -228,13 +227,13 @@ void NdiSender::cleanup() {
         std::lock_guard<std::mutex> lock(lib_mutex_);
         if (--lib_ref_count_ == 0) {
             NDIlib_destroy();
-            std::cout << LOG_PREFIX << " NDI library unloaded" << std::endl;
+            Logger::info("NDI library unloaded");
         }
     }
 }
 
 void NdiSender::reportError(const std::string& error) {
-    std::cerr << LOG_PREFIX << " Error: " << error << std::endl;
+    Logger::error("Error: " + error);
     
     if (error_callback_) {
         error_callback_(error);
