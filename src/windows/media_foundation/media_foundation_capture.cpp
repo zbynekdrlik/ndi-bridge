@@ -24,7 +24,7 @@ MediaFoundationCapture::~MediaFoundationCapture() {
         stopCapture();
     }
     
-    // Then shutdown device properly
+    // Only do full shutdown in destructor
     shutdownDevice();
 }
 
@@ -89,6 +89,10 @@ void MediaFoundationCapture::stopCapture() {
     if (video_capture_) {
         video_capture_->StopCapture();
     }
+    
+    // NOTE: We do NOT shutdown the device here!
+    // The device remains initialized so we can quickly restart capture
+    // This prevents issues with devices like NZXT that don't handle full shutdown well
 }
 
 bool MediaFoundationCapture::isCapturing() const {
@@ -155,7 +159,7 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
         return false;
     }
     
-    // Create media source and keep reference for proper shutdown
+    // Create media source and keep reference
     hr = device_manager_->CreateMediaSource(current_activate_, &current_source_);
     if (FAILED(hr)) {
         last_error_ = "Failed to create media source: " + media_foundation::MFErrorHandler::HResultToString(hr);
@@ -192,43 +196,50 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
 }
 
 void MediaFoundationCapture::shutdownDevice() {
-    // 1. Stop video capture first
+    // This method is only called:
+    // 1. In destructor
+    // 2. On initialization failure
+    // 3. When reinitializing after error
+    
+    // Stop video capture first
     if (video_capture_) {
         video_capture_->StopCapture();
-        video_capture_.reset();  // Release the video capture
+        // Don't reset video_capture_ - we'll reuse it
     }
     
-    // 2. Flush and release source reader
+    // Flush source reader but don't release yet
     if (current_reader_) {
-        // Flush all streams to ensure no pending operations
         current_reader_->Flush(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS));
-        current_reader_->Release();
-        current_reader_ = nullptr;
     }
     
-    // 3. Shutdown the media source properly
-    if (current_source_) {
-        // Stop the media source
-        current_source_->Stop();
+    // For NZXT-like devices, we should NOT do full shutdown during normal operation
+    // Only do full cleanup if we're in destructor or reinitializing after error
+    
+    if (reinit_attempts_ > 0 || !video_capture_) {
+        // Full cleanup only when necessary
         
-        // Shut it down completely
-        current_source_->Shutdown();
+        if (current_reader_) {
+            current_reader_->Release();
+            current_reader_ = nullptr;
+        }
         
-        // Now release
-        current_source_->Release();
-        current_source_ = nullptr;
+        if (current_source_) {
+            // NOTE: We do NOT call Stop() or Shutdown() on the media source
+            // during normal operation to keep the device active
+            current_source_->Release();
+            current_source_ = nullptr;
+        }
+        
+        if (current_activate_) {
+            // NOTE: We do NOT call ShutdownObject() to keep device accessible
+            current_activate_->Release();
+            current_activate_ = nullptr;
+        }
+        
+        // Reset video capture for full reinit
+        video_capture_.reset();
+        video_capture_ = std::make_unique<media_foundation::MFVideoCapture>();
     }
-    
-    // 4. Release the activate object
-    if (current_activate_) {
-        // Shut down the activate object to release the device
-        current_activate_->ShutdownObject();
-        current_activate_->Release();
-        current_activate_ = nullptr;
-    }
-    
-    // 5. Clear cached devices in device manager
-    device_manager_->Cleanup();
     
     initialized_ = false;
 }
