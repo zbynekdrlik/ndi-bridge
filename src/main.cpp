@@ -14,8 +14,7 @@
 #include <windows.h>
 #include <conio.h>
 #include "windows/media_foundation/media_foundation_capture.h"
-// TODO: Re-enable when DeckLink is adapted to ndi_bridge::ICaptureDevice interface
-// #include "capture/DeckLinkCaptureDevice.h"
+#include "windows/decklink/decklink_capture.h"
 #include "capture/DeckLinkDeviceEnumerator.h"
 #else
 #include <termios.h>
@@ -115,15 +114,6 @@ void printUsage(const char* program_name) {
 // List available capture devices
 void listDevices(CaptureType type = CaptureType::MediaFoundation) {
 #ifdef _WIN32
-    if (type == CaptureType::MediaFoundation || type == CaptureType::DeckLink) {
-        // Initialize COM
-        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-        if (FAILED(hr)) {
-            std::cerr << "Failed to initialize COM" << std::endl;
-            return;
-        }
-    }
-    
     if (type == CaptureType::MediaFoundation) {
         auto capture = std::make_unique<ndi_bridge::MediaFoundationCapture>();
         auto devices = capture->enumerateDevices();
@@ -142,21 +132,23 @@ void listDevices(CaptureType type = CaptureType::MediaFoundation) {
             }
         }
     } else if (type == CaptureType::DeckLink) {
-        DeckLinkDeviceEnumerator enumerator;
-        enumerator.EnumerateDevices();
+        auto capture = std::make_unique<ndi_bridge::DeckLinkCapture>();
+        auto devices = capture->enumerateDevices();
         
         std::cout << "\nDeckLink Devices:" << std::endl;
-        auto deviceNames = enumerator.GetDeviceNames();
-        if (deviceNames.empty()) {
+        if (devices.empty()) {
             std::cout << "  No DeckLink devices found." << std::endl;
         } else {
-            for (size_t i = 0; i < deviceNames.size(); ++i) {
-                std::cout << "  " << i << ": " << deviceNames[i] << std::endl;
+            for (size_t i = 0; i < devices.size(); ++i) {
+                const auto& device = devices[i];
+                std::cout << "  " << i << ": " << device.name;
+                if (!device.id.empty() && device.id != device.name) {
+                    std::cout << " (" << device.id << ")";
+                }
+                std::cout << std::endl;
             }
         }
     }
-    
-    CoUninitialize();
 #else
     std::cout << "Device enumeration not yet implemented for Linux." << std::endl;
 #endif
@@ -166,7 +158,7 @@ void listDevices(CaptureType type = CaptureType::MediaFoundation) {
 CaptureType selectCaptureTypeInteractive() {
     std::cout << "\nSelect capture type:" << std::endl;
     std::cout << "0: Media Foundation (Webcams, USB capture)" << std::endl;
-    std::cout << "1: DeckLink (Blackmagic devices) - TEMPORARILY UNAVAILABLE" << std::endl;
+    std::cout << "1: DeckLink (Blackmagic devices)" << std::endl;
     
     int choice = -1;
     while (choice < 0 || choice > 1) {
@@ -176,12 +168,6 @@ CaptureType selectCaptureTypeInteractive() {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             std::cerr << "Invalid input. Please enter a number." << std::endl;
-            choice = -1;
-            continue;
-        }
-        
-        if (choice == 1) {
-            std::cerr << "DeckLink support is temporarily unavailable. Please select Media Foundation." << std::endl;
             choice = -1;
             continue;
         }
@@ -199,82 +185,51 @@ CaptureType selectCaptureTypeInteractive() {
 // Select device interactively
 std::string selectDeviceInteractive(CaptureType type) {
 #ifdef _WIN32
+    std::unique_ptr<ndi_bridge::ICaptureDevice> capture;
+    
     if (type == CaptureType::MediaFoundation) {
-        auto capture = std::make_unique<ndi_bridge::MediaFoundationCapture>();
-        auto devices = capture->enumerateDevices();
-        
-        if (devices.empty()) {
-            std::cerr << "No Media Foundation devices found." << std::endl;
-            return "";
-        }
-        
-        std::cout << "\nAvailable Media Foundation Devices:" << std::endl;
-        for (size_t i = 0; i < devices.size(); ++i) {
-            std::cout << i << ": " << devices[i].name << std::endl;
-        }
-        
-        int chosenIndex = -1;
-        while (chosenIndex < 0 || chosenIndex >= static_cast<int>(devices.size())) {
-            std::cout << "Select device index: ";
-            
-            if (!(std::cin >> chosenIndex)) {
-                std::cin.clear();
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                std::cerr << "Invalid input. Please enter a number." << std::endl;
-                chosenIndex = -1;
-                continue;
-            }
-            
-            if (chosenIndex < 0 || chosenIndex >= static_cast<int>(devices.size())) {
-                std::cerr << "Invalid device index. Please try again." << std::endl;
-            }
-        }
-        
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        
-        std::cout << "Using device: " << devices[chosenIndex].name << std::endl;
-        return devices[chosenIndex].name;
+        capture = std::make_unique<ndi_bridge::MediaFoundationCapture>();
     } else if (type == CaptureType::DeckLink) {
-        DeckLinkDeviceEnumerator enumerator;
-        enumerator.EnumerateDevices();
-        
-        auto deviceNames = enumerator.GetDeviceNames();
-        if (deviceNames.empty()) {
-            std::cerr << "No DeckLink devices found." << std::endl;
-            return "";
-        }
-        
-        std::cout << "\nAvailable DeckLink Devices:" << std::endl;
-        for (size_t i = 0; i < deviceNames.size(); ++i) {
-            std::cout << i << ": " << deviceNames[i] << std::endl;
-        }
-        
-        int chosenIndex = -1;
-        while (chosenIndex < 0 || chosenIndex >= static_cast<int>(deviceNames.size())) {
-            std::cout << "Select device index: ";
-            
-            if (!(std::cin >> chosenIndex)) {
-                std::cin.clear();
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-                std::cerr << "Invalid input. Please enter a number." << std::endl;
-                chosenIndex = -1;
-                continue;
-            }
-            
-            if (chosenIndex < 0 || chosenIndex >= static_cast<int>(deviceNames.size())) {
-                std::cerr << "Invalid device index. Please try again." << std::endl;
-            }
-        }
-        
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-        
-        std::cout << "Using device: " << deviceNames[chosenIndex] << std::endl;
-        return deviceNames[chosenIndex];
+        capture = std::make_unique<ndi_bridge::DeckLinkCapture>();
     }
+    
+    auto devices = capture->enumerateDevices();
+    
+    if (devices.empty()) {
+        std::cerr << "No devices found." << std::endl;
+        return "";
+    }
+    
+    std::cout << "\nAvailable Devices:" << std::endl;
+    for (size_t i = 0; i < devices.size(); ++i) {
+        std::cout << i << ": " << devices[i].name << std::endl;
+    }
+    
+    int chosenIndex = -1;
+    while (chosenIndex < 0 || chosenIndex >= static_cast<int>(devices.size())) {
+        std::cout << "Select device index: ";
+        
+        if (!(std::cin >> chosenIndex)) {
+            std::cin.clear();
+            std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+            std::cerr << "Invalid input. Please enter a number." << std::endl;
+            chosenIndex = -1;
+            continue;
+        }
+        
+        if (chosenIndex < 0 || chosenIndex >= static_cast<int>(devices.size())) {
+            std::cerr << "Invalid device index. Please try again." << std::endl;
+        }
+    }
+    
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+    
+    std::cout << "Using device: " << devices[chosenIndex].name << std::endl;
+    return devices[chosenIndex].name;
 #else
     std::cerr << "Device selection not yet implemented for Linux." << std::endl;
-#endif
     return "";
+#endif
 }
 
 // Parse command line arguments
@@ -319,9 +274,7 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
                 if (args.capture_type_str == "mf" || args.capture_type_str == "mediafoundation") {
                     args.capture_type = CaptureType::MediaFoundation;
                 } else if (args.capture_type_str == "dl" || args.capture_type_str == "decklink") {
-                    // args.capture_type = CaptureType::DeckLink;
-                    std::cerr << "Warning: DeckLink support is temporarily unavailable. Using Media Foundation instead." << std::endl;
-                    args.capture_type = CaptureType::MediaFoundation;
+                    args.capture_type = CaptureType::DeckLink;
                 } else {
                     std::cerr << "Error: Invalid capture type. Use 'mf' or 'dl'" << std::endl;
                     args.show_help = true;
@@ -404,17 +357,6 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     
-    if (args.list_devices) {
-        // List both types if not specified
-        if (args.capture_type_str.empty()) {
-            listDevices(CaptureType::MediaFoundation);
-            listDevices(CaptureType::DeckLink);
-        } else {
-            listDevices(args.capture_type);
-        }
-        return 0;
-    }
-    
     // Platform-specific initialization
 #ifdef _WIN32
     // Initialize COM for Media Foundation and DeckLink
@@ -431,6 +373,20 @@ int main(int argc, char* argv[]) {
     mode &= ~ENABLE_QUICK_EDIT_MODE;
     SetConsoleMode(hInput, mode);
 #endif
+    
+    if (args.list_devices) {
+        // List both types if not specified
+        if (args.capture_type_str.empty()) {
+            listDevices(CaptureType::MediaFoundation);
+            listDevices(CaptureType::DeckLink);
+        } else {
+            listDevices(args.capture_type);
+        }
+        #ifdef _WIN32
+        CoUninitialize();
+        #endif
+        return 0;
+    }
     
     // Interactive capture type and device selection if needed
     if (args.use_interactive) {
@@ -490,14 +446,8 @@ int main(int argc, char* argv[]) {
         std::cout << "Using Media Foundation capture" << std::endl;
         capture_device = std::make_unique<ndi_bridge::MediaFoundationCapture>();
     } else if (args.capture_type == CaptureType::DeckLink) {
-        // TODO: Implement adapter class for DeckLink to ndi_bridge::ICaptureDevice
-        std::cerr << "DeckLink support is temporarily unavailable. Please use Media Foundation (-t mf)." << std::endl;
-        #ifdef _WIN32
-        CoUninitialize();
-        #endif
-        return 1;
-        // std::cout << "Using DeckLink capture" << std::endl;
-        // capture_device = std::make_unique<DeckLinkCaptureDevice>();
+        std::cout << "Using DeckLink capture" << std::endl;
+        capture_device = std::make_unique<ndi_bridge::DeckLinkCapture>();
     }
 #else
     std::cerr << "Linux capture not yet implemented" << std::endl;
