@@ -10,16 +10,17 @@
 2. **DeckLink SDK**
    - Download from: https://www.blackmagicdesign.com/developer/
    - Extract to: `C:\Blackmagic DeckLink SDK 12.5\` (or your preferred location)
-   - Set environment variable: `DECKLINK_SDK_DIR` to SDK path
+   - Copy IDL files to `docs/reference/` and generate API files
+   - See [DeckLink SDK Setup](decklink-sdk-setup.md) for detailed instructions
 
 ## Building with DeckLink Support
 
 ```bash
-# Enable DeckLink support
+# Enable DeckLink support (default is ON)
 cmake -DUSE_DECKLINK=ON ..
 
-# Or set SDK path explicitly
-cmake -DUSE_DECKLINK=ON -DECKLINK_SDK_DIR="C:/Blackmagic DeckLink SDK 12.5" ..
+# Or disable if needed
+cmake -DUSE_DECKLINK=OFF ..
 ```
 
 ## Supported DeckLink Devices
@@ -34,42 +35,36 @@ cmake -DUSE_DECKLINK=ON -DECKLINK_SDK_DIR="C:/Blackmagic DeckLink SDK 12.5" ..
 
 ## Usage Examples
 
-### List all devices (including DeckLink)
+### List all devices
 ```bash
-ndi-bridge.exe --list-devices
+# List Media Foundation devices
+ndi-bridge.exe -t mf -l
+
+# List DeckLink devices
+ndi-bridge.exe -t dl -l
 ```
 
 Output:
 ```
-Media Foundation Devices:
-  0: Integrated Camera
-  1: USB Capture Device
-
-DeckLink Devices:
-  0: DeckLink Mini Recorder
-  1: DeckLink SDI 4K
+[DeckLink] Found device [0]: "DeckLink Mini Recorder" (Serial: 12345678)
+[DeckLink] Found device [1]: "DeckLink SDI 4K"
 ```
 
 ### Use specific DeckLink device
 ```bash
 # By name
-ndi-bridge.exe --capture-type decklink -d "DeckLink Mini Recorder"
+ndi-bridge.exe -t dl -d "DeckLink Mini Recorder" -n "SDI Stream"
 
 # Interactive selection
-ndi-bridge.exe --capture-type decklink
+ndi-bridge.exe -t dl
 ```
 
-### DeckLink-specific options
-```bash
-# Set video format
-ndi-bridge.exe --capture-type decklink --decklink-format "1080p30"
-
-# Available formats:
-# - 1080p30, 1080p25, 1080p24
-# - 1080i60, 1080i50
-# - 720p60, 720p50
-# - 2160p30, 2160p25, 2160p24
-```
+### DeckLink Features
+- **Automatic format detection**: Detects input format automatically
+- **No-signal handling**: Gracefully handles signal loss
+- **Serial number tracking**: Persists device selection across reconnects
+- **Rolling FPS calculation**: Monitors capture performance
+- **Format support**: UYVY and BGRA formats
 
 ## Troubleshooting
 
@@ -78,14 +73,27 @@ ndi-bridge.exe --capture-type decklink --decklink-format "1080p30"
 2. Run Blackmagic Desktop Video Setup
 3. Verify device appears in Device Manager
 4. Check PCIe connection (for internal cards)
+5. Ensure DeckLink API files exist in `docs/reference/`
 
 ### No video signal
 1. Check SDI/HDMI cable connection
 2. Verify input format matches source
 3. Use Desktop Video Setup to test input
-4. Try different video format with `--decklink-format`
+4. Check application logs for "No input signal" messages
 
 ### Build errors
-1. Verify DECKLINK_SDK_DIR is set correctly
-2. Check SDK version compatibility (12.0+)
+1. Verify DeckLink API files are generated:
+   - `docs/reference/DeckLinkAPI_h.h`
+   - `docs/reference/DeckLinkAPI_i.c`
+2. Run generation script if needed:
+   ```cmd
+   cd docs\reference
+   generate-decklink-api.bat
+   ```
 3. Ensure Visual Studio has Windows SDK installed
+
+### Runtime errors
+1. Check if Desktop Video drivers are installed
+2. Verify no other application is using the DeckLink device
+3. Try running as Administrator
+4. Check Windows Event Log for driver issues

@@ -1,86 +1,121 @@
-# Feature Comparison: Original vs Refactored Code
+# Feature Comparison: Evolution from v1.0.0 to v1.1.3
 
-This document compares features between the original single-file implementation and the refactored modular version.
+This document tracks the evolution of NDI Bridge features across all versions.
 
-## Core Features
+## Version 1.1.3 (Current) - Production Ready
 
-| Feature | Original | Refactored | Status | Notes |
-|---------|----------|------------|--------|-------|
-| **Media Foundation Capture** | ✅ | ✅ | ✅ Working | |
-| **NDI Streaming** | ✅ | ✅ | ✅ Working | |
-| **Multiple Device Support** | ✅ | ✅ | ✅ Working | |
-| **Error Recovery** | ✅ | ✅ | ✅ Working | Auto-retry with delays |
-| **Format Conversion** | ✅ | ✅ | ✅ Working | YUY2→UYVY, NV12→UYVY |
+### Major Features Summary
 
-## User Interface Features
+| Feature Category | Status | Version | Notes |
+|-----------------|--------|---------|-------|
+| **Media Foundation** | ✅ Complete | v1.0.0+ | Windows webcams and HDMI capture |
+| **DeckLink Support** | ✅ Complete | v1.1.3 | Professional broadcast equipment |
+| **NDI Streaming** | ✅ Complete | v1.0.0+ | Low-latency network streaming |
+| **Cross-platform Architecture** | 📋 Framework | v1.0.0+ | Linux support planned |
+| **Error Recovery** | ✅ Complete | v1.0.0+ | Automatic reconnection and retry |
+| **Interactive UI** | ✅ Complete | v1.0.5+ | User-friendly device selection |
 
-| Feature | Original | Refactored v1.0.4 | Refactored v1.0.5 | Notes |
-|---------|----------|-------------------|-------------------|-------|
-| **Interactive Device Menu** | ✅ | ❌ | ✅ Fixed | Shows numbered list, prompts for selection |
-| **Interactive NDI Name Input** | ✅ | ❌ | ✅ Fixed | Prompts for NDI stream name |
-| **Command-line Options** | ✅ | ✅ | ✅ | -d, -n, --verbose, etc. |
-| **Positional Parameters** | ✅ | ❌ | ✅ Fixed | `program.exe "device" "ndi_name"` |
-| **List Devices (-l)** | ❌ | ✅ | ✅ | Added in refactored version |
-| **Version Display** | ❌ | ✅ | ✅ | Added in refactored version |
-| **Help Display** | ❌ | ✅ | ✅ | Added in refactored version |
-| **Wait for Enter (CLI mode)** | ✅ | ❌ | ✅ Fixed | Waits before closing in positional mode |
+## Feature Evolution by Version
 
-## Technical Features
+### Core Features
 
-| Feature | Original | Refactored | Status | Notes |
-|---------|----------|------------|--------|-------|
-| **Device Re-enumeration** | ✅ | ✅ | ✅ Working | Re-finds device after disconnect |
-| **MF Reinit on Errors** | ✅ | ✅ | ✅ Working | Handles locked device errors |
-| **COM/MF Initialization** | ✅ | ✅ | ✅ Working | |
-| **Signal Handling** | ❌ | ✅ | ✅ | Clean shutdown on Ctrl+C |
-| **Frame Statistics** | ❌ | ✅ | ✅ | Shows captured/sent/dropped counts |
-| **NDI Connection Count** | ❌ | ✅ | ✅ | Shows active NDI viewers |
-| **Modular Architecture** | ❌ | ✅ | ✅ | Clean separation of concerns |
-| **Cross-platform Ready** | ❌ | ✅ | ✅ | Linux support structure in place |
+| Feature | v1.0.0 | v1.0.7 | v1.1.0 | v1.1.3 | Notes |
+|---------|--------|--------|--------|--------|-------|
+| **Media Foundation Capture** | ✅ | ✅ | ✅ | ✅ | Stable since v1.0.0 |
+| **DeckLink Capture** | ❌ | ❌ | 🔄 | ✅ | Completed in v1.1.3 |
+| **NDI Streaming** | ✅ | ✅ | ✅ | ✅ | Core functionality |
+| **Format Conversion** | ✅ | ✅ | ✅ | ✅ | YUY2→UYVY, NV12→UYVY, BGRA→UYVY |
+| **Capture Type Selection** | ❌ | ❌ | ✅ | ✅ | `-t mf` or `-t dl` |
+| **Multiple Device Support** | ✅ | ✅ | ✅ | ✅ | Unified interface |
 
-## Error Handling
+### User Interface Features
 
-| Feature | Original | Refactored | Status | Notes |
-|---------|----------|------------|--------|-------|
-| **Device Invalidated** | ✅ | ✅ | ✅ Working | MF_E_DEVICE_INVALIDATED |
-| **HW MFT Failed** | ✅ | ✅ | ✅ Working | MF_E_HW_MFT_FAILED_START_STREAMING |
-| **Device Locked** | ✅ | ✅ | ✅ Working | MF_E_VIDEO_RECORDING_DEVICE_LOCKED |
-| **Retry with Delays** | ✅ | ✅ | ✅ Working | Exponential backoff (1s → 5s max) |
-| **Max Retry Attempts** | ❌ | ✅ | ✅ | Configurable via --max-retries |
+| Feature | v1.0.0 | v1.0.5 | v1.0.7 | v1.1.3 | Notes |
+|---------|--------|--------|--------|--------|-------|
+| **Interactive Device Menu** | ❌ | ✅ | ✅ | ✅ | Numbered selection |
+| **Command-line Options** | ✅ | ✅ | ✅ | ✅ | Full CLI support |
+| **Positional Parameters** | ❌ | ✅ | ✅ | ✅ | `program "device" "name"` |
+| **List Devices (-l)** | ✅ | ✅ | ✅ | ✅ | Per capture type |
+| **Interactive NDI Name** | ❌ | ✅ | ✅ | ✅ | Prompts for name |
+| **Version Display** | ✅ | ✅ | ✅ | ✅ | Shows on startup |
+| **Help Display (-h)** | ✅ | ✅ | ✅ | ✅ | Comprehensive help |
 
-## Output Format
+### Technical Features
 
-| Feature | Original | Refactored | Notes |
-|---------|----------|------------|-------|
-| **Device Enumeration Format** | `Device 0: Name` | `0: Name` | Minor difference |
-| **Verbose Logging** | Limited | Extensive | More detailed in refactored |
-| **Version on Startup** | ❌ | ✅ | Shows version automatically |
-| **Module Prefixes** | ❌ | ✅ | [AppController], [NdiSender], etc. |
+| Feature | v1.0.0 | v1.0.7 | v1.1.0 | v1.1.3 | Notes |
+|---------|--------|--------|--------|--------|-------|
+| **Device Re-enumeration** | ✅ | ✅ | ✅ | ✅ | Auto-reconnect |
+| **Signal Handling** | ✅ | ✅ | ✅ | ✅ | Clean shutdown |
+| **Frame Statistics** | ✅ | ✅ | ✅ | ✅ | FPS monitoring |
+| **Modular Architecture** | ✅ | ✅ | ✅ | ✅ | Clean separation |
+| **Thread-safe Processing** | ✅ | ✅ | ✅ | ✅ | Per-device threads |
+| **Format Converter Framework** | ❌ | ❌ | ✅ | ✅ | Extensible design |
+| **Serial Number Tracking** | ❌ | ❌ | ✅ | ✅ | DeckLink persistence |
+| **No-signal Handling** | ❌ | ❌ | ✅ | ✅ | Professional feature |
+
+### DeckLink-Specific Features (v1.1.0+)
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| **Device Enumeration** | ✅ | Lists all DeckLink devices |
+| **Format Auto-detection** | ✅ | Detects input format |
+| **UYVY/BGRA Support** | ✅ | Native formats |
+| **Serial Number Tracking** | ✅ | Device persistence |
+| **No-signal Detection** | ✅ | Handles signal loss |
+| **Rolling FPS Calculation** | ✅ | 60-second average |
+| **Frame Queue Management** | ✅ | Drops on overflow |
+| **Hot-plug Support** | ✅ | Reconnect on unplug |
+
+## Command-Line Interface
+
+### Current Options (v1.1.3)
+
+| Option | Description | Since |
+|--------|-------------|-------|
+| `-t, --type <type>` | Capture type: `mf` or `dl` | v1.1.0 |
+| `-d, --device <name>` | Device name or number | v1.0.0 |
+| `-n, --ndi-name <name>` | NDI stream name | v1.0.0 |
+| `-l, --list-devices` | List available devices | v1.0.0 |
+| `-v, --verbose` | Enable verbose logging | v1.0.0 |
+| `--no-retry` | Disable auto-retry | v1.0.0 |
+| `--retry-delay <ms>` | Retry delay (default: 5000) | v1.0.0 |
+| `--max-retries <n>` | Max retries (-1 = infinite) | v1.0.0 |
+| `-h, --help` | Show help | v1.0.0 |
+| `--version` | Show version | v1.0.0 |
+
+## Architecture Changes
+
+### v1.0.x Series
+- Basic modular architecture
+- Platform abstraction layer
+- Single capture interface
+
+### v1.1.x Series
+- Dual capture interfaces (compatibility issue)
+- Adapter pattern for DeckLink
+- Format converter framework
+- Enhanced error handling
+- Professional broadcast features
+
+## Known Issues
+
+1. **Two ICaptureDevice interfaces** (v1.1.0+)
+   - `src/common/capture_interface.h` (Media Foundation)
+   - `src/capture/ICaptureDevice.h` (DeckLink)
+   - TODO: Consolidate in future version
+
+2. **Linux Support**
+   - Framework exists but not implemented
+   - Planned for future release
 
 ## Summary
 
-### Features Added in Refactored Version:
-1. Structured command-line argument parsing
-2. --list-devices option
-3. --version and --help options
-4. Signal handling for clean shutdown
-5. Frame statistics tracking
-6. NDI connection counting
-7. Modular, maintainable architecture
-8. Cross-platform structure
-9. Configurable retry attempts
-10. Extensive logging system
+NDI Bridge v1.1.3 represents a mature, production-ready application with:
+- ✅ Complete Media Foundation support
+- ✅ Complete DeckLink support
+- ✅ Professional broadcast features
+- ✅ Robust error handling
+- ✅ User-friendly interface
+- ✅ Extensible architecture
 
-### Features Fixed in v1.0.5:
-1. ✅ Interactive device selection menu
-2. ✅ Interactive NDI name input
-3. ✅ Positional parameter support
-4. ✅ Wait for Enter in CLI mode
-5. ✅ Device re-enumeration verification
-
-### Minor Differences:
-- Device listing format slightly different (but functionally equivalent)
-- More verbose logging in refactored version
-- Better error messages and status reporting
-
-The refactored version (v1.0.5) now has **feature parity** with the original code, plus many improvements.
+The application has evolved from a basic capture tool to a professional-grade NDI bridge supporting both consumer and broadcast equipment.
