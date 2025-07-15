@@ -3,6 +3,7 @@
 #include "capture/DeckLinkCaptureCallback.h"
 #include <iostream>
 #include <windows.h>
+#include <vector>
 
 // DeckLink SDK includes
 #include "DeckLinkAPI_h.h"
