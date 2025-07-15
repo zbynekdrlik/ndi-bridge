@@ -20,7 +20,7 @@ namespace ndi_bridge {
  * It handles NDI library initialization, sender creation, and frame sending with
  * proper format handling.
  * 
- * Version: 1.0.1
+ * Version: 1.0.2
  */
 class NdiSender {
 public:
@@ -34,6 +34,8 @@ public:
         uint32_t stride;
         uint32_t fourcc;  // FourCC code for pixel format
         int64_t timestamp_ns;  // Timestamp in nanoseconds
+        uint32_t fps_numerator;  // Frame rate numerator
+        uint32_t fps_denominator;  // Frame rate denominator
     };
 
     /**
