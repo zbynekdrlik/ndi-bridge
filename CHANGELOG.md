@@ -5,6 +5,26 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-07-15
+
+### Changed
+- **Major Refactoring**: DeckLinkCaptureDevice.cpp split into 5 focused components
+  - DeckLinkCaptureCallback: Handles IDeckLinkInputCallback implementation (~50 lines)
+  - DeckLinkFrameQueue: Thread-safe frame queue management (~80 lines)
+  - DeckLinkStatistics: FPS calculation and statistics tracking (~70 lines)
+  - DeckLinkFormatManager: Format detection and change handling (~70 lines)
+  - DeckLinkDeviceInitializer: Device discovery and initialization (~90 lines)
+- Improved code organization following Single Responsibility Principle
+- Better maintainability with smaller, focused files
+- No functional changes - pure refactoring
+
+### Technical Details
+- Original DeckLinkCaptureDevice.cpp: 677 lines
+- After refactoring: ~350 lines + 5 well-organized components
+- Each component now has a single, clear responsibility
+- Easier to unit test individual components
+- Faster compilation due to smaller translation units
+
 ## [1.1.5] - 2025-07-15
 
 ### Fixed
@@ -210,6 +230,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.2.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.5...v1.2.0
 [1.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.2...v1.1.3

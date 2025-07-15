@@ -1,0 +1,87 @@
+// DeckLinkFormatManager.h
+#pragma once
+
+#include <string>
+#include <vector>
+#include <atomic>
+#include <atlbase.h>
+#include "DeckLinkAPI.h"
+
+/**
+ * @brief Manages DeckLink display modes and format changes
+ * 
+ * Handles display mode enumeration, format detection,
+ * and dynamic format changes during capture.
+ */
+class DeckLinkFormatManager {
+public:
+    DeckLinkFormatManager();
+    ~DeckLinkFormatManager() = default;
+    
+    /**
+     * @brief Find the best display mode for capture
+     * @param deckLinkInput DeckLink input interface
+     * @param[out] displayMode Selected display mode
+     * @param[out] width Frame width
+     * @param[out] height Frame height
+     * @param[out] frameDuration Frame duration
+     * @param[out] frameTimescale Frame timescale
+     * @return true if a suitable mode was found
+     */
+    bool FindBestDisplayMode(IDeckLinkInput* deckLinkInput,
+                           BMDDisplayMode& displayMode,
+                           long& width, long& height,
+                           int64_t& frameDuration, int64_t& frameTimescale);
+    
+    /**
+     * @brief Get list of supported display modes
+     * @param deckLinkInput DeckLink input interface
+     * @return Vector of display mode names
+     */
+    std::vector<std::string> GetSupportedFormats(IDeckLinkInput* deckLinkInput) const;
+    
+    /**
+     * @brief Handle format change notification
+     * @param events Format change events
+     * @param newMode New display mode
+     * @param flags Detected format flags
+     * @param deckLinkInput DeckLink input interface
+     * @param[in,out] displayMode Current display mode
+     * @param[in,out] pixelFormat Current pixel format
+     * @param[in,out] width Frame width
+     * @param[in,out] height Frame height
+     * @param[in,out] frameDuration Frame duration
+     * @param[in,out] frameTimescale Frame timescale
+     * @return true if format was changed and capture restarted
+     */
+    bool HandleFormatChange(BMDVideoInputFormatChangedEvents events,
+                          IDeckLinkDisplayMode* newMode,
+                          BMDDetectedVideoInputFormatFlags flags,
+                          IDeckLinkInput* deckLinkInput,
+                          BMDDisplayMode& displayMode,
+                          BMDPixelFormat& pixelFormat,
+                          long& width, long& height,
+                          int64_t& frameDuration, int64_t& frameTimescale);
+    
+    /**
+     * @brief Enable video input with format detection
+     * @param deckLinkInput DeckLink input interface
+     * @param displayMode Display mode to use
+     * @param pixelFormat Pixel format to use
+     * @return true if successful
+     */
+    bool EnableVideoInput(IDeckLinkInput* deckLinkInput,
+                         BMDDisplayMode displayMode,
+                         BMDPixelFormat pixelFormat);
+    
+    /**
+     * @brief Convert BSTR to std::string
+     * @param bstr Wide string
+     * @return UTF-8 string
+     */
+    static std::string BSTRToString(BSTR bstr);
+    
+private:
+    // Track if this is the first format detection
+    std::atomic<bool> m_firstFormatDetection;
+};

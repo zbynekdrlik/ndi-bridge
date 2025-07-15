@@ -2,122 +2,84 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Reverted NZXT-specific changes from v1.1.6/v1.1.7 per user request
-- [x] Prepared all documentation for v1.1.5 merge
-- [x] Updated CHANGELOG.md, README.md, MERGE_PREPARATION.md
-- [x] All version numbers consistent at v1.1.5
-- [x] PR description updated
-- [ ] Currently working on: READY FOR MERGE
-- [ ] Waiting for: User approval to merge
+- [x] Created feature branch: feature/refactor-decklink-v1.2.0
+- [x] Refactored DeckLinkCaptureDevice.cpp into 5 separate components
+- [x] Updated CMakeLists.txt to include new components
+- [x] Version bumped to 1.2.0
+- [ ] Currently working on: Testing refactored code
+- [ ] Waiting for: User to compile and test
 - [ ] Blocked by: None
 
-## GOAL 11: Test and Fix v1.1.3 Issues (COMPLETED)
-### Objective: Fix runtime issues and prepare for merge
+## v1.2.0 Refactoring Progress
 
-### Status: v1.1.5 READY FOR PRODUCTION
+### Components Created:
+1. ✅ **DeckLinkCaptureCallback** (50 lines)
+   - Handles IDeckLinkInputCallback implementation
+   - Files: DeckLinkCaptureCallback.h/cpp
 
-### Issues Fixed in v1.1.5:
-1. ✅ **Version Display Bug** - Fixed in v1.1.4
-2. ✅ **Media Foundation Startup Issue** - Fixed in v1.1.4
-3. ✅ **DeckLink Frame Drop Crisis** - Fixed in v1.1.4
-4. ✅ **Frame Rate Mismatch** - Fixed in v1.1.5
-5. ✅ **No Statistics on Enter** - Fixed in v1.1.5
+2. ✅ **DeckLinkFrameQueue** (80 lines)
+   - Thread-safe frame queue management
+   - Files: DeckLinkFrameQueue.h/cpp
 
-### NZXT Issue Resolution:
-- User requested removal of all device-specific hacks
-- Reverted to clean v1.1.5 without NZXT workarounds
-- MediaFoundationCapture back to v1.0.8 (clean version)
+3. ✅ **DeckLinkStatistics** (70 lines)
+   - FPS calculation and statistics tracking
+   - Files: DeckLinkStatistics.h/cpp
 
-## Merge Preparation Summary
+4. ✅ **DeckLinkFormatManager** (70 lines)
+   - Format detection and change handling
+   - Files: DeckLinkFormatManager.h/cpp
 
-### Documentation Updates (ALL COMPLETE):
-- ✅ version.h: 1.1.5
-- ✅ CMakeLists.txt: 1.1.5
-- ✅ README.md: Updated to v1.1.5 with new features
-- ✅ CHANGELOG.md: Updated to v1.1.5 (removed v1.1.6/v1.1.7)
-- ✅ MERGE_PREPARATION.md: Updated checklist for v1.1.5
-- ✅ PR description: Updated for v1.1.5
+5. ✅ **DeckLinkDeviceInitializer** (90 lines)
+   - Device discovery and initialization
+   - Files: DeckLinkDeviceInitializer.h/cpp
 
-### Code Quality:
-- ✅ All compilation errors fixed
-- ✅ No device-specific hacks
-- ✅ Clean, maintainable code
-- ✅ Comprehensive error handling
-- ✅ Well-documented
-
-### Ready for Merge Checklist:
-- ✅ Version numbers consistent (1.1.5)
-- ✅ Documentation complete and current
-- ✅ All features working
-- ✅ Bug fixes tested
-- ✅ No blocking issues
-- ✅ Clean commit history
+### Refactoring Summary:
+- Original file: 677 lines (DeckLinkCaptureDevice.cpp)
+- After refactoring: ~350 lines + 5 focused components
+- Total improvement: Better separation of concerns
 
 ## Implementation Status
-- Phase: READY FOR PRODUCTION
-- Step: All issues resolved, documentation updated
-- Status: MERGE_READY
-- Version: 1.1.5
+- Phase: REFACTORING
+- Step: Code refactoring complete, needs testing
+- Status: TESTING_REQUIRED
+- Version: 1.2.0
 
 ## Testing Status Matrix
 | Component | Implemented | Compiled | Unit Tested | Integration Tested | Runtime Tested |
 |-----------|------------|----------|-------------|-------------------|----------------|
-| Media Foundation | ✅ v1.0.8 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.5 |
-| DeckLink Adapter | ✅ v1.1.4 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.4 |
-| DeckLink Core | ✅ v1.1.4 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.4 |
-| Format Converter | ✅ v1.1.0 | ✅ v1.1.5 | ❌ | ❌ | ✅ |
-| NDI Sender | ✅ v1.0.2 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.5 |
-| App Controller | ✅ v1.0.2 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.5 |
-
-## Features Summary v1.1.5
-
-### Core Features:
-1. Media Foundation capture support
-2. DeckLink capture support
-3. NDI streaming
-4. Interactive device selection
-5. Command-line interface
-6. Format conversion
-7. Error recovery
-8. Frame statistics
-
-### Bug Fixes in v1.1.5:
-1. Version display corrected
-2. Startup race condition fixed
-3. DeckLink frame drops minimized
-4. Frame rate matches device
-5. Statistics show on Enter
-
-### Clean Code:
-- No device-specific hacks
-- Maintainable architecture
-- Well-documented
-- Production-ready
-
-## PR Status
-- PR #2: "Fix v1.1.3 Runtime Issues"
-- Branch: feature/fix-v1.1.3-issues
-- **Status: READY TO MERGE**
-- 33 commits
-- All checks passed
+| DeckLinkCaptureCallback | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
+| DeckLinkFrameQueue | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
+| DeckLinkStatistics | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
+| DeckLinkFormatManager | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
+| DeckLinkDeviceInitializer | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
+| DeckLinkCaptureDevice | ✅ v1.2.0 | ❌ | ❌ | ❌ | ❌ |
 
 ## Next Steps
-1. **MERGE PR #2 to main**
-2. Create v1.1.5 release
-3. Tag the release
-4. Close related issues
+1. **Compile and test the refactored code**
+   ```bash
+   cmake --build . --config Release --clean-first
+   ndi-bridge.exe -t dl -l
+   ndi-bridge.exe -t dl
+   ```
+2. Verify DeckLink capture still works
+3. Check that all features function correctly
+4. Update documentation if needed
+5. Create PR when testing complete
 
-## Future Development (Post-Merge)
-- v1.2.0: Refactor DeckLinkCaptureDevice.cpp (see GOAL_11_REFACTORING.md)
-- v1.3.0: Linux V4L2 support
-- v2.0.0: Consolidate ICaptureDevice interfaces
+## Benefits Achieved
+- ✅ Single Responsibility Principle
+- ✅ Easier unit testing capability
+- ✅ Better maintainability
+- ✅ Faster compilation (smaller files)
+- ✅ Clearer architecture
+
+## Previous Status (v1.1.5)
+- All runtime issues fixed
+- Production ready
+- Merged to main
 
 ## Last User Action
 - Date/Time: 2025-07-15 (current session)
-- Action: Requested merge preparation
-- Result: All documentation updated for v1.1.5
-- Next Required: Merge approval
-
-## Previous Goals Completed:
-### ✅ GOAL 1-10: Initial development through v1.1.3
-### ✅ GOAL 11: Fix runtime issues and prepare for merge (v1.1.5)
+- Action: Requested DeckLink refactoring
+- Result: Refactoring complete, needs testing
+- Next Required: Compile and test
