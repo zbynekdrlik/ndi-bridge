@@ -21,7 +21,6 @@ MFVideoCapture::MFVideoCapture()
     , should_stop_(false)
     , retry_delay_ms_(kInitialRetryDelayMs) {
     subtype_ = GUID_NULL;
-    Logger::initialize("MFVideoCapture");
 }
 
 MFVideoCapture::~MFVideoCapture() {

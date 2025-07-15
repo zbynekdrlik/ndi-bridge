@@ -9,7 +9,6 @@ namespace ndi_bridge {
 namespace media_foundation {
 
 MFCaptureDevice::MFCaptureDevice() : attributes_(nullptr) {
-    Logger::initialize("MFCaptureDevice");
 }
 
 MFCaptureDevice::~MFCaptureDevice() {
