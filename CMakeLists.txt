@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.1.5 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.2.0 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -65,10 +65,23 @@ if(PLATFORM_WINDOWS)
     # DeckLink sources (Windows)
     if(USE_DECKLINK)
         list(APPEND PLATFORM_SOURCES
+            # DeckLink main classes
             src/capture/DeckLinkCaptureDevice.h
             src/capture/DeckLinkCaptureDevice.cpp
             src/capture/DeckLinkDeviceEnumerator.h
             src/capture/DeckLinkDeviceEnumerator.cpp
+            # Refactored components (v1.2.0)
+            include/capture/DeckLinkCaptureCallback.h
+            src/capture/DeckLinkCaptureCallback.cpp
+            include/capture/DeckLinkFrameQueue.h
+            src/capture/DeckLinkFrameQueue.cpp
+            include/capture/DeckLinkStatistics.h
+            src/capture/DeckLinkStatistics.cpp
+            include/capture/DeckLinkFormatManager.h
+            src/capture/DeckLinkFormatManager.cpp
+            include/capture/DeckLinkDeviceInitializer.h
+            src/capture/DeckLinkDeviceInitializer.cpp
+            # Adapter
             src/windows/decklink/decklink_capture.h
             src/windows/decklink/decklink_capture.cpp
         )
