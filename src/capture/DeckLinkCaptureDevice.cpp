@@ -383,29 +383,38 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             return;
         }
         
-        // Calculate frame size
-        size_t frameSize = videoFrame->GetRowBytes() * frameHeight;
-        
-        // Queue frame
-        {
-            std::lock_guard<std::mutex> lock(m_queueMutex);
+        // Process frame with direct callback if available (v1.1.4)
+        if (m_frameCallback) {
+            ProcessFrameForCallback(frameBytes, frameWidth, frameHeight, 
+                                   m_pixelFormat, std::chrono::steady_clock::now());
+        } else {
+            // Fall back to queue-based approach
+            size_t frameSize = videoFrame->GetRowBytes() * frameHeight;
             
-            // Drop oldest frame if queue is full
-            if (m_frameQueue.size() >= MAX_QUEUE_SIZE) {
-                m_frameQueue.pop_front();
-                m_droppedFrames++;
+            // Queue frame
+            {
+                std::lock_guard<std::mutex> lock(m_queueMutex);
+                
+                // Drop oldest frame if queue is full
+                if (m_frameQueue.size() >= MAX_QUEUE_SIZE) {
+                    m_frameQueue.pop_front();
+                    m_droppedFrames++;
+                }
+                
+                // Add new frame
+                QueuedFrame frame;
+                frame.data.resize(frameSize);
+                memcpy(frame.data.data(), frameBytes, frameSize);
+                frame.width = frameWidth;
+                frame.height = frameHeight;
+                frame.pixelFormat = m_pixelFormat;
+                frame.timestamp = std::chrono::steady_clock::now();
+                
+                m_frameQueue.push_back(std::move(frame));
             }
             
-            // Add new frame
-            QueuedFrame frame;
-            frame.data.resize(frameSize);
-            memcpy(frame.data.data(), frameBytes, frameSize);
-            frame.width = frameWidth;
-            frame.height = frameHeight;
-            frame.pixelFormat = m_pixelFormat;
-            frame.timestamp = std::chrono::steady_clock::now();
-            
-            m_frameQueue.push_back(std::move(frame));
+            // Notify waiting threads
+            m_frameAvailable.notify_one();
         }
         
         // End buffer access
@@ -427,9 +436,6 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             }
         }
         
-        // Notify waiting threads
-        m_frameAvailable.notify_one();
-        
         // Log statistics every 60 frames
         if (m_frameCount % 60 == 0) {
             LogFrameStatistics();
@@ -439,6 +445,47 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
         std::cerr << "[DeckLink] Exception in OnFrameArrived: " << e.what() << std::endl;
         m_droppedFrames++;
     }
+}
+
+void DeckLinkCaptureDevice::ProcessFrameForCallback(void* frameBytes, int width, int height,
+                                                   BMDPixelFormat pixelFormat,
+                                                   std::chrono::steady_clock::time_point timestamp) {
+    // Prepare FrameData for callback
+    FrameData frame;
+    frame.width = width;
+    frame.height = height;
+    frame.timestamp = timestamp;
+    
+    // Calculate stride
+    int sourceStride = (pixelFormat == bmdFormat8BitBGRA) ? 
+                       width * 4 : width * 2;
+    
+    if (pixelFormat == bmdFormat8BitBGRA) {
+        // BGRA format - can use directly
+        frame.format = FrameData::FrameFormat::BGRA;
+        frame.stride = sourceStride;
+        frame.data.resize(sourceStride * height);
+        memcpy(frame.data.data(), frameBytes, frame.data.size());
+    } else if (pixelFormat == bmdFormat8BitYUV) {
+        // UYVY format - convert to BGRA for consistency
+        frame.format = FrameData::FrameFormat::BGRA;
+        frame.stride = width * 4;
+        frame.data.resize(frame.stride * height);
+        
+        if (!m_formatConverter->ConvertUYVYToBGRA(
+            static_cast<uint8_t*>(frameBytes), frame.data.data(),
+            width, height, sourceStride)) {
+            m_droppedFrames++;
+            return;
+        }
+    } else {
+        // Unsupported format
+        m_droppedFrames++;
+        return;
+    }
+    
+    // Deliver frame immediately via callback
+    m_frameCallback(frame);
 }
 
 void DeckLinkCaptureDevice::OnFormatChanged(BMDVideoInputFormatChangedEvents events,
