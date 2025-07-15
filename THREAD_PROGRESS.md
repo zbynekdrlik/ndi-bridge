@@ -2,22 +2,35 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] DeckLink implementation COMPLETED in v1.1.0
-- [x] Fixed DeckLink integration issues in v1.1.1
-- [ ] Waiting for: User to build and test the application with DeckLink
+- [x] Fixed DeckLink interface mismatch in v1.1.2
+- [x] Created proper adapter class implementing correct interface
+- [ ] Waiting for: User to build and test the application with fixed DeckLink
 - [ ] Blocked by: None - ready for build
 
-## GOAL 8: DeckLink Integration (v1.1.1 - FIXED)
+## GOAL 8: DeckLink Integration (v1.1.2 - INTERFACE FIXED)
 ### Objective: Add Blackmagic DeckLink capture card support
 
 ### Status: READY FOR BUILD AND TEST
+
+### Version 1.1.2 Critical Fix:
+- ✅ **FIXED INTERFACE MISMATCH** - DeckLink now implements correct `capture_interface.h`
+- ✅ Created proper `DeckLinkCapture` class with `enumerateDevices()` method
+- ✅ Adapter pattern wraps `DeckLinkCaptureDevice` to match expected interface
+- ✅ Added missing thread includes
+- ✅ Updated CMakeLists.txt with new implementation files
+
+### Root Cause Analysis:
+The compilation errors occurred because:
+1. MediaFoundationCapture uses `src/common/capture_interface.h`
+2. DeckLinkCaptureDevice uses `src/capture/ICaptureDevice.h`
+3. These are DIFFERENT interfaces with different methods
+4. main.cpp expects ALL capture devices to use `capture_interface.h`
 
 ### Version 1.1.1 Fixes:
 - ✅ Created wrapper header `src/windows/decklink/decklink_capture.h` for main.cpp compatibility
 - ✅ Fixed include path issues - main.cpp now properly finds DeckLink headers
 - ✅ Fixed namespace wrapping - DeckLinkCapture now in ndi_bridge namespace
 - ✅ Verified DeckLinkCaptureDevice inherits from ICaptureDevice
-- ✅ Updated version to 1.1.1
 
 ### Previous Work (v1.1.0):
 #### SDK Setup Completed:
@@ -30,14 +43,15 @@
 
 #### Implementation Completed:
 1. **Core DeckLink Support**
-   - ✅ `DeckLinkCaptureDevice.h/cpp` - Main capture implementation
+   - ✅ `DeckLinkCaptureDevice.h/cpp` - Main capture implementation (uses wrong interface!)
    - ✅ `DeckLinkDeviceEnumerator.h/cpp` - Device discovery
-   - ✅ Integrated with existing `AppController` framework
    - ✅ Format conversion (UYVY/BGRA to NDI)
    - ✅ Robust error handling from reference
 
 2. **Interface Architecture**
-   - ✅ `ICaptureDevice.h` - Common interface for all capture devices
+   - ✅ `ICaptureDevice.h` - Interface for DeckLink (NOT used by main.cpp!)
+   - ✅ `capture_interface.h` - Interface expected by main.cpp
+   - ✅ `DeckLinkCapture` adapter class - Bridges the two interfaces
    - ✅ `IFormatConverter.h` - Format conversion interface
    - ✅ `FormatConverterFactory.h` - Factory pattern
    - ✅ `BasicFormatConverter.cpp` - Software conversion implementation
@@ -51,7 +65,7 @@
 4. **Build System**
    - ✅ CMakeLists.txt updated with DeckLink support
    - ✅ Optional DeckLink SDK detection
-   - ✅ Version bumped to 1.1.1
+   - ✅ Version bumped to 1.1.2
 
 ### Features Implemented from Reference:
 - ✅ Serial number tracking for device persistence
@@ -72,11 +86,11 @@
 
 ## Implementation Status
 - Phase: Goal 8 - DeckLink Integration
-- Step: Integration Fixed - Ready for Testing
+- Step: Interface Issues Fixed - Ready for Testing
 - Status: READY_FOR_BUILD_AND_TEST
-- Version: 1.1.1
+- Version: 1.1.2
 
-## All Features in v1.1.1:
+## All Features:
 ### From v1.0.7:
 1. ✅ **Interactive device selection menu**
 2. ✅ **Command-line positional parameters**
@@ -87,20 +101,26 @@
 ### From v1.1.0:
 6. ✅ **DeckLink capture support**
 7. ✅ **Capture type selection**
-8. ✅ **Unified device interface**
+8. ✅ **Unified device interface** (two different ones!)
 9. ✅ **Format converter framework**
 10. ✅ **Enhanced error recovery**
 
-### New in v1.1.1:
+### From v1.1.1:
 11. ✅ **Fixed DeckLink integration**
 12. ✅ **Proper namespace wrapping**
 13. ✅ **Compatible header structure**
+
+### New in v1.1.2:
+14. ✅ **Fixed interface mismatch**
+15. ✅ **Proper adapter implementation**
+16. ✅ **Thread-safe frame processing**
 
 ## Testing Status Matrix
 | Component | Implemented | Compiled | Unit Tested | Integration Tested | Runtime Tested |
 |-----------|------------|----------|-------------|-------------------|----------------|
 | Media Foundation | ✅ v1.0.7 | ❓ | ❌ | ❌ | ❌ |
-| DeckLink | ✅ v1.1.1 | ❓ | ❌ | ❌ | ❌ |
+| DeckLink Adapter | ✅ v1.1.2 | ❓ | ❌ | ❌ | ❌ |
+| DeckLink Core | ✅ v1.1.0 | ❓ | ❌ | ❌ | ❌ |
 | Format Converter | ✅ v1.1.0 | ❓ | ❌ | ❌ | ❌ |
 | NDI Sender | ✅ v1.0.1 | ❓ | ❌ | ❌ | ❌ |
 | App Controller | ✅ v1.0.0 | ❓ | ❌ | ❌ | ❌ |
@@ -113,7 +133,7 @@
 ### ✅ GOAL 5: Feature Restoration (v1.0.5)
 ### ✅ GOAL 6: Fix Compilation Errors (v1.0.6)
 ### ✅ GOAL 7: Fix Windows Macro Conflicts (v1.0.7)
-### ✅ GOAL 8: DeckLink Integration (v1.1.0 -> v1.1.1)
+### ✅ GOAL 8: DeckLink Integration (v1.1.0 -> v1.1.1 -> v1.1.2)
 
 ## Build Instructions
 1. **Ensure DeckLink API files are generated**:
@@ -138,7 +158,7 @@
    cmake --build . --config Release
    ```
 
-## Testing Instructions for v1.1.1:
+## Testing Instructions for v1.1.2:
 1. **Test Media Foundation** (existing functionality):
    ```
    ndi-bridge.exe -t mf -l  # List webcams
@@ -157,16 +177,16 @@
    - No-signal handling
    - Error recovery
    - FPS reporting
-   - Version shows 1.1.1 on startup
+   - Version shows 1.1.2 on startup
 
 ## Notes
-- DeckLink integration now properly wrapped in ndi_bridge namespace
-- Include paths fixed for proper compilation
+- Fixed fundamental interface mismatch between capture implementations
+- DeckLink now properly implements the interface expected by main.cpp
+- Both Media Foundation and DeckLink should now compile correctly
 - Ready for full build and testing
-- Both Media Foundation and DeckLink support should work
 
 ## Last User Action
-- Date/Time: 2025-07-15 07:18:00
-- Action: Pointed out DeckLink should not be disabled
-- Result: Fixed integration issues in v1.1.1
-- Next Required: Build and test the application with DeckLink support
+- Date/Time: 2025-07-15 07:25:00
+- Action: Pointed out multiple compilation errors with DeckLink
+- Result: Fixed interface mismatch with proper adapter pattern
+- Next Required: Build and test the application with fixed DeckLink support
