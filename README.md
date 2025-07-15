@@ -1,6 +1,6 @@
 # NDI Bridge
 
-[![Version](https://img.shields.io/badge/version-1.0.7-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
+[![Version](https://img.shields.io/badge/version-1.1.3-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -10,19 +10,19 @@ NDI Bridge is a high-performance, low-latency tool that bridges video capture de
 
 ## Features
 
-### Current Features (v1.0.7)
+### Current Features (v1.1.3)
 - ✅ **Media Foundation** capture support (Windows)
+- ✅ **DeckLink** capture support (Blackmagic devices)
+- ✅ **Multi-capture type selection** (`-t mf` or `-t dl`)
 - ✅ **Interactive device selection** with numbered menu
 - ✅ **Command-line interface** with positional parameters
 - ✅ **Automatic device reconnection** on disconnect
 - ✅ **Real-time format conversion** to NDI-compatible formats
 - ✅ **Frame statistics** and performance monitoring
 - ✅ **Configurable retry logic** for resilient operation
-
-### In Development (v1.1.0)
-- 🔄 **DeckLink** capture support (Blackmagic devices)
-- 🔄 **Multi-capture** type selection
-- 🔄 **Professional broadcast** features
+- ✅ **Professional broadcast features** (format detection, no-signal handling)
+- ✅ **Serial number tracking** for device persistence
+- ✅ **Rolling FPS calculation** and monitoring
 
 ### Planned Features
 - 📋 **Linux V4L2** support
@@ -34,9 +34,10 @@ NDI Bridge is a high-performance, low-latency tool that bridges video capture de
 
 ### Prerequisites
 - Windows 10/11 (Linux support coming)
-- [NDI SDK 5.0+](https://ndi.tv/sdk/)
+- [NDI SDK 5.0+](https://ndi.tv/sdk/) (NDI 6 SDK recommended)
 - Visual Studio 2019+ or MinGW-w64
 - CMake 3.16+
+- [Blackmagic DeckLink SDK](https://www.blackmagicdesign.com/support) (optional, for DeckLink support)
 
 ### Building
 
@@ -55,6 +56,8 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --config Release
 ```
 
+For DeckLink support, see [DeckLink Setup Guide](docs/decklink-sdk-setup.md).
+
 ### Basic Usage
 
 ```bash
@@ -64,19 +67,24 @@ ndi-bridge.exe
 # Direct mode with device and stream name
 ndi-bridge.exe "Integrated Camera" "My NDI Stream"
 
-# Using named parameters
-ndi-bridge.exe -d "USB Capture" -n "Conference Room"
+# Using named parameters with Media Foundation
+ndi-bridge.exe -t mf -d "USB Capture" -n "Conference Room"
+
+# Using DeckLink devices
+ndi-bridge.exe -t dl -d "DeckLink Mini Recorder" -n "SDI Stream"
 
 # List available devices
-ndi-bridge.exe --list-devices
+ndi-bridge.exe -t mf --list-devices  # List webcams
+ndi-bridge.exe -t dl --list-devices  # List DeckLink devices
 ```
 
 ## Command-Line Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-d, --device <name>` | Capture device name | Interactive selection |
-| `-n, --ndi-name <name>` | NDI stream name | "NDI Bridge" |
+| `-t, --type <type>` | Capture type: `mf` (Media Foundation) or `dl` (DeckLink) | Interactive selection |
+| `-d, --device <n>` | Capture device name | Interactive selection |
+| `-n, --ndi-name <n>` | NDI stream name | "NDI Bridge" |
 | `-l, --list-devices` | List available devices and exit | - |
 | `-v, --verbose` | Enable verbose logging | Disabled |
 | `--no-retry` | Disable automatic retry on errors | Enabled |
@@ -105,9 +113,10 @@ NDI Bridge uses a modular architecture with clear separation of concerns:
 ### Key Components
 
 - **Capture Interface** - Unified API for all capture devices
-- **Format Converter** - Efficient color space conversion
+- **Format Converter** - Efficient color space conversion (UYVY, BGRA, YUV420, NV12)
 - **App Controller** - Orchestrates capture and streaming
 - **NDI Sender** - Handles NDI protocol and network transmission
+- **Device Enumerator** - Device discovery and management
 
 ## Supported Capture Devices
 
@@ -117,15 +126,17 @@ NDI Bridge uses a modular architecture with clear separation of concerns:
 - Virtual cameras
 - DirectShow compatible devices
 
-### DeckLink (Coming in v1.1.0)
+### DeckLink (Windows)
 - Blackmagic DeckLink cards
 - UltraStudio devices
 - Professional SDI/HDMI interfaces
+- Automatic format detection
+- No-signal handling
 
 ## Performance
 
 - **Latency**: < 1 frame (typically 16-33ms)
-- **CPU Usage**: ~5-15% (depends on resolution)
+- **CPU Usage**: ~5-15% (depends on resolution and format)
 - **Memory**: ~100-200MB
 - **Network**: 100-200 Mbps (1080p60)
 
@@ -136,6 +147,7 @@ NDI Bridge uses a modular architecture with clear separation of concerns:
 - Check Windows Device Manager
 - Try running as Administrator
 - Update device drivers
+- For DeckLink: Install Desktop Video drivers
 
 ### NDI stream not visible
 - Check firewall settings
@@ -147,6 +159,13 @@ NDI Bridge uses a modular architecture with clear separation of concerns:
 - Use hardware-accelerated capture devices
 - Lower capture resolution
 - Ensure Release build is used
+- Check format conversion efficiency
+
+### DeckLink specific issues
+- Ensure DeckLink drivers are installed
+- Check DeckLink control panel
+- Verify input signal is present
+- Check supported video formats
 
 ## Contributing
 
