@@ -5,6 +5,21 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] - 2025-07-15
+
+### Fixed
+- **Media Foundation Device Release**: Fixed USB capture card monitor disconnection issue
+  - Added proper `IMFMediaSource::Shutdown()` call before releasing
+  - Added proper `IMFActivate::ShutdownObject()` call before releasing
+  - These calls ensure the USB device is properly released when the app exits
+  - Prevents monitor from disconnecting when using USB capture cards like NZXT Signal HD60
+
+### Technical Details
+- The issue was that Media Foundation objects were being released without proper shutdown
+- According to Microsoft documentation, `Shutdown()` must be called on media sources
+- Without these calls, the USB device remained in an active state even after app exit
+- This caused connected monitors to disconnect, requiring power cycling of the capture device
+
 ## [1.2.0] - 2025-07-15
 
 ### Changed
@@ -230,6 +245,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.1.6]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.5...v1.1.6
 [1.2.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.5...v1.2.0
 [1.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.3...v1.1.4
