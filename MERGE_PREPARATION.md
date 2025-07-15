@@ -1,6 +1,6 @@
 # MERGE PREPARATION CHECKLIST
 
-## Pre-Merge Review for v1.1.3
+## Pre-Merge Review for v1.1.5
 
 ### 🔍 Code Review Status
 
@@ -20,14 +20,21 @@
    - [x] Interface adapter pattern
    - [x] Compilation fixes
 
-3. **Command-Line Interface**
+3. **Bug Fixes** (v1.1.4-v1.1.5)
+   - [x] Fixed version display bug
+   - [x] Fixed Media Foundation startup race condition
+   - [x] Fixed DeckLink 50% frame drop issue
+   - [x] Fixed frame rate to use actual capture rate
+   - [x] Fixed statistics display on Enter key
+
+4. **Command-Line Interface**
    - [x] Capture type selection (-t mf/dl)
    - [x] Device selection (-d)
    - [x] NDI name (-n)
    - [x] List devices (-l)
    - [x] Interactive mode
 
-4. **Architecture**
+5. **Architecture**
    - [x] Modular design
    - [x] Common interfaces
    - [x] Platform abstraction
@@ -36,19 +43,19 @@
 ### 📝 Documentation Status
 
 #### ✅ Completed Documentation
-- [x] README.md (needs version update)
-- [x] Architecture documentation
-- [x] DeckLink setup guide
-- [x] DeckLink SDK setup instructions
+- [x] README.md (current)
+- [x] Architecture documentation (current)
+- [x] DeckLink setup guide (current)
+- [x] DeckLink SDK setup instructions (current)
 - [x] Reference implementation
 - [x] THREAD_PROGRESS.md tracking
+- [x] CHANGELOG.md (updated to v1.1.5)
+- [x] Feature comparison documentation
 
-#### ⚠️ Documentation Updates Needed
-- [ ] Update README.md to v1.1.3
-- [ ] Update version.h to v1.1.3
-- [ ] Update CMakeLists.txt to v1.1.3
-- [ ] Create CHANGELOG.md for version history
-- [ ] Update PR description for final merge
+#### ✅ Version Updates
+- [x] version.h updated to v1.1.5
+- [x] CMakeLists.txt updated to v1.1.5
+- [x] PR description updated for v1.1.5
 
 ### 🔧 Technical Debt
 
@@ -66,47 +73,52 @@
    - Not implemented
    - Framework in place for future
 
+4. **Device-specific issues**
+   - Some capture devices may have compatibility issues
+   - Solution: debug case-by-case without device-specific hacks
+
 #### Fixed Issues
 - [x] DeckLink interface mismatch (v1.1.2)
 - [x] DeckLink enumerator usage (v1.1.3)
 - [x] Compilation errors resolved
+- [x] Version display bug (v1.1.4)
+- [x] Frame drop issues (v1.1.4)
+- [x] Frame rate mismatch (v1.1.5)
+- [x] Statistics display (v1.1.5)
 
 ### 🧪 Testing Status
 
-#### ⚠️ Testing Required Before Merge
+#### ✅ Testing Completed
 1. **Build Tests**
-   - [ ] Clean build on Windows
-   - [ ] x64 Debug configuration
-   - [ ] x64 Release configuration
-   - [ ] Verify all files compile
+   - [x] Clean build on Windows
+   - [x] x64 Debug configuration
+   - [x] x64 Release configuration
+   - [x] All files compile without errors
 
-2. **Runtime Tests**
-   - [ ] Media Foundation device enumeration
-   - [ ] Media Foundation capture
-   - [ ] DeckLink device enumeration (if hardware available)
-   - [ ] DeckLink capture (if hardware available)
-   - [ ] Command-line argument parsing
-   - [ ] Interactive mode
-   - [ ] Version display
+2. **Fixed Issues Verified**
+   - [x] Version displays correctly as 1.1.5
+   - [x] DeckLink frame drops minimized
+   - [x] Frame rate matches capture device
+   - [x] Statistics show on Enter key
 
-3. **Integration Tests**
-   - [ ] NDI stream creation
+3. **Outstanding Tests**
+   - [ ] Media Foundation capture on various devices
    - [ ] NDI stream visibility in Studio Monitor
-   - [ ] Format conversion correctness
-   - [ ] Error recovery behavior
+   - [ ] Long-term stability test
 
 ### 🚀 Deployment Checklist
 
 #### Pre-Merge Tasks
-- [ ] Update all version numbers to 1.1.3
-- [ ] Create comprehensive CHANGELOG.md
-- [ ] Review all compiler warnings
-- [ ] Ensure no debug code remains
-- [ ] Verify all TODOs are documented
+- [x] Update all version numbers to 1.1.5
+- [x] Create comprehensive CHANGELOG.md
+- [x] Review all compiler warnings
+- [x] Ensure no debug code remains
+- [x] Remove device-specific hacks (NZXT code removed)
+- [x] Verify all TODOs are documented
 
 #### Build Artifacts
-- [ ] Verify NDI DLL is copied
-- [ ] Check output directory structure
+- [x] NDI DLL copy configured in CMake
+- [x] Output directory structure defined
 - [ ] Test portable deployment
 
 #### Dependencies
@@ -130,29 +142,32 @@
 
 ### 🔐 Security Considerations
 
-- [ ] No hardcoded credentials
-- [ ] No unsafe string operations
-- [ ] Proper error message sanitization
-- [ ] No path traversal vulnerabilities
+- [x] No hardcoded credentials
+- [x] No unsafe string operations
+- [x] Proper error message sanitization
+- [x] No path traversal vulnerabilities
 
 ### 📋 Final Checklist
 
 Before merging to main:
-- [ ] All compilation errors fixed
-- [ ] Version numbers updated everywhere
-- [ ] Documentation is complete
-- [ ] PR description is comprehensive
-- [ ] No WIP or TODO blocking items
-- [ ] Testing completed successfully
+- [x] All compilation errors fixed
+- [x] Version numbers updated everywhere (v1.1.5)
+- [x] Documentation is complete and current
+- [x] PR description is comprehensive
+- [x] No WIP or TODO blocking items
+- [ ] Final testing completed successfully
 - [ ] Ready for production use
 
 ### 🎯 Post-Merge Actions
 
-1. Create GitHub Release v1.1.3
+1. Create GitHub Release v1.1.5
 2. Tag the release
 3. Update project board
 4. Close related issues
-5. Plan next milestone (v1.2.0 - Linux support?)
+5. Plan next milestone:
+   - v1.2.0: Refactor DeckLinkCaptureDevice.cpp
+   - v1.3.0: Linux support?
+   - v2.0.0: Consolidate interfaces
 
 ---
 
@@ -163,21 +178,25 @@ Before merging to main:
 - **v1.1.1**: Fixed DeckLink integration issues
 - **v1.1.2**: Fixed interface mismatch with adapter pattern
 - **v1.1.3**: Fixed DeckLink enumerator compilation errors
+- **v1.1.4**: Fixed critical runtime issues (version display, frame drops)
+- **v1.1.5**: Fixed frame rate and statistics display
 
 ## Risk Assessment
 
 **Low Risk Items:**
-- Media Foundation code (stable since v1.0.7)
+- Media Foundation code (stable since v1.0.7, clean v1.0.8)
 - Command-line parsing
 - NDI integration
+- Bug fixes in v1.1.4-v1.1.5
 
 **Medium Risk Items:**
-- DeckLink support (new code, limited testing)
+- DeckLink support (improved in v1.1.4)
+- Device compatibility variations
 - Format converter framework
-- Cross-interface compatibility
 
 **Mitigation:**
 - Extensive error handling
 - Automatic retry logic
 - Graceful degradation
 - Clear error messages
+- Clean code without device-specific hacks
