@@ -20,9 +20,9 @@ namespace v4l2 {
  * @brief V4L2 implementation of ICaptureDevice
  * 
  * Provides video capture functionality using Linux V4L2 API.
- * Supports USB capture cards and webcams.
+ * Supports USB capture cards and webcams with low latency optimization.
  * 
- * Version: 1.3.0
+ * Version: 1.3.1
  */
 class V4L2Capture : public ICaptureDevice {
 public:
@@ -39,11 +39,40 @@ public:
     bool hasError() const override;
     std::string getLastError() const override;
     
+    // Performance statistics
+    struct CaptureStats {
+        uint64_t frames_captured = 0;
+        uint64_t frames_dropped = 0;
+        double total_latency_ms = 0.0;
+        double total_convert_ms = 0.0;
+        double max_latency_ms = 0.0;
+        double min_latency_ms = 1000000.0;
+        
+        void reset() {
+            frames_captured = 0;
+            frames_dropped = 0;
+            total_latency_ms = 0.0;
+            total_convert_ms = 0.0;
+            max_latency_ms = 0.0;
+            min_latency_ms = 1000000.0;
+        }
+    };
+    
+    CaptureStats getStats() const;
+    
 private:
     // Buffer structure for memory-mapped buffers
     struct Buffer {
-        void* start;
-        size_t length;
+        void* start = nullptr;
+        size_t length = 0;
+    };
+    
+    // Supported format info
+    struct SupportedFormat {
+        uint32_t pixelformat;
+        uint32_t width;
+        uint32_t height;
+        uint32_t fps;
     };
     
     // Initialize device by path
@@ -67,14 +96,18 @@ private:
     // Capture thread function
     void captureThread();
     
-    // Process a captured frame
-    void processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf);
+    // Process a captured frame (with pre-allocated buffer)
+    void processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf, 
+                      std::vector<uint8_t>& bgra_buffer);
     
     // Set capture format
     bool setCaptureFormat(int width, int height, uint32_t pixelformat);
     
     // Find best format for device
     bool findBestFormat();
+    
+    // Enumerate all supported formats
+    void enumerateFormats(std::vector<SupportedFormat>& formats);
     
     // Query device capabilities
     bool queryCapabilities();
@@ -115,15 +148,26 @@ private:
     std::string last_error_;
     std::atomic<bool> has_error_{false};
     
-    // Callbacks
+    // Callbacks with thread safety
+    mutable std::mutex callback_mutex_;
     FrameCallback frame_callback_;
     ErrorCallback error_callback_;
     
     // Device capabilities
     v4l2_capability device_caps_;
     
-    // Buffer count
-    static constexpr unsigned int kBufferCount = 4;
+    // Device mutex for thread safety
+    mutable std::mutex device_mutex_;
+    
+    // Statistics
+    mutable std::mutex stats_mutex_;
+    CaptureStats stats_;
+    
+    // Disconnect detection
+    uint32_t timeout_count_ = 0;
+    
+    // Buffer count (increase for better buffering)
+    static constexpr unsigned int kBufferCount = 6;
 };
 
 } // namespace v4l2
