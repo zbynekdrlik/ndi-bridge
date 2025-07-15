@@ -53,48 +53,6 @@ void signalHandler(int signal) {
     }
 }
 
-// Platform-specific console input check
-bool isKeyPressed() {
-#ifdef _WIN32
-    return _kbhit() != 0;
-#else
-    struct termios oldt, newt;
-    int ch;
-    int oldf;
-    
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    oldf = fcntl(STDIN_FILENO, F_GETFL, 0);
-    fcntl(STDIN_FILENO, F_SETFL, oldf | O_NONBLOCK);
-    
-    ch = getchar();
-    
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-    fcntl(STDIN_FILENO, F_SETFL, oldf);
-    
-    if (ch != EOF) {
-        ungetc(ch, stdin);
-        return true;
-    }
-    
-    return false;
-#endif
-}
-
-// Clear any pending input
-void clearInput() {
-#ifdef _WIN32
-    while (_kbhit()) {
-        _getch();
-    }
-#else
-    int c;
-    while ((c = getchar()) != '\n' && c != EOF);
-#endif
-}
-
 // Print usage information
 void printUsage(const char* program_name) {
     std::cout << "Usage: " << program_name << " [options]" << std::endl;
@@ -112,7 +70,7 @@ void printUsage(const char* program_name) {
     std::cout << "  -h, --help              Show this help message" << std::endl;
     std::cout << "  --version               Show version information" << std::endl;
     std::cout << std::endl;
-    std::cout << "Press Enter to stop the application while running." << std::endl;
+    std::cout << "Press Ctrl+C to stop the application while running." << std::endl;
 }
 
 // List available capture devices
@@ -342,7 +300,7 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
 } // anonymous namespace
 
 int main(int argc, char* argv[]) {
-    // Log version on startup (updated to 1.1.0 for DeckLink support)
+    // Log version on startup
     std::cout << "[main] NDI Bridge version " << NDI_BRIDGE_VERSION << " starting..." << std::endl;
     
     // Parse command line arguments
@@ -479,42 +437,11 @@ int main(int argc, char* argv[]) {
     }
     
     std::cout << std::endl;
-    std::cout << "NDI Bridge is running. Press Enter to stop..." << std::endl;
+    std::cout << "NDI Bridge is running. Press Ctrl+C to stop..." << std::endl;
     std::cout << std::endl;
     
-    // Clear any pending input
-    clearInput();
-    
-    // Main loop - wait for Enter key or shutdown signal
+    // Main loop - wait for shutdown signal only (no Enter key handling)
     while (!g_shutdown_requested && g_app_controller->isRunning()) {
-        // Check for key press
-        if (isKeyPressed()) {
-            int ch = std::cin.get();
-            if (ch == '\n' || ch == '\r') {
-                std::cout << "Enter key pressed, stopping..." << std::endl;
-                
-                // Display final statistics
-                uint64_t captured, sent, dropped;
-                g_app_controller->getFrameStats(captured, sent, dropped);
-                
-                std::cout << "\nFinal Statistics:" << std::endl;
-                std::cout << "  Frames Captured: " << captured << std::endl;
-                std::cout << "  Frames Sent: " << sent << std::endl;
-                std::cout << "  Frames Dropped: " << dropped;
-                if (captured > 0) {
-                    double drop_rate = (dropped * 100.0) / captured;
-                    std::cout << " (" << std::fixed << std::setprecision(2) 
-                             << drop_rate << "%)";
-                }
-                std::cout << std::endl;
-                
-                int connections = g_app_controller->getNdiConnectionCount();
-                std::cout << "  NDI Connections: " << connections << std::endl;
-                
-                break;
-            }
-        }
-        
         // Small sleep to prevent busy waiting
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         
@@ -541,6 +468,24 @@ int main(int argc, char* argv[]) {
         }
     }
     
+    // Display final statistics when shutting down
+    uint64_t captured, sent, dropped;
+    g_app_controller->getFrameStats(captured, sent, dropped);
+    
+    std::cout << "\nFinal Statistics:" << std::endl;
+    std::cout << "  Frames Captured: " << captured << std::endl;
+    std::cout << "  Frames Sent: " << sent << std::endl;
+    std::cout << "  Frames Dropped: " << dropped;
+    if (captured > 0) {
+        double drop_rate = (dropped * 100.0) / captured;
+        std::cout << " (" << std::fixed << std::setprecision(2) 
+                 << drop_rate << "%)";
+    }
+    std::cout << std::endl;
+    
+    int connections = g_app_controller->getNdiConnectionCount();
+    std::cout << "  NDI Connections: " << connections << std::endl;
+    
     // Stop the application
     std::cout << "Stopping application..." << std::endl;
     g_app_controller->stop();
@@ -556,13 +501,6 @@ int main(int argc, char* argv[]) {
     g_app_controller.reset();
     
     std::cout << "Exiting." << std::endl;
-    
-    // In command-line mode (positional parameters), wait for user input before closing
-    if (args.use_positional) {
-        std::cout << "Press Enter to exit." << std::endl;
-        clearInput();
-        std::cin.get();
-    }
     
     // Cleanup
 #ifdef _WIN32
