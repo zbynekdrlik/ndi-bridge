@@ -5,6 +5,28 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-07-15
+
+### Changed
+- **Simplified Logger Format**: Removed module names from log output
+  - Changed from `[module_name] [timestamp] message` to `[timestamp] message`
+  - Module names were not useful in compiled executables
+  - Cleaner, more concise log output
+
+### Fixed
+- **Single Version Logging**: Only log version once at application startup
+  - Removed redundant version logging from all components
+  - Changed wording from "Script version" to "Version" (not a script)
+- **Logger API Cleanup**: Removed `Logger::initialize()` method
+  - No longer needed without module names
+  - Simplified logger usage across all components
+
+### Technical Details
+- Removed `Logger::initialize()` calls from all components
+- Removed `Logger::logVersion()` calls from all components except main.cpp
+- Fixed remaining cout usage in device selection
+- Updated all Media Foundation components to remove logger initialization
+
 ## [1.2.1] - 2025-07-15
 
 ### Added
@@ -258,6 +280,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.2.2]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.5...v1.2.0
 [1.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.4...v1.1.5

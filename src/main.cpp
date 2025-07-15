@@ -163,7 +163,7 @@ std::string selectDeviceInteractive(CaptureType type) {
         return "";
     }
     
-    ndi_bridge::Logger::info("\nAvailable Devices:");
+    ndi_bridge::Logger::info("Available Devices:");
     for (size_t i = 0; i < devices.size(); ++i) {
         ndi_bridge::Logger::info(std::to_string(i) + ": " + devices[i].name);
     }
