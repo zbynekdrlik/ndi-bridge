@@ -2,6 +2,7 @@
 #include "decklink_capture.h"
 #include <iostream>
 #include <sstream>
+#include <chrono>
 
 namespace ndi_bridge {
 
