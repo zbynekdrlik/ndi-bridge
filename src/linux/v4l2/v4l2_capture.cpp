@@ -9,6 +9,8 @@
 #include <cstring>
 #include <sstream>
 #include <chrono>
+#include <poll.h>
+#include <algorithm>
 
 namespace ndi_bridge {
 namespace v4l2 {
@@ -46,6 +48,8 @@ std::vector<ICaptureDevice::DeviceInfo> V4L2Capture::enumerateDevices() {
 }
 
 bool V4L2Capture::startCapture(const std::string& device_name) {
+    std::lock_guard<std::mutex> lock(device_mutex_);
+    
     if (isCapturing()) {
         Logger::log("V4L2Capture: Already capturing");
         return true;
@@ -104,6 +108,9 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
         return false;
     }
     
+    // Reset statistics
+    stats_.reset();
+    
     // Start capture thread
     should_stop_ = false;
     capturing_ = true;
@@ -114,6 +121,8 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
 }
 
 void V4L2Capture::stopCapture() {
+    std::lock_guard<std::mutex> lock(device_mutex_);
+    
     if (!isCapturing()) {
         return;
     }
@@ -131,6 +140,14 @@ void V4L2Capture::stopCapture() {
     
     capturing_ = false;
     
+    // Log final statistics
+    if (stats_.frames_captured > 0) {
+        double avg_latency = stats_.total_latency_ms / stats_.frames_captured;
+        Logger::log("V4L2Capture: Final stats - Frames: " + std::to_string(stats_.frames_captured) +
+                   ", Avg latency: " + std::to_string(avg_latency) + "ms" +
+                   ", Dropped: " + std::to_string(stats_.frames_dropped));
+    }
+    
     // Stop streaming
     stopStreaming();
     
@@ -142,19 +159,21 @@ void V4L2Capture::stopCapture() {
 }
 
 bool V4L2Capture::isCapturing() const {
-    return capturing_;
+    return capturing_.load();
 }
 
 void V4L2Capture::setFrameCallback(FrameCallback callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
     frame_callback_ = callback;
 }
 
 void V4L2Capture::setErrorCallback(ErrorCallback callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
     error_callback_ = callback;
 }
 
 bool V4L2Capture::hasError() const {
-    return has_error_;
+    return has_error_.load();
 }
 
 std::string V4L2Capture::getLastError() const {
@@ -273,30 +292,58 @@ void V4L2Capture::stopStreaming() {
 void V4L2Capture::captureThread() {
     Logger::log("V4L2Capture: Capture thread started");
     
-    fd_set fds;
-    struct timeval tv;
+    // Use poll instead of select for better performance
+    struct pollfd pfd;
+    pfd.fd = fd_;
+    pfd.events = POLLIN | POLLPRI;
+    
+    // Pre-allocate conversion buffer for better performance
+    std::vector<uint8_t> bgra_buffer;
+    if (V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat)) {
+        size_t bgra_size = V4L2FormatConverter::calculateBGRASize(video_format_.width, video_format_.height);
+        bgra_buffer.reserve(bgra_size);
+    }
+    
+    // Performance monitoring
+    auto last_stats_time = std::chrono::steady_clock::now();
+    uint64_t local_frame_count = 0;
     
     while (!should_stop_) {
-        FD_ZERO(&fds);
-        FD_SET(fd_, &fds);
-        
-        // Timeout
-        tv.tv_sec = 0;
-        tv.tv_usec = 100000; // 100ms
-        
-        int ret = select(fd_ + 1, &fds, NULL, NULL, &tv);
+        // Use low timeout for minimal latency (5ms)
+        int ret = poll(&pfd, 1, 5);
         
         if (ret < 0) {
             if (errno == EINTR) {
                 continue;
             }
-            setError("Select error: " + std::string(strerror(errno)));
+            // Check if device was disconnected
+            if (errno == ENODEV) {
+                setError("Device disconnected");
+                break;
+            }
+            setError("Poll error: " + std::string(strerror(errno)));
             break;
         }
         
         if (ret == 0) {
-            // Timeout - check if we should stop
+            // Timeout - check if device still exists
+            if (++timeout_count_ > 200) { // 1 second without frames
+                struct v4l2_capability cap;
+                if (ioctl(fd_, VIDIOC_QUERYCAP, &cap) < 0) {
+                    setError("Device disconnected or not responding");
+                    break;
+                }
+                timeout_count_ = 0;
+            }
             continue;
+        }
+        
+        timeout_count_ = 0;
+        
+        // Check for errors
+        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            setError("Device error detected");
+            break;
         }
         
         // Dequeue buffer
@@ -304,6 +351,8 @@ void V4L2Capture::captureThread() {
         memset(&v4l2_buf, 0, sizeof(v4l2_buf));
         v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         v4l2_buf.memory = V4L2_MEMORY_MMAP;
+        
+        auto dequeue_start = std::chrono::high_resolution_clock::now();
         
         if (ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf) < 0) {
             if (errno == EAGAIN) {
@@ -315,7 +364,24 @@ void V4L2Capture::captureThread() {
         
         // Process frame
         if (v4l2_buf.index < buffers_.size()) {
-            processFrame(buffers_[v4l2_buf.index], v4l2_buf);
+            processFrame(buffers_[v4l2_buf.index], v4l2_buf, bgra_buffer);
+            
+            // Update statistics
+            auto now = std::chrono::high_resolution_clock::now();
+            auto dequeue_time = std::chrono::duration<double, std::milli>(now - dequeue_start).count();
+            
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            stats_.frames_captured++;
+            stats_.total_latency_ms += dequeue_time;
+            
+            if (dequeue_time > stats_.max_latency_ms) {
+                stats_.max_latency_ms = dequeue_time;
+            }
+            if (dequeue_time < stats_.min_latency_ms) {
+                stats_.min_latency_ms = dequeue_time;
+            }
+            
+            local_frame_count++;
         }
         
         // Requeue buffer
@@ -323,27 +389,55 @@ void V4L2Capture::captureThread() {
             setError("Failed to requeue buffer: " + std::string(strerror(errno)));
             break;
         }
+        
+        // Log statistics periodically
+        auto now = std::chrono::steady_clock::now();
+        if (now - last_stats_time >= std::chrono::seconds(10)) {
+            double avg_latency = stats_.frames_captured > 0 ? 
+                stats_.total_latency_ms / stats_.frames_captured : 0.0;
+            
+            Logger::debug("V4L2Capture: Stats - FPS: " + 
+                std::to_string(local_frame_count / 10) +
+                ", Avg latency: " + std::to_string(avg_latency) + "ms" +
+                ", Max: " + std::to_string(stats_.max_latency_ms) + "ms");
+            
+            last_stats_time = now;
+            local_frame_count = 0;
+        }
     }
     
     Logger::log("V4L2Capture: Capture thread stopped");
 }
 
-void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf) {
-    if (!frame_callback_) {
+void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf, 
+                               std::vector<uint8_t>& bgra_buffer) {
+    FrameCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(callback_mutex_);
+        callback = frame_callback_;
+    }
+    
+    if (!callback) {
         return;
     }
     
-    // Get timestamp
-    auto timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
+    // Use hardware timestamp if available, otherwise use system time
+    int64_t timestamp;
+    if (v4l2_buf.flags & V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC) {
+        // Convert v4l2 timestamp to nanoseconds
+        timestamp = v4l2_buf.timestamp.tv_sec * 1000000000LL + v4l2_buf.timestamp.tv_usec * 1000LL;
+    } else {
+        timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+    }
     
     // Convert format if needed
     if (V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat)) {
-        std::vector<uint8_t> bgra_buffer;
-        
         if (!format_converter_) {
             format_converter_ = std::make_unique<V4L2FormatConverter>();
         }
+        
+        auto convert_start = std::chrono::high_resolution_clock::now();
         
         if (format_converter_->convertToBGRA(buffer.start, v4l2_buf.bytesused,
                                               video_format_.width, video_format_.height,
@@ -354,13 +448,22 @@ void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf
             bgra_format.pixel_format = "BGRA";
             bgra_format.stride = video_format_.width * 4;
             
-            frame_callback_(bgra_buffer.data(), bgra_buffer.size(), timestamp, bgra_format);
+            callback(bgra_buffer.data(), bgra_buffer.size(), timestamp, bgra_format);
+            
+            // Track conversion time
+            auto convert_time = std::chrono::duration<double, std::milli>(
+                std::chrono::high_resolution_clock::now() - convert_start).count();
+            
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            stats_.total_convert_ms += convert_time;
         } else {
             Logger::log("V4L2Capture: Failed to convert frame to BGRA");
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            stats_.frames_dropped++;
         }
     } else {
         // Pass through unsupported format
-        frame_callback_(buffer.start, v4l2_buf.bytesused, timestamp, video_format_);
+        callback(buffer.start, v4l2_buf.bytesused, timestamp, video_format_);
     }
 }
 
@@ -370,64 +473,146 @@ bool V4L2Capture::setCaptureFormat(int width, int height, uint32_t pixelformat) 
     current_format_.fmt.pix.width = width;
     current_format_.fmt.pix.height = height;
     current_format_.fmt.pix.pixelformat = pixelformat;
-    current_format_.fmt.pix.field = V4L2_FIELD_INTERLACED;
+    current_format_.fmt.pix.field = V4L2_FIELD_ANY;  // Let driver choose
     
     if (ioctl(fd_, VIDIOC_S_FMT, &current_format_) < 0) {
-        setError("Failed to set format: " + std::string(strerror(errno)));
         return false;
     }
     
     // Driver may have adjusted the format
     video_format_ = convertFormat(current_format_);
     
+    // Try to set frame rate for low latency
+    v4l2_streamparm parm;
+    memset(&parm, 0, sizeof(parm));
+    parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    
+    if (ioctl(fd_, VIDIOC_G_PARM, &parm) == 0) {
+        if (parm.parm.capture.capability & V4L2_CAP_TIMEPERFRAME) {
+            // Try to set 60fps for lowest latency
+            parm.parm.capture.timeperframe.numerator = 1;
+            parm.parm.capture.timeperframe.denominator = 60;
+            
+            if (ioctl(fd_, VIDIOC_S_PARM, &parm) < 0) {
+                // Try 30fps if 60fps fails
+                parm.parm.capture.timeperframe.denominator = 30;
+                ioctl(fd_, VIDIOC_S_PARM, &parm);
+            }
+        }
+    }
+    
     Logger::log("V4L2Capture: Set format to " + std::to_string(video_format_.width) + 
-               "x" + std::to_string(video_format_.height) + " " + video_format_.pixel_format);
+               "x" + std::to_string(video_format_.height) + " " + video_format_.pixel_format +
+               " @ " + std::to_string(video_format_.fps_numerator) + "/" + 
+               std::to_string(video_format_.fps_denominator) + " fps");
     
     return true;
 }
 
 bool V4L2Capture::findBestFormat() {
-    // Try common formats in order of preference
-    const struct {
-        int width;
-        int height;
-        uint32_t pixelformat;
-    } formats[] = {
-        {1920, 1080, V4L2_PIX_FMT_YUYV},
-        {1920, 1080, V4L2_PIX_FMT_MJPEG},
-        {1280, 720,  V4L2_PIX_FMT_YUYV},
-        {1280, 720,  V4L2_PIX_FMT_MJPEG},
-        {640,  480,  V4L2_PIX_FMT_YUYV},
-        {640,  480,  V4L2_PIX_FMT_MJPEG}
+    // First enumerate all supported formats
+    std::vector<SupportedFormat> supported_formats;
+    enumerateFormats(supported_formats);
+    
+    if (supported_formats.empty()) {
+        setError("No supported formats found");
+        return false;
+    }
+    
+    // Log available formats
+    Logger::log("V4L2Capture: Device supports " + std::to_string(supported_formats.size()) + " formats:");
+    for (const auto& fmt : supported_formats) {
+        Logger::debug("  " + V4L2FormatConverter::getFormatName(fmt.pixelformat) +
+                     " " + std::to_string(fmt.width) + "x" + std::to_string(fmt.height) +
+                     " @ " + std::to_string(fmt.fps) + " fps");
+    }
+    
+    // Prefer formats in this order: YUYV > UYVY > NV12 > RGB24 > BGR24 > MJPEG
+    const uint32_t preferred_formats[] = {
+        V4L2_PIX_FMT_YUYV,
+        V4L2_PIX_FMT_UYVY,
+        V4L2_PIX_FMT_NV12,
+        V4L2_PIX_FMT_RGB24,
+        V4L2_PIX_FMT_BGR24,
+        V4L2_PIX_FMT_MJPEG  // Last resort due to decompression overhead
     };
     
-    for (const auto& fmt : formats) {
-        if (setCaptureFormat(fmt.width, fmt.height, fmt.pixelformat)) {
-            return true;
+    // Try to find best format
+    for (auto pix_fmt : preferred_formats) {
+        // Try 1080p first, then 720p, then 480p
+        const int resolutions[][2] = {{1920, 1080}, {1280, 720}, {640, 480}};
+        
+        for (auto res : resolutions) {
+            // Find matching format with highest FPS
+            auto best = std::find_if(supported_formats.begin(), supported_formats.end(),
+                [&](const SupportedFormat& f) {
+                    return f.pixelformat == pix_fmt && 
+                           f.width == res[0] && f.height == res[1];
+                });
+            
+            if (best != supported_formats.end()) {
+                if (setCaptureFormat(best->width, best->height, best->pixelformat)) {
+                    return true;
+                }
+            }
         }
     }
     
-    // Try to get any supported format
+    // Fallback: use first available format
+    const auto& fallback = supported_formats[0];
+    return setCaptureFormat(fallback.width, fallback.height, fallback.pixelformat);
+}
+
+void V4L2Capture::enumerateFormats(std::vector<SupportedFormat>& formats) {
     v4l2_fmtdesc fmtdesc;
     memset(&fmtdesc, 0, sizeof(fmtdesc));
     fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     
     while (ioctl(fd_, VIDIOC_ENUM_FMT, &fmtdesc) == 0) {
-        // Try to set this format
-        memset(&current_format_, 0, sizeof(current_format_));
-        current_format_.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        // Enumerate frame sizes for this format
+        v4l2_frmsizeenum frmsize;
+        memset(&frmsize, 0, sizeof(frmsize));
+        frmsize.pixel_format = fmtdesc.pixelformat;
+        frmsize.index = 0;
         
-        if (ioctl(fd_, VIDIOC_G_FMT, &current_format_) == 0) {
-            video_format_ = convertFormat(current_format_);
-            Logger::log("V4L2Capture: Using default format");
-            return true;
+        while (ioctl(fd_, VIDIOC_ENUM_FRAMESIZES, &frmsize) == 0) {
+            if (frmsize.type == V4L2_FRMSIZE_TYPE_DISCRETE) {
+                // Enumerate frame rates for this size
+                v4l2_frmivalenum frmival;
+                memset(&frmival, 0, sizeof(frmival));
+                frmival.pixel_format = fmtdesc.pixelformat;
+                frmival.width = frmsize.discrete.width;
+                frmival.height = frmsize.discrete.height;
+                frmival.index = 0;
+                
+                uint32_t max_fps = 0;
+                
+                while (ioctl(fd_, VIDIOC_ENUM_FRAMEINTERVALS, &frmival) == 0) {
+                    if (frmival.type == V4L2_FRMIVAL_TYPE_DISCRETE) {
+                        uint32_t fps = frmival.discrete.denominator / frmival.discrete.numerator;
+                        if (fps > max_fps) {
+                            max_fps = fps;
+                        }
+                    }
+                    frmival.index++;
+                }
+                
+                if (max_fps == 0) {
+                    max_fps = 30; // Default if enumeration fails
+                }
+                
+                SupportedFormat fmt;
+                fmt.pixelformat = fmtdesc.pixelformat;
+                fmt.width = frmsize.discrete.width;
+                fmt.height = frmsize.discrete.height;
+                fmt.fps = max_fps;
+                formats.push_back(fmt);
+            }
+            frmsize.index++;
         }
         
         fmtdesc.index++;
     }
-    
-    setError("No suitable capture format found");
-    return false;
 }
 
 bool V4L2Capture::queryCapabilities() {
@@ -464,13 +649,14 @@ ICaptureDevice::VideoFormat V4L2Capture::convertFormat(const v4l2_format& fmt) c
     fourcc[3] = (fmt.fmt.pix.pixelformat >> 24) & 0xFF;
     format.pixel_format = std::string(fourcc);
     
-    // Get frame rate (many devices don't support this properly)
+    // Get frame rate
     v4l2_streamparm parm;
     memset(&parm, 0, sizeof(parm));
     parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     
     if (ioctl(fd_, VIDIOC_G_PARM, &parm) == 0) {
-        if (parm.parm.capture.timeperframe.denominator > 0) {
+        if (parm.parm.capture.timeperframe.denominator > 0 && 
+            parm.parm.capture.timeperframe.numerator > 0) {
             format.fps_numerator = parm.parm.capture.timeperframe.denominator;
             format.fps_denominator = parm.parm.capture.timeperframe.numerator;
         } else {
@@ -495,9 +681,20 @@ void V4L2Capture::setError(const std::string& error) {
     
     Logger::log("V4L2Capture Error: " + error);
     
-    if (error_callback_) {
-        error_callback_(error);
+    ErrorCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(callback_mutex_);
+        callback = error_callback_;
     }
+    
+    if (callback) {
+        callback(error);
+    }
+}
+
+V4L2Capture::CaptureStats V4L2Capture::getStats() const {
+    std::lock_guard<std::mutex> lock(stats_mutex_);
+    return stats_;
 }
 
 } // namespace v4l2
