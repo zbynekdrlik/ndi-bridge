@@ -2,13 +2,13 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Implementing consistent logging format per LLM instructions
-- [ ] Waiting for: User to test the changes and provide logs
+- [x] Currently working on: Fixed compilation errors in logging implementation
+- [ ] Waiting for: User to test the fixed changes and provide logs
 - [ ] Blocked by: None
 
 ## Implementation Status
 - Phase: Logging System Update
-- Step: Implementation complete, awaiting testing
+- Step: Bug fixes complete, awaiting testing
 - Status: IMPLEMENTED_NOT_TESTED
 
 ## Testing Status Matrix
@@ -17,6 +17,15 @@
 | logger.h/cpp | ✅ v1.2.1 | ❌ | ❌ | ❌ |
 | main.cpp logging | ✅ v1.2.1 | ❌ | ❌ | ❌ |
 | app_controller logging | ✅ v1.2.1 | ❌ | ❌ | ❌ |
+
+## Issues Fixed
+1. **Compilation Error**: Removed Logger calls from parseArgs() function
+   - Logger was being used before initialization
+   - Reverted to std::cerr for error messages in parseArgs()
+   
+2. **Security Warning**: Fixed localtime warning on Windows
+   - Now uses localtime_s on Windows for thread safety
+   - Uses localtime on other platforms
 
 ## Changes Made
 1. Created new logger utility class (logger.h and logger.cpp) that implements:
@@ -27,7 +36,7 @@
 
 2. Updated main.cpp:
    - Added logger initialization
-   - Replaced all cout/cerr with Logger calls
+   - Replaced all cout/cerr with Logger calls (except in parseArgs)
    - Version is logged on startup with proper format
 
 3. Updated app_controller.cpp:
@@ -57,6 +66,11 @@
 4. Confirm the format is correct
 
 ## Branch Information
-- Working branch: feature/consistent-logging
+- Working branch: feature/consistent-logging  
 - Base branch: main
 - Version bumped: 1.2.0 → 1.2.1
+- PR: #7 - https://github.com/zbynekdrlik/ndi-bridge/pull/7
+
+## Latest Commits
+- Fixed compilation errors by removing Logger usage before initialization
+- Fixed Windows localtime security warning
