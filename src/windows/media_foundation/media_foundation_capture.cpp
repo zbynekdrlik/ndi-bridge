@@ -13,7 +13,8 @@ MediaFoundationCapture::MediaFoundationCapture()
     , current_reader_(nullptr)
     , current_source_(nullptr)
     , initialized_(false)
-    , reinit_attempts_(0) {
+    , reinit_attempts_(0)
+    , is_nzxt_device_(false) {
     device_manager_ = std::make_unique<media_foundation::MFCaptureDevice>();
     video_capture_ = std::make_unique<media_foundation::MFVideoCapture>();
 }
@@ -24,7 +25,14 @@ MediaFoundationCapture::~MediaFoundationCapture() {
         stopCapture();
     }
     
-    // Only do full shutdown in destructor
+    // NZXT workaround: Don't do full shutdown for NZXT devices
+    // The OS will clean up when the process exits
+    if (is_nzxt_device_) {
+        std::cout << "NZXT device - skipping full cleanup to prevent input loss" << std::endl;
+        return;
+    }
+    
+    // Only do full shutdown for non-NZXT devices
     shutdownDevice();
 }
 
@@ -121,6 +129,12 @@ std::string MediaFoundationCapture::getLastError() const {
 bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
     selected_device_name_ = device_name.empty() ? L"" : utf8ToWide(device_name);
     
+    // Check if this is an NZXT device
+    if (selected_device_name_.find(L"NZXT") != std::wstring::npos) {
+        is_nzxt_device_ = true;
+        std::cout << "NZXT device detected - special handling enabled" << std::endl;
+    }
+    
     // Re-enumerate and find device by name (for reconnection support)
     std::vector<media_foundation::DeviceInfo> devices;
     HRESULT hr = device_manager_->EnumerateDevices(devices);
@@ -134,6 +148,12 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
     // But keep the fallback to first device for backward compatibility
     if (selected_device_name_.empty()) {
         selected_device_name_ = devices[0].friendly_name;
+        
+        // Check again for NZXT
+        if (selected_device_name_.find(L"NZXT") != std::wstring::npos) {
+            is_nzxt_device_ = true;
+            std::cout << "NZXT device detected - special handling enabled" << std::endl;
+        }
     }
     
     // Find device by name
@@ -197,7 +217,7 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
 
 void MediaFoundationCapture::shutdownDevice() {
     // This method is only called:
-    // 1. In destructor
+    // 1. In destructor (except for NZXT devices)
     // 2. On initialization failure
     // 3. When reinitializing after error
     
