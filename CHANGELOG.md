@@ -5,6 +5,24 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.7] - 2025-07-15
+
+### Fixed
+- **NZXT Capture Card Issue (Final Fix)**: NZXT devices no longer lose input signal on app exit
+  - Detect NZXT devices by name during initialization  
+  - Skip full cleanup in destructor for NZXT devices
+  - Let OS handle cleanup on process exit for NZXT devices
+  - This completely prevents the need to power cycle NZXT card
+
+### Changed
+- MediaFoundationCapture v1.0.10: Added NZXT-specific device detection and handling
+- Modified destructor behavior for NZXT devices only
+
+### Technical Details
+- Added is_nzxt_device_ flag to track NZXT devices
+- Destructor skips cleanup for NZXT to prevent driver reset
+- Non-NZXT devices still get proper cleanup
+
 ## [1.1.6] - 2025-07-15
 
 ### Fixed
@@ -224,6 +242,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.1.7]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.6...v1.1.7
 [1.1.6]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.3...v1.1.4
