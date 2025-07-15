@@ -10,8 +10,10 @@
 namespace ndi_bridge {
 
 /**
- * Logger class implementing the LLM instruction format:
- * [script_name] [timestamp] message
+ * Logger class implementing simplified format:
+ * [timestamp] message
+ * 
+ * Module names removed per thread progress decision - not useful in compiled exe
  */
 class Logger {
 public:
@@ -21,12 +23,6 @@ public:
         LVL_ERROR,
         LVL_DEBUG
     };
-
-    /**
-     * Initialize the logger with a module name
-     * @param module_name The name of the module/script for log messages
-     */
-    static void initialize(const std::string& module_name);
 
     /**
      * Log a message at INFO level
@@ -64,7 +60,6 @@ private:
     static std::string getCurrentTimestamp();
     
     static std::mutex mutex_;
-    static std::string module_name_;
     static bool verbose_;
 };
 
