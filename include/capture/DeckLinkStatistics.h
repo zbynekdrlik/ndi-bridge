@@ -72,6 +72,12 @@ public:
      */
     uint64_t GetDroppedFrames() const { return m_droppedFrames; }
     
+    /**
+     * @brief Get reference to dropped frames counter
+     * @return Reference to atomic dropped frames counter
+     */
+    std::atomic<uint64_t>& GetDroppedFramesRef() { return m_droppedFrames; }
+    
 private:
     /**
      * @brief Frame timestamp record for FPS calculation
