@@ -220,8 +220,8 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
         args.use_positional = true;
         // Default to Media Foundation for backward compatibility
         args.capture_type = CaptureType::MediaFoundation;
-        ndi_bridge::Logger::info("Command-line mode: device name = \"" + args.device_name + 
-                                "\", NDI stream name = \"" + args.ndi_name + "\"");
+        std::cout << "Command-line mode: device name = \"" << args.device_name
+                  << "\", NDI stream name = \"" << args.ndi_name << "\"" << std::endl;
         return args;
     }
     
@@ -237,25 +237,25 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
                 } else if (args.capture_type_str == "dl" || args.capture_type_str == "decklink") {
                     args.capture_type = CaptureType::DeckLink;
                 } else {
-                    ndi_bridge::Logger::error("Invalid capture type. Use 'mf' or 'dl'");
+                    std::cerr << "Error: Invalid capture type. Use 'mf' or 'dl'" << std::endl;
                     args.show_help = true;
                 }
             } else {
-                ndi_bridge::Logger::error("--type requires an argument");
+                std::cerr << "Error: --type requires an argument" << std::endl;
                 args.show_help = true;
             }
         } else if (arg == "-d" || arg == "--device") {
             if (i + 1 < argc) {
                 args.device_name = argv[++i];
             } else {
-                ndi_bridge::Logger::error("--device requires an argument");
+                std::cerr << "Error: --device requires an argument" << std::endl;
                 args.show_help = true;
             }
         } else if (arg == "-n" || arg == "--ndi-name") {
             if (i + 1 < argc) {
                 args.ndi_name = argv[++i];
             } else {
-                ndi_bridge::Logger::error("--ndi-name requires an argument");
+                std::cerr << "Error: --ndi-name requires an argument" << std::endl;
                 args.show_help = true;
             }
         } else if (arg == "-l" || arg == "--list-devices") {
@@ -268,14 +268,14 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
             if (i + 1 < argc) {
                 args.retry_delay_ms = std::stoi(argv[++i]);
             } else {
-                ndi_bridge::Logger::error("--retry-delay requires an argument");
+                std::cerr << "Error: --retry-delay requires an argument" << std::endl;
                 args.show_help = true;
             }
         } else if (arg == "--max-retries") {
             if (i + 1 < argc) {
                 args.max_retries = std::stoi(argv[++i]);
             } else {
-                ndi_bridge::Logger::error("--max-retries requires an argument");
+                std::cerr << "Error: --max-retries requires an argument" << std::endl;
                 args.show_help = true;
             }
         } else if (arg == "-h" || arg == "--help") {
@@ -283,7 +283,7 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
         } else if (arg == "--version") {
             args.show_version = true;
         } else {
-            ndi_bridge::Logger::error("Unknown argument: " + arg);
+            std::cerr << "Error: Unknown argument: " << arg << std::endl;
             args.show_help = true;
         }
     }
