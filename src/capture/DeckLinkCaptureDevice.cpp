@@ -239,9 +239,8 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
         } else {
             // Queue frame
             size_t frameSize = videoFrame->GetRowBytes() * frameHeight;
-            auto droppedFrames = m_statistics->GetDroppedFrames();
             m_frameQueue->AddFrame(frameBytes, frameSize, frameWidth, frameHeight,
-                                  m_pixelFormat, const_cast<std::atomic<uint64_t>&>(droppedFrames));
+                                  m_pixelFormat, m_statistics->GetDroppedFramesRef());
         }
         
         // End buffer access
