@@ -1,16 +1,17 @@
 # MERGE PREPARATION CHECKLIST
 
-## Pre-Merge Review for v1.1.5
+## Pre-Merge Review for v1.2.0
 
 ### 🔍 Code Review Status
 
 #### ✅ Completed Features
-1. **Media Foundation Support** (v1.0.7)
+1. **Media Foundation Support** (v1.0.7-v1.0.8)
    - [x] Device enumeration
    - [x] Interactive selection
    - [x] Format conversion
    - [x] Error handling
    - [x] Retry logic
+   - [x] Proper device shutdown (v1.2.0)
 
 2. **DeckLink Support** (v1.1.0-v1.1.3)
    - [x] Device enumeration
@@ -19,6 +20,7 @@
    - [x] No-signal handling
    - [x] Interface adapter pattern
    - [x] Compilation fixes
+   - [x] Refactored into 5 focused components (v1.2.0)
 
 3. **Bug Fixes** (v1.1.4-v1.1.5)
    - [x] Fixed version display bug
@@ -43,19 +45,19 @@
 ### 📝 Documentation Status
 
 #### ✅ Completed Documentation
-- [x] README.md (current)
+- [x] README.md (updated to v1.2.0)
 - [x] Architecture documentation (current)
 - [x] DeckLink setup guide (current)
 - [x] DeckLink SDK setup instructions (current)
 - [x] Reference implementation
-- [x] THREAD_PROGRESS.md tracking
-- [x] CHANGELOG.md (updated to v1.1.5)
+- [x] CHANGELOG.md (updated to v1.2.0)
 - [x] Feature comparison documentation
 
 #### ✅ Version Updates
-- [x] version.h updated to v1.1.5
-- [x] CMakeLists.txt updated to v1.1.5
-- [x] PR description updated for v1.1.5
+- [x] version.h updated to v1.2.0
+- [x] CMakeLists.txt updated to v1.2.0
+- [x] README.md updated to v1.2.0
+- [x] All version references unified
 
 ### 🔧 Technical Debt
 
@@ -85,6 +87,7 @@
 - [x] Frame drop issues (v1.1.4)
 - [x] Frame rate mismatch (v1.1.5)
 - [x] Statistics display (v1.1.5)
+- [x] Media Foundation device release (v1.2.0)
 
 ### 🧪 Testing Status
 
@@ -96,10 +99,11 @@
    - [x] All files compile without errors
 
 2. **Fixed Issues Verified**
-   - [x] Version displays correctly as 1.1.5
+   - [x] Version displays correctly as 1.2.0
    - [x] DeckLink frame drops minimized
    - [x] Frame rate matches capture device
    - [x] Statistics show on Enter key
+   - [x] Media Foundation devices release properly
 
 3. **Outstanding Tests**
    - [ ] Media Foundation capture on various devices
@@ -109,7 +113,7 @@
 ### 🚀 Deployment Checklist
 
 #### Pre-Merge Tasks
-- [x] Update all version numbers to 1.1.5
+- [x] Update all version numbers to 1.2.0
 - [x] Create comprehensive CHANGELOG.md
 - [x] Review all compiler warnings
 - [x] Ensure no debug code remains
@@ -131,12 +135,12 @@
 ### 📊 Code Quality Metrics
 
 #### File Count
-- Total C++ files: ~30
-- Header files: ~20
+- Total C++ files: ~35 (increased due to refactoring)
+- Header files: ~25
 - Documentation files: ~10
 
 #### Lines of Code
-- Estimated: ~5000 lines
+- Estimated: ~5500 lines
 - Comments: Well documented
 - TODO items: Documented for future
 
@@ -151,7 +155,7 @@
 
 Before merging to main:
 - [x] All compilation errors fixed
-- [x] Version numbers updated everywhere (v1.1.5)
+- [x] Version numbers updated everywhere (v1.2.0)
 - [x] Documentation is complete and current
 - [x] PR description is comprehensive
 - [x] No WIP or TODO blocking items
@@ -160,12 +164,11 @@ Before merging to main:
 
 ### 🎯 Post-Merge Actions
 
-1. Create GitHub Release v1.1.5
+1. Create GitHub Release v1.2.0
 2. Tag the release
 3. Update project board
 4. Close related issues
 5. Plan next milestone:
-   - v1.2.0: Refactor DeckLinkCaptureDevice.cpp
    - v1.3.0: Linux support?
    - v2.0.0: Consolidate interfaces
 
@@ -180,6 +183,7 @@ Before merging to main:
 - **v1.1.3**: Fixed DeckLink enumerator compilation errors
 - **v1.1.4**: Fixed critical runtime issues (version display, frame drops)
 - **v1.1.5**: Fixed frame rate and statistics display
+- **v1.2.0**: DeckLink refactoring + Media Foundation shutdown fix
 
 ## Risk Assessment
 
@@ -188,9 +192,10 @@ Before merging to main:
 - Command-line parsing
 - NDI integration
 - Bug fixes in v1.1.4-v1.1.5
+- Refactored DeckLink components
 
 **Medium Risk Items:**
-- DeckLink support (improved in v1.1.4)
+- DeckLink support (improved in v1.1.4, refactored in v1.2.0)
 - Device compatibility variations
 - Format converter framework
 
@@ -200,3 +205,4 @@ Before merging to main:
 - Graceful degradation
 - Clear error messages
 - Clean code without device-specific hacks
+- Proper resource cleanup
