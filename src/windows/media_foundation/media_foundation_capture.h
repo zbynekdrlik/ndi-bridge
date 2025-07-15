@@ -52,6 +52,7 @@ private:
     
     IMFActivate* current_activate_;
     IMFSourceReader* current_reader_;
+    IMFMediaSource* current_source_;  // Keep reference for proper shutdown
     
     std::wstring selected_device_name_;
     std::string last_error_;
