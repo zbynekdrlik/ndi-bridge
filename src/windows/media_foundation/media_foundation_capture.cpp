@@ -15,8 +15,6 @@ MediaFoundationCapture::MediaFoundationCapture()
     , current_source_(nullptr)
     , initialized_(false)
     , reinit_attempts_(0) {
-    Logger::initialize("MediaFoundation");
-    Logger::logVersion(NDI_BRIDGE_VERSION);
     device_manager_ = std::make_unique<media_foundation::MFCaptureDevice>();
     video_capture_ = std::make_unique<media_foundation::MFVideoCapture>();
 }
