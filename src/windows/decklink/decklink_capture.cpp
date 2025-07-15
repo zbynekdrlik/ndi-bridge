@@ -22,15 +22,28 @@ std::vector<ICaptureDevice::DeviceInfo> DeckLinkCapture::enumerateDevices() {
     
     try {
         // Use the DeckLink enumerator to get devices
-        auto deckLinkDevices = m_enumerator->EnumerateDevices();
+        if (!m_enumerator->EnumerateDevices()) {
+            // Failed to enumerate devices
+            m_lastError = "Failed to enumerate DeckLink devices";
+            m_hasError = true;
+            if (m_errorCallback) {
+                m_errorCallback(m_lastError);
+            }
+            return {};
+        }
         
         // Convert to ICaptureDevice::DeviceInfo format
         std::vector<DeviceInfo> devices;
-        for (const auto& dlDevice : deckLinkDevices) {
-            DeviceInfo info;
-            info.name = dlDevice.name;
-            info.id = dlDevice.name;  // DeckLink uses name as ID
-            devices.push_back(info);
+        int deviceCount = m_enumerator->GetDeviceCount();
+        
+        for (int i = 0; i < deviceCount; ++i) {
+            DeckLinkDeviceEnumerator::DeviceInfo dlInfo;
+            if (m_enumerator->GetDeviceInfo(i, dlInfo)) {
+                DeviceInfo info;
+                info.name = dlInfo.name;
+                info.id = dlInfo.name;  // DeckLink uses name as ID
+                devices.push_back(info);
+            }
         }
         
         return devices;
