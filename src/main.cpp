@@ -14,7 +14,8 @@
 #include <windows.h>
 #include <conio.h>
 #include "windows/media_foundation/media_foundation_capture.h"
-#include "capture/DeckLinkCaptureDevice.h"
+// TODO: Re-enable when DeckLink is adapted to ndi_bridge::ICaptureDevice interface
+// #include "capture/DeckLinkCaptureDevice.h"
 #include "capture/DeckLinkDeviceEnumerator.h"
 #else
 #include <termios.h>
@@ -165,7 +166,7 @@ void listDevices(CaptureType type = CaptureType::MediaFoundation) {
 CaptureType selectCaptureTypeInteractive() {
     std::cout << "\nSelect capture type:" << std::endl;
     std::cout << "0: Media Foundation (Webcams, USB capture)" << std::endl;
-    std::cout << "1: DeckLink (Blackmagic devices)" << std::endl;
+    std::cout << "1: DeckLink (Blackmagic devices) - TEMPORARILY UNAVAILABLE" << std::endl;
     
     int choice = -1;
     while (choice < 0 || choice > 1) {
@@ -175,6 +176,12 @@ CaptureType selectCaptureTypeInteractive() {
             std::cin.clear();
             std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
             std::cerr << "Invalid input. Please enter a number." << std::endl;
+            choice = -1;
+            continue;
+        }
+        
+        if (choice == 1) {
+            std::cerr << "DeckLink support is temporarily unavailable. Please select Media Foundation." << std::endl;
             choice = -1;
             continue;
         }
@@ -312,7 +319,9 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
                 if (args.capture_type_str == "mf" || args.capture_type_str == "mediafoundation") {
                     args.capture_type = CaptureType::MediaFoundation;
                 } else if (args.capture_type_str == "dl" || args.capture_type_str == "decklink") {
-                    args.capture_type = CaptureType::DeckLink;
+                    // args.capture_type = CaptureType::DeckLink;
+                    std::cerr << "Warning: DeckLink support is temporarily unavailable. Using Media Foundation instead." << std::endl;
+                    args.capture_type = CaptureType::MediaFoundation;
                 } else {
                     std::cerr << "Error: Invalid capture type. Use 'mf' or 'dl'" << std::endl;
                     args.show_help = true;
@@ -481,8 +490,14 @@ int main(int argc, char* argv[]) {
         std::cout << "Using Media Foundation capture" << std::endl;
         capture_device = std::make_unique<ndi_bridge::MediaFoundationCapture>();
     } else if (args.capture_type == CaptureType::DeckLink) {
-        std::cout << "Using DeckLink capture" << std::endl;
-        capture_device = std::make_unique<DeckLinkCaptureDevice>();
+        // TODO: Implement adapter class for DeckLink to ndi_bridge::ICaptureDevice
+        std::cerr << "DeckLink support is temporarily unavailable. Please use Media Foundation (-t mf)." << std::endl;
+        #ifdef _WIN32
+        CoUninitialize();
+        #endif
+        return 1;
+        // std::cout << "Using DeckLink capture" << std::endl;
+        // capture_device = std::make_unique<DeckLinkCaptureDevice>();
     }
 #else
     std::cerr << "Linux capture not yet implemented" << std::endl;
