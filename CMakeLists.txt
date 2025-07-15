@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.1.0 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.1.2 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -69,6 +69,8 @@ if(PLATFORM_WINDOWS)
             src/capture/DeckLinkCaptureDevice.cpp
             src/capture/DeckLinkDeviceEnumerator.h
             src/capture/DeckLinkDeviceEnumerator.cpp
+            src/windows/decklink/decklink_capture.h
+            src/windows/decklink/decklink_capture.cpp
         )
     endif()
     
