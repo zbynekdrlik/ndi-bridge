@@ -46,7 +46,37 @@ DeckLinkCaptureDevice::DeckLinkCaptureDevice()
 }
 
 DeckLinkCaptureDevice::~DeckLinkCaptureDevice() {
+    // Ensure capture is stopped
     StopCapture();
+    
+    // Explicitly release COM objects in correct order
+    // This ensures the DeckLink device is properly released
+    // and prevents monitor disconnection issues
+    
+    // First, clear the callback
+    m_callback.reset();
+    
+    // Then release input interface
+    if (m_deckLinkInput) {
+        m_deckLinkInput.Release();
+    }
+    
+    // Release attributes
+    if (m_attributes) {
+        m_attributes.Release();
+    }
+    
+    // Finally release the device
+    if (m_device) {
+        m_device.Release();
+    }
+    
+    // Clear other components
+    m_frameQueue.reset();
+    m_statistics.reset();
+    m_formatManager.reset();
+    m_deviceInitializer.reset();
+    m_formatConverter.reset();
 }
 
 bool DeckLinkCaptureDevice::Initialize(const std::string& deviceName) {
