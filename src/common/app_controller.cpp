@@ -19,8 +19,6 @@ constexpr uint32_t FOURCC_BGRX = 0x58524742;  // 'BGRX'
 
 AppController::AppController(const Config& config)
     : config_(config) {
-    Logger::initialize("AppController");
-    Logger::logVersion(NDI_BRIDGE_VERSION);
     Logger::info("Application Controller initialized");
     
     if (config_.verbose) {

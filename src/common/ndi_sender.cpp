@@ -17,8 +17,6 @@ constexpr int CONNECTION_CHECK_TIMEOUT_MS = 5000;
 NdiSender::NdiSender(const std::string& sender_name, ErrorCallback error_callback)
     : sender_name_(sender_name)
     , error_callback_(std::move(error_callback)) {
-    Logger::initialize("NdiSender");
-    Logger::logVersion(NDI_BRIDGE_VERSION);
 }
 
 NdiSender::~NdiSender() {
