@@ -5,6 +5,47 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-07-15
+
+### Added
+- **Linux Support**: Full V4L2 (Video4Linux2) implementation for USB capture devices
+  - V4L2 capture device implementation with memory-mapped I/O
+  - Device enumeration and automatic detection
+  - Support for common USB capture cards (NZXT, Elgato, etc.)
+  - Format conversion for V4L2 pixel formats:
+    - YUYV (YUV 4:2:2) to BGRA
+    - UYVY (YUV 4:2:2) to BGRA
+    - NV12 (YUV 4:2:0) to BGRA
+    - RGB24 to BGRA
+    - BGR24 to BGRA
+  - Non-blocking capture with proper error handling
+  - Thread-safe implementation
+
+### Changed
+- **Cross-Platform Build**: Updated CMake configuration for Linux support
+  - Platform-specific source file selection
+  - Linux-specific compiler flags
+  - V4L2 dependency handling (kernel headers)
+- **Main Application**: Updated to support V4L2 on Linux
+  - Platform-specific capture type selection
+  - Linux device enumeration
+  - Unified command-line interface across platforms
+- **Version System**: Updated to properly detect platform features
+  - Platform-specific feature flags
+  - Runtime platform detection
+
+### Technical Details
+- V4L2 implementation uses direct kernel API (no external libraries)
+- Memory-mapped buffers for efficient frame capture
+- ITU-R BT.601 color space conversion for YUV formats
+- Automatic format negotiation with capture devices
+- Support for both device paths (/dev/video0) and device name search
+
+### Known Limitations
+- MJPEG decompression not implemented (requires libjpeg)
+- DeckLink support not included for Linux (Windows only)
+- Focus on USB capture devices only
+
 ## [1.2.2] - 2025-07-15
 
 ### Changed
@@ -280,6 +321,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.3.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.2.2...v1.3.0
 [1.2.2]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.5...v1.2.0
