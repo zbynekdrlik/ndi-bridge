@@ -5,6 +5,24 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.5] - 2025-07-15
+
+### Fixed
+- **Frame Rate Issue**: NDI now uses actual capture frame rate instead of hardcoded 30fps
+- **Statistics Display**: Frame statistics now shown when Enter key is pressed
+- **Media Foundation Cleanup**: Improved cleanup sequence to prevent crashes on close
+
+### Changed
+- NdiSender v1.0.2: Added frame rate fields to FrameInfo struct
+- AppController v1.0.2: Now passes capture frame rate to NDI sender
+- Enhanced main.cpp to display final statistics before shutdown
+- Improved Media Foundation shutdown with proper COM object cleanup
+
+### Technical Details
+- NDI sender now uses fps_numerator and fps_denominator from capture device
+- Added proper flush and shutdown sequence for Media Foundation
+- Statistics display includes captured/sent/dropped frames and drop percentage
+
 ## [1.1.4] - 2025-07-15
 
 ### Fixed
@@ -188,6 +206,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.1...v1.1.2
