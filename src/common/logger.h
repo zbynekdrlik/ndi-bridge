@@ -16,10 +16,10 @@ namespace ndi_bridge {
 class Logger {
 public:
     enum class Level {
-        INFO,
-        WARNING,
-        ERROR,
-        DEBUG
+        LOG_INFO,
+        LOG_WARNING,
+        LOG_ERROR,
+        LOG_DEBUG
     };
 
     /**
