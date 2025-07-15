@@ -4,109 +4,102 @@
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
 - [x] Fixed frame rate issue - NDI now uses actual capture rate (v1.1.5)
 - [x] Fixed statistics display - shows stats when Enter pressed (v1.1.5)
-- [x] Fixed Media Foundation cleanup (v1.1.6) - but didn't work for NZXT
-- [x] Fixed NZXT card issue - skip cleanup for NZXT devices (v1.1.7)
-- [ ] Currently working on: Waiting for user to test v1.1.7 NZXT fix
-- [ ] Waiting for: User to rebuild and test if NZXT card issue is finally resolved
+- [x] Reverted NZXT-specific changes from v1.1.6/v1.1.7 per user request
+- [ ] Currently working on: Ready for testing v1.1.5 without NZXT hacks
+- [ ] Waiting for: User to test clean v1.1.5 build
 - [ ] Blocked by: Need test results before PR merge
 
 ## GOAL 11: Test and Fix v1.1.3 Issues (IN PROGRESS)
 ### Objective: Identify and fix functionality issues
 
-### Status: v1.1.7 NZXT FINAL FIX IMPLEMENTED - TESTING REQUIRED
+### Status: v1.1.5 READY FOR TESTING
 
-### Issues Fixed in v1.1.7:
-1. **NZXT Capture Card Shutdown Issue (Final Fix)** 🚧
-   - Problem: NZXT card loses input signal after app exit, requires power cycle
-   - v1.1.6 tried to avoid shutdown but still had issues
-   - v1.1.7 Fix: Detect NZXT devices and skip ALL cleanup in destructor
-   - Let OS handle cleanup on process exit for NZXT devices
-   - Version: MediaFoundationCapture v1.0.10
+### Issues Fixed in v1.1.5:
+1. ✅ **Version Display Bug** - Fixed in v1.1.4
+2. ✅ **Media Foundation Startup Issue** - Fixed in v1.1.4
+3. ✅ **DeckLink Frame Drop Crisis** - Fixed in v1.1.4
+4. ✅ **Frame Rate Mismatch** - Fixed in v1.1.5 - NDI now uses actual capture rate
+5. ✅ **No Statistics on Enter** - Fixed in v1.1.5 - Shows stats when Enter pressed
+
+### NZXT Issue Status:
+- v1.1.6 and v1.1.7 attempted NZXT-specific fixes
+- **User requested removal of all NZXT hacks**
+- Code has been cleaned up and reverted to v1.1.5 state
+- MediaFoundationCapture back to v1.0.8 (clean version)
 
 ### Testing Required:
-1. **Clean rebuild of v1.1.7**
+1. **Clean rebuild of v1.1.5**
    ```
    git checkout feature/fix-v1.1.3-issues
    git pull
    cmake --build . --config Release --clean-first
    ```
 
-2. **Test NZXT Capture Card**
+2. **Test Media Foundation devices**
    ```
    ndi-bridge.exe -t mf -l
-   ndi-bridge.exe  (select NZXT device)
+   ndi-bridge.exe  (select device)
    ```
-   - Should show: "NZXT device detected - special handling enabled"
-   - Let it run for a bit
-   - Press Enter to stop
-   - Should show: "NZXT device - skipping full cleanup to prevent input loss"
-   - **Verify monitor connected to NZXT still works**
-   - **No need to power cycle NZXT**
+   - Verify capture works
+   - Check frame rate matches device
+   - Press Enter to see statistics
 
-3. **Test DeckLink** (regression test)
+3. **Test DeckLink**
    ```
    ndi-bridge.exe -t dl -l
    ndi-bridge.exe  (select DL device)
    ```
    - Verify still works properly
-   - Frame drops still minimal
-
-4. **Test non-NZXT Media Foundation device** (if available)
-   - Should still get proper cleanup (no special message)
+   - Frame drops should be minimal
 
 ## Implementation Status
 - Phase: Bug Fixing
-- Step: v1.1.7 NZXT final fix implemented, awaiting test results
+- Step: v1.1.5 clean version ready for testing
 - Status: TESTING_REQUIRED
-- Version: 1.1.7
+- Version: 1.1.5
 
 ## Testing Status Matrix
 | Component | Implemented | Compiled | Unit Tested | Integration Tested | Runtime Tested |
 |-----------|------------|----------|-------------|-------------------|----------------|
-| Media Foundation | ✅ v1.0.10 | ⏳ v1.1.7 | ❌ | ❌ | ⏳ PENDING |
+| Media Foundation | ✅ v1.0.8 | ⏳ v1.1.5 | ❌ | ❌ | ⏳ PENDING |
 | DeckLink Adapter | ✅ v1.1.4 | ✅ v1.1.4 | ❌ | ❌ | ✅ v1.1.4 |
 | DeckLink Core | ✅ v1.1.4 | ✅ v1.1.4 | ❌ | ❌ | ✅ v1.1.4 |
 | Format Converter | ✅ v1.1.0 | ✅ v1.1.5 | ❌ | ❌ | ❌ |
 | NDI Sender | ✅ v1.0.2 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.5 |
 | App Controller | ✅ v1.0.2 | ✅ v1.1.5 | ❌ | ❌ | ✅ v1.1.5 |
 
-## Code Changes Summary v1.1.7
+## Code Changes Summary v1.1.5
 
-### media_foundation_capture.cpp (v1.0.10)
-- Added is_nzxt_device_ member variable
-- Detect NZXT devices by name in initializeDevice()
-- Skip all cleanup in destructor for NZXT devices
-- Let OS handle cleanup for NZXT to prevent driver issues
+### Cleaned Up:
+- Removed all NZXT-specific code from MediaFoundationCapture
+- Reverted to clean v1.0.8 implementation
+- Removed is_nzxt_device_ member variable
+- Removed special cleanup handling
 
-### media_foundation_capture.h
-- Added is_nzxt_device_ boolean member
-
-### version.h
-- Updated to v1.1.7
-
-## Fix Evolution:
-- v1.1.5: Basic fixes (frame rate, stats)
-- v1.1.6: Tried to avoid full shutdown - didn't work for NZXT
-- v1.1.7: NZXT-specific fix - skip cleanup entirely for NZXT
+### Still Included (from v1.1.4-v1.1.5):
+- Version display fix
+- Media Foundation startup fix
+- DeckLink frame drop optimization
+- NDI frame rate matching
+- Statistics display on Enter
 
 ## Next Steps
-1. User rebuilds with v1.1.7
-2. Test NZXT capture card specifically
-3. Verify monitor stays active after app exit
-4. No power cycle needed
-5. If successful, merge PR
-6. If still issues, investigate USB driver interactions
+1. User rebuilds with clean v1.1.5
+2. Test all capture types
+3. If issues persist, debug without device-specific hacks
+4. Find proper solution if needed
+5. If all works, merge PR
 
 ## PR Status
 - PR #2: "Fix v1.1.3 Runtime Issues"
 - Branch: feature/fix-v1.1.3-issues
-- Ready for v1.1.7 testing
+- Ready for v1.1.5 testing (NZXT hacks removed)
 
 ## Last User Action
 - Date/Time: 2025-07-15 (current session)
-- Action: Reported NZXT still loses signal even with v1.1.5
-- Result: Implemented NZXT-specific fix in v1.1.7
-- Next Required: Rebuild and test v1.1.7
+- Action: Requested removal of all NZXT-specific changes
+- Result: Reverted to v1.1.5 clean state
+- Next Required: Test clean v1.1.5 build
 
 ## Previous Goals Completed:
 ### ✅ GOAL 1-10: See previous sections
