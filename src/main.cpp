@@ -47,9 +47,7 @@ void signalHandler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
         std::cout << "\nShutdown requested..." << std::endl;
         g_shutdown_requested = true;
-        if (g_app_controller) {
-            g_app_controller->stop();
-        }
+        // Don't stop here - let main handle the graceful shutdown
     }
 }
 
@@ -440,7 +438,7 @@ int main(int argc, char* argv[]) {
     std::cout << "NDI Bridge is running. Press Ctrl+C to stop..." << std::endl;
     std::cout << std::endl;
     
-    // Main loop - wait for shutdown signal only (no Enter key handling)
+    // Main loop - wait for shutdown signal only
     while (!g_shutdown_requested && g_app_controller->isRunning()) {
         // Small sleep to prevent busy waiting
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -486,7 +484,7 @@ int main(int argc, char* argv[]) {
     int connections = g_app_controller->getNdiConnectionCount();
     std::cout << "  NDI Connections: " << connections << std::endl;
     
-    // Stop the application
+    // Stop the application gracefully
     std::cout << "Stopping application..." << std::endl;
     g_app_controller->stop();
     
