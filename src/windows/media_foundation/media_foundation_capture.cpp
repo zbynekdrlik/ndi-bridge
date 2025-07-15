@@ -11,6 +11,7 @@ namespace ndi_bridge {
 MediaFoundationCapture::MediaFoundationCapture()
     : current_activate_(nullptr)
     , current_reader_(nullptr)
+    , current_source_(nullptr)
     , initialized_(false)
     , reinit_attempts_(0) {
     device_manager_ = std::make_unique<media_foundation::MFCaptureDevice>();
@@ -18,6 +19,12 @@ MediaFoundationCapture::MediaFoundationCapture()
 }
 
 MediaFoundationCapture::~MediaFoundationCapture() {
+    // Stop capture first
+    if (isCapturing()) {
+        stopCapture();
+    }
+    
+    // Then shutdown device properly
     shutdownDevice();
 }
 
@@ -148,15 +155,24 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
         return false;
     }
     
-    // Create source reader
-    hr = device_manager_->CreateSourceReaderFromActivate(current_activate_, &current_reader_);
+    // Create media source and keep reference for proper shutdown
+    hr = device_manager_->CreateMediaSource(current_activate_, &current_source_);
     if (FAILED(hr)) {
-        last_error_ = "Failed to create source reader: " + media_foundation::MFErrorHandler::HResultToString(hr);
+        last_error_ = "Failed to create media source: " + media_foundation::MFErrorHandler::HResultToString(hr);
         has_error_ = true;
         if (current_activate_) {
             current_activate_->Release();
             current_activate_ = nullptr;
         }
+        return false;
+    }
+    
+    // Create source reader from media source
+    hr = device_manager_->CreateSourceReader(current_source_, &current_reader_);
+    if (FAILED(hr)) {
+        last_error_ = "Failed to create source reader: " + media_foundation::MFErrorHandler::HResultToString(hr);
+        has_error_ = true;
+        shutdownDevice();
         return false;
     }
     
@@ -176,19 +192,43 @@ bool MediaFoundationCapture::initializeDevice(const std::string& device_name) {
 }
 
 void MediaFoundationCapture::shutdownDevice() {
+    // 1. Stop video capture first
     if (video_capture_) {
         video_capture_->StopCapture();
+        video_capture_.reset();  // Release the video capture
     }
     
+    // 2. Flush and release source reader
     if (current_reader_) {
+        // Flush all streams to ensure no pending operations
+        current_reader_->Flush(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS));
         current_reader_->Release();
         current_reader_ = nullptr;
     }
     
+    // 3. Shutdown the media source properly
+    if (current_source_) {
+        // Stop the media source
+        current_source_->Stop();
+        
+        // Shut it down completely
+        current_source_->Shutdown();
+        
+        // Now release
+        current_source_->Release();
+        current_source_ = nullptr;
+    }
+    
+    // 4. Release the activate object
     if (current_activate_) {
+        // Shut down the activate object to release the device
+        current_activate_->ShutdownObject();
         current_activate_->Release();
         current_activate_ = nullptr;
     }
+    
+    // 5. Clear cached devices in device manager
+    device_manager_->Cleanup();
     
     initialized_ = false;
 }
