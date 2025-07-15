@@ -19,7 +19,7 @@ constexpr uint32_t FOURCC_BGRX = 0x58524742;  // 'BGRX'
 
 AppController::AppController(const Config& config)
     : config_(config) {
-    std::cout << LOG_PREFIX << " Application Controller version 1.0.1 initialized" << std::endl;
+    std::cout << LOG_PREFIX << " Application Controller version 1.0.2 initialized" << std::endl;
     
     if (config_.verbose) {
         std::cout << LOG_PREFIX << " Configuration:" << std::endl;
@@ -326,6 +326,8 @@ void AppController::onFrameReceived(const void* frame_data, size_t frame_size,
     frame_info.stride = format.stride;
     frame_info.fourcc = getFourCC(format);
     frame_info.timestamp_ns = timestamp;
+    frame_info.fps_numerator = format.fps_numerator;    // Pass frame rate to NDI
+    frame_info.fps_denominator = format.fps_denominator;  // Pass frame rate to NDI
     
     // Send frame
     if (ndi_sender_->sendFrame(frame_info)) {
