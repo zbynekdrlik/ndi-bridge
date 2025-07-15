@@ -1,10 +1,10 @@
 // version.h
 #pragma once
 
-#define NDI_BRIDGE_VERSION "1.1.5"
+#define NDI_BRIDGE_VERSION "1.2.4"
 #define NDI_BRIDGE_VERSION_MAJOR 1
-#define NDI_BRIDGE_VERSION_MINOR 1
-#define NDI_BRIDGE_VERSION_PATCH 5
+#define NDI_BRIDGE_VERSION_MINOR 2
+#define NDI_BRIDGE_VERSION_PATCH 4
 
 #ifdef _WIN32
 #define NDI_BRIDGE_PLATFORM "Windows"
