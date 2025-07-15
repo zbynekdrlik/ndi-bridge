@@ -79,7 +79,16 @@ std::string Logger::getCurrentTimestamp() {
     auto time_t = std::chrono::system_clock::to_time_t(now);
     
     std::stringstream ss;
+    
+#ifdef _WIN32
+    // Use localtime_s on Windows for thread safety
+    struct tm timeinfo;
+    localtime_s(&timeinfo, &time_t);
+    ss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S");
+#else
+    // Use localtime on other platforms
     ss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+#endif
     
     // Add milliseconds
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
