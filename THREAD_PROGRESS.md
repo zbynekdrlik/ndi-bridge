@@ -2,13 +2,13 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Logging improvements implemented
+- [x] Currently working on: Logging improvements implemented with additional fixes
 - [ ] Waiting for: User to test the changes
 - [ ] Blocked by: None
 
 ## Implementation Status
 - Phase: Logging System Refactor
-- Step: Implementation complete
+- Step: Implementation complete (with additional fixes)
 - Status: TESTING_NEEDED
 
 ## Testing Status Matrix
@@ -19,6 +19,8 @@
 | app_controller logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
 | ndi_sender logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
 | media_foundation logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
+| mf_video_capture logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
+| mf_capture_device logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
 
 ## Changes Implemented in This Thread
 
@@ -42,7 +44,12 @@
 - Replaced "Available Devices:" cout with Logger in `selectDeviceInteractive()`
 - All output now goes through the Logger for consistency
 
-### 4. Version Bump
+### 4. Additional Fixes (after compilation errors)
+- **Removed `Logger::initialize()` calls** from:
+  - mf_video_capture.cpp (line 23)
+  - mf_capture_device.cpp (line 12)
+
+### 5. Version Bump
 - Updated version from 1.2.1 to 1.2.2
 
 ## Files Modified
@@ -53,6 +60,8 @@
 5. **src/common/app_controller.cpp** - Removed Logger::initialize() and logVersion()
 6. **src/common/ndi_sender.cpp** - Removed Logger::initialize() and logVersion()
 7. **src/windows/media_foundation/media_foundation_capture.cpp** - Removed Logger::initialize() and logVersion()
+8. **src/windows/media_foundation/mf_video_capture.cpp** - Removed Logger::initialize() (additional fix)
+9. **src/windows/media_foundation/mf_capture_device.cpp** - Removed Logger::initialize() (additional fix)
 
 ## Expected Test Results
 After building and running, the logs should show:
@@ -81,6 +90,6 @@ After building and running, the logs should show:
 
 ## Last User Action
 - Date/Time: 2025-07-15 (current session)
-- Action: Requested to fulfill new goals (logging improvements)
-- Result: Implementation complete, waiting for test
+- Action: Reported compilation errors with Logger::initialize()
+- Result: Fixed additional files, ready for testing
 - Next Required: User to build and test changes
