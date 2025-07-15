@@ -6,6 +6,8 @@
 #include "../../capture/DeckLinkDeviceEnumerator.h"
 #include <memory>
 #include <mutex>
+#include <thread>
+#include <atomic>
 
 namespace ndi_bridge {
 
