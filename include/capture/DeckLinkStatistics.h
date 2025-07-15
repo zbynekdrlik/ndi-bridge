@@ -5,7 +5,7 @@
 #include <chrono>
 #include <deque>
 #include <mutex>
-#include "CaptureDeviceInterface.h"
+#include "../../src/common/capture_interface.h"
 
 /**
  * @brief Statistics tracking for DeckLink capture
