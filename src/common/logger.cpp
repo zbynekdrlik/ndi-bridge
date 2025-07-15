@@ -13,20 +13,20 @@ void Logger::initialize(const std::string& module_name) {
 }
 
 void Logger::info(const std::string& message) {
-    log(Level::LOG_INFO, message);
+    log(Level::LVL_INFO, message);
 }
 
 void Logger::warning(const std::string& message) {
-    log(Level::LOG_WARNING, message);
+    log(Level::LVL_WARNING, message);
 }
 
 void Logger::error(const std::string& message) {
-    log(Level::LOG_ERROR, message);
+    log(Level::LVL_ERROR, message);
 }
 
 void Logger::debug(const std::string& message) {
     if (verbose_) {
-        log(Level::LOG_DEBUG, message);
+        log(Level::LVL_DEBUG, message);
     }
 }
 
@@ -46,7 +46,7 @@ void Logger::log(Level level, const std::string& message) {
     
     // Get appropriate output stream
     std::ostream* output = &std::cout;
-    if (level == Level::LOG_ERROR) {
+    if (level == Level::LVL_ERROR) {
         output = &std::cerr;
     }
     
@@ -56,16 +56,16 @@ void Logger::log(Level level, const std::string& message) {
     
     // Add level prefix for non-info messages
     switch (level) {
-        case Level::LOG_WARNING:
+        case Level::LVL_WARNING:
             *output << "WARNING: ";
             break;
-        case Level::LOG_ERROR:
+        case Level::LVL_ERROR:
             *output << "ERROR: ";
             break;
-        case Level::LOG_DEBUG:
+        case Level::LVL_DEBUG:
             *output << "DEBUG: ";
             break;
-        case Level::LOG_INFO:
+        case Level::LVL_INFO:
         default:
             // No prefix for info
             break;
