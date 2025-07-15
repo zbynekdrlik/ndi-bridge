@@ -38,6 +38,7 @@ private:
     
     // Shutdown current device
     void shutdownDevice();
+    void shutdownDevice(bool full_shutdown);  // New overload for controlled shutdown
     
     // Helper to reinitialize on device errors
     bool reinitializeOnError(HRESULT hr);
