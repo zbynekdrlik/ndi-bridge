@@ -2,119 +2,85 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Logging implementation complete but has issues
-- [ ] Waiting for: Next thread to implement improvements
+- [x] Currently working on: Logging improvements implemented
+- [ ] Waiting for: User to test the changes
 - [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: Logging System Update
-- Step: Implementation complete with identified issues
-- Status: TESTING_COMPLETE
+- Phase: Logging System Refactor
+- Step: Implementation complete
+- Status: TESTING_NEEDED
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|-----------------------|
-| logger.h/cpp | ✅ v1.2.1 | ✅ Compiles | ✅ Tested | ❌ Has issues |
-| main.cpp logging | ✅ v1.2.1 | ✅ Compiles | ✅ Tested | ✅ |
-| app_controller logging | ✅ v1.2.1 | ✅ Fixed version | ✅ Tested | ❌ Module name wrong |
-| ndi_sender logging | ✅ v1.2.1 | ✅ Updated | ✅ Tested | ❌ Module name wrong |
-| media_foundation logging | ✅ v1.2.1 | ✅ Fixed declaration | ✅ Tested | ❌ Module name wrong |
+| logger.h/cpp | ✅ v1.2.2 | ❌ | ❌ | ❌ |
+| main.cpp logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
+| app_controller logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
+| ndi_sender logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
+| media_foundation logging | ✅ v1.2.2 | ❌ | ❌ | ❌ |
 
-## Final Test Results
+## Changes Implemented in This Thread
 
-User ran complete test showing logging works but has issues:
+### 1. Logger Format Simplified (v1.2.2)
+- **Removed module names** from log format
+- Changed from: `[module_name] [timestamp] message`
+- Changed to: `[timestamp] message`
+- Removed `Logger::initialize()` method completely
+- Removed static `module_name_` member
 
-### Issues Found:
-1. **Module Name Confusion**: Logger::initialize() overwrites global module name
-   - Example: `[MFVideoCapture]` showing for AppController messages
-   - Root cause: Module name is static/global, not per-instance
+### 2. Single Version Logging
+- **Removed all `Logger::logVersion()` calls** from:
+  - AppController constructor
+  - NdiSender constructor
+  - MediaFoundationCapture constructor
+- **Kept only one version log** in main.cpp at startup
+- Changed version message from "Script version X.Y.Z loaded" to "Version X.Y.Z loaded"
 
-2. **Multiple Version Logs**: Each component logs "Script version 1.2.1 loaded"
-   - MediaFoundation logs version
-   - AppController logs version  
-   - NdiSender logs version
-   - Should only log once at startup
+### 3. Fixed cout Usage
+- Replaced direct `cout` usage in `listDevices()` with Logger calls
+- Replaced "Available Devices:" cout with Logger in `selectDeviceInteractive()`
+- All output now goes through the Logger for consistency
 
-3. **Device Enumeration Duplicated**: Being logged multiple times
-   - MFVideoCapture logs devices
-   - NdiSender logs devices twice
+### 4. Version Bump
+- Updated version from 1.2.1 to 1.2.2
 
-4. **Raw cout Usage**: "Available Devices:" still using cout directly
+## Files Modified
+1. **src/common/logger.h** - Removed module name functionality
+2. **src/common/logger.cpp** - Updated to new format
+3. **src/common/version.h** - Bumped to v1.2.2
+4. **src/main.cpp** - Removed Logger::initialize(), fixed cout usage
+5. **src/common/app_controller.cpp** - Removed Logger::initialize() and logVersion()
+6. **src/common/ndi_sender.cpp** - Removed Logger::initialize() and logVersion()
+7. **src/windows/media_foundation/media_foundation_capture.cpp** - Removed Logger::initialize() and logVersion()
 
-### Working Correctly:
-- Timestamp format working perfectly
-- Log levels working
-- Main application startup logging correctly
-- Compilation successful
+## Expected Test Results
+After building and running, the logs should show:
+1. Single version log at startup: `[2025-07-15 HH:MM:SS.mmm] Version 1.2.2 loaded`
+2. No module names in any log entries
+3. Consistent timestamp format throughout
+4. All device listings using Logger instead of cout
 
-## Completed Work Summary
-
-### Issues Fixed in This Thread:
-1. **Compilation Errors**: 
-   - Fixed Windows macro conflicts (ERROR, LOG_*) by using LVL_* enum names
-   - Fixed localtime security warning with localtime_s on Windows
-   - Removed Logger usage before initialization in parseArgs()
-   - Fixed missing wideToUtf8 declaration in mf_capture_device.h
-
-2. **Version Management**:
-   - Fixed hardcoded versions in AppController (was 1.0.3)
-   - Fixed hardcoded versions in NdiSender (was 1.0.2)
-   - All components now use NDI_BRIDGE_VERSION from version.h
-
-3. **Logging Implementation**:
-   - Created new Logger class with format: `[module_name] [timestamp] message`
-   - Updated all components to use new Logger
-   - Added timestamps with milliseconds
-   - Implemented log levels: LVL_INFO, LVL_WARNING, LVL_ERROR, LVL_DEBUG
-
-### Version
-- Bumped from 1.2.0 to 1.2.1
-
-## Next Thread Goals (CONFIRMED)
-
-1. **Remove Module Names from Log Format**:
-   - Change from: `[module_name] [timestamp] message`
-   - Change to: `[timestamp] message`
-   - Reasoning: Module names are not helpful in compiled exe
-   - Fixes the module name confusion issue
-
-2. **Single Version Source**:
-   - Remove Logger::logVersion() calls from all components
-   - Only log version once at main() startup
-   - Remove "Script version" terminology (not a script)
-
-3. **Fix Remaining cout Usage**:
-   - "Available Devices:" list
-   - Any other direct cout/cerr usage
-
-## Handoff Notes for Next Thread
-
-### Technical Details:
-- Logger class uses static module_name_ which causes confusion
-- Need to either remove module names or make Logger instance-based
-- Decision made: Remove module names entirely
-
-### Files to Modify:
-1. logger.h/cpp - Remove module_name_ and update format
-2. All components - Remove Logger::initialize() calls
-3. All components - Remove Logger::logVersion() calls
-4. main.cpp - Keep only one version log at startup
-5. Fix remaining cout usage in device selection
-
-### Test After Changes:
-- Verify single version log at startup
-- Verify consistent timestamp format
-- Verify no module name confusion
-- Verify all output uses Logger
+## Next Steps for User
+1. **Build the application** with the new changes
+2. **Run and capture logs** showing:
+   - Application startup with version log
+   - Device enumeration/selection
+   - Normal operation
+3. **Verify**:
+   - Only one version log appears at startup
+   - No module names in log format
+   - All output uses consistent format
+   - No raw cout usage
 
 ## Branch Information
 - Working branch: feature/consistent-logging  
 - Base branch: main
-- Version: 1.2.1
+- Version: 1.2.2
 - PR: #7 - https://github.com/zbynekdrlik/ndi-bridge/pull/7
 
 ## Last User Action
-- Date/Time: 2025-07-15 21:16
-- Action: Ran full test showing logging works but has issues
-- Result: Confirmed need for improvements
-- Next Required: Continue in new thread with refactoring
+- Date/Time: 2025-07-15 (current session)
+- Action: Requested to fulfill new goals (logging improvements)
+- Result: Implementation complete, waiting for test
+- Next Required: User to build and test changes
