@@ -49,6 +49,9 @@ public:
     // Release all device activates in a vector
     static void ReleaseDevices(std::vector<IMFActivate*>& devices);
     
+    // String conversion helper
+    static std::string wideToUtf8(const std::wstring& wide);
+    
 private:
     // Internal helper to enumerate devices
     HRESULT EnumerateDevicesInternal(IMFActivate*** pppDevices, UINT32* pCount);
