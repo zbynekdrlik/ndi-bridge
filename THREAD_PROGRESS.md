@@ -2,61 +2,90 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Fixed DeckLink enumerator compilation error in v1.1.3
-- [x] Completed deep merge preparation
-- [x] Updated all version numbers to 1.1.3
-- [x] Created comprehensive documentation
-- [x] All documentation files are up to date
-- [ ] **USER REPORTS: Some parts not working correctly in v1.1.3**
-- [ ] **NEXT THREAD: Focus on testing and fixing v1.1.3 issues**
+- [x] Created feature/fix-v1.1.3-issues branch
+- [x] Identified specific issues from user logs
+- [ ] Currently working on: Fixing version display (shows 1.1.0 instead of 1.1.3)
+- [ ] Waiting for: User to test Media Foundation devices
+- [ ] Blocked by: Need to fix frame drop issue after version fix
 
-## GOAL 11: Test and Fix v1.1.3 Issues (NEXT THREAD)
-### Objective: Identify and fix functionality issues in v1.1.3 before merge
+## GOAL 11: Test and Fix v1.1.3 Issues (IN PROGRESS)
+### Objective: Identify and fix functionality issues in v1.1.3
 
-### Status: READY FOR TESTING
+### Status: ACTIVELY FIXING
 
-### Testing Focus Areas:
-1. **Build Process**
-   - Clean build verification
-   - All configurations (Debug/Release)
-   - Dependency resolution
+### Issues Identified from User Logs:
+1. **Version Display Bug** ❌
+   - Shows "version 1.1.0" instead of "1.1.3"
+   - version.h has correct value but main.cpp may not be using it
+   - **Priority: HIGH** - Fix immediately
 
-2. **Media Foundation Testing**
-   - Device enumeration
-   - Capture functionality
-   - Format conversion
-   - Error handling
+2. **Frame Drop Crisis** ❌
+   - 50% frame drop rate (386 dropped out of 780 frames)
+   - DeckLink capture performance severely degraded
+   - **Priority: CRITICAL** - Major functionality issue
 
-3. **DeckLink Testing**
-   - Device detection
-   - Capture initialization
-   - Format auto-detection
-   - No-signal handling
+3. **What's Working** ✅
+   - DeckLink device enumeration
+   - Format auto-detection (1080p60)
+   - Signal detection
+   - Basic capture flow
+   - NDI sender initialization
 
-4. **Command-Line Interface**
-   - All argument parsing
-   - Interactive mode
-   - Error messages
+### Current Fix Plan:
+1. [ ] Fix version display issue in main.cpp
+2. [ ] Investigate frame drop causes:
+   - Check frame timing logic
+   - Review buffer management
+   - Analyze thread priorities
+   - Profile CPU usage
+3. [ ] Test Media Foundation devices
+4. [ ] Verify NDI stream quality
 
-5. **NDI Streaming**
-   - Stream creation
-   - Network visibility
-   - Performance
+### Testing Results So Far:
+- **DeckLink Test**: Device found, capture starts, but 50% frame drops
+- **Media Foundation**: Not tested yet
+- **NDI Stream**: Unknown if visible/quality acceptable
 
-### Known Issues to Investigate:
-- User reports "some parts not working correctly"
-- Need detailed error logs and test results
-- May need debugging of specific components
+## Implementation Status
+- Phase: Bug Fixing
+- Step: Fixing version display bug
+- Status: IMPLEMENTING
+- Version: 1.1.3 → 1.1.4 (after fixes)
 
-### Testing Checklist for Next Thread:
-- [ ] Compile all configurations
-- [ ] Run with -t mf -l (list Media Foundation devices)
-- [ ] Run with -t dl -l (list DeckLink devices)
-- [ ] Test interactive mode
-- [ ] Test device capture
-- [ ] Verify NDI stream output
-- [ ] Check all error scenarios
-- [ ] Collect detailed logs
+## Testing Status Matrix
+| Component | Implemented | Compiled | Unit Tested | Integration Tested | Runtime Tested |
+|-----------|------------|----------|-------------|-------------------|----------------|
+| Media Foundation | ✅ v1.0.7 | ✅ v1.1.3 | ❌ | ❌ | ❌ NOT TESTED |
+| DeckLink Adapter | ✅ v1.1.3 | ✅ v1.1.3 | ❌ | ❌ | ❌ 50% DROPS |
+| DeckLink Core | ✅ v1.1.0 | ✅ v1.1.3 | ❌ | ❌ | ❌ 50% DROPS |
+| Format Converter | ✅ v1.1.0 | ✅ v1.1.3 | ❌ | ❌ | ❌ |
+| NDI Sender | ✅ v1.0.1 | ✅ v1.1.3 | ❌ | ❌ | ❌ UNKNOWN |
+| App Controller | ✅ v1.0.0 | ✅ v1.1.3 | ❌ | ❌ | ❌ |
+
+## Previous Goals Completed:
+### ✅ GOAL 1-10: See previous sections
+
+## Technical Details of Issues
+
+### Version Display Issue:
+- version.h correctly defines NDI_BRIDGE_VERSION as "1.1.3"
+- main.cpp uses NDI_BRIDGE_VERSION macro
+- But log shows "1.1.0" - suggests old binary or build issue
+
+### Frame Drop Analysis:
+- Consistent 50% drop rate suggests systematic issue
+- Possible causes:
+  1. Double buffering with one buffer always busy
+  2. Frame timing mismatch
+  3. Thread synchronization problem
+  4. NDI sender blocking capture thread
+  5. Incorrect frame reference counting
+
+## Last User Action
+- Date/Time: 2025-07-15 (current session)
+- Action: Provided DeckLink test log showing version 1.1.0 and 50% frame drops
+- Result: Created feature branch to fix issues
+- Next Required: Fix version issue, then investigate frame drops
 
 ## GOAL 12: Refactor DeckLinkCaptureDevice.cpp (FUTURE)
 ### Objective: Split large file into smaller components
@@ -66,7 +95,7 @@
 ## GOAL 10: Merge Preparation (COMPLETED)
 ### Objective: Prepare for production merge to main branch
 
-### Status: READY FOR MERGE (pending testing)
+### Status: MERGED but has issues
 
 ### Version 1.1.3 Updates:
 - ✅ **FIXED COMPILATION ERROR** - DeckLink enumerator usage corrected
@@ -82,12 +111,6 @@
 - ✅ docs/decklink-setup.md - Fixed command-line options
 - ✅ docs/feature-comparison.md - Complete rewrite for v1.1.3
 - ✅ docs/architecture/capture-devices.md - Updated status and examples
-
-## Implementation Status
-- Phase: Testing Required
-- Step: User found issues, needs debugging
-- Status: TESTING_BLOCKED
-- Version: 1.1.3
 
 ## All Features:
 ### From v1.0.7:
@@ -120,16 +143,6 @@
 19. ✅ **Production-ready documentation**
 20. ✅ **All documentation updated**
 
-## Testing Status Matrix
-| Component | Implemented | Compiled | Unit Tested | Integration Tested | Runtime Tested |
-|-----------|------------|----------|-------------|-------------------|----------------|
-| Media Foundation | ✅ v1.0.7 | ✅ v1.1.3 | ❌ | ❌ | ❌ ISSUES |
-| DeckLink Adapter | ✅ v1.1.3 | ✅ v1.1.3 | ❌ | ❌ | ❌ ISSUES |
-| DeckLink Core | ✅ v1.1.0 | ✅ v1.1.3 | ❌ | ❌ | ❌ ISSUES |
-| Format Converter | ✅ v1.1.0 | ✅ v1.1.3 | ❌ | ❌ | ❌ |
-| NDI Sender | ✅ v1.0.1 | ✅ v1.1.3 | ❌ | ❌ | ❌ |
-| App Controller | ✅ v1.0.0 | ✅ v1.1.3 | ❌ | ❌ | ❌ |
-
 ## Previous Goals Completed:
 ### ✅ GOAL 1: Initial Project Structure
 ### ✅ GOAL 2: Media Foundation Refactoring
@@ -145,35 +158,30 @@
 ## Critical Information for Next Thread
 
 ### What We Know:
-- v1.1.3 compiles successfully
-- All documentation is current
-- User reports "some parts not working correctly"
-- Testing has not been completed
+- v1.1.3 merged to main but has runtime issues
+- Version displays incorrectly as 1.1.0
+- DeckLink has 50% frame drop rate
+- User needs working solution
 
 ### What We Need:
-1. **Specific error details**
-   - Which commands fail?
-   - What error messages appear?
-   - Which features work/don't work?
+1. **Media Foundation test results**
+   - Run: `ndi-bridge.exe -t mf -l`
+   - Test capture if devices found
 
-2. **Test results from each component**
-   - Media Foundation device listing
-   - DeckLink device listing
-   - Capture functionality
-   - NDI streaming
+2. **NDI stream validation**
+   - Is stream visible in Studio Monitor?
+   - What's the video quality?
 
-3. **Debug logs**
-   - Verbose output from failed operations
-   - System configuration details
-   - SDK versions
+3. **Build verification**
+   - Did user rebuild after merge?
+   - Clean build needed?
 
 ### Priority Actions:
-1. Get detailed bug reports from user
-2. Run systematic tests of all features
-3. Fix identified issues
-4. Update version if needed (1.1.4)
-5. Re-test until stable
-6. Then proceed with merge
+1. Fix version display bug
+2. Investigate frame drop issue
+3. Test all components
+4. Update to v1.1.4 with fixes
+5. Re-test everything
 
 ## Technical Debt Identified
 1. **No automated tests** - All testing is manual
@@ -184,12 +192,7 @@
 ## Current Code State Summary
 - **Compilation successful** ✅
 - **Documentation complete** ✅
-- **Runtime issues reported** ❌
-- **Testing incomplete** ❌
-- **NOT ready for merge** - needs fixing
-
-## Last User Action
-- Date/Time: 2025-07-15 10:10:00
-- Action: Reported that some parts are not working correctly in v1.1.3
-- Result: Set Goal 11 for testing and fixing in next thread
-- Next Required: Detailed testing and bug fixing in new thread
+- **Version display wrong** ❌
+- **DeckLink frame drops** ❌
+- **Media Foundation untested** ❓
+- **NOT production ready** - needs fixes
