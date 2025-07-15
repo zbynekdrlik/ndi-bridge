@@ -4,13 +4,7 @@ namespace ndi_bridge {
 
 // Static member initialization
 std::mutex Logger::mutex_;
-std::string Logger::module_name_ = "ndi-bridge";
 bool Logger::verbose_ = false;
-
-void Logger::initialize(const std::string& module_name) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    module_name_ = module_name;
-}
 
 void Logger::info(const std::string& message) {
     log(Level::LVL_INFO, message);
@@ -37,7 +31,7 @@ void Logger::setVerbose(bool verbose) {
 
 void Logger::logVersion(const std::string& version) {
     std::stringstream msg;
-    msg << "Script version " << version << " loaded";
+    msg << "Version " << version << " loaded";
     info(msg.str());
 }
 
@@ -50,9 +44,8 @@ void Logger::log(Level level, const std::string& message) {
         output = &std::cerr;
     }
     
-    // Format: [module_name] [timestamp] message
-    *output << "[" << module_name_ << "] "
-            << "[" << getCurrentTimestamp() << "] ";
+    // Format: [timestamp] message
+    *output << "[" << getCurrentTimestamp() << "] ";
     
     // Add level prefix for non-info messages
     switch (level) {
