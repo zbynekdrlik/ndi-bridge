@@ -8,6 +8,7 @@
 #include <thread>
 #include <chrono>
 #include <limits>
+#include <iomanip>  // For std::fixed and std::setprecision
 
 #ifdef _WIN32
 #define NOMINMAX  // Prevent Windows.h from defining min/max macros
@@ -480,6 +481,25 @@ int main(int argc, char* argv[]) {
             int ch = std::cin.get();
             if (ch == '\n' || ch == '\r') {
                 std::cout << "Enter key pressed, stopping..." << std::endl;
+                
+                // Display final statistics
+                uint64_t captured, sent, dropped;
+                g_app_controller->getFrameStats(captured, sent, dropped);
+                
+                std::cout << "\nFinal Statistics:" << std::endl;
+                std::cout << "  Frames Captured: " << captured << std::endl;
+                std::cout << "  Frames Sent: " << sent << std::endl;
+                std::cout << "  Frames Dropped: " << dropped;
+                if (captured > 0) {
+                    double drop_rate = (dropped * 100.0) / captured;
+                    std::cout << " (" << std::fixed << std::setprecision(2) 
+                             << drop_rate << "%)";
+                }
+                std::cout << std::endl;
+                
+                int connections = g_app_controller->getNdiConnectionCount();
+                std::cout << "  NDI Connections: " << connections << std::endl;
+                
                 break;
             }
         }
