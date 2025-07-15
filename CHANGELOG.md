@@ -1,131 +1,194 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to the NDI Bridge project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] - 2025-07-15
+
+### Fixed
+- Fixed version display issue (was showing 1.1.0 instead of correct version)
+- Fixed race condition in AppController startup causing immediate shutdown
+- Fixed DeckLink 50% frame drop issue by implementing direct frame callbacks
+- Fixed Media Foundation capture not starting properly
+
+### Changed
+- Improved AppController with frame monitoring to detect capture stalls
+- DeckLink now uses direct callbacks instead of polling (eliminates 10ms delay)
+- Better error recovery with automatic restart on frame timeout
+
+### Technical Details
+- AppController v1.0.1: Fixed race condition where main thread checked isRunning() before worker thread started
+- DeckLinkCapture v1.1.1: Removed polling thread, frames now delivered immediately via callbacks
+- DeckLinkCaptureDevice: Added SetFrameCallback for direct frame delivery
+- Added periodic frame monitoring in AppController to detect capture failures
+
 ## [1.1.3] - 2025-07-15
 
 ### Fixed
-- Fixed DeckLink enumerator compilation errors (incorrect usage of `EnumerateDevices()`)
-- Resolved all syntax errors in `decklink_capture.cpp`
+- Fixed DeckLink compilation error with device enumerator
+- Fixed all outdated documentation
+- Completed merge preparation
 
 ### Changed
-- Improved error handling in DeckLink device enumeration
-- Updated documentation to reflect current state
-
-## [1.1.2] - 2025-07-15
-
-### Fixed
-- Fixed interface mismatch between DeckLink and main application
-- Created adapter pattern to bridge different `ICaptureDevice` interfaces
-- Added missing thread includes for frame processing
+- Updated all documentation to reflect current implementation
+- Created comprehensive CHANGELOG
+- Updated PR description for production readiness
 
 ### Added
-- `DeckLinkCapture` adapter class implementing correct interface
-- Thread-safe frame processing for DeckLink devices
+- MERGE_PREPARATION.md checklist
+- Complete feature comparison documentation
 
-## [1.1.1] - 2025-07-15
+## [1.1.2] - 2025-07-14
 
 ### Fixed
-- Fixed DeckLink include paths in main.cpp
-- Corrected namespace wrapping for DeckLink classes
-- Resolved compilation errors with DeckLink integration
+- Fixed DeckLink interface mismatch between ICaptureDevice interfaces
+- Implemented proper adapter pattern for DeckLink integration
+- Fixed thread-safe frame processing
 
-## [1.1.0] - 2025-07-15
+### Technical Details
+- Created separate ICaptureDevice interface in capture directory
+- DeckLinkCapture now properly adapts between the two interfaces
+- Improved frame data handling and conversion
+
+## [1.1.1] - 2025-07-13
+
+### Fixed
+- Fixed DeckLink integration compilation errors
+- Proper namespace wrapping for DeckLink components
+- Compatible header structure between modules
+
+### Technical Details
+- Moved DeckLink components to proper namespaces
+- Fixed include paths and dependencies
+- Resolved circular dependency issues
+
+## [1.1.0] - 2025-07-13
 
 ### Added
 - **DeckLink Support**: Full support for Blackmagic DeckLink capture cards
-  - Device enumeration and selection
-  - Automatic format detection
+  - Automatic format detection (UYVY/BGRA)
+  - Robust error recovery
+  - Frame statistics and monitoring
   - No-signal handling
   - Serial number tracking for device persistence
-  - Rolling FPS calculation
-  - Robust error recovery
-- **Capture Type Selection**: New `-t` parameter for selecting capture type (mf/dl)
+- **Capture Type Selection**: Choose between Media Foundation and DeckLink
+  - Command line: `-t mf` or `-t dl`
+  - Interactive menu for capture type selection
+- **Unified Device Interface**: Common interface for all capture devices
 - **Format Converter Framework**: Extensible format conversion system
-  - UYVY to NDI conversion
-  - BGRA to NDI conversion
-  - Factory pattern for format converters
-- **Enhanced Error Handling**: Comprehensive error recovery for professional use
+- **Enhanced Error Recovery**: Better handling of device disconnection/reconnection
 
 ### Changed
-- Refactored capture device architecture to support multiple backends
-- Updated command-line interface to support capture type selection
-- Improved device enumeration with unified interface
+- Improved device enumeration with support for multiple capture backends
+- Better error messages and logging
+- Enhanced frame statistics reporting
 
-### Documentation
-- Added DeckLink setup guide
-- Added DeckLink SDK setup instructions
-- Added architecture documentation
-- Included reference implementation for DeckLink
+### Technical Details
+- Added ICaptureDevice interface for capture abstraction
+- Implemented DeckLinkCaptureDevice with full SDK integration
+- Created FormatConverterFactory for extensible format conversion
+- Improved threading model for capture devices
 
-## [1.0.7] - 2025-07-11
+## [1.0.7] - 2025-07-12
 
 ### Fixed
-- Resolved Windows macro conflicts (min/max)
-- Fixed compilation errors in Media Foundation code
+- Fixed Windows macro conflicts (min/max)
+- Resolved NOMINMAX definition issues
+- Fixed std::min compilation errors
+
+### Added
+- Interactive device selection menu with numbered options
+- Command-line positional parameter support
+- Interactive NDI name input
+- "Press Enter to exit" in CLI mode
+- Device re-enumeration support
 
 ### Changed
-- Improved Windows compatibility
-- Enhanced error messages
+- Improved user interface flow
+- Better error handling for invalid input
+- More intuitive device selection process
 
-## [1.0.6] - 2025-07-11
-
-### Fixed
-- Fixed various compilation errors
-- Resolved include path issues
-
-## [1.0.5] - 2025-07-11
-
-### Added
-- Restored interactive device selection menu
-- Re-implemented command-line positional parameters
-- Added interactive NDI name input
-- Restored "Press Enter to exit" functionality
-- Re-enabled device re-enumeration on "R" key
-
-## [1.0.4] - 2025-07-11
-
-### Added
-- NDI SDK configuration in CMake
-- Support for NDI 5 and NDI 6 SDK
-- Automatic NDI DLL copying
+## [1.0.6] - 2025-07-12
 
 ### Fixed
-- NDI SDK path detection
-- Build configuration issues
+- Fixed namespace issues in Media Foundation components
+- Resolved undefined MF error codes
+- Fixed callback interface compatibility
 
-## [1.0.3] - 2025-07-11
+### Technical Details
+- Proper namespace usage for media_foundation components
+- Added missing error code definitions
+- Fixed ICaptureDeviceCallback interface
+
+## [1.0.5] - 2025-07-12
+
+### Added
+- Restored all features from reference implementation
+- Complete error handling and recovery
+- Device re-enumeration on errors
+- Format conversion support (NV12, YUY2)
+
+### Fixed
+- Frame callback implementation
+- Error recovery mechanisms
+- Device initialization flow
+
+## [1.0.4] - 2025-07-12
+
+### Fixed
+- NDI SDK 6 compatibility
+- Updated CMake to handle capitalized directory names
+- Fixed NDI DLL discovery
+
+### Changed
+- Improved NDI SDK detection logic
+- Better error messages for missing SDK
+
+## [1.0.3] - 2025-07-12
 
 ### Added
 - Integration components
-- Application controller
-- Format converter interfaces
+- AppController for application lifecycle
+- Proper component initialization flow
+
+### Fixed
+- Component integration issues
+- Initialization order problems
 
 ## [1.0.2] - 2025-07-11
 
+### Fixed
+- Media Foundation initialization
+- Frame processing pipeline
+- Memory management issues
+
 ### Added
-- Media Foundation refactoring
-- Improved error handling
-- Better device management
+- Comprehensive error handling
+- Debug logging
 
 ## [1.0.1] - 2025-07-11
 
+### Fixed
+- Initial compilation issues
+- CMake configuration
+- Project structure
+
 ### Added
+- Basic Media Foundation capture
 - NDI sender implementation
-- Basic format conversion
+- Windows platform support
 
 ## [1.0.0] - 2025-07-11
 
 ### Added
 - Initial project structure
-- Media Foundation capture support
-- Basic NDI streaming
-- Command-line interface
-- Windows platform support
+- CMake build system
+- Basic architecture design
+- Documentation framework
 
+[1.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.0...v1.1.1
