@@ -118,12 +118,25 @@ bool DeckLinkCapture::startCapture(const std::string& device_name) {
 }
 
 void DeckLinkCapture::stopCapture() {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_captureDevice) {
-        m_captureDevice->StopCapture();
-        m_captureDevice.reset();
+    // Store the capture device pointer and release it from the unique_ptr
+    // This allows us to stop it without holding the mutex
+    std::unique_ptr<DeckLinkCaptureDevice> deviceToStop;
+    
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_captureDevice) {
+            // Move ownership to local variable
+            deviceToStop = std::move(m_captureDevice);
+            m_currentDeviceName.clear();
+        }
     }
-    m_currentDeviceName.clear();
+    
+    // Now stop the capture without holding the mutex
+    // This allows the callback thread to acquire the mutex if needed
+    if (deviceToStop) {
+        deviceToStop->StopCapture();
+        // deviceToStop will be destroyed when it goes out of scope
+    }
 }
 
 bool DeckLinkCapture::isCapturing() const {
@@ -153,10 +166,14 @@ std::string DeckLinkCapture::getLastError() const {
 
 void DeckLinkCapture::onFrameReceived(const FrameData& frame) {
     // This is called directly from DeckLink callback thread
-    std::lock_guard<std::mutex> lock(m_mutex);
-    
-    if (!m_frameCallback) {
-        return;
+    // Check if we're still capturing before acquiring the mutex
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        
+        // Double-check we're still capturing and have a callback
+        if (!m_captureDevice || !m_frameCallback) {
+            return;
+        }
     }
     
     // Convert frame format
@@ -170,8 +187,16 @@ void DeckLinkCapture::onFrameReceived(const FrameData& frame) {
         timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
     }
     
-    // Call the callback
-    m_frameCallback(frame.data.data(), frame.data.size(), timestamp, format);
+    // Call the callback - do this outside the mutex to avoid holding it too long
+    FrameCallback callback;
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        callback = m_frameCallback;
+    }
+    
+    if (callback) {
+        callback(frame.data.data(), frame.data.size(), timestamp, format);
+    }
 }
 
 ICaptureDevice::VideoFormat DeckLinkCapture::convertFrameFormat(const FrameData& frame) const {
