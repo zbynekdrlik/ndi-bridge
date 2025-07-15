@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.2.0 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.2.1 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -41,6 +41,8 @@ set(COMMON_SOURCES
     src/common/ndi_sender.cpp
     src/common/app_controller.h
     src/common/app_controller.cpp
+    src/common/logger.h
+    src/common/logger.cpp
     src/capture/ICaptureDevice.h
     src/capture/IFormatConverter.h
     src/capture/FormatConverterFactory.h
