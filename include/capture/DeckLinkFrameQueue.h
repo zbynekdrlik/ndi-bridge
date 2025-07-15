@@ -8,7 +8,6 @@
 #include <vector>
 #include <atomic>
 #include "DeckLinkAPI.h"
-#include "FrameData.h"
 
 /**
  * @brief Thread-safe queue for managing captured DeckLink frames
