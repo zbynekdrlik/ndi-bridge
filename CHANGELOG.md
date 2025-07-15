@@ -5,59 +5,27 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.7] - 2025-07-15
-
-### Fixed
-- **NZXT Capture Card Issue (Final Fix)**: NZXT devices no longer lose input signal on app exit
-  - Detect NZXT devices by name during initialization  
-  - Skip full cleanup in destructor for NZXT devices
-  - Let OS handle cleanup on process exit for NZXT devices
-  - This completely prevents the need to power cycle NZXT card
-
-### Changed
-- MediaFoundationCapture v1.0.10: Added NZXT-specific device detection and handling
-- Modified destructor behavior for NZXT devices only
-
-### Technical Details
-- Added is_nzxt_device_ flag to track NZXT devices
-- Destructor skips cleanup for NZXT to prevent driver reset
-- Non-NZXT devices still get proper cleanup
-
-## [1.1.6] - 2025-07-15
-
-### Fixed
-- **NZXT Capture Card Issue**: Fixed device losing input signal after app exit
-  - App was doing full device shutdown which NZXT cards don't handle well
-  - Now only stops capture on exit, keeps device initialized
-  - Prevents need to power cycle NZXT card after app closes
-
-### Changed
-- MediaFoundationCapture v1.0.9: Modified shutdown behavior for continuous operation
-- Only performs full device cleanup in destructor or during error recovery
-- Removed Stop()/Shutdown()/ShutdownObject() calls during normal operation
-
-### Technical Details
-- App designed for continuous operation and quick restart
-- Keeps Media Foundation device active between capture sessions
-- Full cleanup only when necessary (destructor or reinit after error)
-
 ## [1.1.5] - 2025-07-15
 
 ### Fixed
 - **Frame Rate Issue**: NDI now uses actual capture frame rate instead of hardcoded 30fps
 - **Statistics Display**: Frame statistics now shown when Enter key is pressed
-- **Media Foundation Cleanup**: Improved cleanup sequence to prevent crashes on close
+- **Version Display Bug**: Fixed version display issue (was showing 1.1.0 instead of correct version)
+- **Media Foundation Startup Issue**: Fixed race condition in AppController startup
+- **DeckLink Frame Drop Crisis**: Fixed 50% frame drop issue by implementing direct frame callbacks
 
 ### Changed
 - NdiSender v1.0.2: Added frame rate fields to FrameInfo struct
 - AppController v1.0.2: Now passes capture frame rate to NDI sender
 - Enhanced main.cpp to display final statistics before shutdown
-- Improved Media Foundation shutdown with proper COM object cleanup
+- DeckLink now uses direct callbacks instead of polling (eliminates 10ms delay)
+- MediaFoundationCapture v1.0.8: Clean implementation without device-specific hacks
 
 ### Technical Details
 - NDI sender now uses fps_numerator and fps_denominator from capture device
-- Added proper flush and shutdown sequence for Media Foundation
 - Statistics display includes captured/sent/dropped frames and drop percentage
+- DeckLinkCapture v1.1.1: Removed polling thread, frames now delivered immediately via callbacks
+- Better error recovery with automatic restart on frame timeout
 
 ## [1.1.4] - 2025-07-15
 
@@ -242,8 +210,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
-[1.1.7]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.6...v1.1.7
-[1.1.6]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.1.2...v1.1.3
