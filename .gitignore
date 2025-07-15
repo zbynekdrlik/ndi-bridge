@@ -1,0 +1,61 @@
+# Build directories
+build/
+cmake-build-*/
+out/
+Release/
+Debug/
+x64/
+x86/
+
+# Visual Studio
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code
+.vscode/
+
+# CLion
+.idea/
+
+# Compiled files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+*.out
+*.app
+
+# Dependencies
+deps/ndi/
+deps/decklink/
+
+# DeckLink SDK files (proprietary - must not be committed)
+docs/reference/DeckLinkAPI*.h
+docs/reference/DeckLinkAPI*.c
+docs/reference/DeckLinkAPI*.idl
+docs/reference/DeckLinkAPIVersion.h
+# But keep our generation script
+!docs/reference/generate-decklink-api.bat
+
+# OS specific
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Logs
+*.log
+
+# Configuration files (local)
+*.conf.local
+ndi-bridge.conf
