@@ -16,7 +16,7 @@ std::vector<V4L2DeviceInfo> V4L2DeviceEnumerator::enumerateDevices() {
     
     DIR* dir = opendir("/dev");
     if (!dir) {
-        Logger::log("V4L2DeviceEnumerator: Failed to open /dev directory");
+        Logger::error("V4L2DeviceEnumerator: Failed to open /dev directory");
         return devices;
     }
     
@@ -45,7 +45,7 @@ std::vector<V4L2DeviceInfo> V4L2DeviceEnumerator::enumerateDevices() {
                   return a.path < b.path;
               });
     
-    Logger::log("V4L2DeviceEnumerator: Found " + std::to_string(devices.size()) + " devices");
+    Logger::info("V4L2DeviceEnumerator: Found " + std::to_string(devices.size()) + " devices");
     return devices;
 }
 

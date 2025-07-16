@@ -16,7 +16,7 @@ const __m256i V4L2FormatConverterAVX2::U_GREEN_COEFF = _mm256_set1_epi16(-100);
 const __m256i V4L2FormatConverterAVX2::V_RED_COEFF = _mm256_set1_epi16(409);
 const __m256i V4L2FormatConverterAVX2::V_GREEN_COEFF = _mm256_set1_epi16(-208);
 const __m256i V4L2FormatConverterAVX2::ROUND_OFFSET = _mm256_set1_epi16(128);
-const __m256i V4L2FormatConverterAVX2::ALPHA_VALUE = _mm256_set1_epi8(255);
+const __m256i V4L2FormatConverterAVX2::ALPHA_VALUE = _mm256_set1_epi8(static_cast<char>(0xFF));
 
 // Shuffle masks for YUYV extraction (32 bytes -> 16 Y, 8 U, 8 V)
 const __m256i V4L2FormatConverterAVX2::YUYV_Y_SHUFFLE = _mm256_setr_epi8(
@@ -220,11 +220,6 @@ bool V4L2FormatConverterAVX2::convertNV12toBGRA_AVX2(const uint8_t* input, int w
             __m128i y0_128 = _mm_loadu_si128((const __m128i*)(y_row0 + x));
             __m128i y1_128 = _mm_loadu_si128((const __m128i*)(y_row1 + x));
             
-            // Convert Y values to 256-bit vectors with zero extension
-            __m256i y0_vec = _mm256_cvtepu8_epi16(y0_128);
-            __m256i y1_vec = _mm256_cvtepu8_epi16(y1_128);
-            
-            // But we need the Y values as 8-bit in a 256-bit register
             // Load as 256-bit and keep as 8-bit
             __m256i y0_256 = _mm256_set_m128i(_mm_setzero_si128(), y0_128);
             __m256i y1_256 = _mm256_set_m128i(_mm_setzero_si128(), y1_128);

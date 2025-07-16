@@ -20,14 +20,14 @@ V4L2Capture::V4L2Capture()
     , capturing_(false)
     , should_stop_(false)
     , has_error_(false) {
-    Logger::log("V4L2Capture: Created");
+    Logger::info("V4L2Capture: Created");
     memset(&current_format_, 0, sizeof(current_format_));
     memset(&device_caps_, 0, sizeof(device_caps_));
 }
 
 V4L2Capture::~V4L2Capture() {
     stopCapture();
-    Logger::log("V4L2Capture: Destroyed");
+    Logger::info("V4L2Capture: Destroyed");
 }
 
 std::vector<ICaptureDevice::DeviceInfo> V4L2Capture::enumerateDevices() {
@@ -43,7 +43,7 @@ std::vector<ICaptureDevice::DeviceInfo> V4L2Capture::enumerateDevices() {
         }
     }
     
-    Logger::log("V4L2Capture: Found " + std::to_string(devices.size()) + " capture devices");
+    Logger::info("V4L2Capture: Found " + std::to_string(devices.size()) + " capture devices");
     return devices;
 }
 
@@ -51,7 +51,7 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
     std::lock_guard<std::mutex> lock(device_mutex_);
     
     if (isCapturing()) {
-        Logger::log("V4L2Capture: Already capturing");
+        Logger::warning("V4L2Capture: Already capturing");
         return true;
     }
     
@@ -81,7 +81,7 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
         device_name_ = device_name;
     }
     
-    Logger::log("V4L2Capture: Starting capture with device: " + device_path);
+    Logger::info("V4L2Capture: Starting capture with device: " + device_path);
     
     if (!initializeDevice(device_path)) {
         return false;
@@ -116,7 +116,7 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
     capturing_ = true;
     capture_thread_ = std::make_unique<std::thread>(&V4L2Capture::captureThread, this);
     
-    Logger::log("V4L2Capture: Capture started successfully");
+    Logger::info("V4L2Capture: Capture started successfully");
     return true;
 }
 
@@ -127,7 +127,7 @@ void V4L2Capture::stopCapture() {
         return;
     }
     
-    Logger::log("V4L2Capture: Stopping capture");
+    Logger::info("V4L2Capture: Stopping capture");
     
     // Signal thread to stop
     should_stop_ = true;
@@ -143,7 +143,7 @@ void V4L2Capture::stopCapture() {
     // Log final statistics
     if (stats_.frames_captured > 0) {
         double avg_latency = stats_.total_latency_ms / stats_.frames_captured;
-        Logger::log("V4L2Capture: Final stats - Frames: " + std::to_string(stats_.frames_captured) +
+        Logger::info("V4L2Capture: Final stats - Frames: " + std::to_string(stats_.frames_captured) +
                    ", Avg latency: " + std::to_string(avg_latency) + "ms" +
                    ", Dropped: " + std::to_string(stats_.frames_dropped));
     }
@@ -155,7 +155,7 @@ void V4L2Capture::stopCapture() {
     cleanupBuffers();
     shutdownDevice();
     
-    Logger::log("V4L2Capture: Capture stopped");
+    Logger::info("V4L2Capture: Capture stopped");
 }
 
 bool V4L2Capture::isCapturing() const {
@@ -191,7 +191,7 @@ bool V4L2Capture::initializeDevice(const std::string& device_path) {
         return false;
     }
     
-    Logger::log("V4L2Capture: Opened device: " + device_path);
+    Logger::info("V4L2Capture: Opened device: " + device_path);
     return true;
 }
 
@@ -255,7 +255,7 @@ bool V4L2Capture::setupBuffers() {
         }
     }
     
-    Logger::log("V4L2Capture: Setup " + std::to_string(buffers_.size()) + " buffers");
+    Logger::info("V4L2Capture: Setup " + std::to_string(buffers_.size()) + " buffers");
     return true;
 }
 
@@ -275,7 +275,7 @@ bool V4L2Capture::startStreaming() {
         return false;
     }
     
-    Logger::log("V4L2Capture: Streaming started");
+    Logger::info("V4L2Capture: Streaming started");
     return true;
 }
 
@@ -283,14 +283,14 @@ void V4L2Capture::stopStreaming() {
     if (fd_ >= 0) {
         v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         if (ioctl(fd_, VIDIOC_STREAMOFF, &type) < 0) {
-            Logger::log("V4L2Capture: Warning - Failed to stop streaming: " + 
+            Logger::warning("V4L2Capture: Warning - Failed to stop streaming: " + 
                        std::string(strerror(errno)));
         }
     }
 }
 
 void V4L2Capture::captureThread() {
-    Logger::log("V4L2Capture: Capture thread started");
+    Logger::info("V4L2Capture: Capture thread started");
     
     // Use poll instead of select for better performance
     struct pollfd pfd;
@@ -406,7 +406,7 @@ void V4L2Capture::captureThread() {
         }
     }
     
-    Logger::log("V4L2Capture: Capture thread stopped");
+    Logger::info("V4L2Capture: Capture thread stopped");
 }
 
 void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf, 
@@ -457,7 +457,7 @@ void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf
             std::lock_guard<std::mutex> lock(stats_mutex_);
             stats_.total_convert_ms += convert_time;
         } else {
-            Logger::log("V4L2Capture: Failed to convert frame to BGRA");
+            Logger::error("V4L2Capture: Failed to convert frame to BGRA");
             std::lock_guard<std::mutex> lock(stats_mutex_);
             stats_.frames_dropped++;
         }
@@ -501,7 +501,7 @@ bool V4L2Capture::setCaptureFormat(int width, int height, uint32_t pixelformat) 
         }
     }
     
-    Logger::log("V4L2Capture: Set format to " + std::to_string(video_format_.width) + 
+    Logger::info("V4L2Capture: Set format to " + std::to_string(video_format_.width) + 
                "x" + std::to_string(video_format_.height) + " " + video_format_.pixel_format +
                " @ " + std::to_string(video_format_.fps_numerator) + "/" + 
                std::to_string(video_format_.fps_denominator) + " fps");
@@ -520,7 +520,7 @@ bool V4L2Capture::findBestFormat() {
     }
     
     // Log available formats
-    Logger::log("V4L2Capture: Device supports " + std::to_string(supported_formats.size()) + " formats:");
+    Logger::info("V4L2Capture: Device supports " + std::to_string(supported_formats.size()) + " formats:");
     for (const auto& fmt : supported_formats) {
         Logger::debug("  " + V4L2FormatConverter::getFormatName(fmt.pixelformat) +
                      " " + std::to_string(fmt.width) + "x" + std::to_string(fmt.height) +
@@ -631,7 +631,7 @@ bool V4L2Capture::queryCapabilities() {
         return false;
     }
     
-    Logger::log("V4L2Capture: Device capabilities verified");
+    Logger::info("V4L2Capture: Device capabilities verified");
     return true;
 }
 
@@ -679,7 +679,7 @@ void V4L2Capture::setError(const std::string& error) {
         has_error_ = true;
     }
     
-    Logger::log("V4L2Capture Error: " + error);
+    Logger::error("V4L2Capture Error: " + error);
     
     ErrorCallback callback;
     {
