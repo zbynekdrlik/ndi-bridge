@@ -5,6 +5,7 @@
 #include <vector>
 #include <memory>
 #include <chrono>
+#include <unordered_map>
 
 // Forward declaration
 struct FrameData {
@@ -29,6 +30,9 @@ struct CaptureStatistics {
     uint64_t droppedFrames = 0;
     double currentFPS = 0.0;
     double averageFPS = 0.0;
+    
+    // v1.6.0: Added metadata field for extended statistics
+    std::unordered_map<std::string, std::string> metadata;
 };
 
 // Abstract interface for all capture devices
