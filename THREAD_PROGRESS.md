@@ -2,15 +2,15 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: DeckLink latency optimizations implemented
-- [ ] Waiting for: User to test optimizations
+- [x] Currently working on: Fixed compilation error - CaptureStatistics missing metadata field
+- [ ] Waiting for: User to test build with fix
 - [ ] Blocked by: None
 
 ## Implementation Status
 - Phase: Latency Optimization - DeckLink Implementation
-- Step: Implementation complete, awaiting testing
+- Step: Compilation fix applied
 - Status: IMPLEMENTED_NOT_TESTED
-- Version: 1.6.0
+- Version: 1.6.0 (with compilation fix)
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
@@ -19,6 +19,16 @@
 | Direct Frame Callback | ✅ v1.6.0 | ❌ | ❌ | ❌ |
 | Pre-allocated Buffers | ✅ v1.6.0 | ❌ | ❌ | ❌ |
 | Reduced Queue Size | ✅ v1.6.0 | ❌ | ❌ | ❌ |
+
+## Recent Fix Applied
+- **Issue**: CaptureStatistics struct was missing `metadata` field
+- **Error**: `C2039 'metadata': is not a member of 'CaptureStatistics'`
+- **Solution**: Added `std::unordered_map<std::string, std::string> metadata;` to CaptureStatistics
+- **File Modified**: `src/capture/ICaptureDevice.h`
+- **Commit**: 9262889a55b027bcb21d52da437e050b61f39bb1
+
+## Version.h Warnings
+The macro redefinition warnings for `NDI_BRIDGE_VERSION_MINOR` and `NDI_BRIDGE_VERSION_STRING` are likely from CMake defining these during build. These are warnings only and shouldn't prevent compilation.
 
 ## Issue Description
 DeckLink implementation has much worse latency than Linux V4L2 implementation. Need to apply the excellent techniques from Linux implementation to DeckLink.
@@ -50,6 +60,7 @@ DeckLink implementation has much worse latency than Linux V4L2 implementation. N
 4. ✅ **Direct callback mode** - bypasses queue entirely
 5. ✅ **Performance tracking** - monitors zero-copy usage
 6. ✅ **Low-latency mode flag** - default ON
+7. ✅ **Metadata field added** to CaptureStatistics (compilation fix)
 
 ## Remaining Critical Optimizations Needed
 1. **AVX2/SIMD Format Conversion** (5-10x speedup) - MOST CRITICAL
@@ -60,7 +71,7 @@ DeckLink implementation has much worse latency than Linux V4L2 implementation. N
 
 ## Version History
 - v1.5.4: Color space fix complete (previous issue)
-- v1.6.0: DeckLink latency optimization Phase 1 IMPLEMENTED
+- v1.6.0: DeckLink latency optimization Phase 1 IMPLEMENTED (with compilation fix)
 - v1.7.0: (PLANNED) AVX2 optimization for format conversion
 
 ## User Action Required
@@ -77,18 +88,19 @@ DeckLink implementation has much worse latency than Linux V4L2 implementation. N
 
 ## Branch State
 - Branch: `feature/decklink-latency-optimization`
-- Version: 1.6.0 (IMPLEMENTED)
-- Commits: 6
+- Version: 1.6.0 (IMPLEMENTED with compilation fix)
+- Commits: 7
 - Testing: NOT STARTED
 - Status: IMPLEMENTED_NOT_TESTED
 - PR: #11 CREATED
 
 ## Next Steps
 1. ✅ Implementation complete
-2. ⏳ User testing required
-3. ⏳ Latency measurements needed
-4. ⏳ Performance verification
-5. ⏳ PR #11 merge after testing
+2. ✅ Compilation fix applied
+3. ⏳ User testing required
+4. ⏳ Latency measurements needed
+5. ⏳ Performance verification
+6. ⏳ PR #11 merge after testing
 
 ## GOAL FOR NEXT THREAD
 **🎯 Implement AVX2/SIMD optimized format conversion for DeckLink (v1.7.0)**
