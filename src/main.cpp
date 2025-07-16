@@ -472,9 +472,9 @@ int main(int argc, char* argv[]) {
     });
     
     // Create capture device based on type
+#ifdef _WIN32
     bool is_nzxt_device = false;
     
-#ifdef _WIN32
     // Keep capture device in global for NZXT workaround
     if (args.capture_type == CaptureType::MediaFoundation) {
         ndi_bridge::Logger::info("Using Media Foundation capture");
