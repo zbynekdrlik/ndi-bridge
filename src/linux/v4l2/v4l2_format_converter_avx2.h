@@ -13,7 +13,7 @@ namespace v4l2 {
  * Optimized for Intel N100 processor with AVX2 support.
  * Processes 16 pixels at a time for maximum throughput.
  * 
- * Version: 1.3.2
+ * Version: 1.3.3
  */
 class V4L2FormatConverterAVX2 {
 public:
