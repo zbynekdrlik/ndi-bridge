@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 #include <linux/videodev2.h>
 
 namespace ndi_bridge {
@@ -32,7 +33,7 @@ struct V4L2DeviceInfo {
 /**
  * @brief Enumerates V4L2 video capture devices
  * 
- * Version: 1.3.0
+ * Version: 1.3.5
  */
 class V4L2DeviceEnumerator {
 public:
