@@ -2,45 +2,53 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Bug fixes for NV12 AVX2 conversion and CPU detection
-- [x] Version updated to 1.3.2 with fixes applied
+- [x] Currently working on: Critical AVX2 bugs fixed - buffer overflow and vector operations
+- [x] Version updated to 1.3.3 with critical fixes
 - [ ] Waiting for: User testing and feedback on fixed implementation
 - [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: Linux USB Capture Support with Intel N100 Optimizations - Bug Fixes
-- Step: Bug fixes completed, ready for testing
+- Phase: Linux USB Capture Support with Intel N100 Optimizations - Critical Bug Fixes
+- Step: Critical AVX2 bugs fixed, ready for testing
 - Status: IMPLEMENTED_NOT_TESTED
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|----------------------|
-| v4l2_capture.h/cpp | ✅ v1.3.2 | ❌ | ❌ | ❌ |
-| v4l2_device_enumerator.h/cpp | ✅ v1.3.2 | ❌ | ❌ | ❌ |
-| v4l2_format_converter.h/cpp | ✅ v1.3.2 | ❌ | ❌ | ❌ |
-| v4l2_format_converter_avx2.h/cpp | ✅ v1.3.2 (FIXED) | ❌ | ❌ | ❌ |
-| CMake Linux config | ✅ v1.3.2 (FIXED) | N/A | N/A | N/A |
-| main.cpp Linux support | ✅ v1.3.2 | ❌ | ❌ | ❌ |
+| v4l2_capture.h/cpp | ✅ v1.3.3 | ❌ | ❌ | ❌ |
+| v4l2_device_enumerator.h/cpp | ✅ v1.3.3 | ❌ | ❌ | ❌ |
+| v4l2_format_converter.h/cpp | ✅ v1.3.3 | ❌ | ❌ | ❌ |
+| v4l2_format_converter_avx2.h/cpp | ✅ v1.3.3 (CRITICAL FIX) | ❌ | ❌ | ❌ |
+| CMake Linux config | ✅ v1.3.3 | N/A | N/A | N/A |
+| main.cpp Linux support | ✅ v1.3.3 | ❌ | ❌ | ❌ |
 
-## Changes Summary (v1.3.2 - Bug Fixes)
+## Changes Summary (v1.3.3 - Critical AVX2 Bug Fixes)
 
-### Issues Fixed ✅
-1. **NV12 AVX2 Conversion Bug** ✅
-   - Fixed incorrect vector size casting in processYUV16_AVX2
-   - Now properly uses 256-bit vectors throughout
-   - Correct UV separation and duplication for NV12 format
-   - Handles edge cases (last row) properly
+### Critical Issues Fixed ✅
+1. **Buffer Overflow in AVX2** 🔴 → ✅
+   - Fixed processYUV16_AVX2 storing 128 bytes instead of 64 bytes
+   - Could have caused crashes or memory corruption
+   - Now correctly outputs exactly 64 bytes for 16 BGRA pixels
+   - Added proper permutation for correct byte ordering after packing
 
+2. **Non-existent AVX2 Function** 🔴 → ✅
+   - Removed _mm256_cvtepu8_epi8 (doesn't exist)
+   - Fixed NV12 conversion to use proper vector loading
+   - Now uses correct 256-bit operations throughout
+
+3. **Vector Size Corrections** 🔴 → ✅
+   - Fixed NV12 conversion vector size mismatches
+   - Proper handling of 128-bit to 256-bit conversions
+   - Correct UV duplication for 2x2 block processing
+
+4. **Version Properly Updated** ✅
+   - Bumped from 1.3.2 to 1.3.3 for critical bug fix release
+   - Updated in version.h, CMakeLists.txt, and AVX2 headers
+
+### v1.3.2 Features (Previous Fix)
+1. **NV12 AVX2 Conversion Bug** (partially fixed, completed in v1.3.3)
 2. **Intel CPU Detection in CMake** ✅
-   - Added runtime CPU vendor detection
-   - Only applies `-mtune=alderlake` on Intel Alder Lake CPUs
-   - Falls back to `-mtune=native` for other Intel CPUs
-   - Skips Intel-specific tuning on AMD/other CPUs
-   - Prevents potential performance issues on non-Intel systems
-
-3. **Version Properly Updated** ✅
-   - Bumped from 1.3.1 to 1.3.2 for bug fix release
-   - Version logging confirmed in main.cpp
+3. **Version logging** ✅
 
 ### v1.3.1 Features (Previously Implemented)
 1. **Intel N100 Optimizations**
@@ -54,21 +62,17 @@
    - Better for high-load scenarios
    - Optimized for N100's 6MB L3 cache
 
-3. **Build System Updates**
-   - V4L2 header checks
-   - AVX2 compiler flag detection
-   - Conditional AVX2 source compilation
-
-4. **Performance Enhancements**
+3. **Performance Enhancements**
    - Pre-allocated conversion buffers
    - Poll-based capture (5ms timeout)
    - Non-blocking I/O
    - Memory-mapped buffers for zero-copy
 
-### Files Modified (v1.3.2)
-1. src/linux/v4l2/v4l2_format_converter_avx2.cpp (NV12 fix) ✅
-2. CMakeLists.txt (CPU detection) ✅
-3. src/common/version.h (v1.3.2) ✅
+### Files Modified (v1.3.3)
+1. src/linux/v4l2/v4l2_format_converter_avx2.h (critical fixes) ✅
+2. src/linux/v4l2/v4l2_format_converter_avx2.cpp (vector operations) ✅
+3. src/common/version.h (v1.3.3) ✅
+4. CMakeLists.txt (v1.3.3) ✅
 
 ## PR Status
 **PR #8**: [feat: Add Linux USB capture card support (V4L2)](https://github.com/zbynekdrlik/ndi-bridge/pull/8)
@@ -76,12 +80,13 @@
 - Files changed: 15
 - Additions: +2200 (approximate)
 - Deletions: -91
-- Ready for: Testing with fixes applied
+- Ready for: Testing with critical fixes applied
 
 ## Testing Required
 - [ ] Build on Linux x64 (Ubuntu 20.04+) with AVX2 support
 - [ ] Verify AVX2 detection on Intel N100
-- [ ] Test NV12 format conversion (fixed)
+- [ ] Test all format conversions (YUYV, UYVY, NV12)
+- [ ] Verify no crashes/memory corruption
 - [ ] Test on non-Intel CPU (AMD) to verify CPU detection
 - [ ] Test device enumeration
 - [ ] Test with USB webcam
@@ -92,7 +97,7 @@
 - [ ] Measure AVX2 performance improvement
 - [ ] Error handling (device disconnect/reconnect)
 - [ ] Long-running stability test
-- [ ] Verify version 1.3.2 logged on startup
+- [ ] Verify version 1.3.3 logged on startup
 
 ## Performance Targets (Intel N100)
 - 1080p60 capture: < 10% CPU usage
@@ -107,18 +112,22 @@
 - Focus on USB capture devices only
 
 ## Next Steps
-1. User to test Linux build on Intel N100 system
-2. Verify NV12 conversion works correctly
-3. Test CPU detection on different processors
+1. **CRITICAL**: User to test Linux build on Intel N100 system
+2. Verify no crashes with AVX2 enabled
+3. Test all format conversions work correctly
 4. Benchmark AVX2 performance improvements
-5. Fix any compilation issues
-6. Test with actual hardware
-7. Address feedback and bugs
-8. Consider MJPEG support if needed
-9. Merge PR after successful testing
+5. Test on different CPU architectures
+6. Fix any compilation issues
+7. Test with actual hardware
+8. Address feedback and bugs
+9. Consider MJPEG support if needed
+10. Merge PR after successful testing
 
 ## Last User Action
 - Date/Time: 2025-07-16
-- Action: Requested to fix issues found in verification
-- Result: Fixed NV12 AVX2 bug and CPU detection, v1.3.2
+- Action: Requested deep verification and fixes
+- Result: Fixed critical AVX2 bugs, v1.3.3
 - Next Required: Build and test on Linux system with Intel N100
+
+## Critical Notes
+⚠️ **DO NOT MERGE WITHOUT TESTING** - The AVX2 buffer overflow was a critical security issue that could cause crashes or worse. Thorough testing is mandatory before merge.
