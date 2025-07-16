@@ -8,6 +8,7 @@
 #include <chrono>
 #include <functional>
 #include <atlbase.h>
+#include <vector>
 
 // Forward declarations for DeckLink SDK
 struct IDeckLink;
@@ -48,6 +49,12 @@ class DeckLinkDeviceInitializer;
  * - DeckLinkStatistics: Handles FPS calculation and statistics
  * - DeckLinkFormatManager: Manages format detection and changes
  * - DeckLinkDeviceInitializer: Handles device discovery and initialization
+ * 
+ * v1.6.0: Added low-latency optimizations inspired by V4L2 implementation:
+ * - Zero-copy path for UYVY format
+ * - Pre-allocated conversion buffers
+ * - Direct callback mode bypasses queue entirely
+ * - Reduced frame queue size to 1
  */
 class DeckLinkCaptureDevice : public ICaptureDevice {
 public:
@@ -75,6 +82,10 @@ public:
     // Frame callback for immediate delivery (v1.1.4)
     using FrameCallback = std::function<void(const FrameData&)>;
     void SetFrameCallback(FrameCallback callback) { m_frameCallback = callback; }
+    
+    // Low-latency mode control (v1.6.0)
+    void SetLowLatencyMode(bool enabled) { m_lowLatencyMode = enabled; }
+    bool IsLowLatencyMode() const { return m_lowLatencyMode; }
     
 private:
     // Device management
@@ -113,8 +124,22 @@ private:
     // Direct frame callback (v1.1.4)
     FrameCallback m_frameCallback;
     
+    // Low-latency optimizations (v1.6.0)
+    std::atomic<bool> m_lowLatencyMode{true};  // Default to low-latency
+    std::vector<uint8_t> m_preallocatedBuffer;  // Pre-allocated conversion buffer
+    size_t m_preallocatedBufferSize{0};
+    std::atomic<bool> m_zeroCopyLogged{false};
+    
+    // Performance tracking (v1.6.0)
+    std::atomic<uint64_t> m_zeroCopyFrames{0};
+    std::atomic<uint64_t> m_directCallbackFrames{0};
+    
     // Helper methods
     void ProcessFrameForCallback(void* frameBytes, int width, int height, 
                                 BMDPixelFormat pixelFormat,
                                 std::chrono::steady_clock::time_point timestamp);
+    void ProcessFrameZeroCopy(void* frameBytes, int width, int height,
+                             BMDPixelFormat pixelFormat,
+                             std::chrono::steady_clock::time_point timestamp);
+    void PreallocateBuffers(int width, int height);
 };
