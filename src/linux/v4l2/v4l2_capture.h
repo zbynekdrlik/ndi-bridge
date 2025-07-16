@@ -22,7 +22,7 @@ namespace v4l2 {
  * Provides video capture functionality using Linux V4L2 API.
  * Supports USB capture cards and webcams with low latency optimization.
  * 
- * Version: 1.3.1
+ * Version: 1.4.0 - Added zero-copy support for YUYV format
  */
 class V4L2Capture : public ICaptureDevice {
 public:
@@ -43,6 +43,7 @@ public:
     struct CaptureStats {
         uint64_t frames_captured = 0;
         uint64_t frames_dropped = 0;
+        uint64_t zero_copy_frames = 0;  // Frames sent without conversion
         double total_latency_ms = 0.0;
         double total_convert_ms = 0.0;
         double max_latency_ms = 0.0;
@@ -51,6 +52,7 @@ public:
         void reset() {
             frames_captured = 0;
             frames_dropped = 0;
+            zero_copy_frames = 0;
             total_latency_ms = 0.0;
             total_convert_ms = 0.0;
             max_latency_ms = 0.0;
@@ -165,6 +167,9 @@ private:
     
     // Disconnect detection
     uint32_t timeout_count_ = 0;
+    
+    // Zero-copy optimization flag
+    bool zero_copy_logged_{false};
     
     // Buffer count optimized for Intel N100 (10 buffers for smoother operation)
     static constexpr unsigned int kBufferCount = 10;
