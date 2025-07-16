@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.2.1 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.3.7 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -101,12 +101,22 @@ if(PLATFORM_WINDOWS)
     endif()
 elseif(PLATFORM_LINUX)
     set(PLATFORM_SOURCES
-        # Linux-specific sources will be added here
+        src/linux/v4l2/v4l2_capture.cpp
+        src/linux/v4l2/v4l2_device_enumerator.cpp
+        src/linux/v4l2/v4l2_format_converter.cpp
+        src/linux/v4l2/v4l2_format_converter_avx2.cpp
     )
     
     # Linux compiler flags
     add_compile_options(-Wall -Wextra -Wpedantic)
     add_compile_options(-Wno-unused-parameter)
+    
+    # Enable position independent code
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    
+    # Add threading support
+    set(THREADS_PREFER_PTHREAD_FLAG ON)
+    find_package(Threads REQUIRED)
 endif()
 
 # Find NDI SDK
@@ -145,22 +155,40 @@ if(WIN32)
     )
 else()
     # Linux NDI SDK paths
+    # First check if NDI_SDK_DIR environment variable is set
+    if(DEFINED ENV{NDI_SDK_DIR})
+        set(NDI_SEARCH_PATHS
+            "$ENV{NDI_SDK_DIR}/include"
+            "$ENV{NDI_SDK_DIR}"
+        )
+        set(NDI_LIB_SEARCH_PATHS
+            "$ENV{NDI_SDK_DIR}/lib/x86_64-linux-gnu"
+            "$ENV{NDI_SDK_DIR}/lib"
+        )
+    else()
+        set(NDI_SEARCH_PATHS
+            "${CMAKE_CURRENT_SOURCE_DIR}/NDI SDK for Linux/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/NDI SDK for Linux"
+            "/usr/local/ndi/include"
+            "/usr/local/ndi"
+            "/usr/include"
+        )
+        set(NDI_LIB_SEARCH_PATHS
+            "${CMAKE_CURRENT_SOURCE_DIR}/NDI SDK for Linux/lib/x86_64-linux-gnu"
+            "/usr/local/ndi/lib/x86_64-linux-gnu"
+            "/usr/local/lib"
+            "/usr/lib"
+        )
+    endif()
+    
     find_path(NDI_INCLUDE_DIR
         NAMES Processing.NDI.Lib.h
-        PATHS
-            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/include
-            $ENV{NDI_SDK_DIR}/include
-            /usr/include
-            /usr/local/include
+        PATHS ${NDI_SEARCH_PATHS}
     )
 
     find_library(NDI_LIBRARY
         NAMES ndi
-        PATHS
-            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/lib/x86_64-linux-gnu
-            $ENV{NDI_SDK_DIR}/lib/x86_64-linux-gnu
-            /usr/lib
-            /usr/local/lib
+        PATHS ${NDI_LIB_SEARCH_PATHS}
     )
 endif()
 
@@ -220,6 +248,14 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
+# Set version definitions
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    NDI_BRIDGE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    NDI_BRIDGE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    NDI_BRIDGE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+    NDI_BRIDGE_VERSION_STRING="${PROJECT_VERSION}"
+)
+
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE ${NDI_LIBRARY})
 
@@ -247,10 +283,28 @@ if(PLATFORM_WINDOWS)
 elseif(PLATFORM_LINUX)
     # Linux system libraries
     target_link_libraries(${PROJECT_NAME} PRIVATE
-        pthread
+        Threads::Threads
         dl
-        # v4l2  # TODO: Uncomment when Linux implementation is ready
+        m
     )
+    
+    # V4L2 doesn't require additional libraries
+    # RPATH for finding NDI library
+    if(NDI_LIBRARY)
+        get_filename_component(NDI_LIB_DIR ${NDI_LIBRARY} DIRECTORY)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            INSTALL_RPATH "${NDI_LIB_DIR}"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+    endif()
+    
+    # AVX2 support for optimized format conversion
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        set_source_files_properties(
+            src/linux/v4l2/v4l2_format_converter_avx2.cpp
+            PROPERTIES COMPILE_FLAGS "-mavx2"
+        )
+    endif()
 endif()
 
 # Installation rules

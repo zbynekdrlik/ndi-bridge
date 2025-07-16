@@ -21,7 +21,9 @@
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
-// Linux capture implementation would go here
+#ifdef __linux__
+#include "linux/v4l2/v4l2_capture.h"
+#endif
 #endif
 
 #include "common/app_controller.h"
@@ -40,7 +42,8 @@ std::unique_ptr<ndi_bridge::ICaptureDevice> g_capture_device;
 // Capture type enum
 enum class CaptureType {
     MediaFoundation,
-    DeckLink
+    DeckLink,
+    V4L2
 };
 
 // Signal handler
@@ -58,7 +61,11 @@ void printUsage(const char* program_name) {
     std::cout << "       " << program_name << " <device_name> <ndi_name>" << std::endl;
     std::cout << std::endl;
     std::cout << "Options:" << std::endl;
+#ifdef _WIN32
     std::cout << "  -t, --type <type>       Capture type: mf (Media Foundation) or dl (DeckLink)" << std::endl;
+#else
+    std::cout << "  -t, --type <type>       Capture type: v4l2 (Video4Linux2)" << std::endl;
+#endif
     std::cout << "  -d, --device <n>        Capture device name (default: interactive selection)" << std::endl;
     std::cout << "  -n, --ndi-name <n>      NDI sender name (default: 'NDI Bridge')" << std::endl;
     std::cout << "  -l, --list-devices      List available capture devices and exit" << std::endl;
@@ -112,13 +119,34 @@ void listDevices(CaptureType type = CaptureType::MediaFoundation) {
             }
         }
     }
+#elif defined(__linux__)
+    if (type == CaptureType::V4L2) {
+        auto capture = std::make_unique<ndi_bridge::v4l2::V4L2Capture>();
+        auto devices = capture->enumerateDevices();
+        
+        ndi_bridge::Logger::info("\nV4L2 Devices:");
+        if (devices.empty()) {
+            ndi_bridge::Logger::info("  No V4L2 devices found.");
+        } else {
+            for (size_t i = 0; i < devices.size(); ++i) {
+                const auto& device = devices[i];
+                std::stringstream ss;
+                ss << "  " << i << ": " << device.name;
+                if (!device.id.empty() && device.id != device.name) {
+                    ss << " (" << device.id << ")";
+                }
+                ndi_bridge::Logger::info(ss.str());
+            }
+        }
+    }
 #else
-    ndi_bridge::Logger::info("Device enumeration not yet implemented for Linux.");
+    ndi_bridge::Logger::info("Device enumeration not implemented for this platform.");
 #endif
 }
 
 // Select capture type interactively
 CaptureType selectCaptureTypeInteractive() {
+#ifdef _WIN32
     std::cout << "\nSelect capture type:" << std::endl;
     std::cout << "0: Media Foundation (Webcams, USB capture)" << std::endl;
     std::cout << "1: DeckLink (Blackmagic devices)" << std::endl;
@@ -143,17 +171,34 @@ CaptureType selectCaptureTypeInteractive() {
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     
     return (choice == 0) ? CaptureType::MediaFoundation : CaptureType::DeckLink;
+#elif defined(__linux__)
+    // Only V4L2 available on Linux for USB capture
+    std::cout << "\nUsing V4L2 capture for USB devices" << std::endl;
+    return CaptureType::V4L2;
+#else
+    return CaptureType::V4L2;
+#endif
 }
 
 // Select device interactively
 std::string selectDeviceInteractive(CaptureType type) {
-#ifdef _WIN32
     std::unique_ptr<ndi_bridge::ICaptureDevice> capture;
     
+#ifdef _WIN32
     if (type == CaptureType::MediaFoundation) {
         capture = std::make_unique<ndi_bridge::MediaFoundationCapture>();
     } else if (type == CaptureType::DeckLink) {
         capture = std::make_unique<ndi_bridge::DeckLinkCapture>();
+    }
+#elif defined(__linux__)
+    if (type == CaptureType::V4L2) {
+        capture = std::make_unique<ndi_bridge::v4l2::V4L2Capture>();
+    }
+#endif
+    
+    if (!capture) {
+        std::cerr << "Failed to create capture device." << std::endl;
+        return "";
     }
     
     auto devices = capture->enumerateDevices();
@@ -189,10 +234,6 @@ std::string selectDeviceInteractive(CaptureType type) {
     
     std::cout << "Using device: " << devices[chosenIndex].name << std::endl;
     return devices[chosenIndex].name;
-#else
-    std::cerr << "Device selection not yet implemented for Linux." << std::endl;
-    return "";
-#endif
 }
 
 // Parse command line arguments
@@ -200,7 +241,7 @@ struct CommandLineArgs {
     std::string device_name;
     std::string ndi_name = "NDI Bridge";
     std::string capture_type_str;
-    CaptureType capture_type = CaptureType::MediaFoundation;
+    CaptureType capture_type;
     bool list_devices = false;
     bool verbose = false;
     bool show_help = false;
@@ -210,6 +251,14 @@ struct CommandLineArgs {
     int max_retries = -1;
     bool use_positional = false;
     bool use_interactive = false;
+    
+    CommandLineArgs() {
+#ifdef _WIN32
+        capture_type = CaptureType::MediaFoundation;
+#else
+        capture_type = CaptureType::V4L2;
+#endif
+    }
 };
 
 CommandLineArgs parseArgs(int argc, char* argv[]) {
@@ -220,8 +269,6 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
         args.device_name = argv[1];
         args.ndi_name = argv[2];
         args.use_positional = true;
-        // Default to Media Foundation for backward compatibility
-        args.capture_type = CaptureType::MediaFoundation;
         std::cout << "Command-line mode: device name = \"" << args.device_name
                   << "\", NDI stream name = \"" << args.ndi_name << "\"" << std::endl;
         return args;
@@ -234,6 +281,7 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
         if (arg == "-t" || arg == "--type") {
             if (i + 1 < argc) {
                 args.capture_type_str = argv[++i];
+#ifdef _WIN32
                 if (args.capture_type_str == "mf" || args.capture_type_str == "mediafoundation") {
                     args.capture_type = CaptureType::MediaFoundation;
                 } else if (args.capture_type_str == "dl" || args.capture_type_str == "decklink") {
@@ -242,6 +290,14 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
                     std::cerr << "Error: Invalid capture type. Use 'mf' or 'dl'" << std::endl;
                     args.show_help = true;
                 }
+#else
+                if (args.capture_type_str == "v4l2") {
+                    args.capture_type = CaptureType::V4L2;
+                } else {
+                    std::cerr << "Error: Invalid capture type. Use 'v4l2'" << std::endl;
+                    args.show_help = true;
+                }
+#endif
             } else {
                 std::cerr << "Error: --type requires an argument" << std::endl;
                 args.show_help = true;
@@ -346,16 +402,21 @@ int main(int argc, char* argv[]) {
 #endif
     
     if (args.list_devices) {
-        // List both types if not specified
+        // List devices based on platform and type
+#ifdef _WIN32
         if (args.capture_type_str.empty()) {
             listDevices(CaptureType::MediaFoundation);
             listDevices(CaptureType::DeckLink);
         } else {
             listDevices(args.capture_type);
         }
-        #ifdef _WIN32
+#else
+        listDevices(CaptureType::V4L2);
+#endif
+        
+#ifdef _WIN32
         CoUninitialize();
-        #endif
+#endif
         return 0;
     }
     
@@ -368,9 +429,9 @@ int main(int argc, char* argv[]) {
         
         args.device_name = selectDeviceInteractive(args.capture_type);
         if (args.device_name.empty()) {
-            #ifdef _WIN32
+#ifdef _WIN32
             CoUninitialize();
-            #endif
+#endif
             return 1;
         }
         
@@ -412,9 +473,9 @@ int main(int argc, char* argv[]) {
     
     // Create capture device based on type
 #ifdef _WIN32
-    // Keep capture device in global for NZXT workaround
     bool is_nzxt_device = false;
     
+    // Keep capture device in global for NZXT workaround
     if (args.capture_type == CaptureType::MediaFoundation) {
         ndi_bridge::Logger::info("Using Media Foundation capture");
         g_capture_device = std::make_unique<ndi_bridge::MediaFoundationCapture>();
@@ -428,21 +489,31 @@ int main(int argc, char* argv[]) {
         ndi_bridge::Logger::info("Using DeckLink capture");
         g_capture_device = std::make_unique<ndi_bridge::DeckLinkCapture>();
     }
+#elif defined(__linux__)
+    if (args.capture_type == CaptureType::V4L2) {
+        ndi_bridge::Logger::info("Using V4L2 capture");
+        g_capture_device = std::make_unique<ndi_bridge::v4l2::V4L2Capture>();
+    }
+#endif
+    
+    if (!g_capture_device) {
+        ndi_bridge::Logger::error("Failed to create capture device");
+#ifdef _WIN32
+        CoUninitialize();
+#endif
+        return 1;
+    }
     
     // Give ownership to app controller but keep global reference for NZXT
     g_app_controller->setCaptureDevice(std::move(g_capture_device));
-#else
-    ndi_bridge::Logger::error("Linux capture not yet implemented");
-    return 1;
-#endif
     
     // Start the application
     ndi_bridge::Logger::info("Starting capture pipeline...");
     if (!g_app_controller->start()) {
         ndi_bridge::Logger::error("Failed to start application");
-        #ifdef _WIN32
+#ifdef _WIN32
         CoUninitialize();
-        #endif
+#endif
         return 1;
     }
     
