@@ -6,6 +6,10 @@
 #include <cstring>
 #include <immintrin.h>  // For AVX2
 
+#ifdef _MSC_VER
+#include <intrin.h>  // For __cpuid on Windows
+#endif
+
 namespace ndi_bridge {
 
 // Static member definitions
@@ -17,6 +21,28 @@ constexpr int CONNECTION_CHECK_TIMEOUT_MS = 5000;
 
 // Custom FourCC for YUYV (not in NDI SDK)
 constexpr uint32_t FOURCC_YUYV = 0x56595559;  // 'YUYV'
+
+// CPU feature detection helper
+static bool detectAVX2Support() {
+#if defined(__GNUC__) || defined(__clang__)
+    // GCC/Clang
+    return __builtin_cpu_supports("avx2");
+#elif defined(_MSC_VER)
+    // MSVC
+    int cpuInfo[4];
+    __cpuid(cpuInfo, 0);
+    int nIds = cpuInfo[0];
+    
+    if (nIds >= 7) {
+        __cpuidex(cpuInfo, 7, 0);
+        return (cpuInfo[1] & (1 << 5)) != 0;  // AVX2 bit
+    }
+    return false;
+#else
+    // Unknown compiler - assume no AVX2
+    return false;
+#endif
+}
 
 NdiSender::NdiSender(const std::string& sender_name, ErrorCallback error_callback)
     : sender_name_(sender_name)
@@ -78,7 +104,7 @@ bool NdiSender::initialize() {
     }
 
     // Check CPU features for optimization
-    has_avx2_ = __builtin_cpu_supports("avx2");
+    has_avx2_ = detectAVX2Support();
     if (has_avx2_) {
         Logger::info("NDI sender: AVX2 support detected for YUV conversions");
     }
