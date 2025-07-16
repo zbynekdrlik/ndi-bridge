@@ -50,11 +50,11 @@ class DeckLinkDeviceInitializer;
  * - DeckLinkFormatManager: Manages format detection and changes
  * - DeckLinkDeviceInitializer: Handles device discovery and initialization
  * 
- * v1.6.0: Added low-latency optimizations inspired by V4L2 implementation:
- * - Zero-copy path for UYVY format
- * - Pre-allocated conversion buffers
- * - Direct callback mode bypasses queue entirely
- * - Reduced frame queue size to 1
+ * v1.6.1: TRUE zero-copy for UYVY format:
+ * - UYVY sent directly to NDI without conversion
+ * - Pre-allocated buffers only for non-UYVY formats
+ * - Direct callback is the ONLY mode (no queuing for low latency)
+ * - Removed low-latency mode flag - it's always on
  */
 class DeckLinkCaptureDevice : public ICaptureDevice {
 public:
@@ -82,10 +82,6 @@ public:
     // Frame callback for immediate delivery (v1.1.4)
     using FrameCallback = std::function<void(const FrameData&)>;
     void SetFrameCallback(FrameCallback callback) { m_frameCallback = callback; }
-    
-    // Low-latency mode control (v1.6.0)
-    void SetLowLatencyMode(bool enabled) { m_lowLatencyMode = enabled; }
-    bool IsLowLatencyMode() const { return m_lowLatencyMode; }
     
 private:
     // Device management
@@ -124,13 +120,12 @@ private:
     // Direct frame callback (v1.1.4)
     FrameCallback m_frameCallback;
     
-    // Low-latency optimizations (v1.6.0)
-    std::atomic<bool> m_lowLatencyMode{true};  // Default to low-latency
+    // Performance optimizations (v1.6.1)
     std::vector<uint8_t> m_preallocatedBuffer;  // Pre-allocated conversion buffer
     size_t m_preallocatedBufferSize{0};
     std::atomic<bool> m_zeroCopyLogged{false};
     
-    // Performance tracking (v1.6.0)
+    // Performance tracking (v1.6.1)
     std::atomic<uint64_t> m_zeroCopyFrames{0};
     std::atomic<uint64_t> m_directCallbackFrames{0};
     
