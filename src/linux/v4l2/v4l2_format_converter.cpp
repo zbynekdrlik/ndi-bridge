@@ -4,11 +4,25 @@
 #include <cstring>
 #include <algorithm>
 
+#ifdef __AVX2__
+#include "v4l2_format_converter_avx2.h"
+#endif
+
 namespace ndi_bridge {
 namespace v4l2 {
 
-V4L2FormatConverter::V4L2FormatConverter() {
-    Logger::log("V4L2FormatConverter: Created");
+V4L2FormatConverter::V4L2FormatConverter() 
+    : use_avx2_(false) {
+#ifdef __AVX2__
+    use_avx2_ = V4L2FormatConverterAVX2::isAVX2Available();
+    if (use_avx2_) {
+        Logger::log("V4L2FormatConverter: Created with AVX2 optimization for Intel N100");
+    } else {
+        Logger::log("V4L2FormatConverter: Created (AVX2 not available)");
+    }
+#else
+    Logger::log("V4L2FormatConverter: Created (no AVX2 support compiled)");
+#endif
 }
 
 V4L2FormatConverter::~V4L2FormatConverter() {
@@ -32,15 +46,36 @@ bool V4L2FormatConverter::convertToBGRA(const void* input, size_t input_size,
     
     switch (pixelformat) {
         case V4L2_PIX_FMT_YUYV:
-            result = convertYUYVtoBGRA(input_data, width, height, output_data);
+#ifdef __AVX2__
+            if (use_avx2_) {
+                result = V4L2FormatConverterAVX2::convertYUYVtoBGRA_AVX2(input_data, width, height, output_data);
+            } else
+#endif
+            {
+                result = convertYUYVtoBGRA(input_data, width, height, output_data);
+            }
             break;
             
         case V4L2_PIX_FMT_UYVY:
-            result = convertUYVYtoBGRA(input_data, width, height, output_data);
+#ifdef __AVX2__
+            if (use_avx2_) {
+                result = V4L2FormatConverterAVX2::convertUYVYtoBGRA_AVX2(input_data, width, height, output_data);
+            } else
+#endif
+            {
+                result = convertUYVYtoBGRA(input_data, width, height, output_data);
+            }
             break;
             
         case V4L2_PIX_FMT_NV12:
-            result = convertNV12toBGRA(input_data, width, height, output_data);
+#ifdef __AVX2__
+            if (use_avx2_) {
+                result = V4L2FormatConverterAVX2::convertNV12toBGRA_AVX2(input_data, width, height, output_data);
+            } else
+#endif
+            {
+                result = convertNV12toBGRA(input_data, width, height, output_data);
+            }
             break;
             
         case V4L2_PIX_FMT_RGB24:

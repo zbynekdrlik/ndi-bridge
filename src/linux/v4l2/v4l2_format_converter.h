@@ -14,7 +14,9 @@ namespace v4l2 {
  * Handles conversion from common V4L2 formats (YUYV, MJPEG, etc.)
  * to BGRA format required by NDI.
  * 
- * Version: 1.3.0
+ * Automatically uses AVX2 optimizations on Intel N100 and compatible processors.
+ * 
+ * Version: 1.3.1
  */
 class V4L2FormatConverter {
 public:
@@ -57,6 +59,12 @@ public:
      */
     static size_t calculateBGRASize(int width, int height);
     
+    /**
+     * @brief Check if AVX2 is being used
+     * @return true if AVX2 optimizations are active
+     */
+    bool isUsingAVX2() const { return use_avx2_; }
+    
 private:
     // YUV to RGB conversion helpers
     static inline uint8_t clamp(int value) {
@@ -90,6 +98,9 @@ private:
     // YUV to RGB conversion
     static void yuvToRgb(uint8_t y, uint8_t u, uint8_t v,
                          uint8_t& r, uint8_t& g, uint8_t& b);
+    
+    // AVX2 support flag
+    bool use_avx2_;
 };
 
 } // namespace v4l2
