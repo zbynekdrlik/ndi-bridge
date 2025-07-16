@@ -145,7 +145,8 @@ void V4L2Capture::stopCapture() {
         double avg_latency = stats_.total_latency_ms / stats_.frames_captured;
         Logger::info("V4L2Capture: Final stats - Frames: " + std::to_string(stats_.frames_captured) +
                    ", Avg latency: " + std::to_string(avg_latency) + "ms" +
-                   ", Dropped: " + std::to_string(stats_.frames_dropped));
+                   ", Dropped: " + std::to_string(stats_.frames_dropped) + 
+                   ", Zero-copy: " + std::to_string(stats_.zero_copy_frames));
     }
     
     // Stop streaming
@@ -299,7 +300,10 @@ void V4L2Capture::captureThread() {
     
     // Pre-allocate conversion buffer for better performance
     std::vector<uint8_t> bgra_buffer;
-    if (V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat)) {
+    bool needs_conversion = (current_format_.fmt.pix.pixelformat != V4L2_PIX_FMT_YUYV) && 
+                           V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat);
+    
+    if (needs_conversion) {
         size_t bgra_size = V4L2FormatConverter::calculateBGRASize(video_format_.width, video_format_.height);
         bgra_buffer.reserve(bgra_size);
     }
@@ -399,7 +403,8 @@ void V4L2Capture::captureThread() {
             Logger::debug("V4L2Capture: Stats - FPS: " + 
                 std::to_string(local_frame_count / 10) +
                 ", Avg latency: " + std::to_string(avg_latency) + "ms" +
-                ", Max: " + std::to_string(stats_.max_latency_ms) + "ms");
+                ", Max: " + std::to_string(stats_.max_latency_ms) + "ms" +
+                ", Zero-copy: " + std::to_string(stats_.zero_copy_frames));
             
             last_stats_time = now;
             local_frame_count = 0;
@@ -431,8 +436,28 @@ void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf
             std::chrono::system_clock::now().time_since_epoch()).count();
     }
     
-    // Convert format if needed
-    if (V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat)) {
+    // Check if we can use zero-copy for YUYV format
+    bool use_zero_copy = false;
+    if (current_format_.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+        // YUYV can be sent directly to NDI (will be converted to UYVY in NDI sender)
+        use_zero_copy = true;
+        
+        // Log once for tracking
+        if (!zero_copy_logged_) {
+            Logger::info("V4L2Capture: Using zero-copy path for YUYV format");
+            zero_copy_logged_ = true;
+        }
+    }
+    
+    if (use_zero_copy) {
+        // Direct pass-through for YUYV format
+        callback(buffer.start, v4l2_buf.bytesused, timestamp, video_format_);
+        
+        // No conversion time to track
+        std::lock_guard<std::mutex> lock(stats_mutex_);
+        stats_.zero_copy_frames++;
+    } else if (V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat)) {
+        // Convert other supported formats to BGRA
         if (!format_converter_) {
             format_converter_ = std::make_unique<V4L2FormatConverter>();
         }
