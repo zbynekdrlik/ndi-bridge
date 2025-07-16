@@ -5,8 +5,8 @@
 namespace ndi_bridge {
 
 FrameQueue::FrameQueue(size_t capacity, size_t frame_size)
-    : capacity_(capacity)
-    , frame_size_(frame_size) {
+    : frame_size_(frame_size)
+    , capacity_(capacity) {
     
     // Allocate frame metadata array
     frames_ = std::make_unique<Frame[]>(capacity);
