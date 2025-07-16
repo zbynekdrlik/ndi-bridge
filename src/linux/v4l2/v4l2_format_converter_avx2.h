@@ -13,7 +13,7 @@ namespace v4l2 {
  * Optimized for Intel N100 processor with AVX2 support.
  * Processes 16 pixels at a time for maximum throughput.
  * 
- * Version: 1.3.1
+ * Version: 1.3.2
  */
 class V4L2FormatConverterAVX2 {
 public:
@@ -136,22 +136,43 @@ inline void V4L2FormatConverterAVX2::processYUV16_AVX2(
     __m256i b = _mm256_packus_epi16(b_lo, b_hi);
     __m256i a = ALPHA_VALUE;
     
-    // Interleave BGRA
-    __m256i bg_lo = _mm256_unpacklo_epi8(b, g);
-    __m256i ra_lo = _mm256_unpacklo_epi8(r, a);
-    __m256i bg_hi = _mm256_unpackhi_epi8(b, g);
-    __m256i ra_hi = _mm256_unpackhi_epi8(r, a);
+    // Fix: After packing, bytes are in wrong order due to lane structure
+    // Need to permute to get correct ordering
+    const __m256i perm_indices = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
+    r = _mm256_permutevar8x32_epi32(r, perm_indices);
+    g = _mm256_permutevar8x32_epi32(g, perm_indices);
+    b = _mm256_permutevar8x32_epi32(b, perm_indices);
     
-    __m256i bgra_0 = _mm256_unpacklo_epi16(bg_lo, ra_lo);
-    __m256i bgra_1 = _mm256_unpackhi_epi16(bg_lo, ra_lo);
-    __m256i bgra_2 = _mm256_unpacklo_epi16(bg_hi, ra_hi);
-    __m256i bgra_3 = _mm256_unpackhi_epi16(bg_hi, ra_hi);
+    // Interleave BGRA - Process in two halves to output exactly 64 bytes
+    // Extract low and high 128-bit lanes
+    __m128i r_lo128 = _mm256_castsi256_si128(r);
+    __m128i g_lo128 = _mm256_castsi256_si128(g);
+    __m128i b_lo128 = _mm256_castsi256_si128(b);
+    __m128i a_lo128 = _mm256_castsi256_si128(a);
     
-    // Store results
-    _mm256_storeu_si256((__m256i*)(output + 0), bgra_0);
-    _mm256_storeu_si256((__m256i*)(output + 32), bgra_1);
-    _mm256_storeu_si256((__m256i*)(output + 64), bgra_2);
-    _mm256_storeu_si256((__m256i*)(output + 96), bgra_3);
+    __m128i r_hi128 = _mm256_extracti128_si256(r, 1);
+    __m128i g_hi128 = _mm256_extracti128_si256(g, 1);
+    __m128i b_hi128 = _mm256_extracti128_si256(b, 1);
+    __m128i a_hi128 = _mm256_extracti128_si256(a, 1);
+    
+    // First 8 pixels (32 bytes)
+    __m128i bg_lo = _mm_unpacklo_epi8(b_lo128, g_lo128);
+    __m128i ra_lo = _mm_unpacklo_epi8(r_lo128, a_lo128);
+    __m128i bg_hi = _mm_unpackhi_epi8(b_lo128, g_lo128);
+    __m128i ra_hi = _mm_unpackhi_epi8(r_lo128, a_lo128);
+    
+    __m128i bgra_0 = _mm_unpacklo_epi16(bg_lo, ra_lo);
+    __m128i bgra_1 = _mm_unpackhi_epi16(bg_lo, ra_lo);
+    __m128i bgra_2 = _mm_unpacklo_epi16(bg_hi, ra_hi);
+    __m128i bgra_3 = _mm_unpackhi_epi16(bg_hi, ra_hi);
+    
+    _mm_storeu_si128((__m128i*)(output + 0), bgra_0);
+    _mm_storeu_si128((__m128i*)(output + 16), bgra_1);
+    _mm_storeu_si128((__m128i*)(output + 32), bgra_2);
+    _mm_storeu_si128((__m128i*)(output + 48), bgra_3);
+    
+    // Second 8 pixels (32 bytes) are not needed - we only process 16 pixels
+    // Total output: 64 bytes for 16 BGRA pixels
 }
 
 } // namespace v4l2
