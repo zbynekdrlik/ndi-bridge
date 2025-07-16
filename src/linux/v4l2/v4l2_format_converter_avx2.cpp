@@ -8,14 +8,15 @@ namespace ndi_bridge {
 namespace v4l2 {
 
 // Initialize AVX2 constants
+// FIXED: Scale coefficients by 256 for use with mulhi_epi16
 const __m256i V4L2FormatConverterAVX2::Y_OFFSET = _mm256_set1_epi16(16);
 const __m256i V4L2FormatConverterAVX2::UV_OFFSET = _mm256_set1_epi16(128);
-const __m256i V4L2FormatConverterAVX2::Y_COEFF = _mm256_set1_epi16(298);
-const __m256i V4L2FormatConverterAVX2::U_BLUE_COEFF = _mm256_set1_epi16(516);
-const __m256i V4L2FormatConverterAVX2::U_GREEN_COEFF = _mm256_set1_epi16(-100);
-const __m256i V4L2FormatConverterAVX2::V_RED_COEFF = _mm256_set1_epi16(409);
-const __m256i V4L2FormatConverterAVX2::V_GREEN_COEFF = _mm256_set1_epi16(-208);
-const __m256i V4L2FormatConverterAVX2::ROUND_OFFSET = _mm256_set1_epi16(128);
+const __m256i V4L2FormatConverterAVX2::Y_COEFF = _mm256_set1_epi16(298 * 256);  // Scaled by 256
+const __m256i V4L2FormatConverterAVX2::U_BLUE_COEFF = _mm256_set1_epi16(516 * 256);  // Scaled by 256
+const __m256i V4L2FormatConverterAVX2::U_GREEN_COEFF = _mm256_set1_epi16(-100 * 256);  // Scaled by 256
+const __m256i V4L2FormatConverterAVX2::V_RED_COEFF = _mm256_set1_epi16(409 * 256);  // Scaled by 256
+const __m256i V4L2FormatConverterAVX2::V_GREEN_COEFF = _mm256_set1_epi16(-208 * 256);  // Scaled by 256
+const __m256i V4L2FormatConverterAVX2::ROUND_OFFSET = _mm256_set1_epi16(128 * 256);  // Scaled by 256
 const __m256i V4L2FormatConverterAVX2::ALPHA_VALUE = _mm256_set1_epi8(static_cast<char>(0xFF));
 
 // Shuffle masks for YUYV extraction (32 bytes -> 16 Y, 8 U, 8 V)

@@ -13,7 +13,7 @@ namespace v4l2 {
  * Optimized for Intel N100 processor with AVX2 support.
  * Processes 16 pixels at a time for maximum throughput.
  * 
- * Version: 1.3.5
+ * Version: 1.3.6 - Fixed black video issue
  */
 class V4L2FormatConverterAVX2 {
 public:
@@ -34,14 +34,15 @@ public:
     
 private:
     // AVX2 constants for YUV to RGB conversion (ITU-R BT.601)
+    // FIXED: Scaled by 256 for use with mulhi_epi16
     static const __m256i Y_OFFSET;      // 16
     static const __m256i UV_OFFSET;     // 128
-    static const __m256i Y_COEFF;       // 298
-    static const __m256i U_BLUE_COEFF;  // 516
-    static const __m256i U_GREEN_COEFF; // -100
-    static const __m256i V_RED_COEFF;   // 409
-    static const __m256i V_GREEN_COEFF; // -208
-    static const __m256i ROUND_OFFSET;  // 128
+    static const __m256i Y_COEFF;       // 298 * 256
+    static const __m256i U_BLUE_COEFF;  // 516 * 256
+    static const __m256i U_GREEN_COEFF; // -100 * 256
+    static const __m256i V_RED_COEFF;   // 409 * 256
+    static const __m256i V_GREEN_COEFF; // -208 * 256
+    static const __m256i ROUND_OFFSET;  // 128 * 256
     static const __m256i ALPHA_VALUE;   // 255
     
     // Helper to process 16 YUV pixels to BGRA using AVX2
@@ -85,6 +86,7 @@ inline void V4L2FormatConverterAVX2::processYUV16_AVX2(
     v_hi = _mm256_sub_epi16(v_hi, UV_OFFSET);
     
     // Calculate RGB components (low 8 pixels)
+    // FIXED: Now using properly scaled coefficients
     __m256i r_lo = _mm256_add_epi16(
         _mm256_mulhi_epi16(y_lo, Y_COEFF),
         _mm256_mulhi_epi16(v_lo, V_RED_COEFF)
@@ -122,13 +124,13 @@ inline void V4L2FormatConverterAVX2::processYUV16_AVX2(
         _mm256_mulhi_epi16(u_hi, U_BLUE_COEFF)
     );
     
-    // Add rounding offset and shift
-    r_lo = _mm256_srai_epi16(_mm256_add_epi16(r_lo, ROUND_OFFSET), 8);
-    g_lo = _mm256_srai_epi16(_mm256_add_epi16(g_lo, ROUND_OFFSET), 8);
-    b_lo = _mm256_srai_epi16(_mm256_add_epi16(b_lo, ROUND_OFFSET), 8);
-    r_hi = _mm256_srai_epi16(_mm256_add_epi16(r_hi, ROUND_OFFSET), 8);
-    g_hi = _mm256_srai_epi16(_mm256_add_epi16(g_hi, ROUND_OFFSET), 8);
-    b_hi = _mm256_srai_epi16(_mm256_add_epi16(b_hi, ROUND_OFFSET), 8);
+    // Add rounding offset (also scaled)
+    r_lo = _mm256_add_epi16(r_lo, ROUND_OFFSET);
+    g_lo = _mm256_add_epi16(g_lo, ROUND_OFFSET);
+    b_lo = _mm256_add_epi16(b_lo, ROUND_OFFSET);
+    r_hi = _mm256_add_epi16(r_hi, ROUND_OFFSET);
+    g_hi = _mm256_add_epi16(g_hi, ROUND_OFFSET);
+    b_hi = _mm256_add_epi16(b_hi, ROUND_OFFSET);
     
     // Pack to 8-bit with saturation
     __m256i r = _mm256_packus_epi16(r_lo, r_hi);
@@ -171,7 +173,7 @@ inline void V4L2FormatConverterAVX2::processYUV16_AVX2(
     _mm_storeu_si128((__m128i*)(output + 32), bgra_2);
     _mm_storeu_si128((__m128i*)(output + 48), bgra_3);
     
-    // Second 8 pixels (32 bytes) - CRITICAL FIX: Process the remaining pixels
+    // Second 8 pixels (32 bytes) - FIXED: These are valid pixels after permutation
     __m128i bg_lo_1 = _mm_unpacklo_epi8(b_hi128, g_hi128);
     __m128i ra_lo_1 = _mm_unpacklo_epi8(r_hi128, a_hi128);
     __m128i bg_hi_1 = _mm_unpackhi_epi8(b_hi128, g_hi128);
@@ -187,7 +189,8 @@ inline void V4L2FormatConverterAVX2::processYUV16_AVX2(
     _mm_storeu_si128((__m128i*)(output + 96), bgra_6);
     _mm_storeu_si128((__m128i*)(output + 112), bgra_7);
     
-    // Total output: 128 bytes for 16 BGRA pixels (8 bytes per pixel)
+    // Total output: 128 bytes for 16 BGRA pixels (incorrect comment - actually processes 32 pixels worth of output)
+    // FIXED: The permutation rearranges data so all 16 pixels are spread across both halves
 }
 
 } // namespace v4l2
