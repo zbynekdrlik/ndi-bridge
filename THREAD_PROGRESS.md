@@ -2,76 +2,81 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Decklink color space conversion fix - v2
-- [ ] Waiting for: User to test the updated color fix (v1.5.2)
+- [x] Currently working on: Decklink color space detection - v3
+- [ ] Waiting for: User to test proper color detection (v1.5.3)
 - [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: Bug Fix - Decklink Color Space (Iteration 2)
-- Step: Updated implementation complete, awaiting testing
+- Phase: Bug Fix - Decklink Color Space (Final Implementation)
+- Step: Proper color detection from Decklink API
 - Status: IMPLEMENTED_NOT_TESTED
-- Version: 1.5.2
+- Version: 1.5.3
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|-----------------------|
-| Color Space Detection | ✅ v1.5.2 | ❌ | ❌ | ❌ |
-| BT.709 Conversion | ✅ v1.5.2 | ❌ | ❌ | ❌ |
-| BT.601 Conversion | ✅ v1.5.2 | ❌ | ❌ | ❌ |
-| Limited Range YUV | ✅ v1.5.2 | ❌ | ❌ | ❌ |
+| Color Space Detection | ✅ v1.5.3 | ❌ | ❌ | ❌ |
+| BT.709/601 Auto-detect | ✅ v1.5.3 | ❌ | ❌ | ❌ |
+| Range Auto-detect | ✅ v1.5.3 | ❌ | ❌ | ❌ |
+| ColorSpaceInfo Interface | ✅ v1.5.3 | ❌ | ❌ | ❌ |
 
 ## Issue Description
-User reported that Decklink video capture has incorrect/faded colors compared to OBS. Initial fix attempted auto-detection of YUV range, but user confirmed OBS shows:
-- YUV range: limited
-- YUV color space: BT.709
+User reported that Decklink video capture has incorrect/faded colors compared to OBS. User correctly pointed out that OBS can auto-detect color parameters, so ndi-bridge should too.
 
-## Solution Implemented (v2)
-1. **Color Space Detection**: HD (≥720p) uses BT.709, SD uses BT.601
-2. **Limited Range YUV**: Force limited range conversion (16-235 for Y, 16-240 for UV)
-3. **Removed Auto-detection**: No longer auto-detect range, always use limited range
-4. **Proper Scaling**: Correct conversion from limited to full range RGB
+## Solution Implemented (v3)
+1. **Proper Decklink API Detection**: Query BMDDetectedVideoInputFormatFlags for color info
+2. **ColorSpaceInfo Interface**: Pass detected color space/range to converter
+3. **Smart Defaults**: If no flags, use resolution-based detection with limited range default
+4. **No Hardcoding**: Properly detects color parameters like OBS does
 
 ## Version History
-- v1.5.1: Initial color fix with auto-detection (had issues)
-- v1.5.2: Fixed to force limited range YUV (matches OBS)
+- v1.5.1: Initial fix with range auto-detection (had issues)
+- v1.5.2: Forced limited range YUV (worked but hardcoded)
+- v1.5.3: Proper detection from Decklink API (like OBS)
 
-## Changes Made (Latest)
-- Updated `BasicFormatConverter.cpp` to force limited range YUV
-- Simplified conversion coefficients
-- Better matches OBS handling of Decklink input
-- Removed problematic auto-detection logic
-- Incremented version to 1.5.2
+## Technical Implementation
+- Added `DetectedColorInfo` struct to DeckLinkFormatManager
+- Detect color space from `bmdDetectedVideoInputColorspaceRec601/709` flags
+- Detect range from `bmdDetectedVideoInputRangeFull` flag (default limited)
+- Pass detected info through `ColorSpaceInfo` to converter
+- Converter uses detected info instead of hardcoded values
+
+## Changes Made (v1.5.3)
+- Updated `DeckLinkFormatManager.h/cpp` with color detection
+- Added `ColorSpaceInfo` to `IFormatConverter.h`
+- Updated `BasicFormatConverter.cpp` to use ColorSpaceInfo
+- Updated `DeckLinkCaptureDevice.cpp` to pass detected info
+- Incremented version to 1.5.3
 
 ## Testing Required
 User needs to:
 1. Pull latest changes from fix/decklink-color-space branch
 2. Rebuild the project
 3. Test with Decklink capture device
-4. Verify version shows as 1.5.2 in logs
-5. Compare colors with OBS output
-6. Verify colors now match correctly
+4. Verify version shows as 1.5.3 in logs
+5. Check logs for detected color space/range
+6. Compare colors with OBS output
+
+## Expected Log Output
+```
+[DeckLink] Detected color space: Rec.709 (HD)
+[DeckLink] Detected color range: Limited/SMPTE (16-235)
+```
 
 ## Last Actions
-- Date/Time: 2025-07-16 17:43
-- Action: Updated to v1.5.2 with forced limited range YUV
-- Result: Code changes committed to fix/decklink-color-space branch
-- Next Required: User testing with v1.5.2
+- Date/Time: 2025-07-16 17:52
+- Action: Implemented proper color detection from Decklink API
+- Result: v1.5.3 ready for testing
+- Next Required: User testing
 
 ## Branch State
 - Branch: `fix/decklink-color-space`
-- Version: 1.5.2
-- Commits: 5 (initial fix, v1.5.1, thread progress, limited range fix, v1.5.2)
+- Version: 1.5.3
+- Commits: 13 total
 - Ready for testing
 
-## Technical Details
-The fix now:
-- Always assumes limited range YUV from Decklink (matching OBS)
-- Converts Y from [16,235] to [0,255]
-- Converts UV from [16,240] to [-112,112]
-- Uses proper BT.709 coefficients for HD content
-
 ## Next Steps
-1. User tests v1.5.2
-2. Verify colors match OBS exactly
-3. If successful, merge PR #10
-4. If issues persist, may need to investigate Decklink API color flags
+1. User tests v1.5.3 with auto-detection
+2. Verify colors match OBS
+3. Check detection logs
+4. If successful, merge PR #10
