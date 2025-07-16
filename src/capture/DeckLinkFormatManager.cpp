@@ -74,6 +74,40 @@ std::vector<std::string> DeckLinkFormatManager::GetSupportedFormats(IDeckLinkInp
     return formats;
 }
 
+DetectedColorInfo DeckLinkFormatManager::DetectColorInfo(BMDDetectedVideoInputFormatFlags flags, int height) {
+    DetectedColorInfo info;
+    
+    // Detect color space from flags
+    if (flags & bmdDetectedVideoInputColorspaceRec601) {
+        info.colorSpace = DetectedColorInfo::ColorSpace_Rec601;
+        std::cout << "[DeckLink] Detected color space: Rec.601 (SD)" << std::endl;
+    } else if (flags & bmdDetectedVideoInputColorspaceRec709) {
+        info.colorSpace = DetectedColorInfo::ColorSpace_Rec709;
+        std::cout << "[DeckLink] Detected color space: Rec.709 (HD)" << std::endl;
+    } else {
+        // If not specified, use resolution-based detection
+        if (height >= 720) {
+            info.colorSpace = DetectedColorInfo::ColorSpace_Rec709;
+            std::cout << "[DeckLink] No color space flag, using Rec.709 for HD content" << std::endl;
+        } else {
+            info.colorSpace = DetectedColorInfo::ColorSpace_Rec601;
+            std::cout << "[DeckLink] No color space flag, using Rec.601 for SD content" << std::endl;
+        }
+    }
+    
+    // Detect color range from flags
+    if (flags & bmdDetectedVideoInputRangeFull) {
+        info.colorRange = DetectedColorInfo::ColorRange_Full;
+        std::cout << "[DeckLink] Detected color range: Full (0-255)" << std::endl;
+    } else {
+        // Default to limited range (SMPTE levels) - this is standard for broadcast
+        info.colorRange = DetectedColorInfo::ColorRange_Limited;
+        std::cout << "[DeckLink] Detected color range: Limited/SMPTE (16-235)" << std::endl;
+    }
+    
+    return info;
+}
+
 bool DeckLinkFormatManager::HandleFormatChange(BMDVideoInputFormatChangedEvents events,
                                               IDeckLinkDisplayMode* newMode,
                                               BMDDetectedVideoInputFormatFlags flags,
@@ -81,7 +115,8 @@ bool DeckLinkFormatManager::HandleFormatChange(BMDVideoInputFormatChangedEvents 
                                               BMDDisplayMode& displayMode,
                                               BMDPixelFormat& pixelFormat,
                                               long& width, long& height,
-                                              int64_t& frameDuration, int64_t& frameTimescale) {
+                                              int64_t& frameDuration, int64_t& frameTimescale,
+                                              DetectedColorInfo& colorInfo) {
     try {
         if (!newMode) {
             return false;
@@ -91,6 +126,10 @@ bool DeckLinkFormatManager::HandleFormatChange(BMDVideoInputFormatChangedEvents 
         BMDDisplayMode newDisplayMode = newMode->GetDisplayMode();
         int newWidth = newMode->GetWidth();
         int newHeight = newMode->GetHeight();
+        
+        // Detect color space and range
+        m_colorInfo = DetectColorInfo(flags, newHeight);
+        colorInfo = m_colorInfo;
         
         // Determine new pixel format
         BMDPixelFormat newPixelFormat = pixelFormat;
