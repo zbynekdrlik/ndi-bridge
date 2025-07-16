@@ -2,131 +2,99 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Fixed compilation error - CaptureStatistics missing metadata field
-- [ ] Waiting for: User to test build with fix
+- [x] Currently working on: v1.6.1 - TRUE zero-copy for UYVY implemented
+- [ ] Waiting for: User to test TRUE zero-copy performance
 - [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: Latency Optimization - DeckLink Implementation
-- Step: Compilation fix applied
+- Phase: Latency Optimization - DeckLink TRUE Zero-Copy
+- Step: v1.6.1 implemented
 - Status: IMPLEMENTED_NOT_TESTED
-- Version: 1.6.0 (with compilation fix)
+- Version: 1.6.1 (TRUE zero-copy for UYVY)
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|-----------------------|
-| DeckLink Zero Latency | ✅ v1.6.0 | ❌ | ❌ | ❌ |
-| Direct Frame Callback | ✅ v1.6.0 | ❌ | ❌ | ❌ |
-| Pre-allocated Buffers | ✅ v1.6.0 | ❌ | ❌ | ❌ |
-| Reduced Queue Size | ✅ v1.6.0 | ❌ | ❌ | ❌ |
+| DeckLink Zero Latency | ✅ v1.6.0 | ✅ (100% direct) | ❌ | ❌ |
+| Direct Frame Callback | ✅ v1.6.0 | ✅ (100% direct) | ❌ | ❌ |
+| Pre-allocated Buffers | ✅ v1.6.0 | ✅ (8MB allocated) | ❌ | ❌ |
+| Reduced Queue Size | ✅ v1.6.0 | ✅ (bypassed) | ❌ | ❌ |
+| TRUE Zero-Copy UYVY | ✅ v1.6.1 | ❌ | ❌ | ❌ |
 
-## Recent Fix Applied
-- **Issue**: CaptureStatistics struct was missing `metadata` field
-- **Error**: `C2039 'metadata': is not a member of 'CaptureStatistics'`
-- **Solution**: Added `std::unordered_map<std::string, std::string> metadata;` to CaptureStatistics
-- **File Modified**: `src/capture/ICaptureDevice.h`
-- **Commit**: 9262889a55b027bcb21d52da437e050b61f39bb1
+## v1.6.1 Implementation Complete
+**TRUE Zero-Copy for UYVY Format**:
+- ✅ UYVY sent directly to NDI without ANY conversion
+- ✅ NDI natively supports UYVY format
+- ✅ Eliminated unnecessary UYVY→BGRA conversion
+- ✅ Removed low-latency mode flag - always optimized
+- ✅ Created DESIGN_PHILOSOPHY.md documenting low-latency focus
 
-## Version.h Warnings
-The macro redefinition warnings for `NDI_BRIDGE_VERSION_MINOR` and `NDI_BRIDGE_VERSION_STRING` are likely from CMake defining these during build. These are warnings only and shouldn't prevent compilation.
+## Recent Fixes Applied
+1. **v1.6.0 Compilation Fix**:
+   - Added `metadata` field to CaptureStatistics
+   - Fixed compilation errors
 
-## Issue Description
-DeckLink implementation has much worse latency than Linux V4L2 implementation. Need to apply the excellent techniques from Linux implementation to DeckLink.
+2. **v1.6.1 TRUE Zero-Copy**:
+   - ProcessFrameZeroCopy now sends UYVY directly to NDI
+   - No format conversion for DeckLink's native UYVY output
+   - Should achieve same performance as Linux V4L2
 
-## Analysis Results
-### Linux V4L2 Low-Latency Techniques:
-1. **Zero-copy path**: YUYV format passed directly without conversion
-2. **Memory-mapped buffers**: Direct DMA access with V4L2_MEMORY_MMAP
-3. **Non-blocking I/O**: O_NONBLOCK with poll() using 1-5ms timeout
-4. **Pre-allocated buffers**: Conversion buffers allocated ahead of time
-5. **Multi-threaded pipeline**: 3 threads with CPU affinity
-6. **Lock-free queues**: Minimal locking for thread communication
-7. **Immediate buffer requeuing**: Buffers requeued ASAP
-8. **Hardware timestamps**: V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC
-9. **AVX2 SIMD optimization**: Process 16 pixels at once
+## Performance Comparison
+### v1.6.0 (Previous Test):
+- Direct callback: 100% ✅
+- Zero-copy frames: 0% ❌ (was converting UYVY→BGRA)
+- Latency: ~33-50ms saved from queue bypass
 
-### DeckLink Latency Issues Found:
-1. **Frame queue buffering**: MAX_QUEUE_SIZE=3 adds 50ms latency at 60fps
-2. **Synchronous processing**: No pipeline parallelism
-3. **COM interface overhead**: Windows COM adds overhead
-4. **No zero-copy path**: Always copies frame data
-5. **No pre-allocation**: Allocates on-demand
-6. **Scalar pixel processing**: No SIMD optimization (CRITICAL BOTTLENECK)
-
-## Implementation Complete (v1.6.0)
-1. ✅ **Reduced frame queue size** from 3 to 1 (saves ~33ms at 60fps)
-2. ✅ **Zero-copy path** for UYVY format - passes frames directly
-3. ✅ **Pre-allocated buffers** for BGRA conversion
-4. ✅ **Direct callback mode** - bypasses queue entirely
-5. ✅ **Performance tracking** - monitors zero-copy usage
-6. ✅ **Low-latency mode flag** - default ON
-7. ✅ **Metadata field added** to CaptureStatistics (compilation fix)
-
-## Remaining Critical Optimizations Needed
-1. **AVX2/SIMD Format Conversion** (5-10x speedup) - MOST CRITICAL
-2. **Multi-threaded Pipeline** - 3 threads with CPU affinity
-3. **Lock-free Queues** - Eliminate mutex contention
-4. **Memory Alignment** - 32-byte alignment for AVX2
-5. **Hardware Timestamps** - Use DeckLink hardware timestamps
+### v1.6.1 Expected:
+- Direct callback: 100% ✅
+- Zero-copy frames: 100% ✅ (UYVY direct to NDI)
+- Additional latency saved: ~5-10ms (no format conversion)
+- Total improvement: ~40-60ms lower latency
 
 ## Version History
-- v1.5.4: Color space fix complete (previous issue)
-- v1.6.0: DeckLink latency optimization Phase 1 IMPLEMENTED (with compilation fix)
-- v1.7.0: (PLANNED) AVX2 optimization for format conversion
+- v1.5.4: Color space fix
+- v1.6.0: Queue bypass + direct callbacks (tested, working)
+- v1.6.1: TRUE zero-copy for UYVY (implemented, needs testing)
+- v1.7.0: (PLANNED) AVX2 optimization for non-UYVY formats
 
 ## User Action Required
-1. **Build the application** with the new changes
+1. **Build v1.6.1** with the new changes
 2. **Run with DeckLink device** 
 3. **Check startup logs** for:
-   - "DeckLink Capture v1.6.0 - Low-latency optimizations enabled"
-   - "Low latency mode: ON"
+   - "Version 1.6.1 loaded"
+   - "DeckLink Capture v1.6.1 - Zero-copy UYVY enabled"
+   - "TRUE ZERO-COPY: UYVY direct to NDI"
 4. **Monitor performance**:
-   - Check for "Using zero-copy path for UYVY format" if applicable
-   - Note final statistics showing zero-copy percentage
-5. **Measure latency** and compare with previous version
-6. **Provide logs** showing all the above
+   - Zero-copy frames should now be > 0
+   - Zero-copy percentage should be 100%
+5. **Measure latency** - should be significantly lower than v1.6.0
+6. **Provide logs** showing zero-copy working
 
 ## Branch State
 - Branch: `feature/decklink-latency-optimization`
-- Version: 1.6.0 (IMPLEMENTED with compilation fix)
-- Commits: 7
-- Testing: NOT STARTED
+- Version: 1.6.1 (IMPLEMENTED)
+- Commits: 11
+- Testing: NOT STARTED for v1.6.1
 - Status: IMPLEMENTED_NOT_TESTED
-- PR: #11 CREATED
+- PR: #11 OPEN
 
 ## Next Steps
-1. ✅ Implementation complete
-2. ✅ Compilation fix applied
-3. ⏳ User testing required
+1. ✅ v1.6.0 tested and working
+2. ✅ v1.6.1 TRUE zero-copy implemented
+3. ⏳ User testing of v1.6.1 required
 4. ⏳ Latency measurements needed
-5. ⏳ Performance verification
-6. ⏳ PR #11 merge after testing
+5. ⏳ PR #11 merge after v1.6.1 testing
 
-## GOAL FOR NEXT THREAD
-**🎯 Implement AVX2/SIMD optimized format conversion for DeckLink (v1.7.0)**
+## Design Philosophy Documented
+Created `docs/DESIGN_PHILOSOPHY.md` to ensure future development maintains focus on:
+- Low latency as NON-NEGOTIABLE priority
+- Modern hardware only (Intel N100+)
+- Simplicity through specialization
+- Zero-copy by default
+- No compatibility modes that compromise performance
 
-### Objectives:
-1. **Create DeckLinkFormatConverterAVX2 class**
-   - Port V4L2's AVX2 optimization to DeckLink
-   - Process 16 pixels at once using AVX2 instructions
-   - Support UYVY->BGRA conversion with proper color space handling
-   - Include CPU feature detection for AVX2 support
-
-2. **Performance targets**:
-   - Achieve 5-10x speedup in format conversion
-   - Reduce conversion time from ~10ms to ~1-2ms for 1080p60
-   - Match or exceed V4L2 conversion performance
-
-3. **Implementation details**:
-   - Use `_mm256_shuffle_epi8` for efficient byte reordering
-   - Implement proper YUV->RGB coefficients for BT.601/BT.709
-   - Handle edge cases for non-16-pixel-aligned widths
-   - Add runtime CPU detection with fallback to scalar code
-
-4. **Testing requirements**:
-   - Benchmark conversion speed before/after
-   - Verify color accuracy matches scalar implementation
-   - Test on various resolutions and formats
-   - Ensure compatibility with older CPUs without AVX2
-
-This is the most critical optimization as the current pixel-by-pixel conversion is the primary latency bottleneck.
+## GOAL AFTER TESTING
+Once v1.6.1 is confirmed working with 100% zero-copy:
+1. **Merge PR #11** - DeckLink now matches Linux V4L2 performance
+2. **v1.7.0**: AVX2 optimization for formats that DO need conversion
+3. **v1.8.0**: Multi-threaded pipeline if further optimization needed
