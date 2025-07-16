@@ -1,6 +1,7 @@
 // v4l2_capture.cpp
 #include "v4l2_capture.h"
 #include "../../common/logger.h"
+#include "../../common/version.h"
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -20,7 +21,7 @@ V4L2Capture::V4L2Capture()
     , capturing_(false)
     , should_stop_(false)
     , has_error_(false) {
-    Logger::info("V4L2Capture: Created");
+    Logger::info("V4L2Capture: Created (version " NDI_BRIDGE_VERSION ")");
     memset(&current_format_, 0, sizeof(current_format_));
     memset(&device_caps_, 0, sizeof(device_caps_));
 }
@@ -111,10 +112,56 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
     // Reset statistics
     stats_.reset();
     
-    // Start capture thread
+    // Start capture thread(s)
     should_stop_ = false;
     capturing_ = true;
-    capture_thread_ = std::make_unique<std::thread>(&V4L2Capture::captureThread, this);
+    
+    if (use_multi_threading_) {
+        Logger::info("V4L2Capture: Starting multi-threaded pipeline (v" NDI_BRIDGE_VERSION ")");
+        
+        // Calculate frame size for queue allocation
+        size_t frame_size = video_format_.stride * video_format_.height;
+        if (current_format_.fmt.pix.pixelformat != V4L2_PIX_FMT_YUYV) {
+            // May need BGRA conversion
+            frame_size = video_format_.width * video_format_.height * 4;
+        }
+        
+        // Create queues
+        capture_to_convert_queue_ = std::make_unique<FrameQueue>(kCaptureQueueDepth, frame_size);
+        convert_to_send_queue_ = std::make_unique<FrameQueue>(kConvertQueueDepth, frame_size);
+        requeue_queue_ = std::make_unique<BufferIndexQueue>(kBufferCount);
+        
+        // Create thread pool
+        thread_pool_ = std::make_unique<PipelineThreadPool>();
+        
+        // Start threads with CPU affinity for Intel N100 (4 cores)
+        // Core 0: System/other processes
+        // Core 1: Capture thread
+        // Core 2: Convert thread  
+        // Core 3: Send thread
+        capture_thread_id_ = thread_pool_->createThread(
+            "V4L2Capture", 
+            [this]() { captureThreadMulti(); }, 
+            1  // CPU core 1
+        );
+        
+        convert_thread_id_ = thread_pool_->createThread(
+            "V4L2Convert",
+            [this]() { convertThreadMulti(); },
+            2  // CPU core 2
+        );
+        
+        send_thread_id_ = thread_pool_->createThread(
+            "V4L2Send",
+            [this]() { sendThreadMulti(); },
+            3  // CPU core 3
+        );
+        
+        Logger::info("V4L2Capture: Multi-threaded pipeline started with 3 threads");
+    } else {
+        Logger::info("V4L2Capture: Starting single-threaded capture");
+        capture_thread_ = std::make_unique<std::thread>(&V4L2Capture::captureThreadSingle, this);
+    }
     
     Logger::info("V4L2Capture: Capture started successfully");
     return true;
@@ -129,14 +176,37 @@ void V4L2Capture::stopCapture() {
     
     Logger::info("V4L2Capture: Stopping capture");
     
-    // Signal thread to stop
+    // Signal threads to stop
     should_stop_ = true;
     
-    // Wait for thread to finish
-    if (capture_thread_ && capture_thread_->joinable()) {
-        capture_thread_->join();
+    if (use_multi_threading_ && thread_pool_) {
+        // Stop all threads
+        thread_pool_->stopAll();
+        thread_pool_->waitAll();
+        
+        // Log thread statistics
+        for (size_t i = 0; i < 3; ++i) {
+            auto info = thread_pool_->getThreadInfo(i);
+            if (info) {
+                Logger::info("Thread '" + info->name + "': " +
+                           std::to_string(info->iterations) + " iterations, " +
+                           "avg time: " + std::to_string(info->avg_processing_time_ms) + "ms");
+            }
+        }
+        
+        thread_pool_.reset();
+        
+        // Clear queues
+        capture_to_convert_queue_.reset();
+        convert_to_send_queue_.reset();
+        requeue_queue_.reset();
+    } else {
+        // Wait for single thread to finish
+        if (capture_thread_ && capture_thread_->joinable()) {
+            capture_thread_->join();
+        }
+        capture_thread_.reset();
     }
-    capture_thread_.reset();
     
     capturing_ = false;
     
@@ -145,7 +215,14 @@ void V4L2Capture::stopCapture() {
         double avg_latency = stats_.total_latency_ms / stats_.frames_captured;
         Logger::info("V4L2Capture: Final stats - Frames: " + std::to_string(stats_.frames_captured) +
                    ", Avg latency: " + std::to_string(avg_latency) + "ms" +
-                   ", Dropped: " + std::to_string(stats_.frames_dropped));
+                   ", Dropped: " + std::to_string(stats_.frames_dropped) + 
+                   ", Zero-copy: " + std::to_string(stats_.zero_copy_frames));
+        
+        if (use_multi_threading_) {
+            Logger::info("V4L2Capture: Queue drops - Capture->Convert: " + 
+                       std::to_string(stats_.queue1_drops) +
+                       ", Convert->Send: " + std::to_string(stats_.queue2_drops));
+        }
     }
     
     // Stop streaming
@@ -289,8 +366,291 @@ void V4L2Capture::stopStreaming() {
     }
 }
 
-void V4L2Capture::captureThread() {
-    Logger::info("V4L2Capture: Capture thread started");
+// Multi-threaded capture thread (Thread 1)
+void V4L2Capture::captureThreadMulti() {
+    Logger::info("V4L2Capture: Multi-threaded capture thread started");
+    
+    // Use poll for device readiness
+    struct pollfd pfd;
+    pfd.fd = fd_;
+    pfd.events = POLLIN | POLLPRI;
+    
+    // Performance monitoring
+    auto last_stats_time = std::chrono::steady_clock::now();
+    uint64_t local_frame_count = 0;
+    
+    while (!thread_pool_->shouldStop(capture_thread_id_)) {
+        ThreadTimer timer(*thread_pool_, capture_thread_id_);
+        
+        // Check for buffers to requeue from send thread
+        uint32_t requeue_index;
+        while (requeue_queue_->tryPop(requeue_index)) {
+            v4l2_buffer v4l2_buf;
+            memset(&v4l2_buf, 0, sizeof(v4l2_buf));
+            v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            v4l2_buf.memory = V4L2_MEMORY_MMAP;
+            v4l2_buf.index = requeue_index;
+            
+            if (ioctl(fd_, VIDIOC_QBUF, &v4l2_buf) < 0) {
+                setError("Failed to requeue buffer: " + std::string(strerror(errno)));
+                return;
+            }
+        }
+        
+        // Poll for frame availability (1ms timeout for responsiveness)
+        int ret = poll(&pfd, 1, 1);
+        
+        if (ret < 0) {
+            if (errno == EINTR) {
+                continue;
+            }
+            if (errno == ENODEV) {
+                setError("Device disconnected");
+                break;
+            }
+            setError("Poll error: " + std::string(strerror(errno)));
+            break;
+        }
+        
+        if (ret == 0) {
+            // Timeout - check if device still exists
+            if (++timeout_count_ > 1000) { // 1 second without frames
+                struct v4l2_capability cap;
+                if (ioctl(fd_, VIDIOC_QUERYCAP, &cap) < 0) {
+                    setError("Device disconnected or not responding");
+                    break;
+                }
+                timeout_count_ = 0;
+            }
+            continue;
+        }
+        
+        timeout_count_ = 0;
+        
+        // Check for errors
+        if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            setError("Device error detected");
+            break;
+        }
+        
+        // Dequeue buffer
+        v4l2_buffer v4l2_buf;
+        memset(&v4l2_buf, 0, sizeof(v4l2_buf));
+        v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        v4l2_buf.memory = V4L2_MEMORY_MMAP;
+        
+        auto dequeue_start = std::chrono::high_resolution_clock::now();
+        
+        if (ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf) < 0) {
+            if (errno == EAGAIN) {
+                continue;
+            }
+            setError("Failed to dequeue buffer: " + std::string(strerror(errno)));
+            break;
+        }
+        
+        // Get timestamp
+        int64_t timestamp;
+        if (v4l2_buf.flags & V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC) {
+            timestamp = v4l2_buf.timestamp.tv_sec * 1000000000LL + v4l2_buf.timestamp.tv_usec * 1000LL;
+        } else {
+            timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+        }
+        
+        // Push frame to convert queue
+        if (v4l2_buf.index < buffers_.size()) {
+            bool needs_conversion = (current_format_.fmt.pix.pixelformat != V4L2_PIX_FMT_YUYV) && 
+                                  V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat);
+            
+            FrameQueue::Frame frame(
+                buffers_[v4l2_buf.index].start,
+                v4l2_buf.bytesused,
+                timestamp,
+                video_format_,
+                v4l2_buf.index,
+                needs_conversion
+            );
+            
+            if (!capture_to_convert_queue_->tryPush(frame)) {
+                // Queue full - requeue buffer immediately
+                if (ioctl(fd_, VIDIOC_QBUF, &v4l2_buf) < 0) {
+                    setError("Failed to requeue buffer: " + std::string(strerror(errno)));
+                    break;
+                }
+                
+                std::lock_guard<std::mutex> lock(stats_mutex_);
+                stats_.queue1_drops++;
+                stats_.frames_dropped++;
+            } else {
+                // Update capture statistics
+                auto now = std::chrono::high_resolution_clock::now();
+                auto dequeue_time = std::chrono::duration<double, std::milli>(now - dequeue_start).count();
+                
+                std::lock_guard<std::mutex> lock(stats_mutex_);
+                stats_.frames_captured++;
+                stats_.total_latency_ms += dequeue_time;
+                stats_.avg_capture_time_ms = 0.9 * stats_.avg_capture_time_ms + 0.1 * dequeue_time;
+                
+                if (dequeue_time > stats_.max_latency_ms) {
+                    stats_.max_latency_ms = dequeue_time;
+                }
+                if (dequeue_time < stats_.min_latency_ms) {
+                    stats_.min_latency_ms = dequeue_time;
+                }
+                
+                local_frame_count++;
+            }
+        }
+        
+        // Log statistics periodically
+        auto now = std::chrono::steady_clock::now();
+        if (now - last_stats_time >= std::chrono::seconds(10)) {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            Logger::debug("V4L2Capture Thread: FPS: " + std::to_string(local_frame_count / 10) +
+                        ", Avg capture: " + std::to_string(stats_.avg_capture_time_ms) + "ms" +
+                        ", Queue1 drops: " + std::to_string(stats_.queue1_drops));
+            
+            last_stats_time = now;
+            local_frame_count = 0;
+        }
+    }
+    
+    Logger::info("V4L2Capture: Multi-threaded capture thread stopped");
+}
+
+// Multi-threaded convert thread (Thread 2)
+void V4L2Capture::convertThreadMulti() {
+    Logger::info("V4L2Convert: Conversion thread started");
+    
+    // Pre-allocate conversion buffer
+    std::vector<uint8_t> bgra_buffer;
+    size_t bgra_size = V4L2FormatConverter::calculateBGRASize(video_format_.width, video_format_.height);
+    bgra_buffer.reserve(bgra_size);
+    
+    // Create format converter
+    auto converter = std::make_unique<V4L2FormatConverter>();
+    
+    while (!thread_pool_->shouldStop(convert_thread_id_)) {
+        ThreadTimer timer(*thread_pool_, convert_thread_id_);
+        
+        FrameQueue::Frame frame;
+        if (!capture_to_convert_queue_->tryPop(frame)) {
+            // No frames available - yield CPU
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            continue;
+        }
+        
+        auto convert_start = std::chrono::high_resolution_clock::now();
+        
+        if (!frame.needs_conversion || current_format_.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+            // Zero-copy path - pass through directly
+            if (!convert_to_send_queue_->tryPush(frame)) {
+                std::lock_guard<std::mutex> lock(stats_mutex_);
+                stats_.queue2_drops++;
+                stats_.frames_dropped++;
+            } else {
+                std::lock_guard<std::mutex> lock(stats_mutex_);
+                stats_.zero_copy_frames++;
+                
+                if (!zero_copy_logged_) {
+                    Logger::info("V4L2Convert: Using zero-copy path for YUYV format");
+                    zero_copy_logged_ = true;
+                }
+            }
+            
+            // Return buffer index for requeuing
+            requeue_queue_->tryPush(frame.buffer_index);
+        } else {
+            // Perform format conversion
+            bgra_buffer.clear();
+            if (converter->convertToBGRA(frame.data, frame.size,
+                                       video_format_.width, video_format_.height,
+                                       current_format_.fmt.pix.pixelformat,
+                                       bgra_buffer)) {
+                // Update format for BGRA
+                VideoFormat bgra_format = video_format_;
+                bgra_format.pixel_format = "BGRA";
+                bgra_format.stride = video_format_.width * 4;
+                
+                // Create new frame with converted data
+                FrameQueue::Frame converted_frame(
+                    bgra_buffer.data(),
+                    bgra_buffer.size(),
+                    frame.timestamp_ns,
+                    bgra_format,
+                    frame.buffer_index,
+                    false  // No further conversion needed
+                );
+                
+                if (!convert_to_send_queue_->tryPush(converted_frame)) {
+                    std::lock_guard<std::mutex> lock(stats_mutex_);
+                    stats_.queue2_drops++;
+                    stats_.frames_dropped++;
+                }
+                
+                // Track conversion time
+                auto convert_time = std::chrono::duration<double, std::milli>(
+                    std::chrono::high_resolution_clock::now() - convert_start).count();
+                
+                std::lock_guard<std::mutex> lock(stats_mutex_);
+                stats_.total_convert_ms += convert_time;
+                stats_.avg_convert_time_ms = 0.9 * stats_.avg_convert_time_ms + 0.1 * convert_time;
+            } else {
+                Logger::error("V4L2Convert: Failed to convert frame to BGRA");
+                std::lock_guard<std::mutex> lock(stats_mutex_);
+                stats_.frames_dropped++;
+            }
+            
+            // Return buffer index for requeuing
+            requeue_queue_->tryPush(frame.buffer_index);
+        }
+    }
+    
+    Logger::info("V4L2Convert: Conversion thread stopped");
+}
+
+// Multi-threaded send thread (Thread 3)
+void V4L2Capture::sendThreadMulti() {
+    Logger::info("V4L2Send: Send thread started");
+    
+    while (!thread_pool_->shouldStop(send_thread_id_)) {
+        ThreadTimer timer(*thread_pool_, send_thread_id_);
+        
+        FrameQueue::Frame frame;
+        if (!convert_to_send_queue_->tryPop(frame)) {
+            // No frames available - yield CPU
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            continue;
+        }
+        
+        auto send_start = std::chrono::high_resolution_clock::now();
+        
+        // Get callback
+        FrameCallback callback;
+        {
+            std::lock_guard<std::mutex> lock(callback_mutex_);
+            callback = frame_callback_;
+        }
+        
+        if (callback) {
+            callback(frame.data, frame.size, frame.timestamp_ns, frame.format);
+        }
+        
+        // Track send time
+        auto send_time = std::chrono::duration<double, std::milli>(
+            std::chrono::high_resolution_clock::now() - send_start).count();
+        
+        std::lock_guard<std::mutex> lock(stats_mutex_);
+        stats_.avg_send_time_ms = 0.9 * stats_.avg_send_time_ms + 0.1 * send_time;
+    }
+    
+    Logger::info("V4L2Send: Send thread stopped");
+}
+
+// Legacy single-threaded capture function
+void V4L2Capture::captureThreadSingle() {
+    Logger::info("V4L2Capture: Single-threaded capture started");
     
     // Use poll instead of select for better performance
     struct pollfd pfd;
@@ -299,7 +659,10 @@ void V4L2Capture::captureThread() {
     
     // Pre-allocate conversion buffer for better performance
     std::vector<uint8_t> bgra_buffer;
-    if (V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat)) {
+    bool needs_conversion = (current_format_.fmt.pix.pixelformat != V4L2_PIX_FMT_YUYV) && 
+                           V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat);
+    
+    if (needs_conversion) {
         size_t bgra_size = V4L2FormatConverter::calculateBGRASize(video_format_.width, video_format_.height);
         bgra_buffer.reserve(bgra_size);
     }
@@ -399,14 +762,15 @@ void V4L2Capture::captureThread() {
             Logger::debug("V4L2Capture: Stats - FPS: " + 
                 std::to_string(local_frame_count / 10) +
                 ", Avg latency: " + std::to_string(avg_latency) + "ms" +
-                ", Max: " + std::to_string(stats_.max_latency_ms) + "ms");
+                ", Max: " + std::to_string(stats_.max_latency_ms) + "ms" +
+                ", Zero-copy: " + std::to_string(stats_.zero_copy_frames));
             
             last_stats_time = now;
             local_frame_count = 0;
         }
     }
     
-    Logger::info("V4L2Capture: Capture thread stopped");
+    Logger::info("V4L2Capture: Single-threaded capture stopped");
 }
 
 void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf, 
@@ -431,8 +795,28 @@ void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf
             std::chrono::system_clock::now().time_since_epoch()).count();
     }
     
-    // Convert format if needed
-    if (V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat)) {
+    // Check if we can use zero-copy for YUYV format
+    bool use_zero_copy = false;
+    if (current_format_.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+        // YUYV can be sent directly to NDI (will be converted to UYVY in NDI sender)
+        use_zero_copy = true;
+        
+        // Log once for tracking
+        if (!zero_copy_logged_) {
+            Logger::info("V4L2Capture: Using zero-copy path for YUYV format");
+            zero_copy_logged_ = true;
+        }
+    }
+    
+    if (use_zero_copy) {
+        // Direct pass-through for YUYV format
+        callback(buffer.start, v4l2_buf.bytesused, timestamp, video_format_);
+        
+        // No conversion time to track
+        std::lock_guard<std::mutex> lock(stats_mutex_);
+        stats_.zero_copy_frames++;
+    } else if (V4L2FormatConverter::isFormatSupported(current_format_.fmt.pix.pixelformat)) {
+        // Convert other supported formats to BGRA
         if (!format_converter_) {
             format_converter_ = std::make_unique<V4L2FormatConverter>();
         }
