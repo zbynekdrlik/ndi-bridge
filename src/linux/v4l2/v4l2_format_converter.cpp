@@ -16,12 +16,12 @@ V4L2FormatConverter::V4L2FormatConverter()
 #ifdef __AVX2__
     use_avx2_ = V4L2FormatConverterAVX2::isAVX2Available();
     if (use_avx2_) {
-        Logger::log("V4L2FormatConverter: AVX2 optimization AVAILABLE for Intel N100");
+        Logger::info("V4L2FormatConverter: AVX2 optimization AVAILABLE for Intel N100");
     } else {
-        Logger::log("V4L2FormatConverter: AVX2 not available at runtime - using scalar code");
+        Logger::info("V4L2FormatConverter: AVX2 not available at runtime - using scalar code");
     }
 #else
-    Logger::log("V4L2FormatConverter: AVX2 support not compiled in - using scalar code");
+    Logger::info("V4L2FormatConverter: AVX2 support not compiled in - using scalar code");
 #endif
 }
 
@@ -49,7 +49,7 @@ bool V4L2FormatConverter::convertToBGRA(const void* input, size_t input_size,
 #ifdef __AVX2__
             if (use_avx2_) {
                 if (!avx2_logged_) {
-                    Logger::log("V4L2FormatConverter: Using AVX2 accelerated YUYV->BGRA conversion");
+                    Logger::info("V4L2FormatConverter: Using AVX2 accelerated YUYV->BGRA conversion");
                     avx2_logged_ = true;
                 }
                 result = V4L2FormatConverterAVX2::convertYUYVtoBGRA_AVX2(input_data, width, height, output_data);
@@ -64,7 +64,7 @@ bool V4L2FormatConverter::convertToBGRA(const void* input, size_t input_size,
 #ifdef __AVX2__
             if (use_avx2_) {
                 if (!avx2_logged_) {
-                    Logger::log("V4L2FormatConverter: Using AVX2 accelerated UYVY->BGRA conversion");
+                    Logger::info("V4L2FormatConverter: Using AVX2 accelerated UYVY->BGRA conversion");
                     avx2_logged_ = true;
                 }
                 result = V4L2FormatConverterAVX2::convertUYVYtoBGRA_AVX2(input_data, width, height, output_data);
@@ -79,7 +79,7 @@ bool V4L2FormatConverter::convertToBGRA(const void* input, size_t input_size,
 #ifdef __AVX2__
             if (use_avx2_) {
                 if (!avx2_logged_) {
-                    Logger::log("V4L2FormatConverter: Using AVX2 accelerated NV12->BGRA conversion");
+                    Logger::info("V4L2FormatConverter: Using AVX2 accelerated NV12->BGRA conversion");
                     avx2_logged_ = true;
                 }
                 result = V4L2FormatConverterAVX2::convertNV12toBGRA_AVX2(input_data, width, height, output_data);
@@ -103,7 +103,7 @@ bool V4L2FormatConverter::convertToBGRA(const void* input, size_t input_size,
             break;
             
         default:
-            Logger::log("V4L2FormatConverter: Unsupported format: " + getFormatName(pixelformat));
+            Logger::error("V4L2FormatConverter: Unsupported format: " + getFormatName(pixelformat));
             return false;
     }
     
@@ -301,7 +301,7 @@ bool V4L2FormatConverter::decompressMJPEGtoBGRA(const uint8_t* input, size_t inp
                                                  int width, int height, uint8_t* output) {
     // For now, we don't support MJPEG without libjpeg
     // This would require linking with libjpeg or libjpeg-turbo
-    Logger::log("V4L2FormatConverter: MJPEG decompression not implemented (requires libjpeg)");
+    Logger::warning("V4L2FormatConverter: MJPEG decompression not implemented (requires libjpeg)");
     return false;
 }
 
