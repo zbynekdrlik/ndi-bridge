@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.3.7 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.4.0 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -302,6 +302,11 @@ elseif(PLATFORM_LINUX)
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         set_source_files_properties(
             src/linux/v4l2/v4l2_format_converter_avx2.cpp
+            PROPERTIES COMPILE_FLAGS "-mavx2"
+        )
+        # Also compile NDI sender with AVX2 for YUYV optimization
+        set_source_files_properties(
+            src/common/ndi_sender.cpp
             PROPERTIES COMPILE_FLAGS "-mavx2"
         )
     endif()
