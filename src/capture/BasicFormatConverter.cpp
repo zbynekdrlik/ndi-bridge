@@ -18,36 +18,8 @@ public:
         // HD content (720p and above) uses BT.709, SD uses BT.601
         bool useBT709 = (height >= 720);
         
-        // Color conversion coefficients
-        // BT.601: Kr = 0.299, Kg = 0.587, Kb = 0.114
-        // BT.709: Kr = 0.2126, Kg = 0.7152, Kb = 0.0722
-        double Kr, Kg, Kb;
-        if (useBT709) {
-            Kr = 0.2126;
-            Kg = 0.7152;
-            Kb = 0.0722;
-        } else {
-            Kr = 0.299;
-            Kg = 0.587;
-            Kb = 0.114;
-        }
-        
-        // Pre-calculate conversion coefficients
-        // For limited range YUV (16-235 for Y, 16-240 for UV)
-        double Ky = 255.0 / (235.0 - 16.0);  // 1.164
-        double Kuv = 255.0 / (240.0 - 16.0); // 1.138
-        
-        // Matrix coefficients
-        double Kr_scaled = Kr * Kuv;
-        double Kg_scaled = Kg * Kuv;
-        double Kb_scaled = Kb * Kuv;
-        
-        // Integer coefficients for performance (scaled by 1024)
-        int coef_y = static_cast<int>(Ky * 1024);
-        int coef_rv = static_cast<int>((Kuv / (1.0 - Kb)) * 1024);
-        int coef_gu = static_cast<int>((Kb_scaled * 2.0 / Kg) * 1024);
-        int coef_gv = static_cast<int>((Kr_scaled * 2.0 / Kg) * 1024);
-        int coef_bu = static_cast<int>((Kuv / (1.0 - Kr)) * 1024);
+        // Pre-calculate conversion coefficients for BT.709 or BT.601
+        // Using limited range YUV (16-235 for Y, 16-240 for UV) as per Decklink output
         
         for (int y = 0; y < height; y++) {
             const uint8_t* srcRow = src + y * srcStride;
@@ -60,56 +32,45 @@ public:
                 int v = srcRow[2];
                 int y1 = srcRow[3];
                 
-                // Check if we have full range or limited range
-                // Full range uses 0-255, limited uses 16-235/240
-                // Auto-detect based on Y values (if we see values < 16 or > 235, assume full range)
-                bool isFullRange = (y0 < 16 || y0 > 235 || y1 < 16 || y1 > 235);
+                // Convert from limited range YUV to RGB
+                // Y: [16,235] -> [0,255]
+                // UV: [16,240] -> [-112,112]
+                y0 = ((y0 - 16) * 255) / 219;
+                y1 = ((y1 - 16) * 255) / 219;
+                u = ((u - 128) * 255) / 224;
+                v = ((v - 128) * 255) / 224;
                 
-                if (!isFullRange) {
-                    // Limited range conversion
-                    y0 = ((y0 - 16) * coef_y + 512) >> 10;
-                    y1 = ((y1 - 16) * coef_y + 512) >> 10;
-                    u = u - 128;
-                    v = v - 128;
-                } else {
-                    // Full range - no offset needed
-                    u = u - 128;
-                    v = v - 128;
-                }
+                // Clamp Y values
+                y0 = std::max(0, std::min(255, y0));
+                y1 = std::max(0, std::min(255, y1));
                 
-                // YUV to RGB conversion using proper coefficients
+                // YUV to RGB conversion
                 int r0, g0, b0, r1, g1, b1;
                 
-                if (!isFullRange) {
-                    // Limited range with proper coefficients
-                    r0 = y0 + ((v * coef_rv + 512) >> 10);
-                    g0 = y0 - ((u * coef_gu + v * coef_gv + 512) >> 10);
-                    b0 = y0 + ((u * coef_bu + 512) >> 10);
+                if (useBT709) {
+                    // BT.709 coefficients
+                    // R = Y + 1.5748 * V
+                    // G = Y - 0.1873 * U - 0.4681 * V
+                    // B = Y + 1.8556 * U
+                    r0 = y0 + ((1575 * v + 500) / 1000);
+                    g0 = y0 - ((187 * u + 468 * v + 500) / 1000);
+                    b0 = y0 + ((1856 * u + 500) / 1000);
                     
-                    r1 = y1 + ((v * coef_rv + 512) >> 10);
-                    g1 = y1 - ((u * coef_gu + v * coef_gv + 512) >> 10);
-                    b1 = y1 + ((u * coef_bu + 512) >> 10);
+                    r1 = y1 + ((1575 * v + 500) / 1000);
+                    g1 = y1 - ((187 * u + 468 * v + 500) / 1000);
+                    b1 = y1 + ((1856 * u + 500) / 1000);
                 } else {
-                    // Full range conversion
-                    if (useBT709) {
-                        // BT.709 full range
-                        r0 = y0 + ((v * 1575 + 512) >> 10);
-                        g0 = y0 - ((u * 187 + v * 468 + 512) >> 10);
-                        b0 = y0 + ((u * 1856 + 512) >> 10);
-                        
-                        r1 = y1 + ((v * 1575 + 512) >> 10);
-                        g1 = y1 - ((u * 187 + v * 468 + 512) >> 10);
-                        b1 = y1 + ((u * 1856 + 512) >> 10);
-                    } else {
-                        // BT.601 full range
-                        r0 = y0 + ((v * 1402 + 512) >> 10);
-                        g0 = y0 - ((u * 344 + v * 714 + 512) >> 10);
-                        b0 = y0 + ((u * 1772 + 512) >> 10);
-                        
-                        r1 = y1 + ((v * 1402 + 512) >> 10);
-                        g1 = y1 - ((u * 344 + v * 714 + 512) >> 10);
-                        b1 = y1 + ((u * 1772 + 512) >> 10);
-                    }
+                    // BT.601 coefficients
+                    // R = Y + 1.402 * V
+                    // G = Y - 0.344 * U - 0.714 * V
+                    // B = Y + 1.772 * U
+                    r0 = y0 + ((1402 * v + 500) / 1000);
+                    g0 = y0 - ((344 * u + 714 * v + 500) / 1000);
+                    b0 = y0 + ((1772 * u + 500) / 1000);
+                    
+                    r1 = y1 + ((1402 * v + 500) / 1000);
+                    g1 = y1 - ((344 * u + 714 * v + 500) / 1000);
+                    b1 = y1 + ((1772 * u + 500) / 1000);
                 }
                 
                 // Clamp and write BGRA
@@ -151,37 +112,25 @@ public:
             
             for (int x = 0; x < width; x++) {
                 int yVal = yRow[x];
-                int u = uRow[x / 2] - 128;
-                int v = vRow[x / 2] - 128;
+                int u = uRow[x / 2];
+                int v = vRow[x / 2];
                 
-                // Check for full range
-                bool isFullRange = (yVal < 16 || yVal > 235);
+                // Convert from limited range
+                yVal = ((yVal - 16) * 255) / 219;
+                u = ((u - 128) * 255) / 224;
+                v = ((v - 128) * 255) / 224;
+                
+                yVal = std::max(0, std::min(255, yVal));
                 
                 int r, g, b;
-                if (!isFullRange) {
-                    // Limited range
-                    yVal = ((yVal - 16) * 1164 + 512) >> 10;
-                    
-                    if (useBT709) {
-                        r = yVal + ((v * 1793 + 512) >> 10);
-                        g = yVal - ((u * 213 + v * 533 + 512) >> 10);
-                        b = yVal + ((u * 2049 + 512) >> 10);
-                    } else {
-                        r = yVal + ((v * 1596 + 512) >> 10);
-                        g = yVal - ((u * 391 + v * 813 + 512) >> 10);
-                        b = yVal + ((u * 2018 + 512) >> 10);
-                    }
+                if (useBT709) {
+                    r = yVal + ((1575 * v + 500) / 1000);
+                    g = yVal - ((187 * u + 468 * v + 500) / 1000);
+                    b = yVal + ((1856 * u + 500) / 1000);
                 } else {
-                    // Full range
-                    if (useBT709) {
-                        r = yVal + ((v * 1575 + 512) >> 10);
-                        g = yVal - ((u * 187 + v * 468 + 512) >> 10);
-                        b = yVal + ((u * 1856 + 512) >> 10);
-                    } else {
-                        r = yVal + ((v * 1402 + 512) >> 10);
-                        g = yVal - ((u * 344 + v * 714 + 512) >> 10);
-                        b = yVal + ((u * 1772 + 512) >> 10);
-                    }
+                    r = yVal + ((1402 * v + 500) / 1000);
+                    g = yVal - ((344 * u + 714 * v + 500) / 1000);
+                    b = yVal + ((1772 * u + 500) / 1000);
                 }
                 
                 dstRow[x * 4 + 0] = static_cast<uint8_t>(std::max(0, std::min(255, b)));
@@ -214,37 +163,25 @@ public:
             for (int x = 0; x < width; x++) {
                 int yVal = yRow[x];
                 int uvIndex = (x / 2) * 2;
-                int u = uvRow[uvIndex] - 128;
-                int v = uvRow[uvIndex + 1] - 128;
+                int u = uvRow[uvIndex];
+                int v = uvRow[uvIndex + 1];
                 
-                // Check for full range
-                bool isFullRange = (yVal < 16 || yVal > 235);
+                // Convert from limited range
+                yVal = ((yVal - 16) * 255) / 219;
+                u = ((u - 128) * 255) / 224;
+                v = ((v - 128) * 255) / 224;
+                
+                yVal = std::max(0, std::min(255, yVal));
                 
                 int r, g, b;
-                if (!isFullRange) {
-                    // Limited range
-                    yVal = ((yVal - 16) * 1164 + 512) >> 10;
-                    
-                    if (useBT709) {
-                        r = yVal + ((v * 1793 + 512) >> 10);
-                        g = yVal - ((u * 213 + v * 533 + 512) >> 10);
-                        b = yVal + ((u * 2049 + 512) >> 10);
-                    } else {
-                        r = yVal + ((v * 1596 + 512) >> 10);
-                        g = yVal - ((u * 391 + v * 813 + 512) >> 10);
-                        b = yVal + ((u * 2018 + 512) >> 10);
-                    }
+                if (useBT709) {
+                    r = yVal + ((1575 * v + 500) / 1000);
+                    g = yVal - ((187 * u + 468 * v + 500) / 1000);
+                    b = yVal + ((1856 * u + 500) / 1000);
                 } else {
-                    // Full range
-                    if (useBT709) {
-                        r = yVal + ((v * 1575 + 512) >> 10);
-                        g = yVal - ((u * 187 + v * 468 + 512) >> 10);
-                        b = yVal + ((u * 1856 + 512) >> 10);
-                    } else {
-                        r = yVal + ((v * 1402 + 512) >> 10);
-                        g = yVal - ((u * 344 + v * 714 + 512) >> 10);
-                        b = yVal + ((u * 1772 + 512) >> 10);
-                    }
+                    r = yVal + ((1402 * v + 500) / 1000);
+                    g = yVal - ((344 * u + 714 * v + 500) / 1000);
+                    b = yVal + ((1772 * u + 500) / 1000);
                 }
                 
                 dstRow[x * 4 + 0] = static_cast<uint8_t>(std::max(0, std::min(255, b)));
