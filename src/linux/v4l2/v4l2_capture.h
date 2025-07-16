@@ -2,6 +2,8 @@
 #pragma once
 
 #include "../../common/capture_interface.h"
+#include "../../common/frame_queue.h"
+#include "../../common/pipeline_thread_pool.h"
 #include "v4l2_device_enumerator.h"
 #include "v4l2_format_converter.h"
 #include <memory>
@@ -17,12 +19,17 @@ namespace ndi_bridge {
 namespace v4l2 {
 
 /**
- * @brief V4L2 implementation of ICaptureDevice
+ * @brief V4L2 implementation of ICaptureDevice with multi-threaded pipeline
  * 
  * Provides video capture functionality using Linux V4L2 API.
  * Supports USB capture cards and webcams with low latency optimization.
  * 
- * Version: 1.4.0 - Added zero-copy support for YUYV format
+ * Version: 1.5.0 - Added multi-threaded pipeline architecture
+ * 
+ * Pipeline structure:
+ * - Thread 1 (Capture): poll -> dequeue -> push to queue1 -> requeue
+ * - Thread 2 (Convert): pop from queue1 -> convert -> push to queue2  
+ * - Thread 3 (Send): pop from queue2 -> callback to NDI sender
  */
 class V4L2Capture : public ICaptureDevice {
 public:
@@ -39,6 +46,15 @@ public:
     bool hasError() const override;
     std::string getLastError() const override;
     
+    /**
+     * @brief Enable/disable multi-threaded pipeline
+     * @param enable True to enable multi-threading (default: true)
+     * 
+     * When disabled, falls back to single-threaded operation
+     */
+    void setMultiThreadingEnabled(bool enable) { use_multi_threading_ = enable; }
+    bool isMultiThreadingEnabled() const { return use_multi_threading_; }
+    
     // Performance statistics
     struct CaptureStats {
         uint64_t frames_captured = 0;
@@ -49,6 +65,13 @@ public:
         double max_latency_ms = 0.0;
         double min_latency_ms = 1000000.0;
         
+        // Multi-threading specific stats
+        uint64_t queue1_drops = 0;  // Drops between capture and convert
+        uint64_t queue2_drops = 0;  // Drops between convert and send
+        double avg_capture_time_ms = 0.0;
+        double avg_convert_time_ms = 0.0;
+        double avg_send_time_ms = 0.0;
+        
         void reset() {
             frames_captured = 0;
             frames_dropped = 0;
@@ -57,6 +80,11 @@ public:
             total_convert_ms = 0.0;
             max_latency_ms = 0.0;
             min_latency_ms = 1000000.0;
+            queue1_drops = 0;
+            queue2_drops = 0;
+            avg_capture_time_ms = 0.0;
+            avg_convert_time_ms = 0.0;
+            avg_send_time_ms = 0.0;
         }
     };
     
@@ -95,10 +123,15 @@ private:
     // Stop streaming
     void stopStreaming();
     
-    // Capture thread function
-    void captureThread();
+    // Single-threaded capture function (legacy)
+    void captureThreadSingle();
     
-    // Process a captured frame (with pre-allocated buffer)
+    // Multi-threaded pipeline functions
+    void captureThreadMulti();     // Thread 1: Capture
+    void convertThreadMulti();     // Thread 2: Convert
+    void sendThreadMulti();        // Thread 3: Send
+    
+    // Process a captured frame (single-threaded version)
     void processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf, 
                       std::vector<uint8_t>& bgra_buffer);
     
@@ -140,7 +173,21 @@ private:
     // Format converter
     std::unique_ptr<V4L2FormatConverter> format_converter_;
     
-    // Capture thread
+    // Multi-threading support
+    bool use_multi_threading_{true};
+    std::unique_ptr<PipelineThreadPool> thread_pool_;
+    
+    // Frame queues for multi-threaded pipeline
+    std::unique_ptr<FrameQueue> capture_to_convert_queue_;  // Queue 1
+    std::unique_ptr<FrameQueue> convert_to_send_queue_;     // Queue 2
+    std::unique_ptr<BufferIndexQueue> requeue_queue_;       // For buffer recycling
+    
+    // Thread IDs
+    size_t capture_thread_id_{0};
+    size_t convert_thread_id_{0};
+    size_t send_thread_id_{0};
+    
+    // Legacy single-threaded capture
     std::unique_ptr<std::thread> capture_thread_;
     std::atomic<bool> capturing_{false};
     std::atomic<bool> should_stop_{false};
@@ -173,6 +220,10 @@ private:
     
     // Buffer count optimized for Intel N100 (10 buffers for smoother operation)
     static constexpr unsigned int kBufferCount = 10;
+    
+    // Queue depths for multi-threading
+    static constexpr size_t kCaptureQueueDepth = 5;
+    static constexpr size_t kConvertQueueDepth = 5;
 };
 
 } // namespace v4l2
