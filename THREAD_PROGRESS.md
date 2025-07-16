@@ -2,13 +2,13 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Fixed integer overflow warnings in AVX2 code (v1.3.7)
-- [ ] Waiting for: User to rebuild and test v1.3.7 on Ubuntu N100
-- [ ] Blocked by: None - fix is ready for testing
+- [x] Currently working on: Fixed CMakeLists.txt to restore Windows/Linux builds (v1.3.7)
+- [ ] Waiting for: User to test builds on both Windows and Ubuntu N100
+- [ ] Blocked by: None - builds should work now
 
 ## Implementation Status
 - Phase: Linux USB Capture Support - Testing Phase
-- Step: Testing AVX2 overflow fix and black video fix
+- Step: Testing AVX2 overflow fix and CMake fixes
 - Status: TESTING_REQUIRED
 - Version: 1.3.7
 
@@ -20,6 +20,7 @@
 | v4l2_format_converter | ✅ v1.3.6 | ❌ | ❌ | ❌ |
 | v4l2_format_converter_avx2 | ✅ v1.3.7 | ❌ | ❌ | ❌ |
 | main.cpp Linux support | ✅ v1.3.5 | ❌ | ❌ | ❌ |
+| CMakeLists.txt | ✅ v1.3.7 | ❌ | ❌ | ❌ |
 
 ## Test Environment
 - **Hardware**: Intel N100 PC with NZXT Signal HD60 USB capture card
@@ -29,6 +30,13 @@
 - **See**: docs/UBUNTU_N100_TEST_SETUP.md for full setup details
 
 ## Recent Changes
+### Fixed CMakeLists.txt (2025-07-16) - v1.3.7
+1. **Issues Fixed**:
+   - Restored original Windows build configuration
+   - Fixed non-existent src/common/version.cpp reference
+   - Restored proper NDI SDK detection for both platforms
+   - Maintained Linux v4l2 additions
+
 ### Fixed Integer Overflow Warnings (2025-07-16) - v1.3.7
 1. **Root Cause**: 
    - Coefficients scaled by 256 exceeded 16-bit signed range
@@ -40,7 +48,7 @@
 3. **Files Updated**: 
    - `v4l2_format_converter_avx2.cpp` - New scaling approach
    - `v4l2_format_converter_avx2.h` - Updated documentation
-   - `CMakeLists.txt` - Version 1.3.7
+   - `CMakeLists.txt` - Version 1.3.7 and build fixes
    - `src/common/version.h` - Version 1.3.7
 
 ### Fixed Black Video Issue (2025-07-16) - v1.3.6
@@ -51,12 +59,6 @@
 2. **Fix Applied**: 
    - Scaled all YUV-to-RGB coefficients by 256 in AVX2 implementation
    - Now matches the scalar code behavior
-
-### Previous Fixes (2025-07-16) - v1.3.5
-1. **Logger API Updates**: All compilation errors fixed
-2. **Char Overflow Warning**: Fixed in AVX2 code
-3. **Unused Variable Warning**: Fixed in main.cpp
-4. **Signed/Unsigned Comparison**: Fixed in v4l2_capture.cpp
 
 ## Test Results So Far
 ### Version 1.3.5 (Tested)
@@ -73,10 +75,16 @@
 
 ### Version 1.3.7 (Awaiting Test)
 - Fixed integer overflow warnings in AVX2 code
+- Fixed CMakeLists.txt for both Windows and Linux builds
 - Should show actual video content
 
-## Next Steps for New Thread
-1. **Rebuild and Test v1.3.7**:
+## Next Steps
+1. **Test Windows Build**:
+   - Open in Visual Studio
+   - Build should work without NDI SDK errors
+   - If NDI SDK not found, install from https://ndi.video/for-developers/ndi-sdk/
+
+2. **Test Linux Build (Ubuntu N100)**:
    ```bash
    cd ~/ndi-test/ndi-bridge
    git pull
@@ -89,14 +97,15 @@
    sudo ./ndi-bridge --device /dev/video0 --ndi-name "NZXT-v1.3.7"
    ```
 
-2. **Verify Fix**:
+3. **Verify Fixes**:
+   - [ ] Windows build works in Visual Studio
+   - [ ] Linux build completes without errors
    - [ ] Check version shows 1.3.7
    - [ ] Verify no compilation warnings
    - [ ] Verify video shows actual content (not black)
    - [ ] Check CPU usage (<10% for 1080p60)
-   - [ ] Test all formats if possible
 
-3. **If Video Still Black**:
+4. **If Video Still Black**:
    - Try disabling AVX2: `export DISABLE_AVX2=1`
    - Test with lower resolution
    - Check if NV12 format works better than YUYV
@@ -114,6 +123,7 @@
 - Critical fixes: 
   - AVX2 black video issue (v1.3.6)
   - Integer overflow warnings (v1.3.7)
+  - CMakeLists.txt build issues (v1.3.7)
 - All compilation issues resolved
 
 ## Commands for Quick Reference
@@ -139,7 +149,7 @@ v4l2-ctl --device=/dev/video0 --set-fmt-video=width=1920,height=1080,pixelformat
 ```
 
 ## Last User Action
-- Date/Time: 2025-07-16 14:00
-- Action: Reported overflow warnings from GCC compiler
-- Result: Fixed by changing scaling approach in v1.3.7
-- Next Required: Test v1.3.7 build and report results
+- Date/Time: 2025-07-16 14:15
+- Action: Reported broken builds on both Windows and Linux
+- Result: Fixed CMakeLists.txt to restore proper build configuration
+- Next Required: Test builds on both Windows and Ubuntu N100
