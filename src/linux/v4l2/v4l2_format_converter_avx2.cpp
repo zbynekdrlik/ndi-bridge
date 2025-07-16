@@ -216,28 +216,33 @@ bool V4L2FormatConverterAVX2::convertNV12toBGRA_AVX2(const uint8_t* input, int w
         uint8_t* dst_row1 = output + (y + 1) * width * 4;
         
         for (int x = 0; x < aligned_width; x += pixels_per_iteration) {
-            // Load 16 Y values for each row as 128-bit, then convert to 256-bit
+            // Load 16 Y values for each row
             __m128i y0_128 = _mm_loadu_si128((const __m128i*)(y_row0 + x));
             __m128i y1_128 = _mm_loadu_si128((const __m128i*)(y_row1 + x));
             
-            // Convert Y values to 256-bit vectors
-            __m256i y0_vec = _mm256_cvtepu8_epi8(y0_128);
-            __m256i y1_vec = _mm256_cvtepu8_epi8(y1_128);
+            // Convert Y values to 256-bit vectors with zero extension
+            __m256i y0_vec = _mm256_cvtepu8_epi16(y0_128);
+            __m256i y1_vec = _mm256_cvtepu8_epi16(y1_128);
+            
+            // But we need the Y values as 8-bit in a 256-bit register
+            // Load as 256-bit and keep as 8-bit
+            __m256i y0_256 = _mm256_set_m128i(_mm_setzero_si128(), y0_128);
+            __m256i y1_256 = _mm256_set_m128i(_mm_setzero_si128(), y1_128);
             
             // Load 16 bytes of interleaved UV (8 U/V pairs)
             __m128i uv_128 = _mm_loadu_si128((const __m128i*)(uv_row + x));
             
-            // Convert to 256-bit for shuffling
-            __m256i uv_256 = _mm256_cvtepu8_epi8(uv_128);
+            // Duplicate UV data to fill 256-bit register
+            __m256i uv_256 = _mm256_set_m128i(uv_128, uv_128);
             
             // Separate and duplicate U and V values
             __m256i u_vec = _mm256_shuffle_epi8(uv_256, uv_shuf_u);
             __m256i v_vec = _mm256_shuffle_epi8(uv_256, uv_shuf_v);
             
-            // Process both rows
-            processYUV16_AVX2(y0_vec, u_vec, v_vec, dst_row0 + x * 4);
+            // Process both rows with the correct Y vectors
+            processYUV16_AVX2(y0_256, u_vec, v_vec, dst_row0 + x * 4);
             if (y + 1 < height) {
-                processYUV16_AVX2(y1_vec, u_vec, v_vec, dst_row1 + x * 4);
+                processYUV16_AVX2(y1_256, u_vec, v_vec, dst_row1 + x * 4);
             }
         }
         
