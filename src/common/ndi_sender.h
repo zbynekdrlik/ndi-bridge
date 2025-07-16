@@ -6,6 +6,7 @@
 #include <mutex>
 #include <atomic>
 #include <functional>
+#include <vector>
 
 // Forward declare NDI types to avoid including NDI SDK headers here
 struct NDIlib_send_instance_type;
@@ -20,7 +21,7 @@ namespace ndi_bridge {
  * It handles NDI library initialization, sender creation, and frame sending with
  * proper format handling.
  * 
- * Version: 1.0.2
+ * Version: 1.4.0 - Added zero-copy YUYV support with AVX2 optimization
  */
 class NdiSender {
 public:
@@ -79,6 +80,9 @@ public:
      * @brief Send a video frame
      * @param frame Frame information including data and format
      * @return true if frame was sent successfully
+     * 
+     * Note: YUYV format will be automatically converted to UYVY
+     * using optimized AVX2 instructions when available.
      */
     bool sendFrame(const FrameInfo& frame);
 
@@ -142,6 +146,16 @@ private:
      */
     void reportError(const std::string& error);
 
+    /**
+     * @brief Convert YUYV to UYVY format (scalar version)
+     */
+    void convertYUYVtoUYVY_Scalar(const uint8_t* src, uint8_t* dst, int width, int height);
+
+    /**
+     * @brief Convert YUYV to UYVY format (AVX2 optimized version)
+     */
+    void convertYUYVtoUYVY_AVX2(const uint8_t* src, uint8_t* dst, int width, int height);
+
     // Member variables
     std::string sender_name_;
     ErrorCallback error_callback_;
@@ -151,6 +165,11 @@ private:
     
     // NDI handles
     NDIlib_send_instance_t ndi_send_instance_{nullptr};
+    
+    // Optimization support
+    bool has_avx2_{false};
+    bool yuyv_conversion_logged_{false};
+    std::vector<uint8_t> yuyv_to_uyvy_buffer_;
     
     // NDI library management
     static std::mutex lib_mutex_;
