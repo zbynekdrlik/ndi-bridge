@@ -540,7 +540,7 @@ bool V4L2Capture::findBestFormat() {
     // Try to find best format
     for (auto pix_fmt : preferred_formats) {
         // Try 1080p first, then 720p, then 480p
-        const int resolutions[][2] = {{1920, 1080}, {1280, 720}, {640, 480}};
+        const uint32_t resolutions[][2] = {{1920, 1080}, {1280, 720}, {640, 480}};
         
         for (auto res : resolutions) {
             // Find matching format with highest FPS
