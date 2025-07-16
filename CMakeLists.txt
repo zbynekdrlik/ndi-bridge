@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.3.4 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.3.5 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)

@@ -13,7 +13,7 @@ namespace v4l2 {
  * Optimized for Intel N100 processor with AVX2 support.
  * Processes 16 pixels at a time for maximum throughput.
  * 
- * Version: 1.3.3
+ * Version: 1.3.5
  */
 class V4L2FormatConverterAVX2 {
 public:
@@ -143,7 +143,7 @@ inline void V4L2FormatConverterAVX2::processYUV16_AVX2(
     g = _mm256_permutevar8x32_epi32(g, perm_indices);
     b = _mm256_permutevar8x32_epi32(b, perm_indices);
     
-    // Interleave BGRA - Process in two halves to output exactly 64 bytes
+    // Interleave BGRA - Process all 16 pixels (64 bytes total)
     // Extract low and high 128-bit lanes
     __m128i r_lo128 = _mm256_castsi256_si128(r);
     __m128i g_lo128 = _mm256_castsi256_si128(g);
@@ -156,23 +156,38 @@ inline void V4L2FormatConverterAVX2::processYUV16_AVX2(
     __m128i a_hi128 = _mm256_extracti128_si256(a, 1);
     
     // First 8 pixels (32 bytes)
-    __m128i bg_lo = _mm_unpacklo_epi8(b_lo128, g_lo128);
-    __m128i ra_lo = _mm_unpacklo_epi8(r_lo128, a_lo128);
-    __m128i bg_hi = _mm_unpackhi_epi8(b_lo128, g_lo128);
-    __m128i ra_hi = _mm_unpackhi_epi8(r_lo128, a_lo128);
+    __m128i bg_lo_0 = _mm_unpacklo_epi8(b_lo128, g_lo128);
+    __m128i ra_lo_0 = _mm_unpacklo_epi8(r_lo128, a_lo128);
+    __m128i bg_hi_0 = _mm_unpackhi_epi8(b_lo128, g_lo128);
+    __m128i ra_hi_0 = _mm_unpackhi_epi8(r_lo128, a_lo128);
     
-    __m128i bgra_0 = _mm_unpacklo_epi16(bg_lo, ra_lo);
-    __m128i bgra_1 = _mm_unpackhi_epi16(bg_lo, ra_lo);
-    __m128i bgra_2 = _mm_unpacklo_epi16(bg_hi, ra_hi);
-    __m128i bgra_3 = _mm_unpackhi_epi16(bg_hi, ra_hi);
+    __m128i bgra_0 = _mm_unpacklo_epi16(bg_lo_0, ra_lo_0);
+    __m128i bgra_1 = _mm_unpackhi_epi16(bg_lo_0, ra_lo_0);
+    __m128i bgra_2 = _mm_unpacklo_epi16(bg_hi_0, ra_hi_0);
+    __m128i bgra_3 = _mm_unpackhi_epi16(bg_hi_0, ra_hi_0);
     
     _mm_storeu_si128((__m128i*)(output + 0), bgra_0);
     _mm_storeu_si128((__m128i*)(output + 16), bgra_1);
     _mm_storeu_si128((__m128i*)(output + 32), bgra_2);
     _mm_storeu_si128((__m128i*)(output + 48), bgra_3);
     
-    // Second 8 pixels (32 bytes) are not needed - we only process 16 pixels
-    // Total output: 64 bytes for 16 BGRA pixels
+    // Second 8 pixels (32 bytes) - CRITICAL FIX: Process the remaining pixels
+    __m128i bg_lo_1 = _mm_unpacklo_epi8(b_hi128, g_hi128);
+    __m128i ra_lo_1 = _mm_unpacklo_epi8(r_hi128, a_hi128);
+    __m128i bg_hi_1 = _mm_unpackhi_epi8(b_hi128, g_hi128);
+    __m128i ra_hi_1 = _mm_unpackhi_epi8(r_hi128, a_hi128);
+    
+    __m128i bgra_4 = _mm_unpacklo_epi16(bg_lo_1, ra_lo_1);
+    __m128i bgra_5 = _mm_unpackhi_epi16(bg_lo_1, ra_lo_1);
+    __m128i bgra_6 = _mm_unpacklo_epi16(bg_hi_1, ra_hi_1);
+    __m128i bgra_7 = _mm_unpackhi_epi16(bg_hi_1, ra_hi_1);
+    
+    _mm_storeu_si128((__m128i*)(output + 64), bgra_4);
+    _mm_storeu_si128((__m128i*)(output + 80), bgra_5);
+    _mm_storeu_si128((__m128i*)(output + 96), bgra_6);
+    _mm_storeu_si128((__m128i*)(output + 112), bgra_7);
+    
+    // Total output: 128 bytes for 16 BGRA pixels (8 bytes per pixel)
 }
 
 } // namespace v4l2
