@@ -14,11 +14,13 @@
  * 
  * Handles frame queuing, dropping old frames when full,
  * and thread-safe access to queued frames.
+ * 
+ * v1.6.0: Reduced queue size from 3 to 1 for minimal latency
  */
 class DeckLinkFrameQueue {
 public:
-    // Maximum number of frames to queue
-    static constexpr size_t MAX_QUEUE_SIZE = 3;
+    // Maximum number of frames to queue - reduced to 1 for minimal latency (v1.6.0)
+    static constexpr size_t MAX_QUEUE_SIZE = 1;
     
     /**
      * @brief Queued frame data structure
