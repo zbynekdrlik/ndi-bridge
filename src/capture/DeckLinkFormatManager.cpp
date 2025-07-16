@@ -3,6 +3,13 @@
 #include <iostream>
 #include <windows.h>
 
+// Check if newer Decklink SDK color space flags are available
+#ifndef bmdDetectedVideoInputColorspaceRec601
+#define DECKLINK_HAS_COLOR_DETECTION 0
+#else
+#define DECKLINK_HAS_COLOR_DETECTION 1
+#endif
+
 DeckLinkFormatManager::DeckLinkFormatManager()
     : m_firstFormatDetection(true) {
 }
@@ -77,7 +84,8 @@ std::vector<std::string> DeckLinkFormatManager::GetSupportedFormats(IDeckLinkInp
 DetectedColorInfo DeckLinkFormatManager::DetectColorInfo(BMDDetectedVideoInputFormatFlags flags, int height) {
     DetectedColorInfo info;
     
-    // Detect color space from flags
+#if DECKLINK_HAS_COLOR_DETECTION
+    // Detect color space from flags if available in SDK
     if (flags & bmdDetectedVideoInputColorspaceRec601) {
         info.colorSpace = DetectedColorInfo::ColorSpace_Rec601;
         std::cout << "[DeckLink] Detected color space: Rec.601 (SD)" << std::endl;
@@ -104,6 +112,20 @@ DetectedColorInfo DeckLinkFormatManager::DetectColorInfo(BMDDetectedVideoInputFo
         info.colorRange = DetectedColorInfo::ColorRange_Limited;
         std::cout << "[DeckLink] Detected color range: Limited/SMPTE (16-235)" << std::endl;
     }
+#else
+    // Fallback for older SDK - use resolution-based detection
+    if (height >= 720) {
+        info.colorSpace = DetectedColorInfo::ColorSpace_Rec709;
+        std::cout << "[DeckLink] Using Rec.709 for HD content (SDK color detection not available)" << std::endl;
+    } else {
+        info.colorSpace = DetectedColorInfo::ColorSpace_Rec601;
+        std::cout << "[DeckLink] Using Rec.601 for SD content (SDK color detection not available)" << std::endl;
+    }
+    
+    // Default to limited range for broadcast content
+    info.colorRange = DetectedColorInfo::ColorRange_Limited;
+    std::cout << "[DeckLink] Using Limited/SMPTE range (16-235) - standard for broadcast" << std::endl;
+#endif
     
     return info;
 }
