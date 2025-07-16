@@ -13,7 +13,7 @@ namespace v4l2 {
  * Optimized for Intel N100 processor with AVX2 support.
  * Processes 16 pixels at a time for maximum throughput.
  * 
- * Version: 1.3.6 - Fixed black video issue
+ * Version: 1.3.7 - Fixed integer overflow warnings
  */
 class V4L2FormatConverterAVX2 {
 public:
@@ -34,15 +34,15 @@ public:
     
 private:
     // AVX2 constants for YUV to RGB conversion (ITU-R BT.601)
-    // FIXED: Scaled by 256 for use with mulhi_epi16
+    // FIXED v1.3.7: Scaled by 32 to avoid overflow, use mullo + shift
     static const __m256i Y_OFFSET;      // 16
     static const __m256i UV_OFFSET;     // 128
-    static const __m256i Y_COEFF;       // 298 * 256
-    static const __m256i U_BLUE_COEFF;  // 516 * 256
-    static const __m256i U_GREEN_COEFF; // -100 * 256
-    static const __m256i V_RED_COEFF;   // 409 * 256
-    static const __m256i V_GREEN_COEFF; // -208 * 256
-    static const __m256i ROUND_OFFSET;  // 128 * 256
+    static const __m256i Y_COEFF;       // 298 * 32
+    static const __m256i U_BLUE_COEFF;  // 516 * 32
+    static const __m256i U_GREEN_COEFF; // -100 * 32
+    static const __m256i V_RED_COEFF;   // 409 * 32
+    static const __m256i V_GREEN_COEFF; // -208 * 32
+    static const __m256i ROUND_OFFSET;  // 128 << 3
     static const __m256i ALPHA_VALUE;   // 255
     
     // Helper to process 16 YUV pixels to BGRA using AVX2
@@ -86,51 +86,51 @@ inline void V4L2FormatConverterAVX2::processYUV16_AVX2(
     v_hi = _mm256_sub_epi16(v_hi, UV_OFFSET);
     
     // Calculate RGB components (low 8 pixels)
-    // FIXED: Now using properly scaled coefficients
+    // FIXED v1.3.7: Use mullo and shift right by 11 (8 + 3)
     __m256i r_lo = _mm256_add_epi16(
-        _mm256_mulhi_epi16(y_lo, Y_COEFF),
-        _mm256_mulhi_epi16(v_lo, V_RED_COEFF)
+        _mm256_srai_epi16(_mm256_mullo_epi16(y_lo, Y_COEFF), 3),
+        _mm256_srai_epi16(_mm256_mullo_epi16(v_lo, V_RED_COEFF), 3)
     );
     
     __m256i g_lo = _mm256_add_epi16(
-        _mm256_mulhi_epi16(y_lo, Y_COEFF),
+        _mm256_srai_epi16(_mm256_mullo_epi16(y_lo, Y_COEFF), 3),
         _mm256_add_epi16(
-            _mm256_mulhi_epi16(u_lo, U_GREEN_COEFF),
-            _mm256_mulhi_epi16(v_lo, V_GREEN_COEFF)
+            _mm256_srai_epi16(_mm256_mullo_epi16(u_lo, U_GREEN_COEFF), 3),
+            _mm256_srai_epi16(_mm256_mullo_epi16(v_lo, V_GREEN_COEFF), 3)
         )
     );
     
     __m256i b_lo = _mm256_add_epi16(
-        _mm256_mulhi_epi16(y_lo, Y_COEFF),
-        _mm256_mulhi_epi16(u_lo, U_BLUE_COEFF)
+        _mm256_srai_epi16(_mm256_mullo_epi16(y_lo, Y_COEFF), 3),
+        _mm256_srai_epi16(_mm256_mullo_epi16(u_lo, U_BLUE_COEFF), 3)
     );
     
     // Calculate RGB components (high 8 pixels)
     __m256i r_hi = _mm256_add_epi16(
-        _mm256_mulhi_epi16(y_hi, Y_COEFF),
-        _mm256_mulhi_epi16(v_hi, V_RED_COEFF)
+        _mm256_srai_epi16(_mm256_mullo_epi16(y_hi, Y_COEFF), 3),
+        _mm256_srai_epi16(_mm256_mullo_epi16(v_hi, V_RED_COEFF), 3)
     );
     
     __m256i g_hi = _mm256_add_epi16(
-        _mm256_mulhi_epi16(y_hi, Y_COEFF),
+        _mm256_srai_epi16(_mm256_mullo_epi16(y_hi, Y_COEFF), 3),
         _mm256_add_epi16(
-            _mm256_mulhi_epi16(u_hi, U_GREEN_COEFF),
-            _mm256_mulhi_epi16(v_hi, V_GREEN_COEFF)
+            _mm256_srai_epi16(_mm256_mullo_epi16(u_hi, U_GREEN_COEFF), 3),
+            _mm256_srai_epi16(_mm256_mullo_epi16(v_hi, V_GREEN_COEFF), 3)
         )
     );
     
     __m256i b_hi = _mm256_add_epi16(
-        _mm256_mulhi_epi16(y_hi, Y_COEFF),
-        _mm256_mulhi_epi16(u_hi, U_BLUE_COEFF)
+        _mm256_srai_epi16(_mm256_mullo_epi16(y_hi, Y_COEFF), 3),
+        _mm256_srai_epi16(_mm256_mullo_epi16(u_hi, U_BLUE_COEFF), 3)
     );
     
-    // Add rounding offset (also scaled)
-    r_lo = _mm256_add_epi16(r_lo, ROUND_OFFSET);
-    g_lo = _mm256_add_epi16(g_lo, ROUND_OFFSET);
-    b_lo = _mm256_add_epi16(b_lo, ROUND_OFFSET);
-    r_hi = _mm256_add_epi16(r_hi, ROUND_OFFSET);
-    g_hi = _mm256_add_epi16(g_hi, ROUND_OFFSET);
-    b_hi = _mm256_add_epi16(b_hi, ROUND_OFFSET);
+    // Add rounding offset and shift by 8 to complete the conversion
+    r_lo = _mm256_srai_epi16(_mm256_add_epi16(r_lo, ROUND_OFFSET), 8);
+    g_lo = _mm256_srai_epi16(_mm256_add_epi16(g_lo, ROUND_OFFSET), 8);
+    b_lo = _mm256_srai_epi16(_mm256_add_epi16(b_lo, ROUND_OFFSET), 8);
+    r_hi = _mm256_srai_epi16(_mm256_add_epi16(r_hi, ROUND_OFFSET), 8);
+    g_hi = _mm256_srai_epi16(_mm256_add_epi16(g_hi, ROUND_OFFSET), 8);
+    b_hi = _mm256_srai_epi16(_mm256_add_epi16(b_hi, ROUND_OFFSET), 8);
     
     // Pack to 8-bit with saturation
     __m256i r = _mm256_packus_epi16(r_lo, r_hi);
