@@ -13,6 +13,7 @@ constexpr auto ERROR_COOLDOWN_PERIOD = std::chrono::seconds(1);
 // FourCC codes for pixel formats
 constexpr uint32_t FOURCC_UYVY = 0x59565955;  // 'UYVY'
 constexpr uint32_t FOURCC_YUY2 = 0x32595559;  // 'YUY2'
+constexpr uint32_t FOURCC_YUYV = 0x56595559;  // 'YUYV' - same as YUY2
 constexpr uint32_t FOURCC_NV12 = 0x3231564E;  // 'NV12'
 constexpr uint32_t FOURCC_BGRA = 0x41524742;  // 'BGRA'
 constexpr uint32_t FOURCC_BGRX = 0x58524742;  // 'BGRX'
@@ -422,7 +423,7 @@ uint32_t AppController::getFourCC(const ICaptureDevice::VideoFormat& format) con
     if (format.pixel_format == "UYVY" || format.pixel_format == "UYVY") {
         return FOURCC_UYVY;
     } else if (format.pixel_format == "YUY2" || format.pixel_format == "YUYV") {
-        return FOURCC_YUY2;
+        return FOURCC_YUYV;  // YUYV will be converted to UYVY in NDI sender
     } else if (format.pixel_format == "NV12") {
         return FOURCC_NV12;
     } else if (format.pixel_format == "BGRA") {
