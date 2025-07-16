@@ -1,25 +1,115 @@
-cmake_minimum_required(VERSION 3.15)
-project(ndi-bridge VERSION 1.3.7)
+cmake_minimum_required(VERSION 3.16)
+project(ndi-bridge VERSION 1.3.7 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Compiler settings
+# Options
+option(BUILD_TESTS "Build unit tests" OFF)
+option(USE_DECKLINK "Build with DeckLink support" ON)
+option(VERBOSE_BUILD "Enable verbose build output" OFF)
+
+# Platform detection
+if(WIN32)
+    set(PLATFORM_WINDOWS TRUE)
+    add_definitions(-DPLATFORM_WINDOWS)
+    add_definitions(-D_WIN32_WINNT=0x0601)  # Windows 7 minimum
+elseif(UNIX AND NOT APPLE)
+    set(PLATFORM_LINUX TRUE)
+    add_definitions(-DPLATFORM_LINUX)
+else()
+    message(FATAL_ERROR "Unsupported platform")
+endif()
+
+# Set build type if not specified
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Platform detection
-if(WIN32)
-    add_definitions(-DPLATFORM_WINDOWS)
-    set(PLATFORM_NAME "Windows")
-elseif(UNIX AND NOT APPLE)
-    add_definitions(-DPLATFORM_LINUX)
-    set(PLATFORM_NAME "Linux")
+# Include directories
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+# Common source files
+set(COMMON_SOURCES
+    src/common/version.h
+    src/common/capture_interface.h
+    src/common/ndi_sender.h
+    src/common/ndi_sender.cpp
+    src/common/app_controller.h
+    src/common/app_controller.cpp
+    src/common/logger.h
+    src/common/logger.cpp
+    src/capture/ICaptureDevice.h
+    src/capture/IFormatConverter.h
+    src/capture/FormatConverterFactory.h
+    src/capture/BasicFormatConverter.cpp
+)
+
+# Platform-specific sources
+if(PLATFORM_WINDOWS)
+    set(PLATFORM_SOURCES
+        src/windows/media_foundation/mf_error_handling.h
+        src/windows/media_foundation/mf_error_handling.cpp
+        src/windows/media_foundation/mf_format_converter.h
+        src/windows/media_foundation/mf_format_converter.cpp
+        src/windows/media_foundation/mf_capture_device.h
+        src/windows/media_foundation/mf_capture_device.cpp
+        src/windows/media_foundation/mf_video_capture.h
+        src/windows/media_foundation/mf_video_capture.cpp
+        src/windows/media_foundation/media_foundation_capture.h
+        src/windows/media_foundation/media_foundation_capture.cpp
+    )
     
-    # Add compile options for Linux
+    # DeckLink sources (Windows)
+    if(USE_DECKLINK)
+        list(APPEND PLATFORM_SOURCES
+            # DeckLink main classes
+            src/capture/DeckLinkCaptureDevice.h
+            src/capture/DeckLinkCaptureDevice.cpp
+            src/capture/DeckLinkDeviceEnumerator.h
+            src/capture/DeckLinkDeviceEnumerator.cpp
+            # Refactored components (v1.2.0)
+            include/capture/DeckLinkCaptureCallback.h
+            src/capture/DeckLinkCaptureCallback.cpp
+            include/capture/DeckLinkFrameQueue.h
+            src/capture/DeckLinkFrameQueue.cpp
+            include/capture/DeckLinkStatistics.h
+            src/capture/DeckLinkStatistics.cpp
+            include/capture/DeckLinkFormatManager.h
+            src/capture/DeckLinkFormatManager.cpp
+            include/capture/DeckLinkDeviceInitializer.h
+            src/capture/DeckLinkDeviceInitializer.cpp
+            # Adapter
+            src/windows/decklink/decklink_capture.h
+            src/windows/decklink/decklink_capture.cpp
+        )
+    endif()
+    
+    # Windows compiler flags
+    add_compile_options(/W4)  # Warning level 4
+    if(MSVC)
+        add_compile_options(/MP)  # Multi-processor compilation
+        add_compile_options(/permissive-)  # Standards conformance
+        
+        # Disable specific warnings
+        add_compile_options(/wd4100)  # Unreferenced formal parameter
+        add_compile_options(/wd4189)  # Local variable initialized but not referenced
+    endif()
+elseif(PLATFORM_LINUX)
+    set(PLATFORM_SOURCES
+        src/linux/v4l2/v4l2_capture.cpp
+        src/linux/v4l2/v4l2_device_enumerator.cpp
+        src/linux/v4l2/v4l2_format_converter.cpp
+        src/linux/v4l2/v4l2_format_converter_avx2.cpp
+    )
+    
+    # Linux compiler flags
     add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wno-unused-parameter)
     
     # Enable position independent code
     set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -27,67 +117,136 @@ elseif(UNIX AND NOT APPLE)
     # Add threading support
     set(THREADS_PREFER_PTHREAD_FLAG ON)
     find_package(Threads REQUIRED)
-else()
-    message(FATAL_ERROR "Unsupported platform")
 endif()
 
-# Output directories
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+# Find NDI SDK
+if(WIN32)
+    # Try multiple possible NDI SDK locations on Windows
+    # Note: NDI 6 SDK uses capitalized directory names (Include, Lib, Bin)
+    find_path(NDI_INCLUDE_DIR
+        NAMES Processing.NDI.Lib.h
+        PATHS
+            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/include
+            $ENV{NDI_SDK_DIR}/Include
+            "C:/Program Files/NDI/NDI 5 SDK/include"
+            "C:/Program Files/NDI/NDI 6 SDK/Include"
+            "C:/Program Files/NewTek/NDI SDK/include"
+    )
 
-# NDI SDK
-if(NOT DEFINED ENV{NDI_SDK_DIR})
-    if(WIN32)
-        set(NDI_SDK_DIR "C:/Program Files/NDI/NDI 5 SDK")
+    find_library(NDI_LIBRARY
+        NAMES Processing.NDI.Lib.x64
+        PATHS
+            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/lib/x64
+            $ENV{NDI_SDK_DIR}/Lib/x64
+            "C:/Program Files/NDI/NDI 5 SDK/lib/x64"
+            "C:/Program Files/NDI/NDI 6 SDK/Lib/x64"
+            "C:/Program Files/NewTek/NDI SDK/lib/x64"
+    )
+    
+    # Find the DLL path - NDI 6 SDK stores DLLs in Bin directory
+    find_file(NDI_DLL
+        NAMES Processing.NDI.Lib.x64.dll
+        PATHS
+            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/bin/x64
+            $ENV{NDI_SDK_DIR}/Bin/x64
+            "C:/Program Files/NDI/NDI 5 SDK/Bin/x64"
+            "C:/Program Files/NDI/NDI 6 SDK/Bin/x64"
+            "C:/Program Files/NewTek/NDI SDK/bin/x64"
+    )
+else()
+    # Linux NDI SDK paths
+    # First check if NDI_SDK_DIR environment variable is set
+    if(DEFINED ENV{NDI_SDK_DIR})
+        set(NDI_SEARCH_PATHS
+            "$ENV{NDI_SDK_DIR}/include"
+            "$ENV{NDI_SDK_DIR}"
+        )
+        set(NDI_LIB_SEARCH_PATHS
+            "$ENV{NDI_SDK_DIR}/lib/x86_64-linux-gnu"
+            "$ENV{NDI_SDK_DIR}/lib"
+        )
     else()
-        # Try common Linux locations
-        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/NDI SDK for Linux")
-            set(NDI_SDK_DIR "${CMAKE_CURRENT_SOURCE_DIR}/NDI SDK for Linux")
-        elseif(EXISTS "/usr/local/ndi")
-            set(NDI_SDK_DIR "/usr/local/ndi")
-        else()
-            message(FATAL_ERROR "NDI SDK not found. Please set NDI_SDK_DIR environment variable")
-        endif()
+        set(NDI_SEARCH_PATHS
+            "${CMAKE_CURRENT_SOURCE_DIR}/NDI SDK for Linux/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/NDI SDK for Linux"
+            "/usr/local/ndi/include"
+            "/usr/local/ndi"
+            "/usr/include"
+        )
+        set(NDI_LIB_SEARCH_PATHS
+            "${CMAKE_CURRENT_SOURCE_DIR}/NDI SDK for Linux/lib/x86_64-linux-gnu"
+            "/usr/local/ndi/lib/x86_64-linux-gnu"
+            "/usr/local/lib"
+            "/usr/lib"
+        )
     endif()
-else()
-    set(NDI_SDK_DIR "$ENV{NDI_SDK_DIR}")
+    
+    find_path(NDI_INCLUDE_DIR
+        NAMES Processing.NDI.Lib.h
+        PATHS ${NDI_SEARCH_PATHS}
+    )
+
+    find_library(NDI_LIBRARY
+        NAMES ndi
+        PATHS ${NDI_LIB_SEARCH_PATHS}
+    )
 endif()
 
-message(STATUS "NDI SDK Directory: ${NDI_SDK_DIR}")
-
-# Verify NDI SDK exists
-if(NOT EXISTS "${NDI_SDK_DIR}")
-    message(FATAL_ERROR "NDI SDK directory does not exist: ${NDI_SDK_DIR}")
+if(NOT NDI_INCLUDE_DIR)
+    message(FATAL_ERROR "NDI SDK include directory not found. Please install NDI SDK or set NDI_SDK_DIR environment variable.")
 endif()
 
-# Source files
-set(COMMON_SOURCES
+if(NOT NDI_LIBRARY)
+    message(FATAL_ERROR "NDI SDK library not found. Please install NDI SDK or set NDI_SDK_DIR environment variable.")
+endif()
+
+if(WIN32 AND NOT NDI_DLL)
+    message(FATAL_ERROR "NDI SDK DLL not found. Please install NDI SDK or set NDI_SDK_DIR environment variable.")
+endif()
+
+message(STATUS "NDI SDK found:")
+message(STATUS "  Include: ${NDI_INCLUDE_DIR}")
+message(STATUS "  Library: ${NDI_LIBRARY}")
+if(WIN32)
+    message(STATUS "  DLL: ${NDI_DLL}")
+endif()
+
+# Add NDI include directory
+include_directories(${NDI_INCLUDE_DIR})
+
+# Find DeckLink SDK (optional)
+if(USE_DECKLINK AND WIN32)
+    find_path(DECKLINK_INCLUDE_DIR
+        NAMES DeckLinkAPI.h DeckLinkAPI_h.h
+        PATHS
+            ${CMAKE_CURRENT_SOURCE_DIR}/deps/decklink/include
+            $ENV{DECKLINK_SDK_DIR}/include
+            "C:/Program Files/Blackmagic Design/DeckLink SDK/Win/include"
+            ${CMAKE_CURRENT_SOURCE_DIR}/docs/reference  # For DeckLinkAPI_h.h and DeckLinkAPI_i.c
+    )
+    
+    if(DECKLINK_INCLUDE_DIR)
+        message(STATUS "DeckLink SDK found: ${DECKLINK_INCLUDE_DIR}")
+        include_directories(${DECKLINK_INCLUDE_DIR})
+        add_definitions(-DHAS_DECKLINK)
+    else()
+        message(WARNING "DeckLink SDK not found. DeckLink support will be disabled.")
+        message(WARNING "To enable DeckLink support, copy DeckLinkAPI_h.h and DeckLinkAPI_i.c to docs/reference/")
+        set(USE_DECKLINK OFF)
+    endif()
+endif()
+
+# Main executable
+add_executable(${PROJECT_NAME}
     src/main.cpp
-    src/common/logger.cpp
-    src/common/version.cpp
-    src/ndi/ndi_sender.cpp
-    src/ndi/ndi_receiver.cpp
+    ${COMMON_SOURCES}
+    ${PLATFORM_SOURCES}
 )
 
-# Platform-specific sources
-if(WIN32)
-    list(APPEND PLATFORM_SOURCES
-        src/windows/capture/media_foundation_capture.cpp
-        src/windows/capture/decklink_capture.cpp
-        src/windows/capture/decklink_discovery.cpp
-    )
-elseif(UNIX AND NOT APPLE)
-    list(APPEND PLATFORM_SOURCES
-        src/linux/v4l2/v4l2_capture.cpp
-        src/linux/v4l2/v4l2_device_enumerator.cpp
-        src/linux/v4l2/v4l2_format_converter.cpp
-        src/linux/v4l2/v4l2_format_converter_avx2.cpp
-    )
-endif()
-
-# Create executable
-add_executable(${PROJECT_NAME} ${COMMON_SOURCES} ${PLATFORM_SOURCES})
+# Set executable properties
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
 
 # Set version definitions
 target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -97,44 +256,33 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     NDI_BRIDGE_VERSION_STRING="${PROJECT_VERSION}"
 )
 
-# Include directories
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    "${NDI_SDK_DIR}/include"
-)
+# Link libraries
+target_link_libraries(${PROJECT_NAME} PRIVATE ${NDI_LIBRARY})
 
-# Link directories and libraries
-if(WIN32)
-    # Windows x64
-    target_link_directories(${PROJECT_NAME} PRIVATE
-        "${NDI_SDK_DIR}/lib/x64"
-    )
-    
+if(PLATFORM_WINDOWS)
+    # Windows Media Foundation and system libraries
     target_link_libraries(${PROJECT_NAME} PRIVATE
-        Processing.NDI.Lib.x64
         mfplat
-        mf
         mfreadwrite
         mfuuid
+        mf
         ole32
-        strmiids
+        shlwapi
+        winmm
+        ws2_32
     )
     
     # Copy NDI runtime DLL to output directory
-    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${NDI_SDK_DIR}/bin/x64/Processing.NDI.Lib.x64.dll"
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>
-    )
-elseif(UNIX AND NOT APPLE)
-    # Linux
-    target_link_directories(${PROJECT_NAME} PRIVATE
-        "${NDI_SDK_DIR}/lib/x86_64-linux-gnu"
-    )
-    
+    if(NDI_DLL)
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${NDI_DLL}"
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>
+        )
+    endif()
+elseif(PLATFORM_LINUX)
+    # Linux system libraries
     target_link_libraries(${PROJECT_NAME} PRIVATE
-        ndi
         Threads::Threads
         dl
         m
@@ -142,10 +290,13 @@ elseif(UNIX AND NOT APPLE)
     
     # V4L2 doesn't require additional libraries
     # RPATH for finding NDI library
-    set_target_properties(${PROJECT_NAME} PROPERTIES
-        INSTALL_RPATH "${NDI_SDK_DIR}/lib/x86_64-linux-gnu"
-        BUILD_WITH_INSTALL_RPATH TRUE
-    )
+    if(NDI_LIBRARY)
+        get_filename_component(NDI_LIB_DIR ${NDI_LIBRARY} DIRECTORY)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+            INSTALL_RPATH "${NDI_LIB_DIR}"
+            BUILD_WITH_INSTALL_RPATH TRUE
+        )
+    endif()
     
     # AVX2 support for optimized format conversion
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -159,16 +310,31 @@ endif()
 # Installation rules
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
 )
+
+# Install NDI runtime on Windows
+if(PLATFORM_WINDOWS AND NDI_DLL)
+    install(FILES "${NDI_DLL}"
+        DESTINATION bin
+    )
+endif()
+
+# Tests
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # Print configuration summary
 message(STATUS "")
-message(STATUS "Configuration Summary:")
-message(STATUS "  Platform: ${PLATFORM_NAME}")
-message(STATUS "  Build Type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
-message(STATUS "  NDI SDK: ${NDI_SDK_DIR}")
+message(STATUS "NDI Bridge Configuration:")
 message(STATUS "  Version: ${PROJECT_VERSION}")
+message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
+message(STATUS "  Build tests: ${BUILD_TESTS}")
+message(STATUS "  DeckLink support: ${USE_DECKLINK}")
+if(PLATFORM_WINDOWS)
+    message(STATUS "  MSVC Version: ${MSVC_VERSION}")
+endif()
 message(STATUS "")
