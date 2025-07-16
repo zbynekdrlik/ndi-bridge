@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <cstring>
 #include <immintrin.h>
-#include "../capture_interface.h"
+#include "capture_interface.h"
 
 namespace ndi_bridge {
 
