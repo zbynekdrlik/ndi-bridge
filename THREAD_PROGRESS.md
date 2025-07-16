@@ -2,13 +2,13 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: v1.6.1 - TRUE zero-copy for UYVY implemented
+- [x] Currently working on: v1.6.1 compilation fixes complete
 - [ ] Waiting for: User to test TRUE zero-copy performance
 - [ ] Blocked by: None
 
 ## Implementation Status
 - Phase: Latency Optimization - DeckLink TRUE Zero-Copy
-- Step: v1.6.1 implemented
+- Step: v1.6.1 implemented and fixed
 - Status: IMPLEMENTED_NOT_TESTED
 - Version: 1.6.1 (TRUE zero-copy for UYVY)
 
@@ -28,6 +28,7 @@
 - ✅ Eliminated unnecessary UYVY→BGRA conversion
 - ✅ Removed low-latency mode flag - always optimized
 - ✅ Created DESIGN_PHILOSOPHY.md documenting low-latency focus
+- ✅ Fixed COM interface usage (GetBytes on IDeckLinkVideoBuffer)
 
 ## Recent Fixes Applied
 1. **v1.6.0 Compilation Fix**:
@@ -38,6 +39,10 @@
    - ProcessFrameZeroCopy now sends UYVY directly to NDI
    - No format conversion for DeckLink's native UYVY output
    - Should achieve same performance as Linux V4L2
+
+3. **v1.6.1 COM Interface Fix**:
+   - Fixed GetBytes() calls to use IDeckLinkVideoBuffer interface
+   - Both callback and legacy paths now use proper COM pattern
 
 ## Performance Comparison
 ### v1.6.0 (Previous Test):
@@ -54,11 +59,11 @@
 ## Version History
 - v1.5.4: Color space fix
 - v1.6.0: Queue bypass + direct callbacks (tested, working)
-- v1.6.1: TRUE zero-copy for UYVY (implemented, needs testing)
+- v1.6.1: TRUE zero-copy for UYVY (implemented, compilation fixed)
 - v1.7.0: (PLANNED) AVX2 optimization for non-UYVY formats
 
 ## User Action Required
-1. **Build v1.6.1** with the new changes
+1. **Build v1.6.1** with the fixed code
 2. **Run with DeckLink device** 
 3. **Check startup logs** for:
    - "Version 1.6.1 loaded"
@@ -73,7 +78,7 @@
 ## Branch State
 - Branch: `feature/decklink-latency-optimization`
 - Version: 1.6.1 (IMPLEMENTED)
-- Commits: 11
+- Commits: 14
 - Testing: NOT STARTED for v1.6.1
 - Status: IMPLEMENTED_NOT_TESTED
 - PR: #11 OPEN
@@ -81,9 +86,10 @@
 ## Next Steps
 1. ✅ v1.6.0 tested and working
 2. ✅ v1.6.1 TRUE zero-copy implemented
-3. ⏳ User testing of v1.6.1 required
-4. ⏳ Latency measurements needed
-5. ⏳ PR #11 merge after v1.6.1 testing
+3. ✅ v1.6.1 compilation fixes applied
+4. ⏳ User testing of v1.6.1 required
+5. ⏳ Latency measurements needed
+6. ⏳ PR #11 merge after v1.6.1 testing
 
 ## Design Philosophy Documented
 Created `docs/DESIGN_PHILOSOPHY.md` to ensure future development maintains focus on:
