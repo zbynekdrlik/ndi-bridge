@@ -12,16 +12,16 @@ namespace ndi_bridge {
 namespace v4l2 {
 
 V4L2FormatConverter::V4L2FormatConverter() 
-    : use_avx2_(false) {
+    : use_avx2_(false), avx2_logged_(false) {
 #ifdef __AVX2__
     use_avx2_ = V4L2FormatConverterAVX2::isAVX2Available();
     if (use_avx2_) {
-        Logger::log("V4L2FormatConverter: Created with AVX2 optimization for Intel N100");
+        Logger::log("V4L2FormatConverter: AVX2 optimization AVAILABLE for Intel N100");
     } else {
-        Logger::log("V4L2FormatConverter: Created (AVX2 not available)");
+        Logger::log("V4L2FormatConverter: AVX2 not available at runtime - using scalar code");
     }
 #else
-    Logger::log("V4L2FormatConverter: Created (no AVX2 support compiled)");
+    Logger::log("V4L2FormatConverter: AVX2 support not compiled in - using scalar code");
 #endif
 }
 
@@ -48,6 +48,10 @@ bool V4L2FormatConverter::convertToBGRA(const void* input, size_t input_size,
         case V4L2_PIX_FMT_YUYV:
 #ifdef __AVX2__
             if (use_avx2_) {
+                if (!avx2_logged_) {
+                    Logger::log("V4L2FormatConverter: Using AVX2 accelerated YUYV->BGRA conversion");
+                    avx2_logged_ = true;
+                }
                 result = V4L2FormatConverterAVX2::convertYUYVtoBGRA_AVX2(input_data, width, height, output_data);
             } else
 #endif
@@ -59,6 +63,10 @@ bool V4L2FormatConverter::convertToBGRA(const void* input, size_t input_size,
         case V4L2_PIX_FMT_UYVY:
 #ifdef __AVX2__
             if (use_avx2_) {
+                if (!avx2_logged_) {
+                    Logger::log("V4L2FormatConverter: Using AVX2 accelerated UYVY->BGRA conversion");
+                    avx2_logged_ = true;
+                }
                 result = V4L2FormatConverterAVX2::convertUYVYtoBGRA_AVX2(input_data, width, height, output_data);
             } else
 #endif
@@ -70,6 +78,10 @@ bool V4L2FormatConverter::convertToBGRA(const void* input, size_t input_size,
         case V4L2_PIX_FMT_NV12:
 #ifdef __AVX2__
             if (use_avx2_) {
+                if (!avx2_logged_) {
+                    Logger::log("V4L2FormatConverter: Using AVX2 accelerated NV12->BGRA conversion");
+                    avx2_logged_ = true;
+                }
                 result = V4L2FormatConverterAVX2::convertNV12toBGRA_AVX2(input_data, width, height, output_data);
             } else
 #endif
