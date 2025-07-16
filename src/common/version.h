@@ -2,26 +2,28 @@
 
 #define NDI_BRIDGE_VERSION_MAJOR 1
 #define NDI_BRIDGE_VERSION_MINOR 3
-#define NDI_BRIDGE_VERSION_PATCH 0
+#define NDI_BRIDGE_VERSION_PATCH 1
 
-#define NDI_BRIDGE_VERSION_STRING "1.3.0"
+#define NDI_BRIDGE_VERSION_STRING "1.3.1"
 #define NDI_BRIDGE_VERSION NDI_BRIDGE_VERSION_STRING
 
 // Build info
-#ifdef _DEBUG
-#define NDI_BRIDGE_BUILD_TYPE "Debug"
-#else
-#define NDI_BRIDGE_BUILD_TYPE "Release"
-#endif
-
-#ifdef _WIN64
-#define NDI_BRIDGE_PLATFORM "Windows x64"
-#elif defined(_WIN32)
-#define NDI_BRIDGE_PLATFORM "Windows x86"
-#elif defined(__linux__)
+#ifdef _WIN32
+#define NDI_BRIDGE_PLATFORM "Windows"
+#elif __linux__
 #define NDI_BRIDGE_PLATFORM "Linux"
 #else
 #define NDI_BRIDGE_PLATFORM "Unknown"
+#endif
+
+#ifdef _MSC_VER
+#define NDI_BRIDGE_COMPILER "MSVC"
+#elif defined(__GNUC__)
+#define NDI_BRIDGE_COMPILER "GCC"
+#elif defined(__clang__)
+#define NDI_BRIDGE_COMPILER "Clang"
+#else
+#define NDI_BRIDGE_COMPILER "Unknown"
 #endif
 
 // Feature flags

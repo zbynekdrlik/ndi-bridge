@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.3.0 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.3.1 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(BUILD_TESTS "Build unit tests" OFF)
 option(USE_DECKLINK "Build with DeckLink support" ON)
 option(VERBOSE_BUILD "Enable verbose build output" OFF)
+option(ENABLE_AVX2 "Enable AVX2 optimizations for Intel N100" ON)
 
 # Platform detection
 if(WIN32)
@@ -25,6 +26,29 @@ endif()
 # Set build type if not specified
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
+endif()
+
+# Linux-specific checks
+if(PLATFORM_LINUX)
+    # Check for V4L2 headers
+    include(CheckIncludeFile)
+    check_include_file("linux/videodev2.h" HAVE_V4L2_H)
+    if(NOT HAVE_V4L2_H)
+        message(FATAL_ERROR "V4L2 headers not found. Please install kernel headers.")
+    endif()
+    
+    # Check CPU features for AVX2
+    if(ENABLE_AVX2)
+        include(CheckCXXCompilerFlag)
+        check_cxx_compiler_flag("-mavx2" COMPILER_SUPPORTS_AVX2)
+        if(COMPILER_SUPPORTS_AVX2)
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mavx2")
+            add_definitions(-D__AVX2__)
+            message(STATUS "AVX2 optimizations enabled for Intel N100")
+        else()
+            message(STATUS "AVX2 not supported by compiler")
+        endif()
+    endif()
 endif()
 
 # Include directories
@@ -110,9 +134,25 @@ elseif(PLATFORM_LINUX)
         src/linux/v4l2/v4l2_format_converter.cpp
     )
     
+    # Add AVX2 optimized sources if enabled
+    if(ENABLE_AVX2 AND COMPILER_SUPPORTS_AVX2)
+        list(APPEND PLATFORM_SOURCES
+            src/linux/v4l2/v4l2_format_converter_avx2.h
+            src/linux/v4l2/v4l2_format_converter_avx2.cpp
+        )
+    endif()
+    
     # Linux compiler flags
     add_compile_options(-Wall -Wextra -Wpedantic)
     add_compile_options(-Wno-unused-parameter)
+    
+    # Optimization flags for Intel N100
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        add_compile_options(-O3)           # Maximum optimization
+        add_compile_options(-march=native) # Use native CPU features
+        add_compile_options(-mtune=alderlake) # Tune for Alder Lake (N100)
+        add_compile_options(-ffast-math)  # Fast math operations
+    endif()
 endif()
 
 # Find NDI SDK
@@ -290,5 +330,10 @@ if(PLATFORM_WINDOWS)
     message(STATUS "  MSVC Version: ${MSVC_VERSION}")
 elseif(PLATFORM_LINUX)
     message(STATUS "  V4L2 support: Enabled")
+    if(ENABLE_AVX2 AND COMPILER_SUPPORTS_AVX2)
+        message(STATUS "  AVX2 optimizations: Enabled (Intel N100)")
+    else()
+        message(STATUS "  AVX2 optimizations: Disabled")
+    endif()
 endif()
 message(STATUS "")

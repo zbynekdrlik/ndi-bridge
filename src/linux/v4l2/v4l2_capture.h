@@ -166,8 +166,8 @@ private:
     // Disconnect detection
     uint32_t timeout_count_ = 0;
     
-    // Buffer count (increase for better buffering)
-    static constexpr unsigned int kBufferCount = 6;
+    // Buffer count optimized for Intel N100 (10 buffers for smoother operation)
+    static constexpr unsigned int kBufferCount = 10;
 };
 
 } // namespace v4l2
