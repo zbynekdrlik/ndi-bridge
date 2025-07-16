@@ -1,8 +1,15 @@
 #include "pipeline_thread_pool.h"
 #include "logger.h"
+#include <sstream>
+
+#ifdef __linux__
 #include <sched.h>
 #include <pthread.h>
-#include <sstream>
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 namespace ndi_bridge {
 
@@ -143,6 +150,12 @@ bool PipelineThreadPool::setThreadAffinity(std::thread& thread, int cpu_core) {
     int result = pthread_setaffinity_np(native_handle, sizeof(cpu_set_t), &cpuset);
     
     return result == 0;
+#elif defined(_WIN32)
+    HANDLE native_handle = thread.native_handle();
+    DWORD_PTR mask = 1ULL << cpu_core;
+    DWORD_PTR result = SetThreadAffinityMask(native_handle, mask);
+    
+    return result != 0;
 #else
     // Not implemented for other platforms
     return false;
@@ -158,6 +171,11 @@ bool PipelineThreadPool::setThreadRealtime(std::thread& thread) {
     int result = pthread_setschedparam(native_handle, SCHED_FIFO, &param);
     
     return result == 0;
+#elif defined(_WIN32)
+    HANDLE native_handle = thread.native_handle();
+    BOOL result = SetThreadPriority(native_handle, THREAD_PRIORITY_TIME_CRITICAL);
+    
+    return result != 0;
 #else
     // Not implemented for other platforms
     return false;
