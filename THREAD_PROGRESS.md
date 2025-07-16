@@ -2,15 +2,15 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Zero-copy optimization SUCCESSFULLY TESTED - 52% latency reduction!
-- [ ] Waiting for: Next thread to implement Priority 2 - Multi-threaded Pipeline
-- [ ] Blocked by: None - ready for next optimization phase
+- [x] Currently working on: Multi-threaded pipeline IMPLEMENTED - ready for testing
+- [ ] Waiting for: User to build and test v1.5.0 multi-threaded performance
+- [ ] Blocked by: None - implementation complete, awaiting test results
 
 ## Implementation Status
-- Phase: Performance Optimization - Priority 1 COMPLETE ✅
-- Step: Ready for Priority 2 - Multi-threaded Pipeline
-- Status: TESTING_COMPLETE - Zero-copy working perfectly
-- Version: 1.4.0 (tested and working)
+- Phase: Performance Optimization - Priority 2 IMPLEMENTED
+- Step: Multi-threaded pipeline complete, ready for testing
+- Status: IMPLEMENTED_NOT_TESTED
+- Version: 1.5.0 (implemented, needs testing)
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
@@ -19,8 +19,11 @@
 | AVX2 YUYV→UYVY | ✅ v1.4.0 | ❌ | ✅ WORKING | ❌ |
 | Zero-Copy Path | ✅ v1.4.0 | ❌ | ✅ WORKING | ❌ |
 | V4L2 processFrame | ✅ v1.4.0 | ❌ | ✅ WORKING | ❌ |
+| Frame Queue | ✅ v1.5.0 | ❌ | ❌ NEEDS TEST | ❌ |
+| Thread Pool | ✅ v1.5.0 | ❌ | ❌ NEEDS TEST | ❌ |
+| Multi-Thread Pipeline | ✅ v1.5.0 | ❌ | ❌ NEEDS TEST | ❌ |
 
-## 🎉 ZERO-COPY OPTIMIZATION RESULTS (v1.4.0)
+## 🎉 COMPLETED: ZERO-COPY OPTIMIZATION (v1.4.0)
 
 ### Performance Achieved:
 - **Average Latency**: 16.068ms → **7.621ms** (52% reduction!)
@@ -29,105 +32,115 @@
 - **Zero-copy frames**: 550/550 (100%)
 - **Dropped frames**: 0
 
-### Test Environment:
-- Hardware: Intel N100 PC with NZXT Signal HD60 USB capture card
-- OS: Ubuntu 24.04 LTS
-- NDI SDK: Version 6.2.0.3
-- Video: 1920x1080 @ 60fps YUYV
+## 🚀 NEW: MULTI-THREADED PIPELINE (v1.5.0)
 
-### Confirmed Working Features:
-- ✅ YUYV format detected and using zero-copy path
-- ✅ AVX2 optimized YUYV→UYVY conversion in NDI sender
-- ✅ No BGRA conversion happening (skipped entirely)
-- ✅ Direct V4L2 buffer to NDI pipeline
+### What's Implemented:
+1. **Lock-free Frame Queues** (`frame_queue.h/cpp`)
+   - Ring buffer with atomic operations
+   - Pre-allocated memory pool
+   - Zero-allocation runtime operation
+   - Separate queues for capture→convert and convert→send
 
-## 🎯 NEXT OPTIMIZATION: MULTI-THREADED PIPELINE
+2. **Pipeline Thread Pool** (`pipeline_thread_pool.h/cpp`)
+   - CPU affinity support for Intel N100
+   - Real-time thread priority (if permitted)
+   - Performance monitoring per thread
+   - Clean shutdown mechanism
 
-### Priority 2 Design (Target: -2ms additional reduction)
-**Current Single-Thread Flow**:
-```
-poll() → dequeue() → YUYV→UYVY convert → NDI_send() → requeue()
-```
+3. **3-Thread Architecture** in V4L2 Capture:
+   - **Thread 1 (Core 1)**: Capture - polls V4L2, dequeues frames
+   - **Thread 2 (Core 2)**: Convert - YUYV→UYVY or format conversion
+   - **Thread 3 (Core 3)**: Send - NDI transmission
+   - **Core 0**: Reserved for system/other processes
 
-**Proposed 3-Thread Architecture**:
-```
-Thread 1 (Capture): poll() → dequeue() → push to queue1 → requeue()
-Thread 2 (Convert): pop from queue1 → YUYV→UYVY → push to queue2
-Thread 3 (Send): pop from queue2 → NDI_send()
-```
+4. **Smart Buffer Management**:
+   - BufferIndexQueue for V4L2 buffer recycling
+   - Non-blocking operations throughout
+   - Queue depth: 5 frames per stage
 
-### Implementation Plan:
-1. **Lock-free queues** between threads (boost::lockfree or custom)
-2. **Ring buffer** for frame data (pre-allocated)
-3. **Thread affinity** for CPU core optimization
-4. **Performance metrics** per thread
-
-### Expected Benefits:
-- Capture never blocks on conversion/sending
-- Better CPU core utilization on N100 (4 cores)
-- Potential to hit 5-6ms total latency
-
-## Commands for Next Thread
-
-### Continue Development:
+### Build Instructions:
 ```bash
 cd /home/ubuntu/ndi-test/ndi-bridge
-git checkout feature/linux-performance-optimization
 git pull origin feature/linux-performance-optimization
 
-# Current working version is 1.4.0
-# Next version will be 1.5.0 for multi-threading
+# Clean rebuild for v1.5.0
+rm -rf build
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j4
+
+# Version 1.5.0 should be logged on startup
 ```
 
-### Test Current Optimized Build:
+### Test Commands:
 ```bash
-cd build
-sudo ./bin/ndi-bridge --device /dev/video0 --ndi-name "NZXT-Optimized" -v
+# Test multi-threaded mode (default)
+sudo ./bin/ndi-bridge --device /dev/video0 --ndi-name "NZXT-MultiThread" -v
+
+# Compare with single-threaded mode (for baseline)
+# Note: Single-threaded mode would need to be enabled in code
 ```
+
+### Expected Results:
+- Target: < 6ms average latency (from current 7.6ms)
+- CPU usage distributed across cores 1-3
+- No increase in dropped frames
+- Smooth 60fps maintained
 
 ### Performance Monitoring:
 ```bash
-# Watch latency in real-time
-watch -n 0.1 'sudo ./bin/ndi-bridge --device /dev/video0 2>&1 | grep -E "Avg latency|Zero-copy"'
+# Monitor thread distribution
+htop  # Should show 3 ndi-bridge threads on different cores
 
-# CPU core usage
-htop
+# Check latency improvements
+watch -n 0.1 'sudo ./bin/ndi-bridge --device /dev/video0 2>&1 | grep -E "Avg latency|Queue drops|Thread"'
 
-# Detailed perf analysis
-sudo perf record -g ./bin/ndi-bridge --device /dev/video0
-sudo perf report
+# Detailed thread stats (will be in logs)
+sudo ./bin/ndi-bridge --device /dev/video0 -v 2>&1 | grep "Thread"
 ```
 
-## Implementation Notes for Next Thread
-
-### Multi-threading Considerations:
-1. **Memory allocation**: All buffers pre-allocated at startup
-2. **Queue depth**: Start with 3-5 frames per queue
-3. **Synchronization**: Avoid mutexes in hot path
-4. **Error handling**: Graceful degradation if thread fails
-
-### Code Structure:
-- Add new files:
-  - `src/common/frame_queue.h/cpp` - Lock-free queue implementation
-  - `src/common/thread_pool.h/cpp` - Thread management
-- Modify:
-  - `v4l2_capture.cpp` - Split into capture thread only
-  - `ndi_sender.cpp` - Add async send capability
+### What to Look For in Logs:
+1. Version confirmation: `V4L2Capture: Created (version 1.5.0)`
+2. Multi-threading enabled: `V4L2Capture: Starting multi-threaded pipeline (v1.5.0)`
+3. Thread creation: `V4L2Capture: Multi-threaded pipeline started with 3 threads`
+4. Thread stats on shutdown showing processing times
+5. Queue drop statistics (should be minimal)
 
 ## Success Metrics for Priority 2:
-- [ ] Average latency < 6ms
-- [ ] CPU usage distributed across cores
-- [ ] No frame drops under load
-- [ ] Smooth 60fps output
+- [ ] Average latency < 6ms achieved
+- [ ] CPU usage shows 3 threads on cores 1-3
+- [ ] No increase in frame drops vs v1.4.0
+- [ ] Smooth 60fps output maintained
+- [ ] Thread statistics show balanced load
+
+## Next Steps After Testing:
+
+### If Performance Goal Met (< 6ms):
+1. Consider Priority 2 optimization complete
+2. Document final performance numbers
+3. Prepare for PR merge
+4. Move to Priority 3 (hardware timestamping) if needed
+
+### If Performance Goal Not Met:
+1. Analyze thread statistics for bottlenecks
+2. Consider tuning queue depths
+3. Profile with `perf` to identify hot spots
+4. May need to optimize conversion further
 
 ## Current Branch State:
 - Branch: `feature/linux-performance-optimization`
-- Version: 1.4.0
+- Version: 1.5.0
 - All changes committed and pushed
-- PR #9 open and ready for review after all optimizations
+- PR #9 open - DO NOT MERGE until tested
+
+## Implementation Summary:
+- ✅ Zero-copy optimization (v1.4.0) - 52% latency reduction
+- ✅ Multi-threaded pipeline (v1.5.0) - implementation complete
+- ⏳ Multi-threaded testing - awaiting results
+- 🎯 Target: Total latency < 6ms (from original 16ms)
 
 ## Notes:
-- Zero-copy optimization exceeded expectations (52% reduction vs 30% target)
-- System is already very performant at 7.6ms
-- Multi-threading is next logical step for further gains
-- Consider if 7.6ms is sufficient before implementing more complexity
+- Multi-threading adds complexity but should improve latency
+- If 7.6ms is sufficient, could stay with simpler v1.4.0
+- Thread pool is reusable for future optimizations
+- Lock-free queues ensure minimal thread contention
