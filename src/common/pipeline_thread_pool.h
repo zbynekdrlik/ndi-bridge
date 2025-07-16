@@ -6,6 +6,8 @@
 #include <atomic>
 #include <string>
 #include <vector>
+#include <mutex>
+#include <chrono>
 
 namespace ndi_bridge {
 
