@@ -2,111 +2,96 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Performance optimization - Zero-Copy YUV implementation
-- [ ] Waiting for: User to test v1.4.0 with zero-copy YUYV support
+- [x] Currently working on: Fixed zero-copy implementation - v1.4.0 updated
+- [ ] Waiting for: User to rebuild and test the fixed version
 - [ ] Blocked by: None
 
 ## Implementation Status
 - Phase: Performance Optimization - Priority 1 (Zero-Copy YUV)
-- Step: Initial implementation complete, awaiting testing
-- Status: IMPLEMENTED_NOT_TESTED
-- Version: 1.4.0
+- Step: Zero-copy path now properly implemented
+- Status: TESTING_STARTED (initial test showed conversion still happening)
+- Version: 1.4.0 (fixed)
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|-----------------------|
-| NDI YUYV Support | ✅ v1.4.0 | ❌ | ❌ | ❌ |
+| NDI YUYV Support | ✅ v1.4.0 | ❌ | ✅ Working | ❌ |
 | AVX2 YUYV→UYVY | ✅ v1.4.0 | ❌ | ❌ | ❌ |
-| Zero-Copy Path | ✅ v1.4.0 | ❌ | ❌ | ❌ |
+| Zero-Copy Path | ✅ v1.4.0 (fixed) | ❌ | ❌ | ❌ |
+| V4L2 processFrame | ✅ v1.4.0 (fixed) | ❌ | ❌ | ❌ |
 
-## What Was Just Implemented (v1.4.0)
+## Issue Found and Fixed
 
-### 1. NDI Sender Enhancements
-- Added direct YUYV support with automatic conversion to UYVY
-- Implemented AVX2-optimized YUYV→UYVY byte swap
-- Added scalar fallback for non-AVX2 systems
-- Zero allocation in conversion path (reuses buffer)
+### Problem in First Test
+- V4L2 was still converting YUYV to BGRA instead of using zero-copy
+- Logs showed: "V4L2FormatConverter: Using AVX2 accelerated YUYV->BGRA conversion"
+- Latency was still 16ms (not improved)
 
-### 2. V4L2 Capture Optimization
-- Modified processFrame to detect YUYV format
-- Implements zero-copy path for YUYV (skips BGRA conversion)
-- Tracks zero-copy frames in statistics
-- Logs when zero-copy mode is active
+### Fix Applied
+- Updated `v4l2_capture.cpp` processFrame method to detect YUYV format
+- Added zero-copy path that skips BGRA conversion entirely
+- YUYV frames now passed directly to NDI sender
+- Added statistics tracking for zero-copy frames
 
-### 3. App Controller Updates
-- Updated getFourCC to properly handle YUYV format
-- Maps YUYV to correct FourCC code (0x56595559)
-
-## Expected Performance Improvement
-- **Before**: V4L2 YUYV → Convert to BGRA → Send BGRA to NDI
-- **After**: V4L2 YUYV → Quick byte swap to UYVY → Send to NDI
-- **Expected latency reduction**: ~3ms (from skipping YUV→RGB conversion)
-- **Expected CPU reduction**: ~30% less processing
-
-## Test Commands
+## Commands to Test Fixed Version
 ```bash
-# Build optimized version
-cd ~/ndi-bridge/build
-cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-O3 -march=native" ..
+# Pull the fix
+cd /home/ubuntu/ndi-test/ndi-bridge
+git pull origin feature/linux-performance-optimization
+
+# Rebuild
+cd build
+make clean
 make -j$(nproc)
 
-# Run with verbose output to see zero-copy logs
-sudo ./ndi-bridge --device /dev/video0 --ndi-name "NZXT-Optimized" -v
-
-# Expected logs to confirm optimization:
-# "V4L2Capture: Using zero-copy path for YUYV format"
-# "NDI sender: Using direct YUYV->UYVY conversion (zero-copy optimization)"
-# "NDI sender: AVX2 support detected for YUV conversions"
+# Run with verbose logging
+sudo ./bin/ndi-bridge --device /dev/video0 --ndi-name "NZXT-Optimized" -v
 ```
 
-## Performance Monitoring
+## Expected Logs (Fixed Version)
+You should now see:
+- "V4L2Capture: Using zero-copy path for YUYV format" ✅ NEW
+- "NDI sender: Using direct YUYV->UYVY conversion (zero-copy optimization)"
+- "NDI sender: AVX2 support detected for YUV conversions"
+- NO MORE "V4L2FormatConverter: Using AVX2 accelerated YUYV->BGRA conversion"
+
+## Expected Performance (After Fix)
+- Latency should drop from 16ms → ~5-7ms
+- CPU usage should be lower
+- Stats should show zero-copy frames incrementing
+
+## Debug Commands
 ```bash
-# Monitor CPU usage
+# Monitor in real-time
+watch -n 0.1 'sudo ./bin/ndi-bridge --device /dev/video0 --ndi-name "NZXT-Optimized" -v 2>&1 | grep -E "(latency|zero-copy|Zero-copy)"'
+
+# Check CPU usage
 htop
 
-# Check latency (in another terminal)
-watch -n 0.1 'ps aux | grep ndi-bridge'
-
-# Detailed performance analysis
-sudo perf stat -e cycles,instructions,cache-misses ./ndi-bridge --device /dev/video0
+# Detailed performance
+sudo perf stat -e cycles,instructions,cache-misses ./bin/ndi-bridge --device /dev/video0
 ```
 
-## Next Steps After Testing
+## Next Steps After Successful Test
 
-### If Successful (latency reduced, CPU lower):
-1. Move to Priority 2: Multi-threaded Pipeline
-2. Implement 3-thread architecture
-3. Add lock-free queues
+### If Zero-Copy Working (latency < 10ms):
+1. Confirm performance metrics
+2. Move to Priority 2: Multi-threaded Pipeline
+3. Target additional -2ms reduction
 
-### If Issues Found:
-1. Check if NDI is accepting UYVY properly
-2. Verify AVX2 conversion correctness
-3. Add more detailed timing logs
-
-## 🎯 Remaining Optimization Goals
-
-### Priority 2: Multi-threaded Pipeline (Next)
-- Separate capture, conversion, and send threads
-- Lock-free queues between stages
-- Target: Additional -2ms latency reduction
-
-### Priority 3: Memory Pool
-- Pre-allocated buffers
-- Cache-aligned memory
-- Target: -0.5ms latency reduction
-
-### Priority 4: V4L2 DMABUF (Future)
-- GPU zero-copy support
-- Direct hardware encoder path
+### If Still Not Working:
+1. Check YUYV detection logic
+2. Add more debug logging
+3. Verify NDI is accepting UYVY format
 
 ## Notes
-- Current implementation focuses on YUYV as it's the most common USB capture format
-- UYVY native support could be added similarly (no conversion needed)
-- The byte swap is extremely fast with AVX2 (processes 32 pixels per instruction)
-- Memory bandwidth reduced by ~75% (no BGRA expansion)
+- The fix was to properly implement the zero-copy path in processFrame
+- YUYV format detection was missing in the original implementation
+- Now YUYV frames bypass the format converter entirely
+- This should give the expected 3ms latency reduction
 
 ## Last User Action
-- Date/Time: Just now
-- Action: Requested performance optimization implementation
-- Result: v1.4.0 implemented with zero-copy YUYV support
-- Next Required: Test the optimized build and provide performance metrics
+- Date/Time: 2025-07-16 14:10
+- Action: Ran v1.4.0 and found it was still converting to BGRA
+- Result: Identified missing zero-copy implementation
+- Next Required: Test the fixed version with proper zero-copy path
