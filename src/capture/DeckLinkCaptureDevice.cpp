@@ -248,11 +248,21 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             PreallocateBuffers(frameWidth, frameHeight);
         }
         
-        // Always use frame callback if set (v1.6.1: simplified logic)
+        // v1.6.1: Optimized COM interface usage for minimal overhead
+        void* frameBytes = nullptr;
+        
+        // For frame callback path - always fastest
         if (m_frameCallback) {
-            // Get frame data pointer with minimal COM overhead
-            void* frameBytes = nullptr;
-            HRESULT result = videoFrame->GetBytes(&frameBytes);
+            // Get buffer interface - required for GetBytes
+            CComPtr<IDeckLinkVideoBuffer> videoBuffer;
+            HRESULT result = videoFrame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer);
+            if (result != S_OK) {
+                m_statistics->RecordDroppedFrame();
+                return;
+            }
+            
+            // Get frame data pointer
+            result = videoBuffer->GetBytes(&frameBytes);
             if (result != S_OK || !frameBytes) {
                 m_statistics->RecordDroppedFrame();
                 return;
@@ -273,14 +283,13 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             m_directCallbackFrames++;
         } else {
             // Legacy queue path for GetNextFrame() - not recommended for low latency
-            void* frameBytes = nullptr;
+            size_t frameSize = videoFrame->GetRowBytes() * frameHeight;
             HRESULT result = videoFrame->GetBytes(&frameBytes);
             if (result != S_OK || !frameBytes) {
                 m_statistics->RecordDroppedFrame();
                 return;
             }
             
-            size_t frameSize = videoFrame->GetRowBytes() * frameHeight;
             m_frameQueue->AddFrame(frameBytes, frameSize, frameWidth, frameHeight,
                                   m_pixelFormat, m_statistics->GetDroppedFramesRef());
         }
