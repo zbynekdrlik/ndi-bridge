@@ -283,13 +283,22 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             m_directCallbackFrames++;
         } else {
             // Legacy queue path for GetNextFrame() - not recommended for low latency
-            size_t frameSize = videoFrame->GetRowBytes() * frameHeight;
-            HRESULT result = videoFrame->GetBytes(&frameBytes);
+            // Get buffer interface first
+            CComPtr<IDeckLinkVideoBuffer> videoBuffer;
+            HRESULT result = videoFrame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer);
+            if (result != S_OK) {
+                m_statistics->RecordDroppedFrame();
+                return;
+            }
+            
+            // Get frame data pointer
+            result = videoBuffer->GetBytes(&frameBytes);
             if (result != S_OK || !frameBytes) {
                 m_statistics->RecordDroppedFrame();
                 return;
             }
             
+            size_t frameSize = videoFrame->GetRowBytes() * frameHeight;
             m_frameQueue->AddFrame(frameBytes, frameSize, frameWidth, frameHeight,
                                   m_pixelFormat, m_statistics->GetDroppedFramesRef());
         }
