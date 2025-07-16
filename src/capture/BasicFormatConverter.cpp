@@ -8,18 +8,43 @@ class BasicFormatConverter : public IFormatConverter {
 public:
     bool ConvertUYVYToBGRA(const uint8_t* src, uint8_t* dst, 
                           int width, int height, int srcStride) override {
+        // Use auto-detection for backward compatibility
+        ColorSpaceInfo autoInfo;
+        autoInfo.space = ColorSpaceInfo::CS_AUTO;
+        autoInfo.range = ColorSpaceInfo::CR_AUTO;
+        return ConvertUYVYToBGRA(src, dst, width, height, srcStride, autoInfo);
+    }
+    
+    bool ConvertUYVYToBGRA(const uint8_t* src, uint8_t* dst, 
+                          int width, int height, int srcStride,
+                          const ColorSpaceInfo& info) override {
         if (!src || !dst || width <= 0 || height <= 0) {
             return false;
         }
         
         const int dstStride = width * 4;
         
-        // Determine color space based on resolution
-        // HD content (720p and above) uses BT.709, SD uses BT.601
-        bool useBT709 = (height >= 720);
+        // Determine color space
+        bool useBT709;
+        if (info.space == ColorSpaceInfo::CS_BT709) {
+            useBT709 = true;
+        } else if (info.space == ColorSpaceInfo::CS_BT601) {
+            useBT709 = false;
+        } else {
+            // Auto-detect based on resolution
+            useBT709 = (height >= 720);
+        }
         
-        // Pre-calculate conversion coefficients for BT.709 or BT.601
-        // Using limited range YUV (16-235 for Y, 16-240 for UV) as per Decklink output
+        // Determine color range
+        bool useFullRange;
+        if (info.range == ColorSpaceInfo::CR_FULL) {
+            useFullRange = true;
+        } else if (info.range == ColorSpaceInfo::CR_LIMITED) {
+            useFullRange = false;
+        } else {
+            // Default to limited range for broadcast content
+            useFullRange = false;
+        }
         
         for (int y = 0; y < height; y++) {
             const uint8_t* srcRow = src + y * srcStride;
@@ -32,17 +57,23 @@ public:
                 int v = srcRow[2];
                 int y1 = srcRow[3];
                 
-                // Convert from limited range YUV to RGB
-                // Y: [16,235] -> [0,255]
-                // UV: [16,240] -> [-112,112]
-                y0 = ((y0 - 16) * 255) / 219;
-                y1 = ((y1 - 16) * 255) / 219;
-                u = ((u - 128) * 255) / 224;
-                v = ((v - 128) * 255) / 224;
-                
-                // Clamp Y values
-                y0 = std::max(0, std::min(255, y0));
-                y1 = std::max(0, std::min(255, y1));
+                if (!useFullRange) {
+                    // Convert from limited range YUV to RGB
+                    // Y: [16,235] -> [0,255]
+                    // UV: [16,240] -> [-112,112]
+                    y0 = ((y0 - 16) * 255) / 219;
+                    y1 = ((y1 - 16) * 255) / 219;
+                    u = ((u - 128) * 255) / 224;
+                    v = ((v - 128) * 255) / 224;
+                    
+                    // Clamp Y values
+                    y0 = std::max(0, std::min(255, y0));
+                    y1 = std::max(0, std::min(255, y1));
+                } else {
+                    // Full range - just center UV
+                    u = u - 128;
+                    v = v - 128;
+                }
                 
                 // YUV to RGB conversion
                 int r0, g0, b0, r1, g1, b1;
