@@ -2,71 +2,74 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Testing completed successfully!
-- [x] Waiting for: Ready to merge PR #10
+- [ ] Currently working on: Analyzing DeckLink latency issues
+- [ ] Waiting for: User to test optimizations
 - [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: Bug Fix - Decklink Color Space (COMPLETE)
-- Step: All testing passed, colors match OBS
-- Status: TESTING_COMPLETE
-- Version: 1.5.4
+- Phase: Latency Optimization - DeckLink Implementation
+- Step: Analysis complete, implementing optimizations
+- Status: IMPLEMENTING
+- Version: 1.6.0 (starting new feature)
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|-----------------------|
-| Color Space Detection | ✅ v1.5.4 | ✅ | ✅ | N/A |
-| BT.709/601 Auto-detect | ✅ v1.5.4 | ✅ | ✅ | N/A |
-| Range Auto-detect | ✅ v1.5.4 | ✅ | ✅ | N/A |
-| ColorSpaceInfo Interface | ✅ v1.5.4 | ✅ | ✅ | N/A |
-| SDK Compatibility | ✅ v1.5.4 | ✅ | ✅ | N/A |
+| DeckLink Zero Latency | 🔧 v1.6.0 | ❌ | ❌ | ❌ |
+| Direct Frame Callback | 🔧 v1.6.0 | ❌ | ❌ | ❌ |
+| Pre-allocated Buffers | 🔧 v1.6.0 | ❌ | ❌ | ❌ |
+| Non-blocking Capture | 🔧 v1.6.0 | ❌ | ❌ | ❌ |
 
 ## Issue Description
-User reported that Decklink video capture has incorrect/faded colors compared to OBS. User correctly pointed out that OBS can auto-detect color parameters, so ndi-bridge should too.
+DeckLink implementation has much worse latency than Linux V4L2 implementation. Need to apply the excellent techniques from Linux implementation to DeckLink.
 
-## Solution Implemented (v4 - SDK Compatibility) - VERIFIED WORKING
-1. **SDK Compatibility Fix**: Added dummy defines for missing color detection enums in older SDKs
-2. **Header Guard Fix**: Added traditional include guards to prevent redefinition warnings
-3. **Maintained Functionality**: Color detection still works on newer SDKs, falls back gracefully on older ones
-4. **Color Detection**: Properly detects BT.709/601 and Limited/Full range like OBS
+## Analysis Results
+### Linux V4L2 Low-Latency Techniques:
+1. **Zero-copy path**: YUYV format passed directly without conversion
+2. **Memory-mapped buffers**: Direct DMA access with V4L2_MEMORY_MMAP
+3. **Non-blocking I/O**: O_NONBLOCK with poll() using 1-5ms timeout
+4. **Pre-allocated buffers**: Conversion buffers allocated ahead of time
+5. **Multi-threaded pipeline**: 3 threads with CPU affinity
+6. **Lock-free queues**: Minimal locking for thread communication
+7. **Immediate buffer requeuing**: Buffers requeued ASAP
+8. **Hardware timestamps**: V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC
+
+### DeckLink Latency Issues Found:
+1. **Frame queue buffering**: MAX_QUEUE_SIZE=3 adds 50ms latency at 60fps
+2. **Synchronous processing**: No pipeline parallelism
+3. **COM interface overhead**: Windows COM adds overhead
+4. **No zero-copy path**: Always copies frame data
+5. **No pre-allocation**: Allocates on-demand
+
+## Optimization Plan
+1. **Remove frame queue**: Process frames immediately in callback
+2. **Add zero-copy path**: Direct pass-through for UYVY format
+3. **Pre-allocate buffers**: Allocate conversion buffers upfront
+4. **Add multi-threading option**: Pipeline with 3 threads
+5. **Use direct callbacks**: Skip queue entirely when callback set
+6. **Optimize COM access**: Minimize QueryInterface calls
 
 ## Version History
-- v1.5.1: Initial fix with range auto-detection (had issues)
-- v1.5.2: Forced limited range YUV (worked but hardcoded)
-- v1.5.3: Proper detection from Decklink API (like OBS)
-- v1.5.4: Fixed SDK compatibility for older versions (FINAL)
+- v1.5.4: Color space fix complete (previous issue)
+- v1.6.0: Starting DeckLink latency optimization
 
-## Test Results (PASSED)
-- Build: ✅ Compiles without errors
-- SDK Compatibility: ✅ Works with older DeckLink SDK
-- Color Detection: ✅ Properly detects Rec.709 and Limited range
-- Color Output: ✅ **Colors match OBS exactly**
-- Performance: ✅ Stable 56-57 fps for 60fps input
-
-## User Confirmation
-- Date/Time: 2025-07-16 20:12
-- Test Result: "it is correct"
-- Colors match OBS: CONFIRMED
-- Ready for merge: YES
-
-## Final Test Log
-```
-[DeckLink] Using Rec.709 for HD content (SDK color detection not available)
-[DeckLink] Using Limited/SMPTE range (16-235) - standard for broadcast
-[DeckLink] Format changed to: 1080p60
-[DeckLink] New format: 1920x1080 @ 60 fps
-```
+## User Action Required
+After implementing optimizations:
+1. Build and test the new version
+2. Measure latency before/after
+3. Provide logs showing version 1.6.0
+4. Compare with Linux implementation
 
 ## Branch State
-- Branch: `fix/decklink-color-space`
-- Version: 1.5.4 (FINAL)
-- Commits: 15 total
-- Testing: COMPLETE
-- Status: READY TO MERGE
+- Branch: `feature/decklink-latency-optimization`
+- Version: 1.6.0 (IN PROGRESS)
+- Commits: 0 (just created)
+- Testing: NOT STARTED
+- Status: IMPLEMENTING
 
 ## Next Steps
-1. ✅ Implementation complete
-2. ✅ Testing complete
-3. ✅ User confirmed colors are correct
-4. ✅ PR #10 ready to merge
-5. ⏳ Merge PR to main branch
+1. ⏳ Implement zero-latency mode
+2. ⏳ Add direct callback path
+3. ⏳ Pre-allocate conversion buffers
+4. ⏳ Test latency improvements
+5. ⏳ Document results
