@@ -8,6 +8,12 @@
 #define NDI_BRIDGE_VERSION NDI_BRIDGE_VERSION_STRING
 
 // Build info
+#ifdef _DEBUG
+#define NDI_BRIDGE_BUILD_TYPE "Debug"
+#else
+#define NDI_BRIDGE_BUILD_TYPE "Release"
+#endif
+
 #ifdef _WIN32
 #define NDI_BRIDGE_PLATFORM "Windows"
 #elif __linux__
