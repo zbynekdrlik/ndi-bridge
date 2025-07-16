@@ -4,10 +4,14 @@
 #include <windows.h>
 
 // Check if newer Decklink SDK color space flags are available
+// If not available, define dummy values that won't match any real flags
 #ifndef bmdDetectedVideoInputColorspaceRec601
-#define DECKLINK_HAS_COLOR_DETECTION 0
+    #define DECKLINK_HAS_COLOR_DETECTION 0
+    #define bmdDetectedVideoInputColorspaceRec601 0x00000000
+    #define bmdDetectedVideoInputColorspaceRec709 0x00000000
+    #define bmdDetectedVideoInputRangeFull 0x00000000
 #else
-#define DECKLINK_HAS_COLOR_DETECTION 1
+    #define DECKLINK_HAS_COLOR_DETECTION 1
 #endif
 
 DeckLinkFormatManager::DeckLinkFormatManager()
