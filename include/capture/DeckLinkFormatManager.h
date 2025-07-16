@@ -8,6 +8,26 @@
 #include "DeckLinkAPI.h"
 
 /**
+ * @brief Color space and range information detected from input
+ */
+struct DetectedColorInfo {
+    enum ColorSpace {
+        ColorSpace_Unknown,
+        ColorSpace_Rec601,  // SD content
+        ColorSpace_Rec709   // HD content
+    };
+    
+    enum ColorRange {
+        ColorRange_Unknown,
+        ColorRange_Limited, // SMPTE levels (16-235)
+        ColorRange_Full     // Full range (0-255)
+    };
+    
+    ColorSpace colorSpace = ColorSpace_Unknown;
+    ColorRange colorRange = ColorRange_Unknown;
+};
+
+/**
  * @brief Manages DeckLink display modes and format changes
  * 
  * Handles display mode enumeration, format detection,
@@ -52,6 +72,7 @@ public:
      * @param[in,out] height Frame height
      * @param[in,out] frameDuration Frame duration
      * @param[in,out] frameTimescale Frame timescale
+     * @param[out] colorInfo Detected color space and range
      * @return true if format was changed and capture restarted
      */
     bool HandleFormatChange(BMDVideoInputFormatChangedEvents events,
@@ -61,7 +82,8 @@ public:
                           BMDDisplayMode& displayMode,
                           BMDPixelFormat& pixelFormat,
                           long& width, long& height,
-                          int64_t& frameDuration, int64_t& frameTimescale);
+                          int64_t& frameDuration, int64_t& frameTimescale,
+                          DetectedColorInfo& colorInfo);
     
     /**
      * @brief Enable video input with format detection
@@ -75,6 +97,12 @@ public:
                          BMDPixelFormat pixelFormat);
     
     /**
+     * @brief Get current detected color info
+     * @return Current color space and range information
+     */
+    const DetectedColorInfo& GetColorInfo() const { return m_colorInfo; }
+    
+    /**
      * @brief Convert BSTR to std::string
      * @param bstr Wide string
      * @return UTF-8 string
@@ -84,4 +112,14 @@ public:
 private:
     // Track if this is the first format detection
     std::atomic<bool> m_firstFormatDetection;
+    
+    // Current detected color info
+    DetectedColorInfo m_colorInfo;
+    
+    /**
+     * @brief Detect color space and range from format flags
+     * @param flags Detected format flags from Decklink
+     * @return Detected color info
+     */
+    DetectedColorInfo DetectColorInfo(BMDDetectedVideoInputFormatFlags flags, int height);
 };

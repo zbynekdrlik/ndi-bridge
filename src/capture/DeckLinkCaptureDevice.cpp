@@ -280,14 +280,24 @@ void DeckLinkCaptureDevice::ProcessFrameForCallback(void* frameBytes, int width,
         frame.data.resize(sourceStride * height);
         memcpy(frame.data.data(), frameBytes, frame.data.size());
     } else if (pixelFormat == bmdFormat8BitYUV) {
-        // UYVY format - convert to BGRA for consistency
+        // UYVY format - convert to BGRA with detected color info
         frame.format = FrameData::FrameFormat::BGRA;
         frame.stride = width * 4;
         frame.data.resize(frame.stride * height);
         
+        // Get detected color info
+        const DetectedColorInfo& colorInfo = m_formatManager->GetColorInfo();
+        
+        // Create color space info for converter
+        ColorSpaceInfo convInfo;
+        convInfo.space = (colorInfo.colorSpace == DetectedColorInfo::ColorSpace_Rec709) ? 
+                        ColorSpaceInfo::CS_BT709 : ColorSpaceInfo::CS_BT601;
+        convInfo.range = (colorInfo.colorRange == DetectedColorInfo::ColorRange_Full) ?
+                        ColorSpaceInfo::CR_FULL : ColorSpaceInfo::CR_LIMITED;
+        
         if (!m_formatConverter->ConvertUYVYToBGRA(
             static_cast<uint8_t*>(frameBytes), frame.data.data(),
-            width, height, sourceStride)) {
+            width, height, sourceStride, convInfo)) {
             m_statistics->RecordDroppedFrame();
             return;
         }
@@ -307,10 +317,12 @@ void DeckLinkCaptureDevice::OnFormatChanged(BMDVideoInputFormatChangedEvents eve
     try {
         long width = m_width;
         long height = m_height;
+        DetectedColorInfo colorInfo;
         
         if (m_formatManager->HandleFormatChange(events, newMode, flags, m_deckLinkInput,
                                                m_displayMode, m_pixelFormat,
-                                               width, height, m_frameDuration, m_frameTimescale)) {
+                                               width, height, m_frameDuration, m_frameTimescale,
+                                               colorInfo)) {
             m_width = width;
             m_height = height;
         }
@@ -356,14 +368,24 @@ bool DeckLinkCaptureDevice::GetNextFrame(FrameData& frame) {
         frame.stride = sourceStride;
         frame.data = std::move(queuedFrame.data);
     } else if (queuedFrame.pixelFormat == bmdFormat8BitYUV) {
-        // UYVY format - convert to BGRA
+        // UYVY format - convert to BGRA with detected color info
         frame.format = FrameData::FrameFormat::BGRA;
         frame.stride = queuedFrame.width * 4;
         frame.data.resize(frame.stride * frame.height);
         
+        // Get detected color info
+        const DetectedColorInfo& colorInfo = m_formatManager->GetColorInfo();
+        
+        // Create color space info for converter
+        ColorSpaceInfo convInfo;
+        convInfo.space = (colorInfo.colorSpace == DetectedColorInfo::ColorSpace_Rec709) ? 
+                        ColorSpaceInfo::CS_BT709 : ColorSpaceInfo::CS_BT601;
+        convInfo.range = (colorInfo.colorRange == DetectedColorInfo::ColorRange_Full) ?
+                        ColorSpaceInfo::CR_FULL : ColorSpaceInfo::CR_LIMITED;
+        
         if (!m_formatConverter->ConvertUYVYToBGRA(
             queuedFrame.data.data(), frame.data.data(),
-            queuedFrame.width, queuedFrame.height, sourceStride)) {
+            queuedFrame.width, queuedFrame.height, sourceStride, convInfo)) {
             return false;
         }
     } else {

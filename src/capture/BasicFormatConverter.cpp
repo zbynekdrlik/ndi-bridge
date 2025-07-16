@@ -8,11 +8,43 @@ class BasicFormatConverter : public IFormatConverter {
 public:
     bool ConvertUYVYToBGRA(const uint8_t* src, uint8_t* dst, 
                           int width, int height, int srcStride) override {
+        // Use auto-detection for backward compatibility
+        ColorSpaceInfo autoInfo;
+        autoInfo.space = ColorSpaceInfo::CS_AUTO;
+        autoInfo.range = ColorSpaceInfo::CR_AUTO;
+        return ConvertUYVYToBGRA(src, dst, width, height, srcStride, autoInfo);
+    }
+    
+    bool ConvertUYVYToBGRA(const uint8_t* src, uint8_t* dst, 
+                          int width, int height, int srcStride,
+                          const ColorSpaceInfo& info) override {
         if (!src || !dst || width <= 0 || height <= 0) {
             return false;
         }
         
         const int dstStride = width * 4;
+        
+        // Determine color space
+        bool useBT709;
+        if (info.space == ColorSpaceInfo::CS_BT709) {
+            useBT709 = true;
+        } else if (info.space == ColorSpaceInfo::CS_BT601) {
+            useBT709 = false;
+        } else {
+            // Auto-detect based on resolution
+            useBT709 = (height >= 720);
+        }
+        
+        // Determine color range
+        bool useFullRange;
+        if (info.range == ColorSpaceInfo::CR_FULL) {
+            useFullRange = true;
+        } else if (info.range == ColorSpaceInfo::CR_LIMITED) {
+            useFullRange = false;
+        } else {
+            // Default to limited range for broadcast content
+            useFullRange = false;
+        }
         
         for (int y = 0; y < height; y++) {
             const uint8_t* srcRow = src + y * srcStride;
@@ -20,27 +52,57 @@ public:
             
             for (int x = 0; x < width; x += 2) {
                 // UYVY format: U0 Y0 V0 Y1
-                int u = srcRow[0] - 128;
-                int y0 = srcRow[1] - 16;
-                int v = srcRow[2] - 128;
-                int y1 = srcRow[3] - 16;
+                int u = srcRow[0];
+                int y0 = srcRow[1];
+                int v = srcRow[2];
+                int y1 = srcRow[3];
                 
-                // YUV to RGB conversion (ITU-R BT.601)
-                int c0 = y0 * 298;
-                int c1 = y1 * 298;
-                int d = u * 100;
-                int e = v * 208;
-                int uv = u * 516 + v * 409;
+                if (!useFullRange) {
+                    // Convert from limited range YUV to RGB
+                    // Y: [16,235] -> [0,255]
+                    // UV: [16,240] -> [-112,112]
+                    y0 = ((y0 - 16) * 255) / 219;
+                    y1 = ((y1 - 16) * 255) / 219;
+                    u = ((u - 128) * 255) / 224;
+                    v = ((v - 128) * 255) / 224;
+                    
+                    // Clamp Y values
+                    y0 = std::max(0, std::min(255, y0));
+                    y1 = std::max(0, std::min(255, y1));
+                } else {
+                    // Full range - just center UV
+                    u = u - 128;
+                    v = v - 128;
+                }
                 
-                // First pixel
-                int r0 = (c0 + e + 128) >> 8;
-                int g0 = (c0 - d - uv + 128) >> 8;
-                int b0 = (c0 + d + 128) >> 8;
+                // YUV to RGB conversion
+                int r0, g0, b0, r1, g1, b1;
                 
-                // Second pixel
-                int r1 = (c1 + e + 128) >> 8;
-                int g1 = (c1 - d - uv + 128) >> 8;
-                int b1 = (c1 + d + 128) >> 8;
+                if (useBT709) {
+                    // BT.709 coefficients
+                    // R = Y + 1.5748 * V
+                    // G = Y - 0.1873 * U - 0.4681 * V
+                    // B = Y + 1.8556 * U
+                    r0 = y0 + ((1575 * v + 500) / 1000);
+                    g0 = y0 - ((187 * u + 468 * v + 500) / 1000);
+                    b0 = y0 + ((1856 * u + 500) / 1000);
+                    
+                    r1 = y1 + ((1575 * v + 500) / 1000);
+                    g1 = y1 - ((187 * u + 468 * v + 500) / 1000);
+                    b1 = y1 + ((1856 * u + 500) / 1000);
+                } else {
+                    // BT.601 coefficients
+                    // R = Y + 1.402 * V
+                    // G = Y - 0.344 * U - 0.714 * V
+                    // B = Y + 1.772 * U
+                    r0 = y0 + ((1402 * v + 500) / 1000);
+                    g0 = y0 - ((344 * u + 714 * v + 500) / 1000);
+                    b0 = y0 + ((1772 * u + 500) / 1000);
+                    
+                    r1 = y1 + ((1402 * v + 500) / 1000);
+                    g1 = y1 - ((344 * u + 714 * v + 500) / 1000);
+                    b1 = y1 + ((1772 * u + 500) / 1000);
+                }
                 
                 // Clamp and write BGRA
                 dstRow[0] = static_cast<uint8_t>(std::max(0, std::min(255, b0)));  // B
@@ -70,6 +132,9 @@ public:
         
         const int dstStride = width * 4;
         
+        // Determine color space based on resolution
+        bool useBT709 = (height >= 720);
+        
         for (int y = 0; y < height; y++) {
             const uint8_t* yRow = srcY + y * strideY;
             const uint8_t* uRow = srcU + (y / 2) * strideU;
@@ -77,18 +142,27 @@ public:
             uint8_t* dstRow = dst + y * dstStride;
             
             for (int x = 0; x < width; x++) {
-                int yVal = yRow[x] - 16;
-                int u = uRow[x / 2] - 128;
-                int v = vRow[x / 2] - 128;
+                int yVal = yRow[x];
+                int u = uRow[x / 2];
+                int v = vRow[x / 2];
                 
-                int c = yVal * 298;
-                int d = u * 100;
-                int e = v * 208;
-                int uv = u * 516 + v * 409;
+                // Convert from limited range
+                yVal = ((yVal - 16) * 255) / 219;
+                u = ((u - 128) * 255) / 224;
+                v = ((v - 128) * 255) / 224;
                 
-                int r = (c + e + 128) >> 8;
-                int g = (c - d - uv + 128) >> 8;
-                int b = (c + d + 128) >> 8;
+                yVal = std::max(0, std::min(255, yVal));
+                
+                int r, g, b;
+                if (useBT709) {
+                    r = yVal + ((1575 * v + 500) / 1000);
+                    g = yVal - ((187 * u + 468 * v + 500) / 1000);
+                    b = yVal + ((1856 * u + 500) / 1000);
+                } else {
+                    r = yVal + ((1402 * v + 500) / 1000);
+                    g = yVal - ((344 * u + 714 * v + 500) / 1000);
+                    b = yVal + ((1772 * u + 500) / 1000);
+                }
                 
                 dstRow[x * 4 + 0] = static_cast<uint8_t>(std::max(0, std::min(255, b)));
                 dstRow[x * 4 + 1] = static_cast<uint8_t>(std::max(0, std::min(255, g)));
@@ -109,25 +183,37 @@ public:
         
         const int dstStride = width * 4;
         
+        // Determine color space based on resolution
+        bool useBT709 = (height >= 720);
+        
         for (int y = 0; y < height; y++) {
             const uint8_t* yRow = srcY + y * strideY;
             const uint8_t* uvRow = srcUV + (y / 2) * strideUV;
             uint8_t* dstRow = dst + y * dstStride;
             
             for (int x = 0; x < width; x++) {
-                int yVal = yRow[x] - 16;
+                int yVal = yRow[x];
                 int uvIndex = (x / 2) * 2;
-                int u = uvRow[uvIndex] - 128;
-                int v = uvRow[uvIndex + 1] - 128;
+                int u = uvRow[uvIndex];
+                int v = uvRow[uvIndex + 1];
                 
-                int c = yVal * 298;
-                int d = u * 100;
-                int e = v * 208;
-                int uv = u * 516 + v * 409;
+                // Convert from limited range
+                yVal = ((yVal - 16) * 255) / 219;
+                u = ((u - 128) * 255) / 224;
+                v = ((v - 128) * 255) / 224;
                 
-                int r = (c + e + 128) >> 8;
-                int g = (c - d - uv + 128) >> 8;
-                int b = (c + d + 128) >> 8;
+                yVal = std::max(0, std::min(255, yVal));
+                
+                int r, g, b;
+                if (useBT709) {
+                    r = yVal + ((1575 * v + 500) / 1000);
+                    g = yVal - ((187 * u + 468 * v + 500) / 1000);
+                    b = yVal + ((1856 * u + 500) / 1000);
+                } else {
+                    r = yVal + ((1402 * v + 500) / 1000);
+                    g = yVal - ((344 * u + 714 * v + 500) / 1000);
+                    b = yVal + ((1772 * u + 500) / 1000);
+                }
                 
                 dstRow[x * 4 + 0] = static_cast<uint8_t>(std::max(0, std::min(255, b)));
                 dstRow[x * 4 + 1] = static_cast<uint8_t>(std::max(0, std::min(255, g)));
