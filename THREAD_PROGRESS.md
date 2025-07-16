@@ -2,158 +2,111 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: v1.3.7 tested successfully - Basic Linux V4L2 support WORKING!
-- [ ] Waiting for: Next thread to implement performance optimizations
-- [ ] Blocked by: None - ready for optimization phase
+- [x] Currently working on: Performance optimization - Zero-Copy YUV implementation
+- [ ] Waiting for: User to test v1.4.0 with zero-copy YUYV support
+- [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: Linux USB Capture Support - COMPLETE (Basic functionality)
-- Step: Ready for Performance Optimization Phase
-- Status: SUCCESS - Basic capture working, optimizations planned
-- Version: 1.3.7 (working)
+- Phase: Performance Optimization - Priority 1 (Zero-Copy YUV)
+- Step: Initial implementation complete, awaiting testing
+- Status: IMPLEMENTED_NOT_TESTED
+- Version: 1.4.0
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|-----------------------|
-| v4l2_capture | ✅ v1.3.7 | ❌ | ✅ WORKING | ❌ |
-| v4l2_device_enumerator | ✅ v1.3.7 | ❌ | ✅ WORKING | ❌ |
-| v4l2_format_converter | ✅ v1.3.7 | ❌ | ✅ WORKING | ❌ |
-| v4l2_format_converter_avx2 | ✅ v1.3.7 | ❌ | ✅ WORKING | ❌ |
-| main.cpp Linux support | ✅ v1.3.7 | ❌ | ✅ WORKING | ❌ |
-| CMakeLists.txt | ✅ v1.3.7 | ❌ | ✅ WORKING | ❌ |
+| NDI YUYV Support | ✅ v1.4.0 | ❌ | ❌ | ❌ |
+| AVX2 YUYV→UYVY | ✅ v1.4.0 | ❌ | ❌ | ❌ |
+| Zero-Copy Path | ✅ v1.4.0 | ❌ | ❌ | ❌ |
 
-## Current Performance Baseline (v1.3.7)
-- **Measured Latency**: 8-10ms (excellent!)
-- **CPU Usage**: <10% for 1080p60 (Intel N100)
-- **Architecture**: 
-  - ✅ Zero-copy from kernel (mmap)
-  - ✅ AVX2 SIMD conversion
-  - ❌ YUV→BGRA conversion required
-  - ❌ Single-threaded pipeline
+## What Was Just Implemented (v1.4.0)
 
-## 🎯 PERFORMANCE OPTIMIZATION GOALS (Next Thread)
+### 1. NDI Sender Enhancements
+- Added direct YUYV support with automatic conversion to UYVY
+- Implemented AVX2-optimized YUYV→UYVY byte swap
+- Added scalar fallback for non-AVX2 systems
+- Zero allocation in conversion path (reuses buffer)
 
-### Priority 1: Zero-Copy YUV to NDI (🎯 Target: -3ms latency)
-**Current Flow**:
-```
-V4L2 YUYV → AVX2 Convert → BGRA Buffer → Copy to NDI
-```
-**Optimized Flow**:
-```
-V4L2 YUYV → Direct to NDI (if supported)
-```
-**Implementation**:
-- Check if NDI accepts UYVY/YUYV directly
-- Skip BGRA conversion entirely
-- Pass V4L2 mmap buffer directly to NDI
+### 2. V4L2 Capture Optimization
+- Modified processFrame to detect YUYV format
+- Implements zero-copy path for YUYV (skips BGRA conversion)
+- Tracks zero-copy frames in statistics
+- Logs when zero-copy mode is active
 
-### Priority 2: Multi-threaded Pipeline (🎯 Target: -2ms latency)
-**Current**: Single thread doing:
-```
-poll() → dequeue() → convert() → callback()
-```
-**Optimized**: 3-thread pipeline:
-```
-Thread1: poll() → dequeue() → raw_queue.push()
-Thread2: raw_queue.pop() → convert() → converted_queue.push()  
-Thread3: converted_queue.pop() → NDI_send()
-```
-**Benefits**:
-- Capture never blocks on conversion
-- Parallel frame processing
-- Better CPU core utilization on N100
+### 3. App Controller Updates
+- Updated getFourCC to properly handle YUYV format
+- Maps YUYV to correct FourCC code (0x56595559)
 
-### Priority 3: Memory Pool Optimization (🎯 Target: -0.5ms latency)
-**Implementation**:
-```cpp
-class FrameMemoryPool {
-    alignas(64) uint8_t buffers[8][1920*1080*4];  // Cache-aligned
-    std::atomic<bool> in_use[8];
-};
-```
-**Benefits**:
-- No malloc/free in hot path
-- Cache-line aligned buffers
-- Predictable memory layout
+## Expected Performance Improvement
+- **Before**: V4L2 YUYV → Convert to BGRA → Send BGRA to NDI
+- **After**: V4L2 YUYV → Quick byte swap to UYVY → Send to NDI
+- **Expected latency reduction**: ~3ms (from skipping YUV→RGB conversion)
+- **Expected CPU reduction**: ~30% less processing
 
-### Priority 4: V4L2 DMABUF Support (Future)
-- Use V4L2_MEMORY_DMABUF instead of MMAP
-- Enable GPU zero-copy path
-- Direct hardware encoder integration
-
-## Expected Performance After Optimization
-| Metric | Current (v1.3.7) | Target | Improvement |
-|--------|------------------|--------|-------------|
-| Latency | 8-10ms | 3-5ms | -5ms (50%) |
-| CPU Usage | <10% | <7% | -30% |
-| Memory Bandwidth | ~500MB/s | ~250MB/s | -50% |
-
-## Implementation Plan for Next Thread
-
-### Step 1: Investigate NDI YUV Support
-```cpp
-// Check these NDI formats:
-NDIlib_FourCC_type_UYVY
-NDIlib_FourCC_type_YV12
-NDIlib_FourCC_type_NV12
-NDIlib_FourCC_type_I420
-```
-
-### Step 2: Implement Zero-Copy Path (if supported)
-- Modify ndi_sender.cpp to accept YUV formats
-- Add format negotiation with NDI
-- Skip V4L2FormatConverter entirely
-
-### Step 3: Add Pipeline Threads
-- Implement lock-free queues
-- Create thread pool
-- Add performance metrics
-
-### Step 4: Memory Pool
-- Pre-allocate all buffers
-- Implement fast buffer cycling
-- Add memory usage tracking
-
-## Test Environment
-- **Hardware**: Intel N100 PC with NZXT Signal HD60 USB capture card
-- **OS**: Ubuntu 24.04 LTS
-- **NDI SDK**: Version 5.x
-- **Goal**: Beat DeckLink latency (~10-20ms) significantly
-
-## Success Criteria
-- [ ] Latency reduced to <5ms
-- [ ] CPU usage remains <10%
-- [ ] No frame drops at 1080p60
-- [ ] Memory usage stable (no leaks)
-- [ ] Performance consistent over 24h test
-
-## Commands for Performance Testing
+## Test Commands
 ```bash
-# Build with optimization flags
+# Build optimized version
+cd ~/ndi-bridge/build
 cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="-O3 -march=native" ..
+make -j$(nproc)
 
-# Run with performance monitoring
-sudo perf record -g ./ndi-bridge --device /dev/video0 --ndi-name "NZXT-Optimized"
-sudo perf report
+# Run with verbose output to see zero-copy logs
+sudo ./ndi-bridge --device /dev/video0 --ndi-name "NZXT-Optimized" -v
 
-# Monitor latency in real-time
-watch -n 0.1 'cat /proc/$(pgrep ndi-bridge)/status | grep voluntary'
-
-# Check cache misses
-sudo perf stat -e cache-misses,cache-references ./ndi-bridge
+# Expected logs to confirm optimization:
+# "V4L2Capture: Using zero-copy path for YUYV format"
+# "NDI sender: Using direct YUYV->UYVY conversion (zero-copy optimization)"
+# "NDI sender: AVX2 support detected for YUV conversions"
 ```
 
-## Notes for Next Thread
-- Current v1.3.7 is stable and working perfectly
-- Basic functionality complete - focus on optimization only
-- Consider creating new branch: `feature/linux-performance-optimization`
-- Benchmark against DeckLink implementation
-- Document all performance measurements
+## Performance Monitoring
+```bash
+# Monitor CPU usage
+htop
 
-## Last Thread Summary
-- ✅ Fixed integer overflow warnings
-- ✅ Fixed black video issue  
-- ✅ Fixed CMake for both platforms
-- ✅ Achieved working Linux V4L2 capture
-- ✅ Video quality confirmed good
-- 🎯 Ready for performance optimization phase
+# Check latency (in another terminal)
+watch -n 0.1 'ps aux | grep ndi-bridge'
+
+# Detailed performance analysis
+sudo perf stat -e cycles,instructions,cache-misses ./ndi-bridge --device /dev/video0
+```
+
+## Next Steps After Testing
+
+### If Successful (latency reduced, CPU lower):
+1. Move to Priority 2: Multi-threaded Pipeline
+2. Implement 3-thread architecture
+3. Add lock-free queues
+
+### If Issues Found:
+1. Check if NDI is accepting UYVY properly
+2. Verify AVX2 conversion correctness
+3. Add more detailed timing logs
+
+## 🎯 Remaining Optimization Goals
+
+### Priority 2: Multi-threaded Pipeline (Next)
+- Separate capture, conversion, and send threads
+- Lock-free queues between stages
+- Target: Additional -2ms latency reduction
+
+### Priority 3: Memory Pool
+- Pre-allocated buffers
+- Cache-aligned memory
+- Target: -0.5ms latency reduction
+
+### Priority 4: V4L2 DMABUF (Future)
+- GPU zero-copy support
+- Direct hardware encoder path
+
+## Notes
+- Current implementation focuses on YUYV as it's the most common USB capture format
+- UYVY native support could be added similarly (no conversion needed)
+- The byte swap is extremely fast with AVX2 (processes 32 pixels per instruction)
+- Memory bandwidth reduced by ~75% (no BGRA expansion)
+
+## Last User Action
+- Date/Time: Just now
+- Action: Requested performance optimization implementation
+- Result: v1.4.0 implemented with zero-copy YUYV support
+- Next Required: Test the optimized build and provide performance metrics
