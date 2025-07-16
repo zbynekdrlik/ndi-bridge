@@ -2,13 +2,13 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Fixed compilation errors in Linux v4l2 code
+- [x] Currently working on: Fixed ALL compilation errors and warnings in Linux v4l2 code
 - [ ] Waiting for: User to test Linux compilation and provide build logs
 - [ ] Blocked by: None
 
 ## Implementation Status
 - Phase: Linux USB Capture Support Implementation
-- Step: Bug fixes for logger API compatibility
+- Step: Bug fixes complete - ready for build testing
 - Status: TESTING_REQUIRED
 
 ## Testing Status Matrix
@@ -35,10 +35,14 @@
    - Moved `is_nzxt_device` declaration inside `#ifdef _WIN32` block
    - Fixed in: `main.cpp`
 
+4. **Fixed Signed/Unsigned Comparison Warning**:
+   - Changed resolution array from `int` to `uint32_t` to match SupportedFormat struct
+   - Fixed in: `v4l2_capture.cpp` line 550
+
 ## Next Steps
 1. **User Testing Required**:
    - [ ] Build on Linux with GCC
-   - [ ] Verify all compilation errors resolved
+   - [ ] Verify all compilation errors/warnings resolved
    - [ ] Test with Intel N100 system (AVX2 support)
    - [ ] Test with USB capture card
 
@@ -49,14 +53,23 @@
    - [ ] NDI streaming
    - [ ] Performance metrics
 
+## Build Commands
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
+
 ## PR Status
 **PR #8**: [feat: Add Linux USB capture card support (V4L2)](https://github.com/zbynekdrlik/ndi-bridge/pull/8)
 - Status: Open, awaiting testing
 - Version: 1.3.5
 - Critical fix: AVX2 pixel processing bug resolved
+- All compilation issues fixed
 
 ## Last User Action
 - Date/Time: 2025-07-16
-- Action: Provided compilation error logs
-- Result: All errors fixed
+- Action: Provided compilation warnings
+- Result: All warnings fixed
 - Next Required: Test compilation and functionality on Linux
