@@ -5,6 +5,27 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.5] - 2025-07-17
+
+### Added
+- **BGRA Zero-Copy Support**: Extended zero-copy to BGRA format
+  - NDI natively supports BGRA - no conversion needed
+  - Works with PC HDMI outputs which typically use RGB/BGRA
+  - Same performance benefits as UYVY zero-copy
+  - Automatic format detection for both UYVY and BGRA
+
+### Changed
+- **Zero-Copy Logic**: Now checks for both UYVY and BGRA formats
+  - ProcessFrameZeroCopy handles both formats
+  - Appropriate logging for each format type
+  - Updated version string to reflect dual format support
+
+### Technical Details
+- PC HDMI outputs typically use RGB444/BGRA format
+- Game consoles and cameras typically use YCbCr422/UYVY
+- Both formats now achieve 100% zero-copy performance
+- ~40-50ms total latency reduction vs v1.5.x
+
 ## [1.6.4] - 2025-07-17
 
 ### Fixed
@@ -460,6 +481,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.6.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.4...v1.6.5
 [1.6.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.3...v1.6.4
 [1.6.3]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.1...v1.6.2
