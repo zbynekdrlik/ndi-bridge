@@ -5,6 +5,21 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.4] - 2025-07-17
+
+### Fixed
+- **Critical DeckLink SDK Compliance**: Restored required buffer access calls
+  - Re-added StartAccess(bmdBufferAccessRead) before accessing frame data
+  - Re-added EndAccess(bmdBufferAccessRead) after processing
+  - These calls are MANDATORY per DeckLink SDK documentation
+  - Without them, GetBytes() may return invalid data
+  - Fixes zero-copy functionality that was broken in v1.6.1-v1.6.3
+
+### Technical Details
+- Zero-copy optimization now properly complies with SDK requirements
+- Maintains all performance benefits while ensuring correct operation
+- This completes the chain of fixes needed for DeckLink optimization
+
 ## [1.6.3] - 2025-07-17
 
 ### Fixed
@@ -445,6 +460,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.6.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.3...v1.6.4
 [1.6.3]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.0...v1.6.1
