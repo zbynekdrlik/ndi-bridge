@@ -2,13 +2,13 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Media Foundation latency regression fix
-- [ ] Waiting for: User to test v1.6.6 with 60fps camera
+- [x] Currently working on: Fixed compilation errors in fix/media-foundation-latency branch
+- [ ] Waiting for: User to build and test v1.6.6 with 60fps camera
 - [ ] Blocked by: Need latency measurement results
 
 ## Implementation Status
 - Phase: **Latency Fix** - Media Foundation optimizations
-- Step: PR #13 created, awaiting testing
+- Step: PR #13 created, compilation errors fixed
 - Status: IMPLEMENTED_NOT_TESTED
 - Version: 1.6.6
 
@@ -26,7 +26,20 @@
 - ✅ Updated version to 1.6.6
 - ✅ Updated CHANGELOG with detailed entry
 - ✅ PR created with comprehensive description
+- ✅ Fixed compilation errors:
+  - Added missing version constants to version.h (NDI_BRIDGE_VERSION, NDI_BRIDGE_BUILD_TYPE, NDI_BRIDGE_PLATFORM)
+  - Updated CMakeLists.txt version to 1.6.6
+  - Alignment warnings in frame_queue.h are benign (alignas(64) for cache line optimization)
 - ⏳ Awaiting user testing and latency measurements
+
+## Compilation Issues Fixed
+1. **Version constants**: main.cpp was using undefined constants
+   - Solution: Added NDI_BRIDGE_VERSION, NDI_BRIDGE_BUILD_TYPE, NDI_BRIDGE_PLATFORM to version.h
+2. **CMake version mismatch**: CMakeLists.txt had version 1.5.0
+   - Solution: Updated to 1.6.6 to match version.h
+3. **Alignment warnings**: C4324 warnings for frame_queue.h
+   - These are expected due to alignas(64) directives for cache optimization
+   - No fix needed - warnings are informational only
 
 ## Problem Analysis
 - User reported Media Foundation latency regression:
@@ -51,7 +64,7 @@
      - MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING=FALSE
      - MF_LOW_LATENCY=TRUE
 
-3. **Version**: Updated to 1.6.6
+3. **Version**: Updated to 1.6.6 across all files
 
 ## Testing Required
 - User needs to build and test with 60fps camera
@@ -65,16 +78,19 @@
 - Active feature branches: fix/update-readme-to-v165, fix/media-foundation-latency
 
 ## Next Steps
-1. User to test PR #13 and provide latency measurements
-2. If latency still high, consider removing threading:
+1. User to build and test PR #13
+2. Verify compilation succeeds with the fixes
+3. Measure latency with 60fps camera
+4. If latency still high, consider removing threading:
    - Refactor to match reference's synchronous model
    - Direct ReadSample → NDI send in main thread
-3. Once latency is acceptable, merge PR #13
-4. Consider merging PR #12 (README update)
-5. Check TODO.md for next priority items
+5. Once latency is acceptable, merge PR #13
+6. Consider merging PR #12 (README update)
+7. Check TODO.md for next priority items
 
 ## Quick Reference
 - Current version in PR: 1.6.6
 - Branch: fix/media-foundation-latency
 - PR: #13
 - Key fix: NDI clock_video=false + no sleep in capture
+- Compilation fixes: version.h updated, CMakeLists.txt updated
