@@ -5,6 +5,32 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] - 2025-07-17
+
+### Fixed
+- **AppController Callback Initialization**: Fixed second callback order issue
+  - AppController was setting callbacks AFTER calling startCapture()
+  - Fixed order: setFrameCallback() → setErrorCallback() → startCapture()
+  - Ensures callbacks are ready when frames start arriving
+
+### Technical Details
+- Completes the callback initialization chain
+- Works with v1.6.2 fix to enable proper frame delivery
+- Both fixes required for DeckLink to receive frames
+
+## [1.6.2] - 2025-07-17
+
+### Fixed
+- **DeckLink Callback Initialization**: Fixed frame delivery issue
+  - Frame callback was being set BEFORE device initialization
+  - Fixed order: Initialize() → SetFrameCallback() → StartCapture()
+  - DeckLink SDK requires device initialization before callbacks
+
+### Technical Details
+- Fixes "No frames received" error
+- Enables VideoInputFrameArrived callback to deliver frames
+- First of two initialization order fixes needed
+
 ## [1.6.1] - 2025-07-16
 
 ### Added
@@ -419,6 +445,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.6.3]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.2...v1.6.3
+[1.6.2]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.1...v1.6.2
 [1.6.1]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.0...v1.6.1
 [1.6.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.4.0...v1.5.0
