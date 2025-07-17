@@ -126,10 +126,10 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
             frame_size = video_format_.width * video_format_.height * 4;
         }
         
-        // Create queues
-        capture_to_convert_queue_ = std::make_unique<FrameQueue>(kCaptureQueueDepth, frame_size);
-        convert_to_send_queue_ = std::make_unique<FrameQueue>(kConvertQueueDepth, frame_size);
-        requeue_queue_ = std::make_unique<BufferIndexQueue>(kBufferCount);
+        // Create queues with dynamic depths based on mode
+        capture_to_convert_queue_ = std::make_unique<FrameQueue>(getCaptureQueueDepth(), frame_size);
+        convert_to_send_queue_ = std::make_unique<FrameQueue>(getConvertQueueDepth(), frame_size);
+        requeue_queue_ = std::make_unique<BufferIndexQueue>(getBufferCount());
         
         // Create thread pool
         thread_pool_ = std::make_unique<PipelineThreadPool>();
@@ -223,6 +223,12 @@ void V4L2Capture::stopCapture() {
                        std::to_string(stats_.queue1_drops) +
                        ", Convert->Send: " + std::to_string(stats_.queue2_drops));
         }
+        
+        if (stats_.e2e_samples > 0) {
+            Logger::info("V4L2Capture: E2E latency - Avg: " + 
+                       std::to_string(stats_.avg_e2e_latency_ms) + "ms" +
+                       ", Max: " + std::to_string(stats_.max_e2e_latency_ms) + "ms");
+        }
     }
     
     // Stop streaming
@@ -258,6 +264,16 @@ std::string V4L2Capture::getLastError() const {
     return last_error_;
 }
 
+void V4L2Capture::setLowLatencyMode(bool enable) {
+    low_latency_mode_ = enable;
+    
+    if (enable) {
+        // Force single-threaded mode for lowest latency
+        use_multi_threading_ = false;
+        Logger::info("V4L2Capture: Low latency mode enabled - forcing single-threaded operation");
+    }
+}
+
 bool V4L2Capture::initializeDevice(const std::string& device_path) {
     device_path_ = device_path;
     
@@ -283,7 +299,7 @@ void V4L2Capture::shutdownDevice() {
 bool V4L2Capture::setupBuffers() {
     v4l2_requestbuffers reqbuf;
     memset(&reqbuf, 0, sizeof(reqbuf));
-    reqbuf.count = kBufferCount;
+    reqbuf.count = getBufferCount();
     reqbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     reqbuf.memory = V4L2_MEMORY_MMAP;
     
@@ -332,7 +348,8 @@ bool V4L2Capture::setupBuffers() {
         }
     }
     
-    Logger::info("V4L2Capture: Setup " + std::to_string(buffers_.size()) + " buffers");
+    Logger::info("V4L2Capture: Setup " + std::to_string(buffers_.size()) + 
+               " buffers" + (low_latency_mode_ ? " (low latency mode)" : ""));
     return true;
 }
 
@@ -397,8 +414,8 @@ void V4L2Capture::captureThreadMulti() {
             }
         }
         
-        // Poll for frame availability (1ms timeout for responsiveness)
-        int ret = poll(&pfd, 1, 1);
+        // Poll for frame availability with proper timeout
+        int ret = poll(&pfd, 1, getPollTimeout());
         
         if (ret < 0) {
             if (errno == EINTR) {
@@ -536,8 +553,7 @@ void V4L2Capture::convertThreadMulti() {
         
         FrameQueue::Frame frame;
         if (!capture_to_convert_queue_->tryPop(frame)) {
-            // No frames available - yield CPU
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            // No frames available - tight loop, no sleep for lowest latency
             continue;
         }
         
@@ -619,8 +635,7 @@ void V4L2Capture::sendThreadMulti() {
         
         FrameQueue::Frame frame;
         if (!convert_to_send_queue_->tryPop(frame)) {
-            // No frames available - yield CPU
-            std::this_thread::sleep_for(std::chrono::microseconds(100));
+            // No frames available - tight loop, no sleep for lowest latency
             continue;
         }
         
@@ -637,12 +652,25 @@ void V4L2Capture::sendThreadMulti() {
             callback(frame.data, frame.size, frame.timestamp_ns, frame.format);
         }
         
-        // Track send time
+        // Track send time and E2E latency
         auto send_time = std::chrono::duration<double, std::milli>(
             std::chrono::high_resolution_clock::now() - send_start).count();
         
+        // Calculate E2E latency if timestamp is valid
+        auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+        double e2e_ms = (now_ns - frame.timestamp_ns) / 1000000.0;
+        
         std::lock_guard<std::mutex> lock(stats_mutex_);
         stats_.avg_send_time_ms = 0.9 * stats_.avg_send_time_ms + 0.1 * send_time;
+        
+        if (e2e_ms > 0 && e2e_ms < 1000) { // Sanity check
+            stats_.avg_e2e_latency_ms = 0.9 * stats_.avg_e2e_latency_ms + 0.1 * e2e_ms;
+            if (e2e_ms > stats_.max_e2e_latency_ms) {
+                stats_.max_e2e_latency_ms = e2e_ms;
+            }
+            stats_.e2e_samples++;
+        }
     }
     
     Logger::info("V4L2Send: Send thread stopped");
@@ -672,8 +700,8 @@ void V4L2Capture::captureThreadSingle() {
     uint64_t local_frame_count = 0;
     
     while (!should_stop_) {
-        // Use low timeout for minimal latency (5ms)
-        int ret = poll(&pfd, 1, 5);
+        // Use proper timeout based on mode
+        int ret = poll(&pfd, 1, getPollTimeout());
         
         if (ret < 0) {
             if (errno == EINTR) {
@@ -765,6 +793,12 @@ void V4L2Capture::captureThreadSingle() {
                 ", Max: " + std::to_string(stats_.max_latency_ms) + "ms" +
                 ", Zero-copy: " + std::to_string(stats_.zero_copy_frames));
             
+            if (stats_.e2e_samples > 0) {
+                Logger::debug("V4L2Capture: E2E latency - Avg: " + 
+                            std::to_string(stats_.avg_e2e_latency_ms) + "ms" +
+                            ", Max: " + std::to_string(stats_.max_e2e_latency_ms) + "ms");
+            }
+            
             last_stats_time = now;
             local_frame_count = 0;
         }
@@ -848,6 +882,20 @@ void V4L2Capture::processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf
     } else {
         // Pass through unsupported format
         callback(buffer.start, v4l2_buf.bytesused, timestamp, video_format_);
+    }
+    
+    // Track E2E latency in single-threaded mode
+    auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    double e2e_ms = (now_ns - timestamp) / 1000000.0;
+    
+    if (e2e_ms > 0 && e2e_ms < 1000) { // Sanity check
+        std::lock_guard<std::mutex> lock(stats_mutex_);
+        stats_.avg_e2e_latency_ms = 0.9 * stats_.avg_e2e_latency_ms + 0.1 * e2e_ms;
+        if (e2e_ms > stats_.max_e2e_latency_ms) {
+            stats_.max_e2e_latency_ms = e2e_ms;
+        }
+        stats_.e2e_samples++;
     }
 }
 
