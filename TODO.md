@@ -1,7 +1,3 @@
-- Code Consolidation: Merge v4l2_capture_multi.cpp and v4l2_capture.cpp
-- Performance Monitoring: Add FPS counter and latency measurements
-- Error Recovery: Implement automatic device reconnection
-- Configuration File: Support for config files instead of command-line only
 - Audio Support: Add audio capture and synchronization
 - Multiple Outputs: Support sending to multiple NDI destinations
 - Web UI: Simple web interface for remote monitoring/control
@@ -9,3 +5,8 @@
 - Docker Support: Containerized deployment option
 - Unit Tests: Comprehensive test coverage
 - CI/CD Pipeline: Automated builds and releases
+- Configuration File: Support for config files instead of command-line only
+- Error Recovery: Enhance automatic device reconnection (partial support exists)
+- Cross-platform DeckLink: Add DeckLink support for Linux
+- MJPEG Support: Add MJPEG decompression for V4L2 devices
+- Network Diagnostics: NDI network bandwidth and latency monitoring
