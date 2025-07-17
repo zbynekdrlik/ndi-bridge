@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.5.0 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.6.5 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -252,13 +252,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
-# Set version definitions
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    NDI_BRIDGE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
-    NDI_BRIDGE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
-    NDI_BRIDGE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
-    NDI_BRIDGE_VERSION_STRING="${PROJECT_VERSION}"
-)
+# Note: Version definitions are handled in src/common/version.h
+# No need to set them here as compile definitions
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE ${NDI_LIBRARY})
