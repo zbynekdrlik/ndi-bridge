@@ -78,18 +78,17 @@ bool DeckLinkCapture::startCapture(const std::string& device_name) {
             targetDevice = devices[0].name;
         }
         
-        // Initialize device FIRST - v1.6.2 fix
-        if (!m_captureDevice->Initialize(targetDevice)) {
-            throw std::runtime_error("Failed to initialize DeckLink device: " + targetDevice);
-        }
-        
-        // Set frame callback AFTER initialization - v1.6.2 fix
-        // This ensures the device is ready to handle callbacks
+        // Set frame callback directly on the device - no polling needed!
         m_captureDevice->SetFrameCallback(
             [this](const FrameData& frame) {
                 onFrameReceived(frame);
             }
         );
+        
+        // Initialize device
+        if (!m_captureDevice->Initialize(targetDevice)) {
+            throw std::runtime_error("Failed to initialize DeckLink device: " + targetDevice);
+        }
         
         // Start capture
         if (!m_captureDevice->StartCapture()) {
