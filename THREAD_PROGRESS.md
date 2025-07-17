@@ -2,54 +2,54 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: COMPLETE - DeckLink optimization merged!
-- [ ] Waiting for: Nothing - ready for next feature
+- [x] Currently working on: Documentation consistency check
+- [ ] Waiting for: User review and approval of PR #12
 - [ ] Blocked by: None
 
 ## Implementation Status
-- Phase: **COMPLETE** - DeckLink Latency Optimization
-- Step: Merged to main
-- Status: PRODUCTION_READY
-- Version: 1.6.5 (in main branch)
+- Phase: **Documentation Fix** - README version update
+- Step: PR created and ready for review
+- Status: WAITING_FOR_REVIEW
+- Version: Documentation update only (no code changes)
 
-## Recent Completion Summary
-**DeckLink Latency Optimization - PR #11 MERGED**
-- ✅ v1.6.5 tested successfully
-- ✅ 100% zero-copy achieved (475/475 frames)
-- ✅ ~40-50ms latency reduction confirmed
-- ✅ PR #11 merged to main branch
-- ✅ TODO.md created for future work items
-
-## Performance Results
-```
-[DeckLink] TRUE ZERO-COPY: BGRA direct to NDI (v1.6.5)
-[DeckLink] Performance stats:
-  - Zero-copy frames: 475
-  - Direct callback frames: 475
-  - Zero-copy percentage: 100.0%
-  - Direct callback percentage: 100.0%
-[Status] Frames Dropped: 0 (0.00%)
-```
+## Documentation Fix Details
+**Pull Request #12 - Update README.md to v1.6.5**
+- ✅ Created feature branch: `fix/update-readme-to-v165`
+- ✅ Updated README.md version badge from 1.5.0 to 1.6.5
+- ✅ Added DeckLink optimization details to features
+- ✅ Updated performance metrics with v1.6.x improvements
+- ✅ Added BGRA zero-copy support documentation
+- ✅ Updated Performance Evolution table
+- ✅ PR created with comprehensive description
 
 ## Last Session Summary
 - Date: 2025-07-17
-- Work: DeckLink optimization testing and merge
-- Result: Complete success - all goals achieved
-- Known Issue: NDI shows 2 connections when only 1 active (tracked in TODO.md)
+- Work: Documentation consistency review
+- Result: Found README showing outdated version 1.5.0 instead of 1.6.5
+- Action: Created PR #12 to fix documentation
 
 ## Repository State
 - Main branch: v1.6.5
-- Open PRs: None
-- Active feature branches: None (decklink branch can be deleted)
-- Documentation: Up to date
-- CHANGELOG: Updated through v1.6.5
+- Open PRs: #12 (fix/update-readme-to-v165)
+- Active feature branches: fix/update-readme-to-v165
+- Documentation: README.md updated in PR #12
+- CHANGELOG: Up to date through v1.6.5
 
-## Ready for Next Feature
-With DeckLink optimization complete, the project is ready for the next improvement.
-See `TODO.md` for prioritized list of future enhancements.
+## Documentation Consistency Findings
+During the deep research, I found:
+1. **Version mismatch**: README showed v1.5.0 but actual version is v1.6.5
+2. **Missing features**: DeckLink optimizations from v1.6.x not documented
+3. **Outdated metrics**: Performance highlights didn't include DeckLink improvements
+4. All other documentation appears consistent and up-to-date
 
-## Quick Start for Next Thread
-1. Check `TODO.md` for next priority item
-2. Create new feature branch
-3. Update version to 1.7.0 for next feature
-4. Create PR immediately after branch creation
+## Next Steps
+1. User to review and merge PR #12
+2. After merge, delete `fix/update-readme-to-v165` branch
+3. Check TODO.md for next priority item
+4. Consider "Code Consolidation" task marked as HIGH PRIORITY
+
+## Quick Reference
+- Current version in code: 1.6.5 (verified in src/common/version.h)
+- CHANGELOG.md: Complete through v1.6.5
+- README.md: Will be updated via PR #12
+- Design philosophy: Followed (simple documentation fix)

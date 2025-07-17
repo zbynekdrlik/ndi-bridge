@@ -1,30 +1,38 @@
 # NDI Bridge
 
-[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
+[![Version](https://img.shields.io/badge/version-1.6.5-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capture devices to NDI (Network Device Interface) streams. It enables seamless integration of HDMI capture cards, webcams, and professional video equipment into IP-based video workflows.
 
-## 🚀 Performance Highlights (v1.5.0)
+## 🚀 Performance Highlights (v1.6.5)
 
-- **Sub-millisecond latency**: 0.73ms average (95.5% reduction from v1.0.0)
-- **Zero-copy pipeline**: 100% direct memory access
+- **Sub-millisecond latency**: 0.73ms average on Linux, ~40-50ms reduction on DeckLink
+- **Zero-copy pipeline**: 100% direct memory access for UYVY and BGRA formats
 - **Multi-threaded architecture**: Parallel capture, conversion, and transmission
 - **AVX2 optimizations**: Hardware-accelerated format conversion
 - **Lock-free queues**: Minimal thread contention
+- **DeckLink optimization**: Direct callback mode with pre-allocated buffers
 
 ## Features
 
-### Current Features (v1.5.0)
+### Current Features (v1.6.5)
 - ✅ **Ultra-low latency pipeline** with multi-threading (Linux)
 - ✅ **Media Foundation** capture support (Windows)
-- ✅ **DeckLink** capture support (Blackmagic devices - Windows)
+- ✅ **DeckLink** capture support with extreme latency optimization (Windows)
+  - Direct callback mode bypassing frame queues
+  - True zero-copy for UYVY and BGRA formats
+  - Pre-allocated conversion buffers
+  - 100% zero-copy performance achieved
 - ✅ **V4L2** capture support with zero-copy optimization (Linux)
 - ✅ **AVX2 SIMD Optimizations** for format conversion
 - ✅ **Multi-threaded pipeline** with CPU core affinity (Linux)
 - ✅ **Lock-free frame queues** for thread communication
-- ✅ **Zero-copy YUYV support** with direct NDI transmission
+- ✅ **Zero-copy format support**:
+  - YUYV/YUY2 with AVX2-accelerated byte swapping
+  - UYVY direct to NDI (no conversion needed)
+  - BGRA direct to NDI (no conversion needed)
 - ✅ **Cross-platform support** (Windows and Linux)
 - ✅ **Interactive device selection** with numbered menu
 - ✅ **Command-line interface** with flexible parameters
@@ -209,12 +217,21 @@ ndi-bridge.exe -t dl --list-devices  # List DeckLink devices
 - **Frame Drops**: < 0.1%
 - **CPU Usage**: < 15% total across 3 cores
 
+### DeckLink (Windows - v1.6.5)
+- **Latency Reduction**: ~40-50ms vs standard implementations
+- **Zero-copy Performance**: 100% for UYVY and BGRA formats
+- **Direct Callback**: 100% (bypasses frame queue entirely)
+- **Frame Rate**: 60 FPS sustained
+- **Frame Drops**: 0%
+
 ### Performance Evolution
 | Version | Latency | Improvement |
 |---------|---------|-------------|
 | v1.0.0 | 16.068ms | Baseline |
 | v1.4.0 | 7.621ms | -52% (Zero-copy) |
 | v1.5.0 | 0.730ms | -95.5% (Multi-threaded) |
+| v1.6.0 | ~40-50ms reduction | DeckLink optimization |
+| v1.6.5 | 100% zero-copy | BGRA support added |
 
 ## Supported Devices
 
@@ -231,6 +248,7 @@ ndi-bridge.exe -t dl --list-devices  # List DeckLink devices
 - DeckLink Studio series
 - Automatic format detection
 - No-signal handling
+- Zero-copy for UYVY (YCbCr 422) and BGRA (RGB 444) formats
 
 ### V4L2 (Linux)
 - USB webcams
