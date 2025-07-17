@@ -69,6 +69,25 @@ This file tracks future improvements and feature ideas for the NDI Bridge projec
 
 ## 🔧 Code Quality
 
+### Code Consolidation (HIGH PRIORITY)
+- [ ] **Consolidate capture implementations into unified low-latency architecture**
+  - Media Foundation, DeckLink, and Linux V4L2 have duplicate code
+  - Create common base classes with platform-specific implementations
+  - Share zero-copy logic, frame callbacks, and buffer management
+  - Maintain extreme low-latency optimizations across all platforms
+  - Benefits:
+    - Reduce code duplication
+    - Easier maintenance
+    - Consistent performance across platforms
+    - Single place to optimize
+  - Key areas to consolidate:
+    - Frame callback mechanisms
+    - Buffer pre-allocation strategies
+    - Zero-copy paths
+    - Statistics and performance tracking
+    - Format conversion pipelines
+
+### Testing & CI
 - [ ] Add unit tests for critical components
 - [ ] Set up CI/CD pipeline
 - [ ] Code coverage reporting
