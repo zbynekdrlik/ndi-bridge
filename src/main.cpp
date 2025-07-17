@@ -65,6 +65,8 @@ void printUsage(const char* program_name) {
     std::cout << "  -t, --type <type>       Capture type: mf (Media Foundation) or dl (DeckLink)" << std::endl;
 #else
     std::cout << "  -t, --type <type>       Capture type: v4l2 (Video4Linux2)" << std::endl;
+    std::cout << "  --single-thread         Use single-threaded capture (Linux V4L2 only)" << std::endl;
+    std::cout << "  --low-latency           Enable low latency mode (Linux V4L2 only)" << std::endl;
 #endif
     std::cout << "  -d, --device <n>        Capture device name (default: interactive selection)" << std::endl;
     std::cout << "  -n, --ndi-name <n>      NDI sender name (default: 'NDI Bridge')" << std::endl;
@@ -76,6 +78,16 @@ void printUsage(const char* program_name) {
     std::cout << "  -h, --help              Show this help message" << std::endl;
     std::cout << "  --version               Show version information" << std::endl;
     std::cout << std::endl;
+#ifdef __linux__
+    std::cout << "Linux V4L2 Performance Options:" << std::endl;
+    std::cout << "  --single-thread         Force single-threaded capture (lower latency)" << std::endl;
+    std::cout << "  --low-latency           Enable aggressive low latency settings:" << std::endl;
+    std::cout << "                          - Forces single-threaded mode" << std::endl;
+    std::cout << "                          - Reduces buffer count to minimum (4)" << std::endl;
+    std::cout << "                          - Uses immediate polling" << std::endl;
+    std::cout << "                          - Minimizes queue depths" << std::endl;
+    std::cout << std::endl;
+#endif
     std::cout << "Press Ctrl+C to stop the application while running." << std::endl;
 }
 
@@ -251,6 +263,8 @@ struct CommandLineArgs {
     int max_retries = -1;
     bool use_positional = false;
     bool use_interactive = false;
+    bool single_thread = false;
+    bool low_latency = false;
     
     CommandLineArgs() {
 #ifdef _WIN32
@@ -320,6 +334,10 @@ CommandLineArgs parseArgs(int argc, char* argv[]) {
             args.list_devices = true;
         } else if (arg == "-v" || arg == "--verbose") {
             args.verbose = true;
+        } else if (arg == "--single-thread") {
+            args.single_thread = true;
+        } else if (arg == "--low-latency") {
+            args.low_latency = true;
         } else if (arg == "--no-retry") {
             args.auto_retry = false;
         } else if (arg == "--retry-delay") {
@@ -440,6 +458,25 @@ int main(int argc, char* argv[]) {
         if (args.ndi_name.empty()) {
             args.ndi_name = "NDI Bridge";
         }
+        
+#ifdef __linux__
+        // Ask about performance options in interactive mode
+        std::cout << "\nPerformance options:" << std::endl;
+        std::cout << "Enable low latency mode? (y/n) [n]: ";
+        std::string response;
+        std::getline(std::cin, response);
+        if (response == "y" || response == "Y") {
+            args.low_latency = true;
+            std::cout << "Low latency mode enabled" << std::endl;
+        } else if (!args.low_latency) {
+            std::cout << "Use single-threaded capture? (y/n) [n]: ";
+            std::getline(std::cin, response);
+            if (response == "y" || response == "Y") {
+                args.single_thread = true;
+                std::cout << "Single-threaded mode enabled" << std::endl;
+            }
+        }
+#endif
     }
     
     // Set up signal handlers
@@ -492,7 +529,18 @@ int main(int argc, char* argv[]) {
 #elif defined(__linux__)
     if (args.capture_type == CaptureType::V4L2) {
         ndi_bridge::Logger::info("Using V4L2 capture");
-        g_capture_device = std::make_unique<ndi_bridge::v4l2::V4L2Capture>();
+        auto v4l2_capture = std::make_unique<ndi_bridge::v4l2::V4L2Capture>();
+        
+        // Apply performance settings
+        if (args.low_latency) {
+            v4l2_capture->setLowLatencyMode(true);
+            ndi_bridge::Logger::info("V4L2: Low latency mode enabled");
+        } else if (args.single_thread) {
+            v4l2_capture->setMultiThreadingEnabled(false);
+            ndi_bridge::Logger::info("V4L2: Single-threaded mode enabled");
+        }
+        
+        g_capture_device = std::move(v4l2_capture);
     }
 #endif
     
@@ -544,6 +592,14 @@ int main(int argc, char* argv[]) {
                 ss << ", NDI Connections: " << connections;
                 
                 ndi_bridge::Logger::debug(ss.str());
+                
+#ifdef __linux__
+                // Log V4L2-specific stats if available
+                if (args.capture_type == CaptureType::V4L2) {
+                    // Note: Would need to add getStats() to ICaptureDevice interface
+                    // to access V4L2-specific statistics here
+                }
+#endif
                 
                 last_stats_time = now;
             }
