@@ -248,29 +248,35 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             PreallocateBuffers(frameWidth, frameHeight);
         }
         
-        // v1.6.1: Optimized COM interface usage for minimal overhead
-        void* frameBytes = nullptr;
+        // v1.6.4: RESTORED CRITICAL BUFFER ACCESS CALLS
+        // Get video buffer interface (from reference)
+        CComPtr<IDeckLinkVideoBuffer> videoBuffer;
+        HRESULT result = videoFrame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer);
+        if (result != S_OK) {
+            m_statistics->RecordDroppedFrame();
+            return;
+        }
         
-        // For frame callback path - always fastest
+        // Prepare buffer for CPU read access - CRITICAL
+        result = videoBuffer->StartAccess(bmdBufferAccessRead);
+        if (result != S_OK) {
+            m_statistics->RecordDroppedFrame();
+            return;
+        }
+        
+        // Get pointer to frame data
+        void* frameBytes = nullptr;
+        result = videoBuffer->GetBytes(&frameBytes);
+        if (result != S_OK) {
+            videoBuffer->EndAccess(bmdBufferAccessRead);
+            m_statistics->RecordDroppedFrame();
+            return;
+        }
+        
+        auto timestamp = std::chrono::steady_clock::now();
+        
+        // Direct callback path - always fastest path
         if (m_frameCallback) {
-            // Get buffer interface - required for GetBytes
-            CComPtr<IDeckLinkVideoBuffer> videoBuffer;
-            HRESULT result = videoFrame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer);
-            if (result != S_OK) {
-                m_statistics->RecordDroppedFrame();
-                return;
-            }
-            
-            // Get frame data pointer
-            result = videoBuffer->GetBytes(&frameBytes);
-            if (result != S_OK || !frameBytes) {
-                m_statistics->RecordDroppedFrame();
-                return;
-            }
-            
-            auto timestamp = std::chrono::steady_clock::now();
-            
-            // Direct callback path - always fastest path
             if (m_pixelFormat == bmdFormat8BitYUV) {
                 // UYVY format - TRUE ZERO-COPY
                 ProcessFrameZeroCopy(frameBytes, frameWidth, frameHeight, 
@@ -283,25 +289,13 @@ void DeckLinkCaptureDevice::OnFrameArrived(IDeckLinkVideoInputFrame* videoFrame)
             m_directCallbackFrames++;
         } else {
             // Legacy queue path for GetNextFrame() - not recommended for low latency
-            // Get buffer interface first
-            CComPtr<IDeckLinkVideoBuffer> videoBuffer;
-            HRESULT result = videoFrame->QueryInterface(IID_IDeckLinkVideoBuffer, (void**)&videoBuffer);
-            if (result != S_OK) {
-                m_statistics->RecordDroppedFrame();
-                return;
-            }
-            
-            // Get frame data pointer
-            result = videoBuffer->GetBytes(&frameBytes);
-            if (result != S_OK || !frameBytes) {
-                m_statistics->RecordDroppedFrame();
-                return;
-            }
-            
             size_t frameSize = videoFrame->GetRowBytes() * frameHeight;
             m_frameQueue->AddFrame(frameBytes, frameSize, frameWidth, frameHeight,
                                   m_pixelFormat, m_statistics->GetDroppedFramesRef());
         }
+        
+        // End buffer access - CRITICAL
+        videoBuffer->EndAccess(bmdBufferAccessRead);
         
         // Update statistics
         m_statistics->RecordFrame();
