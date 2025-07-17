@@ -5,6 +5,29 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.6] - 2025-07-17
+
+### Fixed
+- **Media Foundation Latency Regression**: Fixed major latency increase (14 frames back to 8 frames)
+  - Set NDI `clock_video=false` for immediate frame delivery (was true, causing pacing)
+  - Removed 5ms sleep in capture loop when no sample available (now tight loop)
+  - Added Media Foundation attributes to minimize internal buffering
+  - This brings latency back in line with old reference implementation
+
+### Changed
+- **Media Foundation Configuration**: Added low-latency attributes
+  - `MF_READWRITE_DISABLE_CONVERTERS=TRUE` - Disable unnecessary conversions
+  - `MF_SOURCE_READER_DISABLE_DXVA=TRUE` - Disable hardware acceleration overhead
+  - `MF_SOURCE_READER_ENABLE_VIDEO_PROCESSING=FALSE` - Disable extra processing
+  - `MF_LOW_LATENCY=TRUE` - Enable low latency mode when supported
+
+### Technical Details
+- Latency regression was caused by differences from reference implementation
+- NDI clock_video was pacing frames instead of immediate delivery
+- Sleep in capture loop was adding unnecessary delay
+- Default Media Foundation buffering was adding 3-5 frames
+- Threading model unchanged (to be addressed if needed after measurement)
+
 ## [1.6.5] - 2025-07-17
 
 ### Added
@@ -481,6 +504,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[1.6.6]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.5...v1.6.6
 [1.6.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.4...v1.6.5
 [1.6.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.3...v1.6.4
 [1.6.3]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.2...v1.6.3
