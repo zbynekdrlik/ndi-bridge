@@ -193,10 +193,8 @@ void MFVideoCapture::CaptureLoop() {
         if (pSample) {
             ProcessSample(pSample);
             pSample->Release();
-        } else {
-            // No sample available, brief sleep
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
+        // REMOVED: No sleep when no sample - tight loop for lowest latency
     }
     
     Logger::info("Capture loop ended.");
