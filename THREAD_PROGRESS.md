@@ -2,114 +2,118 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: v1.6.4 version updated and ready
-- [ ] Waiting for: User to build and test v1.6.4 with critical SDK calls
-- [ ] Blocked by: None
+- [x] Currently working on: Root cause found - DeckLink outputting BGRA not UYVY
+- [ ] Waiting for: User input on source type OR decision to add BGRA zero-copy
+- [ ] Blocked by: Format mismatch - need BGRA zero-copy support
 
 ## Implementation Status
 - Phase: Latency Optimization - DeckLink TRUE Zero-Copy
-- Step: v1.6.4 testing phase
-- Status: VERSION_UPDATED_READY_TO_TEST
-- Version: 1.6.4 (all fixes + critical SDK calls)
+- Step: v1.6.5 planning - BGRA zero-copy support
+- Status: ROOT_CAUSE_FOUND
+- Version: 1.6.4 (tested, format issue identified)
 
 ## Testing Status Matrix
 | Component | Implemented | Unit Tested | Integration Tested | Multi-Instance Tested | 
 |-----------|------------|-------------|--------------------|-----------------------|
-| DeckLink Zero Latency | ✅ v1.6.0 | ✅ (100% direct) | ❌ | ❌ |
-| Direct Frame Callback | ✅ v1.6.0 | ✅ (100% direct) | ❌ | ❌ |
-| Pre-allocated Buffers | ✅ v1.6.0 | ✅ (8MB allocated) | ❌ | ❌ |
-| Reduced Queue Size | ✅ v1.6.0 | ✅ (bypassed) | ❌ | ❌ |
-| TRUE Zero-Copy UYVY | ✅ v1.6.1 | ❌ (0% in v1.6.3) | ❌ | ❌ |
-| DeckLink Callback Fix | ✅ v1.6.2 | ✅ (frames received) | ❌ | ❌ |
-| AppController Fix | ✅ v1.6.3 | ✅ (callbacks working) | ❌ | ❌ |
-| StartAccess/EndAccess | ✅ v1.6.4 | ❌ | ❌ | ❌ |
+| DeckLink Zero Latency | ✅ v1.6.0 | ✅ (100% direct) | ✅ | ❌ |
+| Direct Frame Callback | ✅ v1.6.0 | ✅ (100% direct) | ✅ | ❌ |
+| Pre-allocated Buffers | ✅ v1.6.0 | ✅ (8MB allocated) | ✅ | ❌ |
+| Reduced Queue Size | ✅ v1.6.0 | ✅ (bypassed) | ✅ | ❌ |
+| TRUE Zero-Copy UYVY | ✅ v1.6.1 | ❌ (wrong format) | ❌ | ❌ |
+| DeckLink Callback Fix | ✅ v1.6.2 | ✅ (frames received) | ✅ | ❌ |
+| AppController Fix | ✅ v1.6.3 | ✅ (callbacks working) | ✅ | ❌ |
+| StartAccess/EndAccess | ✅ v1.6.4 | ✅ (SDK compliant) | ✅ | ❌ |
+| BGRA Zero-Copy | ❌ | ❌ | ❌ | ❌ |
 
-## v1.6.4 Critical Updates Applied
-**Version Files Updated**:
-- ✅ Updated src/common/version.h to 1.6.4
-- ✅ Updated CHANGELOG.md with v1.6.4 entry
-- ✅ Documented critical SDK compliance fix
+## ROOT CAUSE IDENTIFIED
+**Why Zero-Copy Isn't Working**:
+- DeckLink is outputting **BGRA** format, not UYVY
+- Format detection shows `bmdDetectedVideoInputRGB444`
+- Zero-copy only implemented for UYVY format
+- Your input source (likely computer HDMI) outputs RGB
 
-**What v1.6.4 Fixes**:
-- Restored MANDATORY DeckLink SDK calls
-- StartAccess/EndAccess are REQUIRED for buffer access
-- Without them, GetBytes() returns invalid data
-- This was preventing zero-copy from working in v1.6.3
+**Evidence**:
+- No "TRUE ZERO-COPY" log message
+- Zero-copy frames: 0%
+- Format detection changing pixel format to BGRA
 
-## v1.6.3 Test Results
-**Good News**:
-- 650 frames captured, 0 dropped ✅
-- Direct callbacks: 100% ✅
-- No "No frames received" errors ✅
-- Stable 59.94 FPS ✅
+## v1.6.4 Test Results Summary
+**Working**:
+- ✅ Version 1.6.4 loaded correctly
+- ✅ 456 frames captured, 0 dropped
+- ✅ Direct callbacks: 100%
+- ✅ Stable 59.91 FPS
+- ✅ 2 NDI connections active
+- ✅ All callback fixes working
+- ✅ SDK compliance restored
 
-**Critical Issue Found**:
-- **Zero-copy frames: 0%** ❌
-- All frames being converted instead of zero-copy
-- Root cause: Missing StartAccess/EndAccess calls
+**Not Working**:
+- ❌ Zero-copy frames: 0%
+- ❌ Format is BGRA, not UYVY
+
+## Proposed Solution: v1.6.5
+**Add BGRA Zero-Copy Support**:
+1. NDI natively supports BGRA - no conversion needed!
+2. Add ProcessFrameZeroCopyBGRA() method
+3. Check for both UYVY and BGRA in OnFrameArrived
+4. Achieve zero-copy with current RGB input
+
+**Benefits**:
+- Works immediately with current setup
+- No format forcing needed
+- Follows design philosophy (fastest path)
+- Compatible with computer HDMI outputs
 
 ## Version History
-- v1.5.4: Color space fix
-- v1.6.0: Queue bypass + direct callbacks (tested, working)
-- v1.6.1: TRUE zero-copy for UYVY (SDK calls missing)
-- v1.6.2: Fixed DeckLink callback initialization order
-- v1.6.3: Fixed AppController callback initialization order (tested, no zero-copy)
-- v1.6.4: **Restored critical StartAccess/EndAccess calls**
+- v1.6.0: Queue bypass + direct callbacks ✅
+- v1.6.1: TRUE zero-copy for UYVY (wrong format assumption)
+- v1.6.2: Fixed DeckLink callback order ✅
+- v1.6.3: Fixed AppController callback order ✅
+- v1.6.4: Restored SDK compliance ✅
+- v1.6.5: *Proposed* - Add BGRA zero-copy
 
 ## User Action Required
-1. **Pull latest changes** (version files updated)
-2. **Build v1.6.4**
-3. **Run with DeckLink device** 
-4. **Check startup logs** for:
-   - "Version 1.6.4 loaded"
-   - "DeckLink Capture v1.6.1" (internal version)
-5. **Monitor for success**:
-   - **Zero-copy frames should be 100%**
-   - "TRUE ZERO-COPY: UYVY direct to NDI" message
-   - No frame access violations
-6. **Provide logs** showing zero-copy working
+**Option 1**: Tell me your input source type:
+- Computer HDMI? (RGB/BGRA output)
+- Game console? (YUV output)
+- Camera? (YUV output)
 
-## Expected v1.6.4 Results
-```
-[DeckLink] Performance - Zero-copy frames: 650, Direct callbacks: 650
-[DeckLink] Performance stats:
-  - Zero-copy frames: 650
-  - Direct callback frames: 650
-  - Zero-copy percentage: 100.0%
-  - Direct callback percentage: 100.0%
-```
+**Option 2**: Let me implement BGRA zero-copy (v1.6.5)
+- Works with your current RGB input
+- Same performance benefit as UYVY zero-copy
+- No configuration changes needed
 
 ## Branch State
 - Branch: `feature/decklink-latency-optimization`
-- Version: 1.6.4 (VERSION UPDATED)
-- Commits: 29
-- Testing: NOT STARTED for v1.6.4
-- Status: READY_TO_TEST
+- Version: 1.6.4 (current)
+- Commits: 30
+- Testing: ROOT CAUSE FOUND
+- Status: AWAITING_DECISION
 - PR: #11 OPEN
 
 ## Next Steps
-1. ✅ v1.6.0 tested and working (queue bypass)
-2. ✅ v1.6.1 TRUE zero-copy implemented
-3. ✅ v1.6.2 DeckLink callback fix applied
-4. ✅ v1.6.3 AppController callback fix applied (tested)
-5. ✅ v1.6.4 Critical SDK calls restored
-6. ✅ Version files updated to 1.6.4
-7. ⏳ User testing of v1.6.4 required
-8. ⏳ Verify zero-copy working at 100%
-9. ⏳ Latency measurements needed
-10. ⏳ PR #11 merge after v1.6.4 success
+1. ✅ All infrastructure fixes complete
+2. ✅ Root cause identified (BGRA format)
+3. ⏳ Implement BGRA zero-copy support
+4. ⏳ Test v1.6.5 with BGRA zero-copy
+5. ⏳ Achieve 100% zero-copy performance
+6. ⏳ Merge PR #11
 
 ## Technical Summary
-The complete fix chain:
-1. **Queue bypass**: Eliminates 33ms latency ✅
-2. **TRUE zero-copy**: UYVY direct to NDI (saves 10ms) ✅
-3. **Callback order**: Ensures frames are received ✅
-4. **SDK compliance**: StartAccess/EndAccess enable buffer access ✅
+**Current State**:
+- DeckLink outputs BGRA (RGB444 detected)
+- Zero-copy only works for UYVY
+- All other optimizations working perfectly
 
-All pieces are now in place. v1.6.4 should achieve 100% zero-copy.
+**Solution**:
+- Add BGRA to zero-copy formats
+- NDI handles BGRA natively
+- No performance penalty
+- Works with RGB HDMI sources
 
-## GOAL AFTER TESTING
-Once v1.6.4 shows 100% zero-copy:
-1. **Merge PR #11** - DeckLink matches Linux V4L2 performance
-2. **Celebrate** - ~40-50ms latency reduction achieved!
-3. **Future**: AVX2 optimization for non-UYVY formats
+## GOAL
+Implement BGRA zero-copy to achieve:
+- Zero-copy frames: 100%
+- Direct callbacks: 100%
+- ~40-50ms total latency reduction
+- DeckLink matches Linux V4L2 performance
