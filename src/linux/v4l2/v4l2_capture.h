@@ -19,17 +19,24 @@ namespace ndi_bridge {
 namespace v4l2 {
 
 /**
- * @brief V4L2 implementation of ICaptureDevice with multi-threaded pipeline
+ * @brief V4L2 implementation of ICaptureDevice with optimized latency
  * 
  * Provides video capture functionality using Linux V4L2 API.
  * Supports USB capture cards and webcams with low latency optimization.
  * 
- * Version: 1.5.0 - Added multi-threaded pipeline architecture
+ * Version: 1.7.0 - Major latency improvements
+ * - Reduced buffer count for lower latency
+ * - Removed sleeps in processing threads
+ * - Tighter queue depths
+ * - Single-threaded mode option
  * 
- * Pipeline structure:
+ * Pipeline structure (multi-threaded):
  * - Thread 1 (Capture): poll -> dequeue -> push to queue1 -> requeue
  * - Thread 2 (Convert): pop from queue1 -> convert -> push to queue2  
  * - Thread 3 (Send): pop from queue2 -> callback to NDI sender
+ * 
+ * Single-threaded mode:
+ * - One thread: poll -> dequeue -> convert -> send -> requeue
  */
 class V4L2Capture : public ICaptureDevice {
 public:
@@ -50,7 +57,7 @@ public:
      * @brief Enable/disable multi-threaded pipeline
      * @param enable True to enable multi-threading (default: true)
      * 
-     * When disabled, falls back to single-threaded operation
+     * When disabled, uses single-threaded operation for lowest latency
      */
     void setMultiThreadingEnabled(bool enable) { use_multi_threading_ = enable; }
     bool isMultiThreadingEnabled() const { return use_multi_threading_; }
@@ -72,6 +79,11 @@ public:
         double avg_convert_time_ms = 0.0;
         double avg_send_time_ms = 0.0;
         
+        // End-to-end latency tracking
+        double avg_e2e_latency_ms = 0.0;
+        double max_e2e_latency_ms = 0.0;
+        uint64_t e2e_samples = 0;
+        
         void reset() {
             frames_captured = 0;
             frames_dropped = 0;
@@ -85,10 +97,26 @@ public:
             avg_capture_time_ms = 0.0;
             avg_convert_time_ms = 0.0;
             avg_send_time_ms = 0.0;
+            avg_e2e_latency_ms = 0.0;
+            max_e2e_latency_ms = 0.0;
+            e2e_samples = 0;
         }
     };
     
     CaptureStats getStats() const;
+    
+    /**
+     * @brief Set low latency mode
+     * @param enable True to enable aggressive low latency settings
+     * 
+     * When enabled:
+     * - Reduces buffer count to minimum (4)
+     * - Uses immediate polling (no timeout)
+     * - Minimizes queue depths
+     * - Forces single-threaded mode
+     */
+    void setLowLatencyMode(bool enable);
+    bool isLowLatencyMode() const { return low_latency_mode_; }
     
 private:
     // Buffer structure for memory-mapped buffers
@@ -123,7 +151,7 @@ private:
     // Stop streaming
     void stopStreaming();
     
-    // Single-threaded capture function (legacy)
+    // Single-threaded capture function (optimized for low latency)
     void captureThreadSingle();
     
     // Multi-threaded pipeline functions
@@ -218,12 +246,43 @@ private:
     // Zero-copy optimization flag
     bool zero_copy_logged_{false};
     
-    // Buffer count optimized for Intel N100 (10 buffers for smoother operation)
-    static constexpr unsigned int kBufferCount = 10;
+    // Low latency mode
+    bool low_latency_mode_{false};
     
-    // Queue depths for multi-threading
-    static constexpr size_t kCaptureQueueDepth = 5;
-    static constexpr size_t kConvertQueueDepth = 5;
+    // Buffer count - optimized for low latency
+    static constexpr unsigned int kBufferCountNormal = 6;    // Reduced from 10
+    static constexpr unsigned int kBufferCountLowLatency = 4; // Minimum for stability
+    
+    // Queue depths for multi-threading - optimized for low latency
+    static constexpr size_t kCaptureQueueDepthNormal = 3;    // Reduced from 5
+    static constexpr size_t kCaptureQueueDepthLowLatency = 2;
+    static constexpr size_t kConvertQueueDepthNormal = 2;    // Reduced from 5
+    static constexpr size_t kConvertQueueDepthLowLatency = 1;
+    
+    // Poll timeouts - optimized for low latency
+    static constexpr int kPollTimeoutMsMulti = 0;       // Immediate (was 1ms)
+    static constexpr int kPollTimeoutMsSingle = 1;      // Reduced from 5ms
+    static constexpr int kPollTimeoutMsLowLatency = 0;  // Immediate
+    
+    // Get current buffer count based on mode
+    unsigned int getBufferCount() const {
+        return low_latency_mode_ ? kBufferCountLowLatency : kBufferCountNormal;
+    }
+    
+    // Get current queue depths based on mode
+    size_t getCaptureQueueDepth() const {
+        return low_latency_mode_ ? kCaptureQueueDepthLowLatency : kCaptureQueueDepthNormal;
+    }
+    
+    size_t getConvertQueueDepth() const {
+        return low_latency_mode_ ? kConvertQueueDepthLowLatency : kConvertQueueDepthNormal;
+    }
+    
+    // Get poll timeout based on mode
+    int getPollTimeout() const {
+        if (low_latency_mode_) return kPollTimeoutMsLowLatency;
+        return use_multi_threading_ ? kPollTimeoutMsMulti : kPollTimeoutMsSingle;
+    }
 };
 
 } // namespace v4l2
