@@ -110,7 +110,7 @@ bool NdiSender::initialize() {
     }
 
     initialized_ = true;
-    Logger::info("NDI sender initialized successfully");
+    Logger::info("NDI sender initialized successfully (clock_video=false for low latency)");
     return true;
 }
 
@@ -338,7 +338,7 @@ bool NdiSender::createSender() {
     // Create NDI sender description
     NDIlib_send_create_t send_create;
     send_create.p_ndi_name = sender_name_.c_str();
-    send_create.clock_video = true;
+    send_create.clock_video = false;  // CRITICAL: Set to false for immediate delivery (like reference)
     send_create.clock_audio = false;
 
     // Create the sender
@@ -348,7 +348,7 @@ bool NdiSender::createSender() {
         return false;
     }
 
-    Logger::info("Created NDI sender: " + sender_name_);
+    Logger::info("Created NDI sender: " + sender_name_ + " (clock_video=false for low latency)");
     return true;
 }
 
