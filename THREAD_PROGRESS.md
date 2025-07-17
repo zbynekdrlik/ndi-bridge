@@ -3,16 +3,16 @@
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
 - [x] Currently working on: Media Foundation latency optimization v1.6.7
-- [ ] Waiting for: User to test v1.6.7 (removed sleep in capture loop)
-- [ ] Blocked by: Need latency measurement results
+- [x] Waiting for: User to test v1.6.7 (removed sleep in capture loop)
+- [x] SUCCESS: Achieved 8 frames latency on Windows Media Foundation!
 
 ## Implementation Status
 - Phase: **Latency Fix** - Media Foundation optimizations
-- Step: v1.6.7 pushed, awaiting testing
-- Status: IMPLEMENTED_NOT_TESTED
+- Step: v1.6.7 COMPLETE - Target achieved!
+- Status: TESTED_AND_WORKING
 - Version: 1.6.7
 
-## Media Foundation Latency Fix Progress
+## Media Foundation Latency Fix - COMPLETE ✅
 **v1.6.6 Results**:
 - Reduced latency from 14 frames to 10 frames
 - Improvements:
@@ -20,59 +20,54 @@
   - Removed 5ms sleep (initially)
   - Added MF low-latency attributes
 
-**v1.6.7 Changes**:
+**v1.6.7 Results**:
+- ✅ Reduced latency from 10 frames to 8 frames!
 - ✅ Removed remaining 5ms sleep in capture loop
 - ✅ Now uses tight loop when no sample available
-- ✅ Added CMake option MF_SYNCHRONOUS_MODE for future use
-- ✅ Updated version to 1.6.7
-- ⏳ Should reduce latency from 10 frames closer to 8 frames
+- ✅ TARGET ACHIEVED: Back to reference implementation performance
 
-## Remaining Latency Sources
-After v1.6.7, if latency is still above 8 frames:
-1. **Threading overhead** (1-2 frames):
-   - Capture thread → Main thread → NDI thread
-   - Each thread hop adds synchronization delay
-   - Solution: Implement synchronous mode (MF_SYNCHRONOUS_MODE)
+## Key Learnings from Media Foundation Fix
+1. **NDI clock_video=false** is CRITICAL for low latency
+2. **No sleeps in capture loops** - tight loops are essential
+3. **Media Foundation attributes** help reduce internal buffering
+4. **Threading still adds 1-2 frames** but acceptable for now
 
-2. **Possible future optimizations**:
-   - Direct ReadSample → NDI send in main thread
-   - Remove all intermediate buffering
-   - Match reference implementation's synchronous model
+## Next Goal: Linux V4L2 Latency Fix
+**Current Linux Performance**:
+- v1.5.0: Multi-threaded pipeline with 12 frames latency
+- Despite being "optimized", it's worse than Windows!
+- Target: Reduce from 12 frames to 8 frames
 
-## Testing Required
-- Build v1.6.7 with standard settings
-- Test with 60fps camera
-- Measure roundtrip latency
-- Target: 8-9 frames (down from 10)
+**Suspected Issues in Linux Implementation**:
+1. **Multi-threading overhead** (3 threads might be overkill)
+2. **Frame queues** between threads add buffering
+3. **Possible sleeps** in capture or processing loops
+4. **NDI clock settings** might not be optimized
+5. **V4L2 buffer count** might be too high
 
-If still above 8 frames:
-- Build with: `cmake -DMF_SYNCHRONOUS_MODE=ON ..`
-- Implement synchronous capture mode
-- Test again for final 8-frame target
+**Action Plan for Next Thread**:
+1. Analyze v4l2_capture.cpp for sleep/delay patterns
+2. Check NDI sender configuration (clock_video setting)
+3. Review multi-threaded pipeline - might need simplification
+4. Examine frame queue depths and buffering
+5. Consider single-threaded option like Media Foundation
 
 ## Repository State
 - Main branch: v1.6.5
 - Open PRs: #12 (README update), #13 (latency fix)
 - Current branch: fix/media-foundation-latency (v1.6.7)
-- Compilation: Fixed all errors
+- Windows latency: FIXED (8 frames) ✅
+- Linux latency: TO BE FIXED (12 frames) ❌
 
 ## Next Steps
-1. User tests v1.6.7 build
-2. If latency ≤ 8 frames: SUCCESS! Update PR #13
-3. If latency > 8 frames:
-   - Implement synchronous mode using MF_SYNCHRONOUS_MODE flag
-   - Remove capture thread entirely
-   - Direct capture → NDI pipeline
-4. Once latency target achieved:
-   - Update PR #13 description
-   - Merge PR #13
-   - Consider merging PR #12
+1. Update PR #13 with v1.6.7 success
+2. Merge PR #13 to main
+3. Create new branch: fix/linux-v4l2-latency
+4. Apply learnings from Windows to Linux implementation
 
 ## Quick Reference
 - Current version: 1.6.7
 - Branch: fix/media-foundation-latency
 - PR: #13
-- Key fixes:
-  - v1.6.6: NDI clock_video=false + MF attributes
-  - v1.6.7: Removed ALL sleeps in capture loop
-- Next optimization: Synchronous mode (if needed)
+- Windows latency: 8 frames ✅
+- Linux latency: 12 frames (needs fixing)
