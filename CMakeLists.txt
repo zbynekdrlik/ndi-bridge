@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.5.0 LANGUAGES CXX)
+project(ndi-bridge VERSION 1.6.7 LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(BUILD_TESTS "Build unit tests" OFF)
 option(USE_DECKLINK "Build with DeckLink support" ON)
 option(VERBOSE_BUILD "Enable verbose build output" OFF)
+option(MF_SYNCHRONOUS_MODE "Use synchronous capture for lowest latency (experimental)" OFF)
 
 # Platform detection
 if(WIN32)
@@ -259,6 +260,14 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
     NDI_BRIDGE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
     NDI_BRIDGE_VERSION_STRING="${PROJECT_VERSION}"
 )
+
+# Set synchronous mode flag if enabled
+if(MF_SYNCHRONOUS_MODE)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE MF_SYNCHRONOUS_CAPTURE)
+    message(STATUS "Media Foundation synchronous mode: ENABLED (experimental)")
+else()
+    message(STATUS "Media Foundation synchronous mode: DISABLED")
+endif()
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PRIVATE ${NDI_LIBRARY})

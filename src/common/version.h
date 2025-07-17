@@ -1,14 +1,15 @@
-#ifndef NDI_BRIDGE_VERSION_H
-#define NDI_BRIDGE_VERSION_H
+#pragma once
 
-#define NDI_BRIDGE_VERSION_MAJOR 1
-#define NDI_BRIDGE_VERSION_MINOR 6
-#define NDI_BRIDGE_VERSION_PATCH 5
+#define VERSION_MAJOR 1
+#define VERSION_MINOR 6
+#define VERSION_PATCH 7
 
-#define NDI_BRIDGE_VERSION_STRING "1.6.5"
-#define NDI_BRIDGE_VERSION NDI_BRIDGE_VERSION_STRING
+#define VERSION_STRING "1.6.7"
 
-// Build info
+// Additional defines for main.cpp compatibility
+#define NDI_BRIDGE_VERSION VERSION_STRING
+
+// Build type and platform detection
 #ifdef _DEBUG
 #define NDI_BRIDGE_BUILD_TYPE "Debug"
 #else
@@ -17,35 +18,8 @@
 
 #ifdef _WIN32
 #define NDI_BRIDGE_PLATFORM "Windows"
-#elif __linux__
+#elif defined(__linux__)
 #define NDI_BRIDGE_PLATFORM "Linux"
 #else
 #define NDI_BRIDGE_PLATFORM "Unknown"
 #endif
-
-#ifdef _MSC_VER
-#define NDI_BRIDGE_COMPILER "MSVC"
-#elif defined(__GNUC__)
-#define NDI_BRIDGE_COMPILER "GCC"
-#elif defined(__clang__)
-#define NDI_BRIDGE_COMPILER "Clang"
-#else
-#define NDI_BRIDGE_COMPILER "Unknown"
-#endif
-
-// Feature flags
-#ifdef PLATFORM_WINDOWS
-#define NDI_BRIDGE_HAS_MEDIA_FOUNDATION 1
-#define NDI_BRIDGE_HAS_DECKLINK 1
-#define NDI_BRIDGE_HAS_V4L2 0
-#elif defined(PLATFORM_LINUX)
-#define NDI_BRIDGE_HAS_MEDIA_FOUNDATION 0
-#define NDI_BRIDGE_HAS_DECKLINK 0
-#define NDI_BRIDGE_HAS_V4L2 1
-#else
-#define NDI_BRIDGE_HAS_MEDIA_FOUNDATION 0
-#define NDI_BRIDGE_HAS_DECKLINK 0
-#define NDI_BRIDGE_HAS_V4L2 0
-#endif
-
-#endif // NDI_BRIDGE_VERSION_H
