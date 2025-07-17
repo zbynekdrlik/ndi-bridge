@@ -8,6 +8,7 @@
 #include <chrono>
 #include <functional>
 #include <atlbase.h>
+#include <vector>
 
 // Forward declarations for DeckLink SDK
 struct IDeckLink;
@@ -48,6 +49,12 @@ class DeckLinkDeviceInitializer;
  * - DeckLinkStatistics: Handles FPS calculation and statistics
  * - DeckLinkFormatManager: Manages format detection and changes
  * - DeckLinkDeviceInitializer: Handles device discovery and initialization
+ * 
+ * v1.6.1: TRUE zero-copy for UYVY format:
+ * - UYVY sent directly to NDI without conversion
+ * - Pre-allocated buffers only for non-UYVY formats
+ * - Direct callback is the ONLY mode (no queuing for low latency)
+ * - Removed low-latency mode flag - it's always on
  */
 class DeckLinkCaptureDevice : public ICaptureDevice {
 public:
@@ -113,8 +120,21 @@ private:
     // Direct frame callback (v1.1.4)
     FrameCallback m_frameCallback;
     
+    // Performance optimizations (v1.6.1)
+    std::vector<uint8_t> m_preallocatedBuffer;  // Pre-allocated conversion buffer
+    size_t m_preallocatedBufferSize{0};
+    std::atomic<bool> m_zeroCopyLogged{false};
+    
+    // Performance tracking (v1.6.1)
+    std::atomic<uint64_t> m_zeroCopyFrames{0};
+    std::atomic<uint64_t> m_directCallbackFrames{0};
+    
     // Helper methods
     void ProcessFrameForCallback(void* frameBytes, int width, int height, 
                                 BMDPixelFormat pixelFormat,
                                 std::chrono::steady_clock::time_point timestamp);
+    void ProcessFrameZeroCopy(void* frameBytes, int width, int height,
+                             BMDPixelFormat pixelFormat,
+                             std::chrono::steady_clock::time_point timestamp);
+    void PreallocateBuffers(int width, int height);
 };
