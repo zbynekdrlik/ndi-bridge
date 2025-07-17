@@ -2,72 +2,93 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Media Foundation latency optimization v1.6.7
-- [x] Waiting for: User to test v1.6.7 (removed sleep in capture loop)
-- [x] SUCCESS: Achieved 8 frames latency on Windows Media Foundation!
+- [x] Currently working on: Linux V4L2 latency optimization v1.7.0
+- [x] Waiting for: User to test v1.7.0 implementation
+- [ ] Blocked by: None - implementation complete, needs testing
 
 ## Implementation Status
-- Phase: **Latency Fix** - Media Foundation optimizations
-- Step: v1.6.7 COMPLETE - Target achieved!
-- Status: TESTED_AND_WORKING
-- Version: 1.6.7
+- Phase: **Linux V4L2 Latency Fix** - All optimizations implemented
+- Step: v1.7.0 COMPLETE - Ready for testing
+- Status: IMPLEMENTED_NOT_TESTED
+- Version: 1.7.0
 
-## Media Foundation Latency Fix - COMPLETE ✅
-**v1.6.6 Results**:
-- Reduced latency from 14 frames to 10 frames
-- Improvements:
-  - NDI clock_video=false (immediate delivery)
-  - Removed 5ms sleep (initially)
-  - Added MF low-latency attributes
+## Linux V4L2 Latency Fix - IMPLEMENTED ✅
+**v1.7.0 Changes**:
+- ✅ Removed all sleeps in multi-threaded pipeline
+- ✅ Reduced buffer counts (10→6 normal, 4 low latency)
+- ✅ Reduced queue depths (5→3/2 normal, 2/1 low latency)
+- ✅ Immediate polling (0ms timeout)
+- ✅ Added single-threaded mode option
+- ✅ Added low latency mode
+- ✅ Added end-to-end latency tracking
+- ✅ Command-line options: --single-thread, --low-latency
 
-**v1.6.7 Results**:
-- ✅ Reduced latency from 10 frames to 8 frames!
-- ✅ Removed remaining 5ms sleep in capture loop
-- ✅ Now uses tight loop when no sample available
-- ✅ TARGET ACHIEVED: Back to reference implementation performance
+## Testing Required
+1. **Basic Multi-threaded Test**:
+   ```bash
+   ./ndi-bridge -d /dev/video0 -n "Test Stream"
+   ```
+   - Expected: Should show reduced latency from 12 frames
 
-## Key Learnings from Media Foundation Fix
-1. **NDI clock_video=false** is CRITICAL for low latency
-2. **No sleeps in capture loops** - tight loops are essential
-3. **Media Foundation attributes** help reduce internal buffering
-4. **Threading still adds 1-2 frames** but acceptable for now
+2. **Single-threaded Test**:
+   ```bash
+   ./ndi-bridge -d /dev/video0 -n "Test Stream" --single-thread
+   ```
+   - Expected: Lowest latency, around 8 frames
 
-## Next Goal: Linux V4L2 Latency Fix
-**Current Linux Performance**:
-- v1.5.0: Multi-threaded pipeline with 12 frames latency
-- Despite being "optimized", it's worse than Windows!
-- Target: Reduce from 12 frames to 8 frames
+3. **Low Latency Mode Test**:
+   ```bash
+   ./ndi-bridge -d /dev/video0 -n "Test Stream" --low-latency
+   ```
+   - Expected: Forces single-thread + minimal buffers, 8 frames
 
-**Suspected Issues in Linux Implementation**:
-1. **Multi-threading overhead** (3 threads might be overkill)
-2. **Frame queues** between threads add buffering
-3. **Possible sleeps** in capture or processing loops
-4. **NDI clock settings** might not be optimized
-5. **V4L2 buffer count** might be too high
+4. **Verbose Mode for Stats**:
+   ```bash
+   ./ndi-bridge -d /dev/video0 -n "Test Stream" --single-thread -v
+   ```
+   - Should show E2E latency statistics every 10 seconds
 
-**Action Plan for Next Thread**:
-1. Analyze v4l2_capture.cpp for sleep/delay patterns
-2. Check NDI sender configuration (clock_video setting)
-3. Review multi-threaded pipeline - might need simplification
-4. Examine frame queue depths and buffering
-5. Consider single-threaded option like Media Foundation
+## Key Changes Made
+1. **v4l2_capture.h**:
+   - Added low latency mode support
+   - Reduced buffer counts and queue depths
+   - Added E2E latency tracking in stats
+   - Dynamic configuration based on mode
+
+2. **v4l2_capture.cpp**:
+   - Removed 100μs sleeps in convert/send threads
+   - Tight polling loops for immediate response
+   - Reduced poll timeouts to 0ms (immediate)
+   - Enhanced statistics with E2E latency
+
+3. **main.cpp**:
+   - Added --single-thread option
+   - Added --low-latency option
+   - Interactive mode prompts for performance
+   - Updated help text
+
+## Performance Expectations
+- **Multi-threaded**: ~10 frames (down from 12)
+- **Single-threaded**: ~8 frames (matches Windows)
+- **Low latency mode**: ~8 frames (most aggressive settings)
 
 ## Repository State
-- Main branch: v1.6.5
-- Open PRs: #12 (README update), #13 (latency fix)
-- Current branch: fix/media-foundation-latency (v1.6.7)
+- Main branch: v1.6.7
+- Current branch: fix/linux-v4l2-latency (v1.7.0)
+- PR: Not created yet (no commits initially)
 - Windows latency: FIXED (8 frames) ✅
-- Linux latency: TO BE FIXED (12 frames) ❌
+- Linux latency: IMPLEMENTED (awaiting test) ⏳
 
 ## Next Steps
-1. Update PR #13 with v1.6.7 success
-2. Merge PR #13 to main
-3. Create new branch: fix/linux-v4l2-latency
-4. Apply learnings from Windows to Linux implementation
+1. User tests the implementation with 60fps camera
+2. Measure round-trip latency
+3. Compare single vs multi-threaded modes
+4. Check CPU usage
+5. If successful, create PR and merge
 
 ## Quick Reference
-- Current version: 1.6.7
-- Branch: fix/media-foundation-latency
-- PR: #13
+- Current version: 1.7.0
+- Branch: fix/linux-v4l2-latency
+- Files changed: 5 (version.h, v4l2_capture.h/cpp, main.cpp, CHANGELOG.md)
 - Windows latency: 8 frames ✅
-- Linux latency: 12 frames (needs fixing)
+- Linux latency: 12 frames → 8 frames (expected)
