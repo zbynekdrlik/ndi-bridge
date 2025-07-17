@@ -272,7 +272,8 @@ bool AppController::initialize() {
         return false;
     }
     
-    // Set capture callbacks
+    // v1.6.3: Set capture callbacks BEFORE starting capture
+    // This ensures the callbacks are ready when frames start arriving
     capture_device_->setFrameCallback(
         [this](const void* data, size_t size, int64_t timestamp, 
                const ICaptureDevice::VideoFormat& format) {
@@ -284,7 +285,7 @@ bool AppController::initialize() {
         [this](const std::string& error) { onCaptureError(error); }
     );
     
-    // Start capture
+    // Start capture AFTER callbacks are set
     if (!capture_device_->startCapture(config_.device_name)) {
         reportError("Failed to start capture device", false);
         return false;
