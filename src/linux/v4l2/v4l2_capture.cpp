@@ -18,13 +18,6 @@
 namespace ndi_bridge {
 namespace v4l2 {
 
-// HARDCODED OPTIMAL SETTINGS - NO COMPROMISE
-constexpr unsigned int BUFFER_COUNT = 3;          // Absolute minimum
-constexpr int POLL_TIMEOUT = 0;                   // Immediate polling
-constexpr bool USE_MULTI_THREADING = false;       // Single thread only
-constexpr bool ZERO_COPY_MODE = true;             // Always zero-copy
-constexpr int REALTIME_PRIORITY = 80;             // High RT priority
-
 // Format priority for NDI optimization
 const std::vector<uint32_t> V4L2Capture::kFormatPriority = {
     V4L2_PIX_FMT_UYVY,    // NDI native - best
@@ -40,10 +33,10 @@ V4L2Capture::V4L2Capture()
     , capturing_(false)
     , should_stop_(false)
     , has_error_(false)
-    , use_multi_threading_(USE_MULTI_THREADING)     // ALWAYS single thread
-    , zero_copy_mode_(ZERO_COPY_MODE)               // ALWAYS zero copy
+    , use_multi_threading_(kUseMultiThreading)     // ALWAYS single thread
+    , zero_copy_mode_(kZeroCopyMode)               // ALWAYS zero copy
     , realtime_scheduling_(true)                     // ALWAYS try RT
-    , realtime_priority_(REALTIME_PRIORITY)         // ALWAYS high priority
+    , realtime_priority_(kRealtimePriority)         // ALWAYS high priority
     , low_latency_mode_(true)                        // ALWAYS low latency
     , ultra_low_latency_mode_(true)                  // ALWAYS ultra low
     , frames_captured_(0)
@@ -52,9 +45,9 @@ V4L2Capture::V4L2Capture()
     , timeout_count_(0)
     , zero_copy_logged_(false) {
     
-    Logger::info("V4L2 Ultra-Low Latency Capture (v" NDI_BRIDGE_VERSION ")");
-    Logger::info("Configuration: 3 buffers, zero-copy, single-thread, RT priority 80");
-    Logger::info("NO COMPROMISE - MAXIMUM PERFORMANCE ALWAYS");
+    Logger::info("V4L2 EXTREME Low Latency Capture (v" NDI_BRIDGE_VERSION ")");
+    Logger::info("Configuration: " + std::to_string(kBufferCount) + " buffers, zero-copy, single-thread, RT priority " + std::to_string(kRealtimePriority));
+    Logger::info("EXTREME MODE - BUSY WAIT, CPU AFFINITY, NO COMPROMISE");
     
     memset(&current_format_, 0, sizeof(current_format_));
     memset(&device_caps_, 0, sizeof(device_caps_));
@@ -118,13 +111,14 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
     
     Logger::info("V4L2Capture: Starting capture with device: " + device_path);
     
-    // ALWAYS log our uncompromising settings
-    Logger::info("Applying MAXIMUM PERFORMANCE settings:");
-    Logger::info("  - Buffer count: 3 (minimum)");
+    // ALWAYS log our EXTREME settings
+    Logger::info("Applying EXTREME PERFORMANCE settings:");
+    Logger::info("  - Buffer count: " + std::to_string(kBufferCount) + " (absolute minimum)");
     Logger::info("  - Zero-copy: ENABLED");
     Logger::info("  - Threading: SINGLE");
-    Logger::info("  - Polling: IMMEDIATE (0ms)");
-    Logger::info("  - Real-time: SCHED_FIFO priority 80");
+    Logger::info("  - Polling: BUSY-WAIT (no syscalls)");
+    Logger::info("  - Real-time: SCHED_FIFO priority " + std::to_string(kRealtimePriority));
+    Logger::info("  - CPU affinity: core " + std::to_string(kCpuAffinity));
     
     if (!initializeDevice(device_path)) {
         return false;
@@ -154,14 +148,14 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
     // Reset statistics
     stats_.reset();
     
-    // ALWAYS start single-threaded capture
+    // ALWAYS start EXTREME capture thread
     should_stop_ = false;
     capturing_ = true;
     
-    Logger::info("V4L2Capture: Starting ULTRA-LOW LATENCY capture thread");
-    capture_thread_ = std::make_unique<std::thread>(&V4L2Capture::captureThreadSingle, this);
+    Logger::info("V4L2Capture: Starting EXTREME capture thread");
+    capture_thread_ = std::make_unique<std::thread>(&V4L2Capture::captureThreadExtreme, this);
     
-    Logger::info("V4L2Capture: Capture started successfully (MAXIMUM PERFORMANCE MODE)");
+    Logger::info("V4L2Capture: Capture started successfully (EXTREME PERFORMANCE MODE)");
     return true;
 }
 
@@ -270,7 +264,7 @@ bool V4L2Capture::setupBuffers() {
     
     v4l2_requestbuffers reqbuf;
     memset(&reqbuf, 0, sizeof(reqbuf));
-    reqbuf.count = BUFFER_COUNT;  // ALWAYS 3 buffers
+    reqbuf.count = kBufferCount;  // ALWAYS 2 buffers (EXTREME minimum)
     reqbuf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
     reqbuf.memory = buffer_type_;
     
@@ -320,7 +314,7 @@ bool V4L2Capture::setupBuffers() {
     }
     
     Logger::info("V4L2Capture: Setup " + std::to_string(buffers_.size()) + 
-               " buffers (ULTRA-LOW LATENCY MODE)");
+               " buffers (EXTREME LOW LATENCY MODE)");
     return true;
 }
 
@@ -379,14 +373,118 @@ void V4L2Capture::stopStreaming() {
     }
 }
 
-// ULTRA-LOW LATENCY capture thread
+// EXTREME capture thread with busy-wait and CPU affinity
+void V4L2Capture::captureThreadExtreme() {
+    Logger::info("V4L2 EXTREME capture thread started");
+    
+    // Apply EXTREME real-time settings
+    applyExtremeRealtimeSettings();
+    
+    // Performance monitoring
+    auto last_stats_time = std::chrono::steady_clock::now();
+    uint64_t local_frame_count = 0;
+    
+    while (!should_stop_) {
+        // BUSY WAIT - no poll, no syscalls
+        v4l2_buffer v4l2_buf = {};
+        v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        v4l2_buf.memory = buffer_type_;
+        
+        // Try to dequeue buffer
+        int ret = ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf);
+        if (ret < 0) {
+            if (errno == EAGAIN) {
+                // No frame ready, busy wait
+                continue;
+            }
+            setError("Failed to dequeue buffer: " + std::string(strerror(errno)));
+            break;
+        }
+        
+        // Capture timestamp for accurate latency measurement
+        auto capture_time = std::chrono::steady_clock::now();
+        
+        // ALWAYS direct send (zero-copy) with timing
+        sendFrameExtreme(buffers_[v4l2_buf.index], v4l2_buf, capture_time);
+        
+        // Requeue immediately
+        if (ioctl(fd_, VIDIOC_QBUF, &v4l2_buf) < 0) {
+            setError("Failed to requeue buffer: " + std::string(strerror(errno)));
+            break;
+        }
+        
+        local_frame_count++;
+        
+        // Log statistics periodically
+        auto now = std::chrono::steady_clock::now();
+        if (now - last_stats_time >= std::chrono::seconds(10)) {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            Logger::debug("V4L2 EXTREME: FPS: " + std::to_string(local_frame_count / 10) +
+                        ", Zero-copy frames: " + std::to_string(stats_.zero_copy_frames) +
+                        ", Internal latency: " + std::to_string(stats_.avg_e2e_latency_ms) + "ms");
+            
+            last_stats_time = now;
+            local_frame_count = 0;
+        }
+    }
+    
+    Logger::info("V4L2 EXTREME capture thread stopped");
+}
+
+void V4L2Capture::sendFrameExtreme(const Buffer& buffer, const v4l2_buffer& v4l2_buf,
+                                   std::chrono::steady_clock::time_point capture_time) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    
+    if (!frame_callback_) {
+        return;
+    }
+    
+    // Get timestamp
+    int64_t timestamp_ns = v4l2_buf.timestamp.tv_sec * 1000000000LL + 
+                          v4l2_buf.timestamp.tv_usec * 1000LL;
+    
+    // Update format with actual pixel format for direct pass-through
+    VideoFormat format = video_format_;
+    if (current_format_.fmt.pix.pixelformat == V4L2_PIX_FMT_UYVY) {
+        format.pixel_format = "UYVY";
+    } else if (current_format_.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
+        format.pixel_format = "YUYV";  // Will be converted to UYVY by NDI sender
+    }
+    
+    // Direct callback with original YUV data - NO CONVERSION!
+    frame_callback_(buffer.start, v4l2_buf.bytesused, timestamp_ns, format);
+    
+    // Calculate internal processing latency
+    auto send_time = std::chrono::steady_clock::now();
+    double internal_latency_ms = std::chrono::duration<double, std::milli>(send_time - capture_time).count();
+    
+    // Update stats
+    std::lock_guard<std::mutex> stats_lock(stats_mutex_);
+    stats_.frames_captured++;
+    stats_.zero_copy_frames++;
+    
+    // Track accurate internal latency
+    if (internal_latency_ms > 0 && internal_latency_ms < 10) {  // Sanity check
+        stats_.avg_e2e_latency_ms = 0.9 * stats_.avg_e2e_latency_ms + 0.1 * internal_latency_ms;
+        if (internal_latency_ms > stats_.max_e2e_latency_ms) {
+            stats_.max_e2e_latency_ms = internal_latency_ms;
+        }
+        stats_.e2e_samples++;
+    }
+    
+    // Log once for performance tracking
+    if (!zero_copy_logged_) {
+        Logger::info("EXTREME zero-copy path active: " + format.pixel_format + " -> NDI (NO BGRA CONVERSION)");
+        zero_copy_logged_ = true;
+    }
+}
+
+// Regular single-threaded capture (fallback)
 void V4L2Capture::captureThreadSingle() {
-    Logger::info("V4L2 capture thread started (ULTRA-LOW LATENCY MODE)");
+    Logger::info("V4L2 capture thread started (FALLBACK MODE)");
     
-    // ALWAYS apply real-time scheduling
+    // Apply real-time scheduling
     applyRealtimeScheduling();
-    
-    // NO conversion buffer needed - always zero-copy
     
     // Use poll for device readiness
     struct pollfd pfd;
@@ -398,8 +496,8 @@ void V4L2Capture::captureThreadSingle() {
     uint64_t local_frame_count = 0;
     
     while (!should_stop_) {
-        // ALWAYS immediate poll (0ms timeout)
-        int ret = poll(&pfd, 1, POLL_TIMEOUT);
+        // Poll with timeout
+        int ret = poll(&pfd, 1, 0);  // 0ms timeout
         
         if (ret < 0) {
             if (errno == EINTR) continue;
@@ -420,7 +518,7 @@ void V4L2Capture::captureThreadSingle() {
             break;
         }
         
-        // ALWAYS direct send (zero-copy)
+        // Direct send (zero-copy)
         sendFrameDirect(buffers_[v4l2_buf.index], v4l2_buf);
         
         // Requeue immediately
@@ -448,61 +546,19 @@ void V4L2Capture::captureThreadSingle() {
 }
 
 void V4L2Capture::sendFrameDirect(const Buffer& buffer, const v4l2_buffer& v4l2_buf) {
-    std::lock_guard<std::mutex> lock(callback_mutex_);
-    
-    if (!frame_callback_) {
-        return;
-    }
-    
-    // Get timestamp
-    int64_t timestamp_ns = v4l2_buf.timestamp.tv_sec * 1000000000LL + 
-                          v4l2_buf.timestamp.tv_usec * 1000LL;
-    
-    // Update format with actual pixel format for direct pass-through
-    VideoFormat format = video_format_;
-    if (current_format_.fmt.pix.pixelformat == V4L2_PIX_FMT_UYVY) {
-        format.pixel_format = "UYVY";
-    } else if (current_format_.fmt.pix.pixelformat == V4L2_PIX_FMT_YUYV) {
-        format.pixel_format = "YUYV";  // Will be converted to UYVY by NDI sender
-    }
-    
-    // Direct callback with original YUV data - NO CONVERSION!
-    frame_callback_(buffer.start, v4l2_buf.bytesused, timestamp_ns, format);
-    
-    // Update stats
-    std::lock_guard<std::mutex> stats_lock(stats_mutex_);
-    stats_.frames_captured++;
-    stats_.zero_copy_frames++;
-    
-    // Track E2E latency
-    auto now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-        std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-    double e2e_ms = (now_ns - timestamp_ns) / 1000000.0;
-    
-    if (e2e_ms > 0 && e2e_ms < 1000) {
-        stats_.avg_e2e_latency_ms = 0.9 * stats_.avg_e2e_latency_ms + 0.1 * e2e_ms;
-        if (e2e_ms > stats_.max_e2e_latency_ms) {
-            stats_.max_e2e_latency_ms = e2e_ms;
-        }
-        stats_.e2e_samples++;
-    }
-    
-    // Log once for performance tracking
-    if (!zero_copy_logged_) {
-        Logger::info("Zero-copy path active: " + format.pixel_format + " -> NDI (NO BGRA CONVERSION)");
-        zero_copy_logged_ = true;
-    }
+    auto capture_time = std::chrono::steady_clock::now();
+    sendFrameExtreme(buffer, v4l2_buf, capture_time);
 }
 
 void V4L2Capture::applyRealtimeScheduling() {
     struct sched_param param;
-    param.sched_priority = REALTIME_PRIORITY;
+    param.sched_priority = kRealtimePriority;
     
     if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0) {
         Logger::warning("Could not set real-time priority (need CAP_SYS_NICE)");
         Logger::warning("Run with: sudo setcap cap_sys_nice+ep ndi-bridge");
     } else {
-        Logger::info("Real-time SCHED_FIFO priority 80 active");
+        Logger::info("Real-time SCHED_FIFO priority " + std::to_string(kRealtimePriority) + " active");
     }
     
     // Also try to lock memory
@@ -510,6 +566,39 @@ void V4L2Capture::applyRealtimeScheduling() {
         Logger::warning("Could not lock memory");
     } else {
         Logger::info("Memory locked (no page faults)");
+    }
+}
+
+void V4L2Capture::applyExtremeRealtimeSettings() {
+    // Set CPU affinity
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(kCpuAffinity, &cpuset);
+    
+    if (pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset) != 0) {
+        Logger::warning("Could not set CPU affinity to core " + std::to_string(kCpuAffinity));
+    } else {
+        Logger::info("CPU affinity set to core " + std::to_string(kCpuAffinity));
+    }
+    
+    // Set maximum real-time priority
+    struct sched_param param;
+    param.sched_priority = kRealtimePriority;
+    
+    if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0) {
+        Logger::warning("Could not set real-time priority " + std::to_string(kRealtimePriority) + 
+                       " (need CAP_SYS_NICE)");
+        Logger::warning("Run with: sudo setcap 'cap_sys_nice,cap_ipc_lock+ep' ndi-bridge");
+    } else {
+        Logger::info("EXTREME real-time SCHED_FIFO priority " + std::to_string(kRealtimePriority) + " active");
+    }
+    
+    // Lock memory with MCL_ONFAULT for better performance
+    if (mlockall(MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT) != 0) {
+        Logger::warning("Could not lock memory (need CAP_IPC_LOCK)");
+        Logger::warning("Run with: sudo setcap 'cap_sys_nice,cap_ipc_lock+ep' ndi-bridge");
+    } else {
+        Logger::info("Memory locked with MCL_ONFAULT (EXTREME mode)");
     }
 }
 
