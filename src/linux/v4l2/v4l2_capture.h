@@ -24,11 +24,12 @@ namespace v4l2 {
  * Provides video capture functionality using Linux V4L2 API.
  * Supports USB capture cards and webcams with low latency optimization.
  * 
- * Version: 1.7.0 - Major latency improvements
- * - Reduced buffer count for lower latency
- * - Removed sleeps in processing threads
- * - Tighter queue depths
- * - Single-threaded mode option
+ * Version: 1.8.0 - Ultra-low latency with zero-copy YUV support
+ * - Direct YUYV/UYVY pass-through without conversion
+ * - Real-time scheduling support
+ * - Ultra-low buffer counts (3 minimum)
+ * - DMABUF preparation for future zero-copy
+ * - Format priority favoring NDI-native formats
  * 
  * Pipeline structure (multi-threaded):
  * - Thread 1 (Capture): poll -> dequeue -> push to queue1 -> requeue
@@ -36,7 +37,10 @@ namespace v4l2 {
  * - Thread 3 (Send): pop from queue2 -> callback to NDI sender
  * 
  * Single-threaded mode:
- * - One thread: poll -> dequeue -> convert -> send -> requeue
+ * - One thread: poll -> dequeue -> convert/send -> requeue
+ * 
+ * Zero-copy mode (YUV formats):
+ * - One thread: poll -> dequeue -> direct send -> requeue
  */
 class V4L2Capture : public ICaptureDevice {
 public:
@@ -118,6 +122,33 @@ public:
     void setLowLatencyMode(bool enable);
     bool isLowLatencyMode() const { return low_latency_mode_; }
     
+    /**
+     * @brief Enable ultra-low latency mode
+     * @param enable True to enable most aggressive settings
+     * 
+     * When enabled:
+     * - Minimum buffer count (3)
+     * - Zero-copy for YUV formats
+     * - Single-threaded
+     * - Immediate polling
+     */
+    void setUltraLowLatencyMode(bool enable);
+    bool isUltraLowLatencyMode() const { return ultra_low_latency_mode_; }
+    
+    /**
+     * @brief Enable real-time scheduling
+     * @param enable True to enable
+     * @param priority RT priority (1-99)
+     */
+    void setRealtimeScheduling(bool enable, int priority = 50);
+    
+    /**
+     * @brief Enable zero-copy mode
+     * @param enable True to enable direct format pass-through
+     */
+    void setZeroCopyMode(bool enable) { zero_copy_mode_ = enable; }
+    bool isZeroCopyMode() const { return zero_copy_mode_; }
+    
 private:
     // Buffer structure for memory-mapped buffers
     struct Buffer {
@@ -142,6 +173,9 @@ private:
     // Setup memory-mapped buffers
     bool setupBuffers();
     
+    // Try to setup DMABUF for zero-copy
+    bool trySetupDMABUF();
+    
     // Cleanup buffers
     void cleanupBuffers();
     
@@ -163,6 +197,9 @@ private:
     void processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf, 
                       std::vector<uint8_t>& bgra_buffer);
     
+    // Direct send without conversion (zero-copy path)
+    void sendFrameDirect(const Buffer& buffer, const v4l2_buffer& v4l2_buf);
+    
     // Set capture format
     bool setCaptureFormat(int width, int height, uint32_t pixelformat);
     
@@ -177,6 +214,12 @@ private:
     
     // Convert V4L2 format to our VideoFormat
     VideoFormat convertFormat(const v4l2_format& fmt) const;
+    
+    // Apply real-time scheduling to thread
+    void applyRealtimeScheduling();
+    
+    // Convert pixel format to string
+    std::string pixelFormatToString(uint32_t format) const;
     
     // Error handling
     void setError(const std::string& error);
@@ -243,43 +286,61 @@ private:
     // Disconnect detection
     uint32_t timeout_count_ = 0;
     
-    // Zero-copy optimization flag
+    // Zero-copy optimization
+    bool zero_copy_mode_{false};
     bool zero_copy_logged_{false};
+    bool dmabuf_supported_{false};
+    v4l2_memory buffer_type_{V4L2_MEMORY_MMAP};
     
-    // Low latency mode
+    // Real-time scheduling
+    bool realtime_scheduling_{false};
+    int realtime_priority_{50};
+    
+    // Latency modes
     bool low_latency_mode_{false};
+    bool ultra_low_latency_mode_{false};
     
     // Buffer count - optimized for low latency
-    static constexpr unsigned int kBufferCountNormal = 6;    // Reduced from 10
-    static constexpr unsigned int kBufferCountLowLatency = 4; // Minimum for stability
+    static constexpr unsigned int kBufferCountNormal = 6;        // Reduced from 10
+    static constexpr unsigned int kBufferCountLowLatency = 4;    // Minimum for stability
+    static constexpr unsigned int kBufferCountUltraLow = 3;      // Absolute minimum
     
     // Queue depths for multi-threading - optimized for low latency
-    static constexpr size_t kCaptureQueueDepthNormal = 3;    // Reduced from 5
+    static constexpr size_t kCaptureQueueDepthNormal = 3;        // Reduced from 5
     static constexpr size_t kCaptureQueueDepthLowLatency = 2;
-    static constexpr size_t kConvertQueueDepthNormal = 2;    // Reduced from 5
+    static constexpr size_t kConvertQueueDepthNormal = 2;        // Reduced from 5
     static constexpr size_t kConvertQueueDepthLowLatency = 1;
+    static constexpr size_t kQueueDepthUltraLow = 1;             // Single buffer queue
     
     // Poll timeouts - optimized for low latency
-    static constexpr int kPollTimeoutMsMulti = 0;       // Immediate (was 1ms)
-    static constexpr int kPollTimeoutMsSingle = 1;      // Reduced from 5ms
-    static constexpr int kPollTimeoutMsLowLatency = 0;  // Immediate
+    static constexpr int kPollTimeoutMsMulti = 0;          // Immediate (was 1ms)
+    static constexpr int kPollTimeoutMsSingle = 1;         // Reduced from 5ms
+    static constexpr int kPollTimeoutMsLowLatency = 0;     // Immediate
+    static constexpr int kPollTimeoutUltraLow = 0;         // No wait
+    
+    // Format priority for NDI optimization
+    static const std::vector<uint32_t> kFormatPriority;
     
     // Get current buffer count based on mode
     unsigned int getBufferCount() const {
+        if (ultra_low_latency_mode_) return kBufferCountUltraLow;
         return low_latency_mode_ ? kBufferCountLowLatency : kBufferCountNormal;
     }
     
     // Get current queue depths based on mode
     size_t getCaptureQueueDepth() const {
+        if (ultra_low_latency_mode_) return kQueueDepthUltraLow;
         return low_latency_mode_ ? kCaptureQueueDepthLowLatency : kCaptureQueueDepthNormal;
     }
     
     size_t getConvertQueueDepth() const {
+        if (ultra_low_latency_mode_) return kQueueDepthUltraLow;
         return low_latency_mode_ ? kConvertQueueDepthLowLatency : kConvertQueueDepthNormal;
     }
     
     // Get poll timeout based on mode
     int getPollTimeout() const {
+        if (ultra_low_latency_mode_) return kPollTimeoutUltraLow;
         if (low_latency_mode_) return kPollTimeoutMsLowLatency;
         return use_multi_threading_ ? kPollTimeoutMsMulti : kPollTimeoutMsSingle;
     }
