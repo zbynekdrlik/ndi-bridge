@@ -382,19 +382,40 @@ void V4L2Capture::captureThreadExtreme() {
     
     // Performance monitoring
     auto last_stats_time = std::chrono::steady_clock::now();
+    auto last_frame_time = std::chrono::steady_clock::now();
     uint64_t local_frame_count = 0;
+    uint64_t total_frame_count = 0;
+    
+    // Debug: Track actual FPS more accurately
+    const int fps_window = 60;  // Calculate FPS over 60 frames
+    std::chrono::steady_clock::time_point fps_start_time = std::chrono::steady_clock::now();
+    uint64_t fps_frame_count = 0;
     
     while (!should_stop_) {
-        // BUSY WAIT - no poll, no syscalls
+        // Use poll with very short timeout instead of pure busy-wait
+        // This gives the kernel a chance to actually deliver frames
+        struct pollfd pfd;
+        pfd.fd = fd_;
+        pfd.events = POLLIN | POLLPRI;
+        
+        // Poll with 1ms timeout - still very responsive but doesn't starve kernel
+        int ret = poll(&pfd, 1, 1);
+        
+        if (ret < 0) {
+            if (errno == EINTR) continue;
+            setError("Poll error: " + std::string(strerror(errno)));
+            break;
+        }
+        
+        if (ret == 0) continue;  // Timeout, no data yet
+        
+        // Try to dequeue buffer
         v4l2_buffer v4l2_buf = {};
         v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         v4l2_buf.memory = buffer_type_;
         
-        // Try to dequeue buffer
-        int ret = ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf);
-        if (ret < 0) {
+        if (ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf) < 0) {
             if (errno == EAGAIN) {
-                // No frame ready, busy wait
                 continue;
             }
             setError("Failed to dequeue buffer: " + std::string(strerror(errno)));
@@ -414,21 +435,41 @@ void V4L2Capture::captureThreadExtreme() {
         }
         
         local_frame_count++;
+        total_frame_count++;
+        fps_frame_count++;
+        
+        // Calculate actual FPS over smaller window
+        if (fps_frame_count >= fps_window) {
+            auto fps_end_time = std::chrono::steady_clock::now();
+            double fps_duration = std::chrono::duration<double>(fps_end_time - fps_start_time).count();
+            double actual_fps = fps_frame_count / fps_duration;
+            
+            Logger::debug("Actual FPS: " + std::to_string(actual_fps) + 
+                         " (measured over " + std::to_string(fps_window) + " frames)");
+            
+            fps_frame_count = 0;
+            fps_start_time = fps_end_time;
+        }
         
         // Log statistics periodically
         auto now = std::chrono::steady_clock::now();
         if (now - last_stats_time >= std::chrono::seconds(10)) {
+            double elapsed = std::chrono::duration<double>(now - last_stats_time).count();
+            double fps = local_frame_count / elapsed;
+            
             std::lock_guard<std::mutex> lock(stats_mutex_);
-            Logger::debug("V4L2 EXTREME: FPS: " + std::to_string(local_frame_count / 10) +
+            Logger::debug("V4L2 EXTREME: FPS: " + std::to_string(fps) +
                         ", Zero-copy frames: " + std::to_string(stats_.zero_copy_frames) +
-                        ", Internal latency: " + std::to_string(stats_.avg_e2e_latency_ms) + "ms");
+                        ", Internal latency: " + std::to_string(stats_.avg_e2e_latency_ms) + "ms" +
+                        ", Total frames: " + std::to_string(total_frame_count));
             
             last_stats_time = now;
             local_frame_count = 0;
         }
     }
     
-    Logger::info("V4L2 EXTREME capture thread stopped");
+    Logger::info("V4L2 EXTREME capture thread stopped. Total frames captured: " + 
+                std::to_string(total_frame_count));
 }
 
 void V4L2Capture::sendFrameExtreme(const Buffer& buffer, const v4l2_buffer& v4l2_buf,
