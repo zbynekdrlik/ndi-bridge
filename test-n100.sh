@@ -34,8 +34,12 @@ echo "🔐 Setting capabilities..."
 sudo setcap 'cap_sys_nice,cap_ipc_lock+ep' ./bin/ndi-bridge
 
 echo ""
-echo "✅ Build complete! Version:"
-./bin/ndi-bridge --version || true
+echo "✅ Build complete!"
+
+# Show version by running with no args (shows usage which includes version)
+echo ""
+echo "📋 Version info:"
+./bin/ndi-bridge --help 2>&1 | head -1 || true
 
 echo ""
 echo "🎥 Starting NDI Bridge..."
@@ -43,9 +47,16 @@ echo "Device: /dev/video0"
 echo "NDI Name: NZXT HD60"
 echo "Mode: EXTREME LOW LATENCY (v2.1.0)"
 echo ""
+echo "Features:"
+echo "  - 2 buffers (absolute minimum)"
+echo "  - Busy-wait (no poll overhead)"
+echo "  - CPU affinity to core 3"
+echo "  - RT priority 90"
+echo "  - Memory locked"
+echo ""
 echo "Press Ctrl+C to stop"
 echo "======================================"
 echo ""
 
-# Run with proper arguments (positional, not flags for v2.x)
+# Run with proper arguments (positional for v2.x)
 ./bin/ndi-bridge /dev/video0 "NZXT HD60"
