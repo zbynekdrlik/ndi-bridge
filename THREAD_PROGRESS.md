@@ -2,108 +2,79 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Linux V4L2 ultra-low latency v1.8.0
-- [ ] Waiting for: User to implement and test v1.8.0 code changes
-- [ ] Blocked by: None - implementation plan ready
+- [x] Currently working on: Linux V4L2 v2.0.0 - ZERO COMPROMISE implementation
+- [ ] Waiting for: User to implement v2.0.0 simplified code
+- [ ] Blocked by: None - design philosophy updated
 
 ## Implementation Status
-- Phase: **Linux V4L2 Ultra-Low Latency** - v1.8.0 PLANNED
-- Step: Code modifications provided, awaiting implementation
-- Status: IMPLEMENTATION_READY
-- Version: 1.8.0 (planned)
+- Phase: **Version 2.0.0** - Single-Purpose Appliance
+- Step: Simplifying code to remove ALL options
+- Status: DESIGN_COMPLETE
+- Version: 2.0.0 (planned)
 
-## v1.8.0 Ultra-Low Latency Features ⏳
-**CRITICAL OPTIMIZATIONS PLANNED**:
-- ✅ Direct YUYV support without BGRA conversion
-- ✅ Zero-copy mode for YUV formats
-- ✅ Ultra-low buffer count (3 minimum)
-- ✅ Real-time scheduling support
-- ✅ Format priority (UYVY > YUYV > NV12)
-- ✅ DMABUF preparation for future zero-copy
-- ✅ New command-line options:
-  - `--ultra-low-latency`
-  - `--zero-copy`
-  - `--realtime [priority]`
+## v2.0.0 ZERO COMPROMISE Design ✅
+**NO OPTIONS, NO MODES, JUST MAXIMUM PERFORMANCE**:
+- ✅ Remove ALL command-line performance options
+- ✅ Hardcode optimal settings:
+  - 3 buffers (minimum)
+  - Zero-copy for YUV
+  - Single-threaded
+  - Real-time priority 80
+  - Immediate polling
+- ✅ Simplify main.cpp to just: `ndi-bridge [device] [name]`
+- ✅ Remove all "set mode" methods from V4L2Capture
+- ✅ Always apply maximum performance
 
-**Key Changes**:
-1. **v4l2_capture.h**: Updated with new methods and members
-2. **v4l2_capture.cpp**: Critical sections to modify:
-   - Format priority vector
-   - findBestFormat() with NDI-optimized selection
-   - sendFrameDirect() for zero-copy
-   - processFrame() with zero-copy path
-   - Real-time scheduling support
-3. **main.cpp**: New command-line options
-4. **version.h**: Updated to 1.8.0
+**Key Philosophy Change**:
+- v1.x: "Here are options to tune performance"
+- v2.0: "We've already chosen the fastest settings"
+
+## What Changed
+1. **DESIGN_PHILOSOPHY.md**: Now explicitly states ZERO COMPROMISE
+2. **version.h**: Bumped to 2.0.0
+3. **Implementation**: Remove all performance options
+
+## Simple Implementation Steps
+1. Remove all performance flags from main.cpp
+2. Remove all setMode methods from V4L2Capture
+3. Hardcode all settings to maximum performance
+4. Always apply RT scheduling, zero-copy, etc.
+
+## Test Command (v2.0)
+```bash
+# That's it. No options.
+sudo ./ndi-bridge /dev/video0 "N100"
+```
 
 ## Performance Expectations
-- **Current v1.7.1**: ~8-12 frames latency
-- **v1.8.0 Multi-threaded**: ~6-8 frames (with zero-copy YUV)
-- **v1.8.0 Single-threaded**: ~4-6 frames
-- **v1.8.0 Ultra-low latency**: ~2-3 frames (target)
-
-## NDI Format Support (Verified)
-- **UYVY**: Native, zero-copy
-- **YUYV**: Converted to UYVY with AVX2 (in NDI sender)
-- **BGRA/BGRX/RGBA/RGBX**: Native
-- **NV12**: Requires conversion (avoid)
-
-## Implementation Steps
-1. Apply v4l2_capture.h changes ✅ (committed)
-2. Apply v4l2_capture.cpp critical changes
-3. Apply main.cpp modifications
-4. Compile and test basic functionality
-5. Test with 60fps camera:
-   - Normal mode baseline
-   - `--zero-copy` mode
-   - `--ultra-low-latency` mode
-   - `--ultra-low-latency --realtime 80`
-6. Measure round-trip latency for each mode
-7. Verify zero-copy frames in stats
-
-## Test Commands
-```bash
-# Baseline test
-./ndi-bridge -d /dev/video0 -n "Test" -v
-
-# Zero-copy test
-./ndi-bridge -d /dev/video0 -n "Test" -v --zero-copy
-
-# Ultra-low latency test
-./ndi-bridge -d /dev/video0 -n "Test" -v --ultra-low-latency
-
-# Maximum performance test
-./ndi-bridge -d /dev/video0 -n "Test" -v --ultra-low-latency --realtime 80
-```
+- **Current v1.x**: Variable based on options
+- **v2.0**: ALWAYS maximum performance
+- **Target**: 2-3 frames latency ALWAYS
 
 ## Repository State
 - Main branch: v1.6.7
-- Current branch: fix/linux-v4l2-latency (v1.8.0 planned)
-- PR: Not created yet
-- Windows latency: 8 frames ✅
-- Linux latency: 8-12 frames (v1.7.1)
-- Target latency: 2-3 frames (v1.8.0)
+- Current branch: fix/linux-v4l2-latency (v2.0.0 planned)
+- Design philosophy: UPDATED for zero-compromise
+- Implementation: Simplified approach ready
 
 ## Next Steps
-1. User implements code changes from artifacts
-2. Compile and fix any build errors
-3. Test all modes with latency measurements
-4. If 2-3 frames achieved, create PR
-5. Otherwise, investigate further optimizations:
-   - DMABUF implementation
-   - Kernel bypass techniques
-   - Custom V4L2 driver modifications
+1. Implement simplified v2.0.0 code
+2. Remove ALL performance options
+3. Hardcode optimal settings
+4. Test with single command
+5. Achieve 2-3 frame latency
+6. Create PR for v2.0.0
 
-## Key Insights
-- BGRA conversion is the main latency culprit
-- YUV formats (UYVY/YUYV) can go direct to NDI
-- Most USB devices output YUYV (not UYVY)
-- NDI sender already handles YUYV→UYVY with AVX2
-- Zero-copy YUV path should save 3-5 frames
+## v2.0 Manifesto
+**We are building an APPLIANCE, not an application.**
+- No options
+- No modes  
+- No compromise
+- Just maximum speed
 
 ## Quick Reference
-- Current version: 1.8.0 (planned)
+- Current version: 2.0.0 (planned)
 - Branch: fix/linux-v4l2-latency
-- Files to modify: 3 (v4l2_capture.cpp, main.cpp, version.h)
-- v4l2_capture.h: Already updated ✅
-- Critical feature: Zero-copy YUV support
+- Philosophy: SINGLE-PURPOSE, ZERO-COMPROMISE
+- Usage: `ndi-bridge /dev/video0 "Name"`
+- Options: NONE
