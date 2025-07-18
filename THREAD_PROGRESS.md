@@ -2,99 +2,108 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Linux V4L2 latency optimization v1.7.1
-- [ ] Waiting for: User to test v1.7.1 implementation with critical fixes
-- [ ] Blocked by: None - critical fixes implemented, needs testing
+- [x] Currently working on: Linux V4L2 ultra-low latency v1.8.0
+- [ ] Waiting for: User to implement and test v1.8.0 code changes
+- [ ] Blocked by: None - implementation plan ready
 
 ## Implementation Status
-- Phase: **Linux V4L2 Latency Fix** - CRITICAL FIXES COMPLETE
-- Step: v1.7.1 COMPLETE - Fixed all critical issues
-- Status: IMPLEMENTED_NOT_TESTED
-- Version: 1.7.1
+- Phase: **Linux V4L2 Ultra-Low Latency** - v1.8.0 PLANNED
+- Step: Code modifications provided, awaiting implementation
+- Status: IMPLEMENTATION_READY
+- Version: 1.8.0 (planned)
 
-## Linux V4L2 Latency Fix - v1.7.1 FIXES ✅
-**CRITICAL FIXES IMPLEMENTED**:
-- ✅ REMOVED all sleeps in multi-threaded threads (lines 460, 565)
-- ✅ IMPLEMENTED setLowLatencyMode() function
-- ✅ FIXED poll timeouts to use immediate (0ms) for multi-threaded
-- ✅ FIXED dynamic buffer counts (6 normal, 4 low latency)
-- ✅ FIXED dynamic queue depths based on mode
-- ✅ Added E2E latency tracking in statistics
-- ✅ Fixed all compilation issues
+## v1.8.0 Ultra-Low Latency Features ⏳
+**CRITICAL OPTIMIZATIONS PLANNED**:
+- ✅ Direct YUYV support without BGRA conversion
+- ✅ Zero-copy mode for YUV formats
+- ✅ Ultra-low buffer count (3 minimum)
+- ✅ Real-time scheduling support
+- ✅ Format priority (UYVY > YUYV > NV12)
+- ✅ DMABUF preparation for future zero-copy
+- ✅ New command-line options:
+  - `--ultra-low-latency`
+  - `--zero-copy`
+  - `--realtime [priority]`
 
-**v1.7.0 Features (still included)**:
-- Reduced buffer counts (10→6 normal, 4 low latency)
-- Reduced queue depths (5→3/2 normal, 2/1 low latency)
-- Immediate polling (0ms timeout)
-- Single-threaded mode option
-- Command-line options: --single-thread, --low-latency
-
-## Failed Requirements Fixed
-1. ✅ **Sleeps Removed**: Lines 460 & 565 changed from sleep_for(100μs) to tight loops
-2. ✅ **setLowLatencyMode()**: Fully implemented - forces single-thread + minimal buffers
-3. ✅ **Poll Timeouts**: Now using getPollTimeout() with immediate (0ms) values
-4. ✅ **Dynamic Configuration**: Using getBufferCount(), getCaptureQueueDepth(), etc.
-
-## Testing Required
-1. **Basic Multi-threaded Test**:
-   ```bash
-   ./ndi-bridge -d /dev/video0 -n "Test Stream"
-   ```
-   - Expected: Should show reduced latency from 12 frames
-
-2. **Single-threaded Test**:
-   ```bash
-   ./ndi-bridge -d /dev/video0 -n "Test Stream" --single-thread
-   ```
-   - Expected: Lowest latency, around 8 frames
-
-3. **Low Latency Mode Test**:
-   ```bash
-   ./ndi-bridge -d /dev/video0 -n "Test Stream" --low-latency
-   ```
-   - Expected: Forces single-thread + minimal buffers, 8 frames
-
-4. **Verbose Mode for Stats**:
-   ```bash
-   ./ndi-bridge -d /dev/video0 -n "Test Stream" --single-thread -v
-   ```
-   - Should show E2E latency statistics every 10 seconds
-
-## Key Changes in v1.7.1
-1. **v4l2_capture.cpp**:
-   - Removed ALL sleeps in convert/send threads
-   - Added setLowLatencyMode() implementation
-   - Fixed buffer/queue configuration to use dynamic values
-   - Fixed poll timeouts to use immediate (0ms)
-   - Enhanced E2E latency tracking
-
-2. **version.h**:
-   - Bumped version to 1.7.1
+**Key Changes**:
+1. **v4l2_capture.h**: Updated with new methods and members
+2. **v4l2_capture.cpp**: Critical sections to modify:
+   - Format priority vector
+   - findBestFormat() with NDI-optimized selection
+   - sendFrameDirect() for zero-copy
+   - processFrame() with zero-copy path
+   - Real-time scheduling support
+3. **main.cpp**: New command-line options
+4. **version.h**: Updated to 1.8.0
 
 ## Performance Expectations
-- **Multi-threaded**: ~10 frames (down from 12)
-- **Single-threaded**: ~8 frames (matches Windows)
-- **Low latency mode**: ~8 frames (most aggressive settings)
+- **Current v1.7.1**: ~8-12 frames latency
+- **v1.8.0 Multi-threaded**: ~6-8 frames (with zero-copy YUV)
+- **v1.8.0 Single-threaded**: ~4-6 frames
+- **v1.8.0 Ultra-low latency**: ~2-3 frames (target)
+
+## NDI Format Support (Verified)
+- **UYVY**: Native, zero-copy
+- **YUYV**: Converted to UYVY with AVX2 (in NDI sender)
+- **BGRA/BGRX/RGBA/RGBX**: Native
+- **NV12**: Requires conversion (avoid)
+
+## Implementation Steps
+1. Apply v4l2_capture.h changes ✅ (committed)
+2. Apply v4l2_capture.cpp critical changes
+3. Apply main.cpp modifications
+4. Compile and test basic functionality
+5. Test with 60fps camera:
+   - Normal mode baseline
+   - `--zero-copy` mode
+   - `--ultra-low-latency` mode
+   - `--ultra-low-latency --realtime 80`
+6. Measure round-trip latency for each mode
+7. Verify zero-copy frames in stats
+
+## Test Commands
+```bash
+# Baseline test
+./ndi-bridge -d /dev/video0 -n "Test" -v
+
+# Zero-copy test
+./ndi-bridge -d /dev/video0 -n "Test" -v --zero-copy
+
+# Ultra-low latency test
+./ndi-bridge -d /dev/video0 -n "Test" -v --ultra-low-latency
+
+# Maximum performance test
+./ndi-bridge -d /dev/video0 -n "Test" -v --ultra-low-latency --realtime 80
+```
 
 ## Repository State
 - Main branch: v1.6.7
-- Current branch: fix/linux-v4l2-latency (v1.7.1)
+- Current branch: fix/linux-v4l2-latency (v1.8.0 planned)
 - PR: Not created yet
-- Windows latency: FIXED (8 frames) ✅
-- Linux latency: CRITICAL FIXES DONE (awaiting test) ⏳
+- Windows latency: 8 frames ✅
+- Linux latency: 8-12 frames (v1.7.1)
+- Target latency: 2-3 frames (v1.8.0)
 
 ## Next Steps
-1. User compiles and tests v1.7.1
-2. Verify no compilation errors
-3. Measure round-trip latency with 60fps camera
-4. Compare single vs multi-threaded modes
-5. Check CPU usage
-6. If successful (8 frames achieved), create PR and merge
+1. User implements code changes from artifacts
+2. Compile and fix any build errors
+3. Test all modes with latency measurements
+4. If 2-3 frames achieved, create PR
+5. Otherwise, investigate further optimizations:
+   - DMABUF implementation
+   - Kernel bypass techniques
+   - Custom V4L2 driver modifications
+
+## Key Insights
+- BGRA conversion is the main latency culprit
+- YUV formats (UYVY/YUYV) can go direct to NDI
+- Most USB devices output YUYV (not UYVY)
+- NDI sender already handles YUYV→UYVY with AVX2
+- Zero-copy YUV path should save 3-5 frames
 
 ## Quick Reference
-- Current version: 1.7.1
+- Current version: 1.8.0 (planned)
 - Branch: fix/linux-v4l2-latency
-- Files changed: 2 (v4l2_capture.cpp, version.h)
-- Critical issues: ALL FIXED ✅
-- Windows latency: 8 frames ✅
-- Linux latency target: 8 frames (expected with fixes)
+- Files to modify: 3 (v4l2_capture.cpp, main.cpp, version.h)
+- v4l2_capture.h: Already updated ✅
+- Critical feature: Zero-copy YUV support
