@@ -12,19 +12,21 @@
 #include <vector>
 #include <linux/videodev2.h>
 #include <sys/mman.h>
+#include <chrono>
 
 namespace ndi_bridge {
 namespace v4l2 {
 
 /**
- * @brief V4L2 implementation of ICaptureDevice - ZERO COMPROMISE VERSION
+ * @brief V4L2 implementation of ICaptureDevice - EXTREME LOW LATENCY VERSION
  * 
- * Version: 2.0.0 - Ultra-low latency single-purpose appliance
- * - ALWAYS 3 buffers (absolute minimum)
+ * Version: 2.1.0 - Extreme low latency with busy-wait and CPU affinity
+ * - ALWAYS 2 buffers (absolute minimum)
  * - ALWAYS zero-copy for YUV formats
  * - ALWAYS single-threaded
- * - ALWAYS real-time priority 80
- * - ALWAYS immediate polling (0ms)
+ * - ALWAYS real-time priority 90
+ * - ALWAYS busy-wait (no poll)
+ * - ALWAYS CPU affinity
  * - NO configuration options
  * - NO compromise on latency
  * 
@@ -73,11 +75,12 @@ public:
     
 private:
     // HARDCODED OPTIMAL SETTINGS
-    static constexpr unsigned int kBufferCount = 3;          // Absolute minimum
-    static constexpr int kPollTimeout = 0;                   // No wait
+    static constexpr unsigned int kBufferCount = 2;          // Absolute minimum
+    static constexpr int kPollTimeout = -1;                  // Busy wait
     static constexpr bool kUseMultiThreading = false;        // Single thread only
     static constexpr bool kZeroCopyMode = true;              // Always zero-copy
-    static constexpr int kRealtimePriority = 80;             // High RT priority
+    static constexpr int kRealtimePriority = 90;             // Maximum RT priority
+    static constexpr int kCpuAffinity = 3;                   // CPU core to pin to
     
     // Buffer structure
     struct Buffer {
@@ -117,8 +120,15 @@ private:
     // Main capture thread - single-threaded ultra-low latency
     void captureThreadSingle();
     
+    // EXTREME capture thread - busy-wait with CPU affinity
+    void captureThreadExtreme();
+    
     // Direct send without conversion (zero-copy path)
     void sendFrameDirect(const Buffer& buffer, const v4l2_buffer& v4l2_buf);
+    
+    // EXTREME send with accurate timing
+    void sendFrameExtreme(const Buffer& buffer, const v4l2_buffer& v4l2_buf,
+                         std::chrono::steady_clock::time_point capture_time);
     
     // Process frame with conversion
     void processFrame(const Buffer& buffer, const v4l2_buffer& v4l2_buf, 
@@ -141,6 +151,9 @@ private:
     
     // Apply real-time scheduling
     void applyRealtimeScheduling();
+    
+    // Apply EXTREME real-time settings
+    void applyExtremeRealtimeSettings();
     
     // Convert pixel format to string
     std::string pixelFormatToString(uint32_t format) const;
