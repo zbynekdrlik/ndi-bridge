@@ -11,6 +11,7 @@
 #include <mutex>
 #include <vector>
 #include <linux/videodev2.h>
+#include <sys/mman.h>
 
 namespace ndi_bridge {
 namespace v4l2 {
@@ -46,6 +47,30 @@ public:
     
     // NO PUBLIC CONFIGURATION METHODS!
     
+    // Statistics structure
+    struct CaptureStats {
+        uint64_t frames_captured = 0;
+        uint64_t frames_dropped = 0;
+        uint64_t zero_copy_frames = 0;
+        double total_latency_ms = 0.0;
+        double avg_e2e_latency_ms = 0.0;
+        double max_e2e_latency_ms = 0.0;
+        uint64_t e2e_samples = 0;
+        
+        void reset() {
+            frames_captured = 0;
+            frames_dropped = 0;
+            zero_copy_frames = 0;
+            total_latency_ms = 0.0;
+            avg_e2e_latency_ms = 0.0;
+            max_e2e_latency_ms = 0.0;
+            e2e_samples = 0;
+        }
+    };
+    
+    // Get statistics
+    CaptureStats getStats() const;
+    
 private:
     // HARDCODED OPTIMAL SETTINGS
     static constexpr unsigned int kBufferCount = 3;          // Absolute minimum
@@ -76,6 +101,9 @@ private:
     
     // Setup buffers
     bool setupBuffers();
+    
+    // Try to setup DMABUF
+    bool trySetupDMABUF();
     
     // Cleanup buffers
     void cleanupBuffers();
@@ -133,6 +161,12 @@ private:
     // Memory-mapped buffers
     std::vector<Buffer> buffers_;
     
+    // Buffer type (MMAP or DMABUF)
+    uint32_t buffer_type_;
+    
+    // DMABUF support flag
+    bool dmabuf_supported_ = false;
+    
     // Current format
     v4l2_format current_format_;
     VideoFormat video_format_;
@@ -161,7 +195,20 @@ private:
     // Device mutex
     mutable std::mutex device_mutex_;
     
-    // Statistics (minimal)
+    // Statistics
+    mutable std::mutex stats_mutex_;
+    CaptureStats stats_;
+    
+    // These member variables are used in constructor but not needed in header
+    // They are replaced by static constexpr values
+    bool use_multi_threading_;
+    bool zero_copy_mode_;
+    bool realtime_scheduling_;
+    int realtime_priority_;
+    bool low_latency_mode_;
+    bool ultra_low_latency_mode_;
+    
+    // Statistics (minimal) - kept for compatibility
     std::atomic<uint64_t> frames_captured_{0};
     std::atomic<uint64_t> frames_dropped_{0};
     std::atomic<uint64_t> zero_copy_frames_{0};
