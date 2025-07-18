@@ -1,10 +1,10 @@
 #pragma once
 
-#define VERSION_MAJOR 1
-#define VERSION_MINOR 8
+#define VERSION_MAJOR 2
+#define VERSION_MINOR 0
 #define VERSION_PATCH 0
 
-#define VERSION_STRING "1.8.0"
+#define VERSION_STRING "2.0.0"
 
 // Additional defines for main.cpp compatibility
 #define NDI_BRIDGE_VERSION VERSION_STRING
