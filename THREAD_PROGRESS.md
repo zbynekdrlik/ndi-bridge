@@ -2,60 +2,60 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Linux V4L2 extreme latency optimization (v2.1.0)
-- [x] Waiting for: User to test FIXED v2.1.0 implementation
-- [ ] Blocked by: Need to verify if 8 frames latency achieved
+- [x] Currently working on: Linux V4L2 FPS issue fix (v2.1.1)
+- [x] Waiting for: User to test FIXED v2.1.1 implementation with non-blocking poll
+- [ ] Blocked by: Need to verify if 60 FPS and 8 frames latency achieved
 
 ## Implementation Status
-- Phase: **Linux V4L2 Extreme Latency Fix** - v2.1.0 FIXED and ready
-- Step: Implementation corrected, needs retesting
-- Status: IMPLEMENTED_NOT_TESTED (with correct constants now)
-- Version: 2.1.0 (properly implemented)
+- Phase: **Linux V4L2 Extreme Latency Fix** - v2.1.1 ready
+- Step: FPS fix implemented, needs testing
+- Status: IMPLEMENTED_NOT_TESTED (with non-blocking poll now)
+- Version: 2.1.1 (FPS fix implemented)
 
-## v2.1.0 Implementation Issue FIXED
+## v2.1.1 FPS Fix Details
 **Problem Found**:
-- Header defined extreme settings (2 buffers, RT 90, busy-wait)
-- Implementation was still using old constants (3 buffers, RT 80)
-- This has been FIXED in latest commit
+- 1ms poll timeout was causing FPS drop to ~23-29 FPS
+- Frames weren't being dropped, but capture timing was disrupted
 
-**v2.1.0 NOW PROPERLY INCLUDES**:
-1. ✅ 2 buffers (absolute minimum) - FIXED
-2. ✅ Busy-wait instead of poll() - FIXED
-3. ✅ CPU affinity to core 3 - FIXED
-4. ✅ RT priority 90 - FIXED
-5. ✅ Better memory locking with MCL_ONFAULT
-6. ✅ More accurate timing measurement
-7. ✅ test-n100.sh script for easy testing
+**v2.1.1 Fix Includes**:
+1. ✅ Non-blocking poll (0ms timeout) instead of 1ms
+2. ✅ Thread yield to prevent CPU starvation
+3. ✅ Better FPS warning detection (logs if <58 or >62 FPS)
+4. ✅ All v2.1.0 extreme features still active:
+   - 2 buffers (absolute minimum)
+   - CPU affinity to core 3
+   - RT priority 90
+   - Memory locked with MCL_ONFAULT
 
 ## Quick Test Instructions
 ```bash
-# Pull the fix and test again:
+# Pull the latest fix and test:
 cd ~/ndi-test/ndi-bridge
 git pull
 ./test-n100.sh
 ```
 
-## First Test Results (with broken implementation)
+## Previous Test Results (v2.1.0 with 1ms poll)
 - Version loaded: ✅
 - Memory locked: ✅ 
 - Zero-copy: ✅
 - **Issues found**:
-  - Still using 3 buffers (not 2)
-  - RT priority 80 (not 90)
-  - FPS: 53-58 (not 60)
-  - Latency measurement: 0.000ms (broken)
+  - FPS: 21-29 (NOT 60) ❌
+  - No frames dropped but timing was wrong
+  - 1ms poll was the culprit
 
-## Expected with FIXED v2.1.0
-- 2 buffers (down from 3)
-- RT priority 90 (up from 80)
+## Expected with v2.1.1
+- 60 FPS stable capture
+- 2 buffers active
+- RT priority 90
 - CPU pinned to core 3
-- Busy-wait (100% CPU expected)
+- Non-blocking poll with yield
 - Target: 8 frames latency
 
 ## Linux V4L2 "EXTREME" Implementation
-**v2.1.0 Features** (2 buffers, busy-wait):
+**v2.1.x Features**:
 - ALWAYS 2 buffers (EXTREME minimum)
-- ALWAYS busy-wait (no poll)
+- ALWAYS non-blocking poll (0ms)
 - ALWAYS CPU affinity (core 3)
 - ALWAYS RT priority 90 (maximum)
 - ALWAYS memory locked
@@ -63,32 +63,32 @@ git pull
 
 ## Repository State
 - Main branch: v1.6.5
-- Current branch: fix/linux-v4l2-latency (v2.1.0 FIXED)
-- Latest commit: Fixed v2.1.0 implementation
+- Current branch: fix/linux-v4l2-latency (v2.1.1)
+- Latest commit: Non-blocking poll fix
 - Open PR: #15 (Linux latency fix)
 - Windows latency: FIXED (8 frames) ✅
-- Linux latency: RETESTING v2.1.0 🎯
+- Linux latency: TESTING v2.1.1 🎯
 
 ## Next Steps
-1. **IMMEDIATE**: User runs test-n100.sh with fixed implementation
-2. Verify 2 buffers and RT 90 in logs
+1. **IMMEDIATE**: User runs test-n100.sh with v2.1.1
+2. Verify 60 FPS in logs
 3. Check if latency reaches 8 frames
 4. If successful:
-   - Update PR #15 with v2.1.0 results
+   - Update PR #15 with v2.1.1 results
    - Merge to main
 5. If not successful:
    - Analyze remaining bottlenecks
    - Consider v2.2.0 with more extreme measures:
+     - Pure busy-wait (no poll at all)
      - Custom kernel module
-     - Bypass V4L2 entirely
      - Direct hardware access
 
 ## Key Success Metrics
+- FPS: 60 (stable, no drops)
 - Latency: 8 frames or less
 - 2 buffers active
 - RT priority 90 working
-- FPS: Solid 60
-- CPU usage: 100% on core 3 (expected with busy-wait)
+- CPU usage: High on core 3 (expected)
 
 ## Command Line Format (v2.x)
 **IMPORTANT**: v2.x uses positional arguments only:
@@ -99,3 +99,9 @@ git pull
 ```
 
 No flags like -d or -n in v2.x for simplicity!
+
+## Polling Strategy Evolution
+- v2.0.0: 0ms poll (original)
+- v2.1.0: Pure busy-wait (caused issues)
+- v2.1.0 fix1: 1ms poll (caused FPS drop)
+- v2.1.1: Non-blocking poll (0ms) with yield ← CURRENT
