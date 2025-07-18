@@ -35,15 +35,22 @@ const std::vector<uint32_t> V4L2Capture::kFormatPriority = {
 
 V4L2Capture::V4L2Capture() 
     : fd_(-1)
+    , buffer_type_(V4L2_MEMORY_MMAP)
+    , dmabuf_supported_(false)
+    , capturing_(false)
+    , should_stop_(false)
+    , has_error_(false)
     , use_multi_threading_(USE_MULTI_THREADING)     // ALWAYS single thread
     , zero_copy_mode_(ZERO_COPY_MODE)               // ALWAYS zero copy
     , realtime_scheduling_(true)                     // ALWAYS try RT
     , realtime_priority_(REALTIME_PRIORITY)         // ALWAYS high priority
     , low_latency_mode_(true)                        // ALWAYS low latency
     , ultra_low_latency_mode_(true)                  // ALWAYS ultra low
-    , capturing_(false)
-    , should_stop_(false)
-    , has_error_(false) {
+    , frames_captured_(0)
+    , frames_dropped_(0)
+    , zero_copy_frames_(0)
+    , timeout_count_(0)
+    , zero_copy_logged_(false) {
     
     Logger::info("V4L2 Ultra-Low Latency Capture (v" NDI_BRIDGE_VERSION ")");
     Logger::info("Configuration: 3 buffers, zero-copy, single-thread, RT priority 80");
