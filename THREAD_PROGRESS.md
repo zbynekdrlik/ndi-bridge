@@ -2,97 +2,95 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Linux V4L2 pure busy-wait implementation (v2.1.2)
-- [x] Waiting for: User to test v2.1.2 with PURE BUSY-WAIT
-- [ ] Blocked by: Need to verify if 60 FPS and 8 frames latency achieved
+- [x] Currently working on: Diagnosing FPS issue with v2.1.3
+- [x] Waiting for: User to test v2.1.3 with frame timing diagnostics
+- [ ] Blocked by: Need to understand why device delivers <30 FPS instead of 60
 
 ## Implementation Status
-- Phase: **Linux V4L2 Extreme Latency Fix** - v2.1.2 ready
-- Step: Pure busy-wait implemented for maximum FPS
-- Status: IMPLEMENTED_NOT_TESTED (pure busy-wait, no poll)
-- Version: 2.1.2 (pure busy-wait implementation)
+- Phase: **Linux V4L2 Frame Rate Diagnosis** - v2.1.3 ready
+- Step: Added detailed frame timing diagnostics
+- Status: IMPLEMENTED_NOT_TESTED (diagnostics version)
+- Version: 2.1.3 (frame timing diagnostics)
 
-## v2.1.2 Pure Busy-Wait Details
-**Problem Analysis**:
-- Poll with any timeout disrupts frame capture timing
-- Thread yield causes us to miss frames
-- At 60fps, we need to check for frames constantly
+## v2.1.3 Diagnostic Details
+**Problem**:
+- Device configured for 60fps but only delivering 17-31 FPS
+- No frames dropped, but frames arrive irregularly
+- Need to understand if it's device/driver/USB issue
 
-**v2.1.2 Implementation**:
-1. ✅ PURE BUSY-WAIT - No poll() at all
-2. ✅ Constant VIDIOC_DQBUF attempts
-3. ✅ EAGAIN counter for debugging
-4. ✅ 100% CPU usage expected on core 3
-5. ✅ All v2.1.0 extreme features active:
-   - 2 buffers (absolute minimum)
-   - CPU affinity to core 3
-   - RT priority 90
-   - Memory locked with MCL_ONFAULT
+**v2.1.3 Diagnostics Include**:
+1. ✅ Frame gap measurement (time between frames)
+2. ✅ EAGAIN counting (busy-wait iterations)
+3. ✅ Frame gap warnings (>25ms = missing frames)
+4. ✅ Overall FPS tracking
+5. ✅ Max frame gap reporting
+6. ✅ Frame timing logs every 100 frames
 
 ## Quick Test Instructions
 ```bash
-# Pull the latest fix and test:
+# Pull the latest diagnostics and test:
 cd ~/ndi-test/ndi-bridge
 git pull
 ./test-n100.sh
 ```
 
-## Previous Test Results Summary
-- v2.1.0 (busy-wait): Implementation bug - still used 3 buffers
-- v2.1.0 fix1 (1ms poll): FPS dropped to 23-29
-- v2.1.1 (0ms poll + yield): FPS still 16-28
-- v2.1.2 (pure busy-wait): TESTING NOW
+## What to Look For in v2.1.3 Logs
+- **Frame gap warnings**: "Large frame gap detected: XXms"
+- **EAGAIN counts**: Shows how many times we check between frames
+- **Actual FPS**: Should show why it's not 60
+- **Max frame gap**: Largest gap between frames
 
-## Expected with v2.1.2
-- 60 FPS stable capture ✅
-- 100% CPU usage on core 3 (normal)
-- 2 buffers active
+If frame gaps are consistently >16.67ms, the device isn't delivering 60fps.
+
+## Test Results History
+- v2.0.0: Implementation issues
+- v2.1.0: 3 buffer bug
+- v2.1.0 fix1: 23-29 FPS with 1ms poll
+- v2.1.1: 16-28 FPS with 0ms poll + yield  
+- v2.1.2: 17-31 FPS with pure busy-wait
+- v2.1.3: TESTING with diagnostics
+
+## Possible Root Causes
+1. **USB Bandwidth** - USB 2.0 vs 3.0?
+2. **Device/Driver** - Not actually capable of 60fps?
+3. **Format Issue** - YUYV 1080p60 too much bandwidth?
+4. **V4L2 Config** - Missing some setting?
+
+## Linux V4L2 Implementation
+**Current v2.1.x**:
+- 2 buffers (minimum)
+- Pure busy-wait
+- CPU affinity to core 3
 - RT priority 90
-- No poll overhead
-- Target: 8 frames latency
+- Memory locked
+- Zero-copy YUYV->NDI
 
-## Linux V4L2 "EXTREME" Implementation
-**v2.1.2 Features**:
-- ALWAYS 2 buffers (EXTREME minimum)
-- ALWAYS pure busy-wait (no poll)
-- ALWAYS CPU affinity (core 3)
-- ALWAYS RT priority 90 (maximum)
-- ALWAYS memory locked
-- NO compromise on latency
-
-## Repository State
+## Repository State  
 - Main branch: v1.6.5
-- Current branch: fix/linux-v4l2-latency (v2.1.2)
-- Latest commit: Pure busy-wait implementation
+- Current branch: fix/linux-v4l2-latency (v2.1.3)
+- Latest commit: Frame timing diagnostics
 - Open PR: #15 (Linux latency fix)
 - Windows latency: FIXED (8 frames) ✅
-- Linux latency: TESTING v2.1.2 🎯
+- Linux FPS issue: DIAGNOSING 🔍
 
 ## Next Steps
-1. **IMMEDIATE**: User runs test-n100.sh with v2.1.2
-2. Verify 60 FPS in logs (should see "Actual FPS: ~60")
-3. Check CPU usage on core 3 (should be 100%)
-4. Measure latency to see if we hit 8 frames
-5. If successful:
-   - Update PR #15 with v2.1.2 results
-   - Merge to main
-6. If still issues:
-   - Investigate USB/driver bottlenecks
-   - Consider kernel bypass approach
+1. **IMMEDIATE**: Run v2.1.3 and analyze frame timing
+2. Check if frame gaps are consistent or variable
+3. Look for patterns in EAGAIN counts
+4. Determine if it's a device limitation
 
-## Key Success Metrics
-- FPS: 60 (stable, logged every 60 frames)
-- Latency: 8 frames or less
-- CPU: 100% on core 3 (expected)
-- No frame drops
-- Smooth capture
+Possible solutions:
+- Try lower resolution (720p60?)
+- Try different format (NV12?)
+- Check USB port (2.0 vs 3.0)
+- Try different capture device
 
-## Polling Strategy Evolution
-- v2.0.0: 0ms poll (original)
-- v2.1.0: Pure busy-wait (had implementation bug)
-- v2.1.0 fix1: 1ms poll (FPS drop to 23-29)
-- v2.1.1: Non-blocking poll + yield (FPS 16-28)
-- v2.1.2: PURE BUSY-WAIT - no poll() ← CURRENT
+## Key Diagnostics to Report
+- Frame gap pattern (consistent or variable?)
+- Max frame gap value
+- EAGAIN count patterns
+- Any error messages
+- USB port type being used
 
 ## Technical Note
-Pure busy-wait means the capture thread continuously calls ioctl(VIDIOC_DQBUF) in a tight loop. When no frame is ready, it returns EAGAIN and we immediately try again. This uses 100% CPU but ensures we never miss a frame.
+At 60fps, frames should arrive every ~16.67ms. If we see consistent gaps of 33ms, the device is actually running at 30fps. Variable gaps suggest USB bandwidth or driver issues.
