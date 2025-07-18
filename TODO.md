@@ -1,12 +1,40 @@
-- Audio Support: Add audio capture and synchronization
-- Multiple Outputs: Support sending to multiple NDI destinations
-- Web UI: Simple web interface for remote monitoring/control
-- GPU Acceleration: Hardware encoding support where available
-- Docker Support: Containerized deployment option
-- Unit Tests: Comprehensive test coverage
-- CI/CD Pipeline: Automated builds and releases
-- Configuration File: Support for config files instead of command-line only
-- Error Recovery: Enhance automatic device reconnection (partial support exists)
-- Cross-platform DeckLink: Add DeckLink support for Linux
-- MJPEG Support: Add MJPEG decompression for V4L2 devices
-- Network Diagnostics: NDI network bandwidth and latency monitoring
+# TODO
+
+## Current Priority
+- [ ] Implement v1.8.0 ultra-low latency code changes
+- [ ] Test zero-copy YUV path with 60fps camera
+- [ ] Measure latency reduction from direct YUYV support
+- [ ] Verify 2-3 frame target latency achievement
+
+## v1.8.0 Implementation
+- [ ] Apply v4l2_capture.cpp modifications from artifact
+- [ ] Apply main.cpp command-line option changes
+- [ ] Compile and fix any build errors
+- [ ] Test all performance modes
+
+## Testing Matrix
+- [ ] Normal mode (baseline)
+- [ ] --zero-copy mode
+- [ ] --single-thread mode
+- [ ] --low-latency mode
+- [ ] --ultra-low-latency mode
+- [ ] --ultra-low-latency --realtime 80
+
+## Future Optimizations (if needed)
+- [ ] Implement full DMABUF support with buffer allocation
+- [ ] Add V4L2_MEMORY_USERPTR support
+- [ ] Investigate kernel bypass techniques
+- [ ] Consider custom V4L2 driver for ultimate performance
+- [ ] Add CPU affinity for capture thread
+- [ ] Implement NUMA optimization
+
+## Documentation
+- [ ] Update README with new performance options
+- [ ] Document latency measurement methodology
+- [ ] Create performance tuning guide
+- [ ] Add troubleshooting for real-time scheduling
+
+## Release
+- [ ] Create PR once target latency achieved
+- [ ] Update CHANGELOG with v1.8.0 features
+- [ ] Tag release after merge
