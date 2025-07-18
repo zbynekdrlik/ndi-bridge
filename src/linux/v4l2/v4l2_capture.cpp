@@ -26,7 +26,7 @@ constexpr bool ZERO_COPY_MODE = true;             // Always zero-copy
 constexpr int REALTIME_PRIORITY = 80;             // High RT priority
 
 // Format priority for NDI optimization
-const std::vector<uint32_t> kFormatPriority = {
+const std::vector<uint32_t> V4L2Capture::kFormatPriority = {
     V4L2_PIX_FMT_UYVY,    // NDI native - best
     V4L2_PIX_FMT_YUYV,    // Simple byte swap to UYVY
     V4L2_PIX_FMT_NV12,    // Requires conversion
