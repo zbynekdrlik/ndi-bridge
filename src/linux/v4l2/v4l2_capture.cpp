@@ -47,7 +47,7 @@ V4L2Capture::V4L2Capture()
     
     Logger::info("V4L2 EXTREME Low Latency Capture (v" NDI_BRIDGE_VERSION ")");
     Logger::info("Configuration: " + std::to_string(kBufferCount) + " buffers, zero-copy, single-thread, RT priority " + std::to_string(kRealtimePriority));
-    Logger::info("EXTREME MODE - MINIMAL POLLING, CPU AFFINITY, NO COMPROMISE");
+    Logger::info("EXTREME MODE - PURE BUSY-WAIT, CPU AFFINITY, NO COMPROMISE");
     
     memset(&current_format_, 0, sizeof(current_format_));
     memset(&device_caps_, 0, sizeof(device_caps_));
@@ -116,7 +116,7 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
     Logger::info("  - Buffer count: " + std::to_string(kBufferCount) + " (absolute minimum)");
     Logger::info("  - Zero-copy: ENABLED");
     Logger::info("  - Threading: SINGLE");
-    Logger::info("  - Polling: NON-BLOCKING (0ms timeout)");
+    Logger::info("  - Polling: PURE BUSY-WAIT (100% CPU)");
     Logger::info("  - Real-time: SCHED_FIFO priority " + std::to_string(kRealtimePriority));
     Logger::info("  - CPU affinity: core " + std::to_string(kCpuAffinity));
     
@@ -373,9 +373,9 @@ void V4L2Capture::stopStreaming() {
     }
 }
 
-// EXTREME capture thread with minimal polling
+// EXTREME capture thread with pure busy-wait
 void V4L2Capture::captureThreadExtreme() {
-    Logger::info("V4L2 EXTREME capture thread started");
+    Logger::info("V4L2 EXTREME capture thread started (PURE BUSY-WAIT)");
     
     // Apply EXTREME real-time settings
     applyExtremeRealtimeSettings();
@@ -391,40 +391,36 @@ void V4L2Capture::captureThreadExtreme() {
     std::chrono::steady_clock::time_point fps_start_time = std::chrono::steady_clock::now();
     uint64_t fps_frame_count = 0;
     
+    // Count consecutive EAGAIN to detect possible issues
+    uint32_t eagain_count = 0;
+    const uint32_t max_eagain = 1000000;  // Detect if we're stuck
+    
     while (!should_stop_) {
-        // Use poll with 0 timeout for non-blocking check
-        struct pollfd pfd;
-        pfd.fd = fd_;
-        pfd.events = POLLIN | POLLPRI;
-        
-        // Poll with 0 timeout - non-blocking, immediate return
-        int ret = poll(&pfd, 1, 0);
-        
-        if (ret < 0) {
-            if (errno == EINTR) continue;
-            setError("Poll error: " + std::string(strerror(errno)));
-            break;
-        }
-        
-        if (ret == 0) {
-            // No data available yet, yield to prevent CPU starvation
-            // This is better than pure busy-wait
-            std::this_thread::yield();
-            continue;
-        }
-        
-        // Try to dequeue buffer
+        // PURE BUSY-WAIT - No poll, no yield, just constant checking
         v4l2_buffer v4l2_buf = {};
         v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         v4l2_buf.memory = buffer_type_;
         
-        if (ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf) < 0) {
+        // Try to dequeue buffer
+        int ret = ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf);
+        
+        if (ret < 0) {
             if (errno == EAGAIN) {
+                // No frame ready yet, continue busy-waiting
+                eagain_count++;
+                if (eagain_count > max_eagain) {
+                    // Log warning but continue
+                    Logger::warning("V4L2: High EAGAIN count: " + std::to_string(eagain_count));
+                    eagain_count = 0;
+                }
                 continue;
             }
             setError("Failed to dequeue buffer: " + std::string(strerror(errno)));
             break;
         }
+        
+        // Frame ready! Reset EAGAIN counter
+        eagain_count = 0;
         
         // Capture timestamp for accurate latency measurement
         auto capture_time = std::chrono::steady_clock::now();
@@ -448,11 +444,9 @@ void V4L2Capture::captureThreadExtreme() {
             double fps_duration = std::chrono::duration<double>(fps_end_time - fps_start_time).count();
             double actual_fps = fps_frame_count / fps_duration;
             
-            // Only log if FPS is significantly off from expected
-            if (actual_fps < 58.0 || actual_fps > 62.0) {
-                Logger::debug("WARNING: FPS deviation - Actual FPS: " + std::to_string(actual_fps) + 
-                             " (expected 60, measured over " + std::to_string(fps_window) + " frames)");
-            }
+            // Always log FPS for debugging
+            Logger::debug("Actual FPS: " + std::to_string(actual_fps) + 
+                         " (measured over " + std::to_string(fps_window) + " frames)");
             
             fps_frame_count = 0;
             fps_start_time = fps_end_time;
