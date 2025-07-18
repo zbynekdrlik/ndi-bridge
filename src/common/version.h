@@ -2,9 +2,9 @@
 
 #define VERSION_MAJOR 2
 #define VERSION_MINOR 1
-#define VERSION_PATCH 0
+#define VERSION_PATCH 1
 
-#define VERSION_STRING "2.1.0"
+#define VERSION_STRING "2.1.1"
 
 // Additional defines for main.cpp compatibility
 #define NDI_BRIDGE_VERSION VERSION_STRING
