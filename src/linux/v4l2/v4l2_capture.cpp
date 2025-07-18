@@ -382,7 +382,7 @@ void V4L2Capture::captureThreadExtreme() {
     
     // Performance monitoring
     auto last_stats_time = std::chrono::steady_clock::now();
-    auto last_frame_time = std::chrono::steady_clock::now();
+    auto thread_start_time = std::chrono::steady_clock::now();
     uint64_t local_frame_count = 0;
     uint64_t total_frame_count = 0;
     
@@ -391,9 +391,17 @@ void V4L2Capture::captureThreadExtreme() {
     std::chrono::steady_clock::time_point fps_start_time = std::chrono::steady_clock::now();
     uint64_t fps_frame_count = 0;
     
+    // Track frame timing to detect issues
+    std::chrono::steady_clock::time_point last_frame_time = std::chrono::steady_clock::now();
+    double max_frame_gap_ms = 0.0;
+    
     // Count consecutive EAGAIN to detect possible issues
     uint32_t eagain_count = 0;
+    uint32_t max_eagain_seen = 0;
     const uint32_t max_eagain = 1000000;  // Detect if we're stuck
+    
+    // Log initial thread stats
+    Logger::info("V4L2 EXTREME: Thread started, expecting 60 FPS (16.67ms per frame)");
     
     while (!should_stop_) {
         // PURE BUSY-WAIT - No poll, no yield, just constant checking
@@ -408,9 +416,13 @@ void V4L2Capture::captureThreadExtreme() {
             if (errno == EAGAIN) {
                 // No frame ready yet, continue busy-waiting
                 eagain_count++;
+                if (eagain_count > max_eagain_seen) {
+                    max_eagain_seen = eagain_count;
+                }
                 if (eagain_count > max_eagain) {
                     // Log warning but continue
-                    Logger::warning("V4L2: High EAGAIN count: " + std::to_string(eagain_count));
+                    Logger::warning("V4L2: High EAGAIN count: " + std::to_string(eagain_count) + 
+                                  " (max seen: " + std::to_string(max_eagain_seen) + ")");
                     eagain_count = 0;
                 }
                 continue;
@@ -419,14 +431,36 @@ void V4L2Capture::captureThreadExtreme() {
             break;
         }
         
-        // Frame ready! Reset EAGAIN counter
+        // Frame ready! 
+        auto now = std::chrono::steady_clock::now();
+        
+        // Calculate frame gap
+        if (total_frame_count > 0) {
+            double frame_gap_ms = std::chrono::duration<double, std::milli>(now - last_frame_time).count();
+            if (frame_gap_ms > max_frame_gap_ms) {
+                max_frame_gap_ms = frame_gap_ms;
+            }
+            
+            // Log warning if frame gap is too large (>25ms means we're missing frames)
+            if (frame_gap_ms > 25.0) {
+                Logger::warning("V4L2: Large frame gap detected: " + std::to_string(frame_gap_ms) + 
+                              "ms (expected 16.67ms for 60fps)");
+            }
+        }
+        last_frame_time = now;
+        
+        // Log EAGAIN stats periodically
+        if (total_frame_count % 100 == 0 && total_frame_count > 0) {
+            Logger::debug("V4L2: Frame " + std::to_string(total_frame_count) + 
+                        ", EAGAIN count since last frame: " + std::to_string(eagain_count) +
+                        ", max EAGAIN seen: " + std::to_string(max_eagain_seen));
+        }
+        
+        // Reset EAGAIN counter
         eagain_count = 0;
         
-        // Capture timestamp for accurate latency measurement
-        auto capture_time = std::chrono::steady_clock::now();
-        
         // ALWAYS direct send (zero-copy) with timing
-        sendFrameExtreme(buffers_[v4l2_buf.index], v4l2_buf, capture_time);
+        sendFrameExtreme(buffers_[v4l2_buf.index], v4l2_buf, now);
         
         // Requeue immediately
         if (ioctl(fd_, VIDIOC_QBUF, &v4l2_buf) < 0) {
@@ -445,32 +479,47 @@ void V4L2Capture::captureThreadExtreme() {
             double actual_fps = fps_frame_count / fps_duration;
             
             // Always log FPS for debugging
-            Logger::debug("Actual FPS: " + std::to_string(actual_fps) + 
-                         " (measured over " + std::to_string(fps_window) + " frames)");
+            Logger::info("Actual FPS: " + std::to_string(actual_fps) + 
+                        " (measured over " + std::to_string(fps_window) + " frames)" +
+                        ", max frame gap: " + std::to_string(max_frame_gap_ms) + "ms");
+            
+            // Reset max frame gap
+            max_frame_gap_ms = 0.0;
             
             fps_frame_count = 0;
             fps_start_time = fps_end_time;
         }
         
         // Log statistics periodically
-        auto now = std::chrono::steady_clock::now();
-        if (now - last_stats_time >= std::chrono::seconds(10)) {
-            double elapsed = std::chrono::duration<double>(now - last_stats_time).count();
+        auto stats_now = std::chrono::steady_clock::now();
+        if (stats_now - last_stats_time >= std::chrono::seconds(10)) {
+            double elapsed = std::chrono::duration<double>(stats_now - last_stats_time).count();
             double fps = local_frame_count / elapsed;
             
-            std::lock_guard<std::mutex> lock(stats_mutex_);
-            Logger::debug("V4L2 EXTREME: FPS: " + std::to_string(fps) +
-                        ", Zero-copy frames: " + std::to_string(stats_.zero_copy_frames) +
-                        ", Internal latency: " + std::to_string(stats_.avg_e2e_latency_ms) + "ms" +
-                        ", Total frames: " + std::to_string(total_frame_count));
+            double total_elapsed = std::chrono::duration<double>(stats_now - thread_start_time).count();
+            double overall_fps = total_frame_count / total_elapsed;
             
-            last_stats_time = now;
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            Logger::info("V4L2 EXTREME Stats:");
+            Logger::info("  - 10s FPS: " + std::to_string(fps));
+            Logger::info("  - Overall FPS: " + std::to_string(overall_fps));
+            Logger::info("  - Total frames: " + std::to_string(total_frame_count));
+            Logger::info("  - Zero-copy frames: " + std::to_string(stats_.zero_copy_frames));
+            Logger::info("  - Internal latency: " + std::to_string(stats_.avg_e2e_latency_ms) + "ms");
+            Logger::info("  - Max EAGAIN seen: " + std::to_string(max_eagain_seen));
+            
+            last_stats_time = stats_now;
             local_frame_count = 0;
         }
     }
     
-    Logger::info("V4L2 EXTREME capture thread stopped. Total frames captured: " + 
-                std::to_string(total_frame_count));
+    double total_elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - thread_start_time).count();
+    double overall_fps = total_frame_count / total_elapsed;
+    
+    Logger::info("V4L2 EXTREME capture thread stopped.");
+    Logger::info("  Total frames: " + std::to_string(total_frame_count));
+    Logger::info("  Total time: " + std::to_string(total_elapsed) + "s"); 
+    Logger::info("  Overall FPS: " + std::to_string(overall_fps));
 }
 
 void V4L2Capture::sendFrameExtreme(const Buffer& buffer, const v4l2_buffer& v4l2_buf,
@@ -504,10 +553,15 @@ void V4L2Capture::sendFrameExtreme(const Buffer& buffer, const v4l2_buffer& v4l2
     std::lock_guard<std::mutex> stats_lock(stats_mutex_);
     stats_.frames_captured++;
     stats_.zero_copy_frames++;
+    stats_.total_latency_ms += internal_latency_ms;
     
     // Track accurate internal latency
     if (internal_latency_ms > 0 && internal_latency_ms < 10) {  // Sanity check
-        stats_.avg_e2e_latency_ms = 0.9 * stats_.avg_e2e_latency_ms + 0.1 * internal_latency_ms;
+        if (stats_.e2e_samples == 0) {
+            stats_.avg_e2e_latency_ms = internal_latency_ms;
+        } else {
+            stats_.avg_e2e_latency_ms = 0.9 * stats_.avg_e2e_latency_ms + 0.1 * internal_latency_ms;
+        }
         if (internal_latency_ms > stats_.max_e2e_latency_ms) {
             stats_.max_e2e_latency_ms = internal_latency_ms;
         }
@@ -671,10 +725,22 @@ bool V4L2Capture::setCaptureFormat(int width, int height, uint32_t pixelformat) 
             parm.parm.capture.timeperframe.denominator = 60;
             
             if (ioctl(fd_, VIDIOC_S_PARM, &parm) < 0) {
+                Logger::warning("Failed to set 60fps, trying 30fps");
                 // Try 30fps if 60fps fails
                 parm.parm.capture.timeperframe.denominator = 30;
-                ioctl(fd_, VIDIOC_S_PARM, &parm);
+                if (ioctl(fd_, VIDIOC_S_PARM, &parm) < 0) {
+                    Logger::warning("Failed to set frame rate");
+                }
             }
+            
+            // Read back what we actually got
+            if (ioctl(fd_, VIDIOC_G_PARM, &parm) == 0) {
+                Logger::info("V4L2: Actual frame rate set to " + 
+                           std::to_string(parm.parm.capture.timeperframe.denominator) + "/" +
+                           std::to_string(parm.parm.capture.timeperframe.numerator) + " fps");
+            }
+        } else {
+            Logger::warning("Device does not support frame rate setting");
         }
     }
     
