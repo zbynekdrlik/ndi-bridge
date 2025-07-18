@@ -4,7 +4,7 @@
 
 set -e  # Exit on error
 
-echo "🚀 NDI Bridge Quick Test Script v2.1.0"
+echo "🚀 NDI Bridge Quick Test Script v2.1.2"
 echo "======================================"
 
 # Set NDI SDK path if not already set
@@ -23,7 +23,7 @@ git checkout fix/linux-v4l2-latency
 git pull
 
 echo ""
-echo "🔨 Building v2.1.0..."
+echo "🔨 Building v2.1.2..."
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -45,14 +45,16 @@ echo ""
 echo "🎥 Starting NDI Bridge..."
 echo "Device: /dev/video0"
 echo "NDI Name: NZXT HD60"
-echo "Mode: EXTREME LOW LATENCY (v2.1.0)"
+echo "Mode: EXTREME LOW LATENCY (v2.1.2)"
 echo ""
 echo "Features:"
 echo "  - 2 buffers (absolute minimum)"
-echo "  - Busy-wait (no poll overhead)"
+echo "  - PURE BUSY-WAIT (100% CPU)"
 echo "  - CPU affinity to core 3"
 echo "  - RT priority 90"
 echo "  - Memory locked"
+echo ""
+echo "EXPECT: 60 FPS, 100% CPU on core 3"
 echo ""
 echo "Press Ctrl+C to stop"
 echo "======================================"
