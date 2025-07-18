@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <sched.h>
 #include <pthread.h>
+#include <sys/poll.h>
 
 namespace ndi_bridge {
 namespace v4l2 {
@@ -45,9 +46,9 @@ V4L2Capture::V4L2Capture()
     , timeout_count_(0)
     , zero_copy_logged_(false) {
     
-    Logger::info("V4L2 EXTREME Low Latency Capture (v" NDI_BRIDGE_VERSION ")");
+    Logger::info("V4L2 Optimized Low Latency Capture (v" NDI_BRIDGE_VERSION ")");
     Logger::info("Configuration: " + std::to_string(kBufferCount) + " buffers, zero-copy, single-thread, RT priority " + std::to_string(kRealtimePriority));
-    Logger::info("EXTREME MODE - PURE BUSY-WAIT, CPU AFFINITY, NO COMPROMISE");
+    Logger::info("Optimized for stable 60fps and 8-frame roundtrip latency");
     
     memset(&current_format_, 0, sizeof(current_format_));
     memset(&device_caps_, 0, sizeof(device_caps_));
@@ -152,10 +153,10 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
     should_stop_ = false;
     capturing_ = true;
     
-    Logger::info("V4L2Capture: Starting EXTREME capture thread");
+    Logger::info("V4L2Capture: Starting optimized capture thread");
     capture_thread_ = std::make_unique<std::thread>(&V4L2Capture::captureThreadExtreme, this);
     
-    Logger::info("V4L2Capture: Capture started successfully (EXTREME PERFORMANCE MODE)");
+    Logger::info("V4L2Capture: Capture started successfully (optimized for 60fps)");
     return true;
 }
 
@@ -314,7 +315,7 @@ bool V4L2Capture::setupBuffers() {
     }
     
     Logger::info("V4L2Capture: Setup " + std::to_string(buffers_.size()) + 
-               " buffers (EXTREME LOW LATENCY MODE)");
+               " buffers (optimized for 8-frame latency)");
     return true;
 }
 
@@ -373,66 +374,89 @@ void V4L2Capture::stopStreaming() {
     }
 }
 
-// EXTREME capture thread with pure busy-wait
+// Optimized capture thread for stable 60fps
 void V4L2Capture::captureThreadExtreme() {
-    Logger::info("V4L2 EXTREME capture thread started (PURE BUSY-WAIT)");
+    Logger::info("V4L2 Optimized capture thread started (stable 60fps)");
     
-    // Apply EXTREME real-time settings
+    // Apply real-time settings
     applyExtremeRealtimeSettings();
+    
+    // Frame timing for stable 60fps
+    const auto frame_duration = std::chrono::microseconds(16667); // 60fps = 16.667ms
+    auto next_frame_time = std::chrono::steady_clock::now();
     
     // Performance monitoring
     auto last_stats_time = std::chrono::steady_clock::now();
-    auto thread_start_time = std::chrono::steady_clock::now();
     uint64_t local_frame_count = 0;
     uint64_t total_frame_count = 0;
+    uint64_t dropped_frames = 0;
     
-    // Debug: Track actual FPS more accurately
-    const int fps_window = 60;  // Calculate FPS over 60 frames
+    // FPS calculation
+    const int fps_window = 60;
     std::chrono::steady_clock::time_point fps_start_time = std::chrono::steady_clock::now();
     uint64_t fps_frame_count = 0;
     
-    // Track frame timing to detect issues
+    // Track frame timing
     std::chrono::steady_clock::time_point last_frame_time = std::chrono::steady_clock::now();
     double max_frame_gap_ms = 0.0;
     
-    // Count consecutive EAGAIN to detect possible issues
-    uint32_t eagain_count = 0;
-    uint32_t max_eagain_seen = 0;
-    const uint32_t max_eagain = 1000000;  // Detect if we're stuck
+    // Use poll for efficient waiting
+    struct pollfd pfd;
+    pfd.fd = fd_;
+    pfd.events = POLLIN;
     
-    // Log initial thread stats
-    Logger::info("V4L2 EXTREME: Thread started, expecting 60 FPS (16.67ms per frame)");
+    // Pre-allocate v4l2_buffer
+    v4l2_buffer v4l2_buf = {};
+    v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    v4l2_buf.memory = buffer_type_;
+    
+    Logger::info("V4L2: Thread started, targeting stable 60 FPS");
     
     while (!should_stop_) {
-        // PURE BUSY-WAIT - No poll, no yield, just constant checking
-        v4l2_buffer v4l2_buf = {};
-        v4l2_buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        v4l2_buf.memory = buffer_type_;
+        // Calculate time until next frame
+        auto now = std::chrono::steady_clock::now();
+        auto time_until_next = next_frame_time - now;
         
-        // Try to dequeue buffer
-        int ret = ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf);
+        // Use poll with dynamic timeout
+        int timeout_ms = 1; // Default 1ms
+        if (time_until_next > std::chrono::milliseconds(0)) {
+            timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(time_until_next).count();
+            timeout_ms = std::max(0, std::min(timeout_ms, 16)); // Cap at frame time
+        }
+        
+        // Time poll wait
+        auto poll_start = std::chrono::high_resolution_clock::now();
+        int ret = poll(&pfd, 1, timeout_ms);
+        auto poll_end = std::chrono::high_resolution_clock::now();
+        double poll_wait_us = std::chrono::duration<double, std::micro>(poll_end - poll_start).count();
         
         if (ret < 0) {
-            if (errno == EAGAIN) {
-                // No frame ready yet, continue busy-waiting
-                eagain_count++;
-                if (eagain_count > max_eagain_seen) {
-                    max_eagain_seen = eagain_count;
-                }
-                if (eagain_count > max_eagain) {
-                    // Log warning but continue
-                    Logger::warning("V4L2: High EAGAIN count: " + std::to_string(eagain_count) + 
-                                  " (max seen: " + std::to_string(max_eagain_seen) + ")");
-                    eagain_count = 0;
-                }
-                continue;
-            }
-            setError("Failed to dequeue buffer: " + std::string(strerror(errno)));
+            if (errno == EINTR) continue;
+            setError("Poll error: " + std::string(strerror(errno)));
             break;
         }
         
-        // Frame ready! 
-        auto now = std::chrono::steady_clock::now();
+        if (ret == 0) {
+            // Timeout - check if we missed a frame
+            if (now > next_frame_time + frame_duration) {
+                dropped_frames++;
+                next_frame_time = now; // Reset timing
+            }
+            continue;
+        }
+        
+        // Data available - dequeue buffer with timing
+        auto dequeue_start = std::chrono::high_resolution_clock::now();
+        if (ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf) < 0) {
+            if (errno == EAGAIN) continue;
+            setError("Failed to dequeue buffer: " + std::string(strerror(errno)));
+            break;
+        }
+        auto dequeue_end = std::chrono::high_resolution_clock::now();
+        double dequeue_us = std::chrono::duration<double, std::micro>(dequeue_end - dequeue_start).count();
+        
+        // Frame ready - process with timing
+        now = std::chrono::steady_clock::now();
         
         // Calculate frame gap
         if (total_frame_count > 0) {
@@ -440,37 +464,59 @@ void V4L2Capture::captureThreadExtreme() {
             if (frame_gap_ms > max_frame_gap_ms) {
                 max_frame_gap_ms = frame_gap_ms;
             }
-            
-            // Log warning if frame gap is too large (>25ms means we're missing frames)
-            if (frame_gap_ms > 25.0) {
-                Logger::warning("V4L2: Large frame gap detected: " + std::to_string(frame_gap_ms) + 
-                              "ms (expected 16.67ms for 60fps)");
-            }
         }
         last_frame_time = now;
         
-        // Log EAGAIN stats periodically
-        if (total_frame_count % 100 == 0 && total_frame_count > 0) {
-            Logger::debug("V4L2: Frame " + std::to_string(total_frame_count) + 
-                        ", EAGAIN count since last frame: " + std::to_string(eagain_count) +
-                        ", max EAGAIN seen: " + std::to_string(max_eagain_seen));
-        }
-        
-        // Reset EAGAIN counter
-        eagain_count = 0;
-        
-        // ALWAYS direct send (zero-copy) with timing
+        // Process frame with zero-copy timing
+        auto callback_start = std::chrono::high_resolution_clock::now();
         sendFrameExtreme(buffers_[v4l2_buf.index], v4l2_buf, now);
+        auto callback_end = std::chrono::high_resolution_clock::now();
+        double callback_us = std::chrono::duration<double, std::micro>(callback_end - callback_start).count();
         
-        // Requeue immediately
+        // Requeue buffer immediately with timing
+        auto requeue_start = std::chrono::high_resolution_clock::now();
         if (ioctl(fd_, VIDIOC_QBUF, &v4l2_buf) < 0) {
             setError("Failed to requeue buffer: " + std::string(strerror(errno)));
             break;
         }
+        auto requeue_end = std::chrono::high_resolution_clock::now();
+        double requeue_us = std::chrono::duration<double, std::micro>(requeue_end - requeue_start).count();
         
+        // Update timing statistics
+        {
+            std::lock_guard<std::mutex> lock(stats_mutex_);
+            // Running average
+            if (stats_.frames_captured == 0) {
+                stats_.avg_poll_wait_us = poll_wait_us;
+                stats_.avg_dequeue_us = dequeue_us;
+                stats_.avg_callback_us = callback_us;
+                stats_.avg_requeue_us = requeue_us;
+            } else {
+                stats_.avg_poll_wait_us = 0.95 * stats_.avg_poll_wait_us + 0.05 * poll_wait_us;
+                stats_.avg_dequeue_us = 0.95 * stats_.avg_dequeue_us + 0.05 * dequeue_us;
+                stats_.avg_callback_us = 0.95 * stats_.avg_callback_us + 0.05 * callback_us;
+                stats_.avg_requeue_us = 0.95 * stats_.avg_requeue_us + 0.05 * requeue_us;
+            }
+            // Track maximums
+            stats_.max_poll_wait_us = std::max(stats_.max_poll_wait_us, poll_wait_us);
+            stats_.max_dequeue_us = std::max(stats_.max_dequeue_us, dequeue_us);
+            stats_.max_callback_us = std::max(stats_.max_callback_us, callback_us);
+            stats_.max_requeue_us = std::max(stats_.max_requeue_us, requeue_us);
+        }
+        
+        // Update counters
         local_frame_count++;
         total_frame_count++;
         fps_frame_count++;
+        
+        // Maintain 60fps pacing
+        next_frame_time += frame_duration;
+        
+        // If we're behind, catch up but don't accumulate delay
+        now = std::chrono::steady_clock::now();
+        if (now > next_frame_time + frame_duration * 2) {
+            next_frame_time = now;
+        }
         
         // Calculate actual FPS over smaller window
         if (fps_frame_count >= fps_window) {
@@ -496,34 +542,40 @@ void V4L2Capture::captureThreadExtreme() {
             double elapsed = std::chrono::duration<double>(stats_now - last_stats_time).count();
             double fps = local_frame_count / elapsed;
             
-            double total_elapsed = std::chrono::duration<double>(stats_now - thread_start_time).count();
+            double total_elapsed = std::chrono::duration<double>(stats_now - fps_start_time).count();
             double overall_fps = total_frame_count / total_elapsed;
             
             std::lock_guard<std::mutex> lock(stats_mutex_);
-            Logger::info("V4L2 EXTREME Stats:");
+            Logger::info("V4L2 Performance Stats:");
             Logger::info("  - 10s FPS: " + std::to_string(fps));
             Logger::info("  - Overall FPS: " + std::to_string(overall_fps));
             Logger::info("  - Total frames: " + std::to_string(total_frame_count));
             Logger::info("  - Zero-copy frames: " + std::to_string(stats_.zero_copy_frames));
             Logger::info("  - Internal latency: " + std::to_string(stats_.avg_e2e_latency_ms) + "ms");
-            Logger::info("  - Max EAGAIN seen: " + std::to_string(max_eagain_seen));
+            Logger::info("Detailed timing breakdown (microseconds):");
+            Logger::info("  - Poll wait: avg=" + std::to_string(stats_.avg_poll_wait_us) + "µs, max=" + std::to_string(stats_.max_poll_wait_us) + "µs");
+            Logger::info("  - Dequeue: avg=" + std::to_string(stats_.avg_dequeue_us) + "µs, max=" + std::to_string(stats_.max_dequeue_us) + "µs");
+            Logger::info("  - Callback (NDI send): avg=" + std::to_string(stats_.avg_callback_us) + "µs, max=" + std::to_string(stats_.max_callback_us) + "µs");
+            Logger::info("  - Requeue: avg=" + std::to_string(stats_.avg_requeue_us) + "µs, max=" + std::to_string(stats_.max_requeue_us) + "µs");
+            double total_avg_us = stats_.avg_poll_wait_us + stats_.avg_dequeue_us + stats_.avg_callback_us + stats_.avg_requeue_us;
+            Logger::info("  - TOTAL: " + std::to_string(total_avg_us / 1000.0) + "ms (" + std::to_string(total_avg_us) + "µs)");
             
             last_stats_time = stats_now;
             local_frame_count = 0;
         }
     }
     
-    double total_elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - thread_start_time).count();
-    double overall_fps = total_frame_count / total_elapsed;
+    // Final stats logged elsewhere
     
-    Logger::info("V4L2 EXTREME capture thread stopped.");
-    Logger::info("  Total frames: " + std::to_string(total_frame_count));
-    Logger::info("  Total time: " + std::to_string(total_elapsed) + "s"); 
-    Logger::info("  Overall FPS: " + std::to_string(overall_fps));
+    Logger::info("V4L2 capture thread stopped");
+    Logger::info("Final stats - Total frames: " + std::to_string(total_frame_count) +
+                ", Dropped: " + std::to_string(dropped_frames));
 }
 
 void V4L2Capture::sendFrameExtreme(const Buffer& buffer, const v4l2_buffer& v4l2_buf,
                                    std::chrono::steady_clock::time_point capture_time) {
+    auto callback_entry = std::chrono::high_resolution_clock::now();
+    
     std::lock_guard<std::mutex> lock(callback_mutex_);
     
     if (!frame_callback_) {
@@ -543,7 +595,13 @@ void V4L2Capture::sendFrameExtreme(const Buffer& buffer, const v4l2_buffer& v4l2
     }
     
     // Direct callback with original YUV data - NO CONVERSION!
+    auto actual_send_start = std::chrono::high_resolution_clock::now();
     frame_callback_(buffer.start, v4l2_buf.bytesused, timestamp_ns, format);
+    auto actual_send_end = std::chrono::high_resolution_clock::now();
+    
+    // Calculate detailed timings
+    double prep_us = std::chrono::duration<double, std::micro>(actual_send_start - callback_entry).count();
+    double send_us = std::chrono::duration<double, std::micro>(actual_send_end - actual_send_start).count();
     
     // Calculate internal processing latency
     auto send_time = std::chrono::steady_clock::now();
@@ -571,7 +629,13 @@ void V4L2Capture::sendFrameExtreme(const Buffer& buffer, const v4l2_buffer& v4l2
     // Log once for performance tracking
     if (!zero_copy_logged_) {
         Logger::info("EXTREME zero-copy path active: " + format.pixel_format + " -> NDI (NO BGRA CONVERSION)");
+        Logger::info("  Callback breakdown: prep=" + std::to_string(prep_us) + "µs, NDI send=" + std::to_string(send_us) + "µs");
         zero_copy_logged_ = true;
+    }
+    
+    // Log detailed timing every 600 frames
+    if (stats_.frames_captured % 600 == 0 && stats_.frames_captured > 0) {
+        Logger::debug("Frame callback timing: prep=" + std::to_string(prep_us) + "µs, send=" + std::to_string(send_us) + "µs");
     }
 }
 

@@ -59,6 +59,16 @@ public:
         double max_e2e_latency_ms = 0.0;
         uint64_t e2e_samples = 0;
         
+        // Detailed timing breakdown (microseconds)
+        double avg_poll_wait_us = 0.0;
+        double avg_dequeue_us = 0.0;
+        double avg_callback_us = 0.0;
+        double avg_requeue_us = 0.0;
+        double max_poll_wait_us = 0.0;
+        double max_dequeue_us = 0.0;
+        double max_callback_us = 0.0;
+        double max_requeue_us = 0.0;
+        
         void reset() {
             frames_captured = 0;
             frames_dropped = 0;
@@ -67,6 +77,14 @@ public:
             avg_e2e_latency_ms = 0.0;
             max_e2e_latency_ms = 0.0;
             e2e_samples = 0;
+            avg_poll_wait_us = 0.0;
+            avg_dequeue_us = 0.0;
+            avg_callback_us = 0.0;
+            avg_requeue_us = 0.0;
+            max_poll_wait_us = 0.0;
+            max_dequeue_us = 0.0;
+            max_callback_us = 0.0;
+            max_requeue_us = 0.0;
         }
     };
     
@@ -75,12 +93,12 @@ public:
     
 private:
     // HARDCODED OPTIMAL SETTINGS
-    static constexpr unsigned int kBufferCount = 2;          // Absolute minimum
-    static constexpr int kPollTimeout = -1;                  // Busy wait
+    static constexpr unsigned int kBufferCount = 4;          // Reduced for 8-frame latency
+    static constexpr int kPollTimeout = 1;                  // 1ms timeout
     static constexpr bool kUseMultiThreading = false;        // Single thread only
     static constexpr bool kZeroCopyMode = true;              // Always zero-copy
     static constexpr int kRealtimePriority = 90;             // Maximum RT priority
-    static constexpr int kCpuAffinity = 3;                   // CPU core to pin to
+    static constexpr int kCpuAffinity = -1;                   // Disabled for testing
     
     // Buffer structure
     struct Buffer {
