@@ -236,10 +236,10 @@ echo "NDI name set to: $1"
 EOFNAME
 chmod +x /usr/local/bin/set-ndi-name
 
-# Configure GRUB with 20 second timeout
+# Configure GRUB with 2 second timeout for fast boot
 cat > /etc/default/grub << EOFGRUB
 GRUB_DEFAULT=0
-GRUB_TIMEOUT=20
+GRUB_TIMEOUT=2
 GRUB_TIMEOUT_STYLE=menu
 GRUB_DISTRIBUTOR="NDI Bridge Linux"
 GRUB_CMDLINE_LINUX_DEFAULT="quiet"
