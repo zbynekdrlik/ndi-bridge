@@ -192,10 +192,7 @@ while [ ! -e "$DEVICE" ]; do
     sleep 2
 done
 
-# Create log directory
-mkdir -p /var/log/ndi-bridge
-
-# Main loop with restart and logging
+# Main loop with restart and logging to tmpfs
 while true; do
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NDI Bridge: $DEVICE -> $NDI_NAME"
     LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-bridge "$DEVICE" "$NDI_NAME" 2>&1 | tee -a /var/log/ndi-bridge/ndi-bridge.log
@@ -229,19 +226,30 @@ EOFSERVICE
 
 systemctl enable ndi-bridge
 
-# Configure log rotation for ndi-bridge
-cat > /etc/logrotate.d/ndi-bridge << EOFROTATE
-/var/log/ndi-bridge/*.log {
-    daily
-    rotate 7
-    maxsize 100M
-    compress
-    delaycompress
-    missingok
-    notifempty
-    create 0644 root root
-}
-EOFROTATE
+# Configure tmpfs for volatile directories
+cat >> /etc/fstab << EOFTMPFS
+tmpfs /tmp tmpfs defaults,noatime,mode=1777,size=256M 0 0
+tmpfs /var/log tmpfs defaults,noatime,mode=0755,size=512M 0 0
+tmpfs /var/tmp tmpfs defaults,noatime,mode=1777,size=64M 0 0
+EOFTMPFS
+
+# Create systemd service to setup log directories on boot
+cat > /etc/systemd/system/setup-logs.service << EOFSETUP
+[Unit]
+Description=Setup log directories in tmpfs
+Before=ndi-bridge.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mkdir -p /var/log/ndi-bridge
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOFSETUP
+
+systemctl enable setup-logs
 
 # Configure auto-login on TTY1 to show ndi-bridge output
 mkdir -p /etc/systemd/system/getty@tty1.service.d
@@ -264,18 +272,39 @@ echo ""
 journalctl -u ndi-bridge -f --no-pager
 EOFPROFILE
 
-# NDI name updater
+# NDI name updater (handles read-only filesystem)
 cat > /usr/local/bin/set-ndi-name << 'EOFNAME'
 #!/bin/bash
 if [ $# -eq 0 ]; then
     echo "Usage: set-ndi-name <name>"
     exit 1
 fi
+# Remount root as read-write
+mount -o remount,rw /
+# Update config
 sed -i "s/NDI_NAME=.*/NDI_NAME=\"$1\"/" /etc/ndi-bridge/config
+# Remount as read-only
+mount -o remount,ro /
 systemctl restart ndi-bridge
 echo "NDI name set to: $1"
 EOFNAME
 chmod +x /usr/local/bin/set-ndi-name
+
+# Helper to remount filesystem
+cat > /usr/local/bin/rw << 'EOFRW'
+#!/bin/bash
+mount -o remount,rw /
+echo "Filesystem mounted read-write. Use 'ro' to return to read-only."
+EOFRW
+chmod +x /usr/local/bin/rw
+
+cat > /usr/local/bin/ro << 'EOFRO'
+#!/bin/bash
+sync
+mount -o remount,ro /
+echo "Filesystem mounted read-only."
+EOFRO
+chmod +x /usr/local/bin/ro
 
 # Configure GRUB with 2 second timeout for fast boot
 cat > /etc/default/grub << EOFGRUB
@@ -295,7 +324,7 @@ update-grub
 UUID_ROOT=$(blkid -s UUID -o value /dev/sdb2)
 UUID_EFI=$(blkid -s UUID -o value /dev/sdb1)
 cat > /etc/fstab << EOFFSTAB
-UUID=$UUID_ROOT / ext4 errors=remount-ro,noatime 0 1
+UUID=$UUID_ROOT / ext4 ro,noatime,errors=remount-ro 0 1
 UUID=$UUID_EFI /boot/efi vfat umask=0077 0 1
 EOFFSTAB
 
