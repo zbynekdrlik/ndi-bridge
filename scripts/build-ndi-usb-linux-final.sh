@@ -426,8 +426,7 @@ echo "  â€¢ Chain devices through second port"
 echo ""
 echo -e "\033[1;36mAvailable Commands:\033[0m"
 echo -e "  \033[1;33mndi-bridge-info\033[0m         - Display system status"
-echo -e "  \033[1;33mndi-bridge-set-name\033[0m     - Set NDI source name"
-echo -e "  \033[1;33mndi-bridge-set-hostname\033[0m - Change system hostname"
+echo -e "  \033[1;33mndi-bridge-set-device-name\033[0m - Set device name (hostname & NDI)"
 echo -e "  \033[1;33mndi-bridge-update\033[0m       - Update NDI binary"
 echo -e "  \033[1;33mndi-bridge-logs\033[0m         - View NDI logs"
 echo -e "  \033[1;33mndi-bridge-netstat\033[0m      - Network bridge status"
@@ -444,23 +443,157 @@ systemctl is-active ndi-bridge >/dev/null 2>&1 && echo -e "  Status: \033[1;32mâ
 echo ""
 EOFPROFILE
 
-# NDI name updater (handles read-only filesystem)
-cat > /usr/local/bin/ndi-bridge-set-name << 'EOFNAME'
+# Unified device name setter (replaces separate set-name and set-hostname)
+cat > /usr/local/bin/ndi-bridge-set-device-name << 'EOFDEVNAME'
 #!/bin/bash
+# NDI Bridge Device Name Setter
+# Sets both hostname and NDI name in a unified way
+# Usage: ndi-bridge-set-device-name <simple-name>
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Helper functions
+log() {
+    echo -e "${GREEN}[INFO]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[ERROR]${NC} $1" >&2
+    exit 1
+}
+
+warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+# Check usage
 if [ $# -eq 0 ]; then
-    echo "Usage: ndi-bridge-set-name <name>"
+    echo "Usage: ndi-bridge-set-device-name <simple-name>"
+    echo ""
+    echo "Example: ndi-bridge-set-device-name cam1"
+    echo "         This will set:"
+    echo "         - Hostname: ndi-bridge-cam1"
+    echo "         - NDI Name: NDI Bridge Cam1"
+    echo ""
+    echo "Current settings:"
+    echo "  Hostname: $(hostname)"
+    if [ -f /etc/ndi-bridge/config ]; then
+        current_ndi=$(grep "^NDI_NAME=" /etc/ndi-bridge/config | cut -d'"' -f2)
+        if [ -z "$current_ndi" ]; then
+            echo "  NDI Name: (using hostname)"
+        else
+            echo "  NDI Name: $current_ndi"
+        fi
+    fi
     exit 1
 fi
-# Remount root as read-write
-mount -o remount,rw /
-# Update config
-sed -i "s/NDI_NAME=.*/NDI_NAME=\"$1\"/" /etc/ndi-bridge/config
+
+# Validate input
+SIMPLE_NAME="$1"
+
+# Check if input contains only allowed characters (letters, numbers, hyphens)
+if ! echo "$SIMPLE_NAME" | grep -qE '^[a-zA-Z0-9-]+$'; then
+    error "Name must contain only letters, numbers, and hyphens"
+fi
+
+# Check length
+if [ ${#SIMPLE_NAME} -gt 32 ]; then
+    error "Name must be 32 characters or less"
+fi
+
+# Convert to lowercase for hostname
+SIMPLE_NAME_LOWER=$(echo "$SIMPLE_NAME" | tr '[:upper:]' '[:lower:]')
+
+# Create hostname with prefix
+NEW_HOSTNAME="ndi-bridge-${SIMPLE_NAME_LOWER}"
+
+# Create human-readable NDI name
+# Convert to proper case and add spaces
+NDI_NAME="NDI Bridge $(echo "$SIMPLE_NAME" | sed 's/\b\(.\)/\u\1/g')"
+
+log "Setting device name..."
+log "  Simple name: $SIMPLE_NAME"
+log "  Hostname:    $NEW_HOSTNAME"
+log "  NDI Name:    $NDI_NAME"
+
+# Remount filesystem as read-write
+log "Remounting filesystem as read-write..."
+mount -o remount,rw / || error "Failed to remount filesystem"
+
+# Update hostname files
+log "Updating hostname..."
+echo "$NEW_HOSTNAME" > /etc/hostname
+sed -i "s/127.0.1.1.*/127.0.1.1 $NEW_HOSTNAME/" /etc/hosts
+
+# Apply hostname immediately
+hostname "$NEW_HOSTNAME"
+
+# Update NDI configuration
+log "Updating NDI configuration..."
+if [ -f /etc/ndi-bridge/config ]; then
+    sed -i "s/NDI_NAME=.*/NDI_NAME=\"$NDI_NAME\"/" /etc/ndi-bridge/config
+else
+    error "NDI configuration file not found at /etc/ndi-bridge/config"
+fi
+
+# Sync filesystem
+sync
+
 # Remount as read-only
-mount -o remount,ro /
-systemctl restart ndi-bridge
-echo "NDI name set to: $1"
-EOFNAME
-chmod +x /usr/local/bin/ndi-bridge-set-name
+log "Remounting filesystem as read-only..."
+mount -o remount,ro / || warn "Failed to remount filesystem as read-only"
+
+# Restart services for immediate visibility
+log "Restarting services..."
+
+# Restart Avahi daemon for mDNS/Bonjour discovery
+if systemctl is-enabled avahi-daemon &>/dev/null; then
+    log "  Restarting Avahi daemon..."
+    systemctl restart avahi-daemon || warn "Failed to restart Avahi daemon"
+    sleep 1
+fi
+
+# Restart NDI Bridge service
+log "  Restarting NDI Bridge service..."
+systemctl restart ndi-bridge || error "Failed to restart NDI Bridge service"
+
+# Wait a moment for services to stabilize
+sleep 2
+
+# Verify changes
+log "Verifying changes..."
+log "  Current hostname: $(hostname)"
+
+# Check if NDI service is running
+if systemctl is-active ndi-bridge >/dev/null 2>&1; then
+    log "  NDI Bridge service: Running"
+else
+    warn "  NDI Bridge service: Not running"
+fi
+
+# Show network information
+if ip -4 addr show dev br0 2>/dev/null | grep -q inet; then
+    IP_ADDR=$(ip -4 addr show dev br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    log "  Network address: $IP_ADDR"
+    log ""
+    log "Device should now be visible on the network as:"
+    log "  - Hostname: $NEW_HOSTNAME (ping $NEW_HOSTNAME.local)"
+    log "  - NDI Name: $NDI_NAME"
+else
+    warn "  No IP address found on br0 interface"
+fi
+
+log ""
+log "Device name update complete!"
+log "The NDI source should be immediately visible as '$NDI_NAME' in NDI applications."
+EOFDEVNAME
+chmod +x /usr/local/bin/ndi-bridge-set-device-name
 
 # Helper to remount filesystem
 cat > /usr/local/bin/ndi-bridge-rw << 'EOFRW'
@@ -478,39 +611,25 @@ echo "Filesystem mounted read-only."
 EOFRO
 chmod +x /usr/local/bin/ndi-bridge-ro
 
-# Update hostname helper
-cat > /usr/local/bin/ndi-bridge-set-hostname << 'EOFHOST'
+# Legacy compatibility - redirect to new unified command
+cat > /usr/local/bin/ndi-bridge-set-name << 'EOFLEGACY1'
 #!/bin/bash
-if [ $# -eq 0 ]; then
-    echo "Usage: ndi-bridge-set-hostname <hostname>"
-    echo "Current hostname: $(hostname)"
-    exit 1
-fi
+echo "Note: This command is deprecated. Use 'ndi-bridge-set-device-name' instead."
+echo "Example: ndi-bridge-set-device-name cam1"
+echo ""
+echo "The new command sets both hostname and NDI name in a unified way."
+exit 1
+EOFLEGACY1
+chmod +x /usr/local/bin/ndi-bridge-set-name
 
-NEW_HOSTNAME="$1"
-
-# Remount as read-write
-mount -o remount,rw /
-
-# Update hostname files
-echo "$NEW_HOSTNAME" > /etc/hostname
-sed -i "s/127.0.1.1.*/127.0.1.1 $NEW_HOSTNAME/" /etc/hosts
-
-# Update NDI name if not explicitly set
-if grep -q 'NDI_NAME=""' /etc/ndi-bridge/config; then
-    echo "Hostname will be used as NDI name"
-fi
-
-# Apply hostname immediately
-hostname "$NEW_HOSTNAME"
-
-# Remount as read-only
-sync
-mount -o remount,ro /
-
-echo "Hostname changed to: $NEW_HOSTNAME"
-echo "Reboot recommended for full effect"
-EOFHOST
+cat > /usr/local/bin/ndi-bridge-set-hostname << 'EOFLEGACY2'
+#!/bin/bash
+echo "Note: This command is deprecated. Use 'ndi-bridge-set-device-name' instead."
+echo "Example: ndi-bridge-set-device-name cam1"
+echo ""
+echo "The new command sets both hostname and NDI name in a unified way."
+exit 1
+EOFLEGACY2
 chmod +x /usr/local/bin/ndi-bridge-set-hostname
 
 # Update ndi-bridge binary helper
@@ -592,8 +711,7 @@ echo "=== NDI Bridge System Commands ==="
 echo ""
 echo "Available commands:"
 echo "  ndi-bridge-info         - Display system information and status"
-echo "  ndi-bridge-set-name     - Set the NDI source name"
-echo "  ndi-bridge-set-hostname - Change system hostname"  
+echo "  ndi-bridge-set-device-name - Set device name (hostname & NDI)"    
 echo "  ndi-bridge-update       - Update the ndi-bridge binary"
 echo "  ndi-bridge-logs         - Follow NDI Bridge service logs"
 echo "  ndi-bridge-netstat      - Show network bridge status"
