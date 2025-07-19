@@ -124,6 +124,9 @@ configure_system() {
 #!/bin/bash
 set -e
 
+# Reduce dpkg warnings in chroot
+export DEBIAN_FRONTEND=noninteractive
+
 echo "=== Configuring NDI Bridge USB System (Ubuntu 24.04) ==="
 
 # Update package list
@@ -146,13 +149,18 @@ apt-get install -y -qq --no-install-recommends \
     iproute2 \
     net-tools \
     bridge-utils \
-    isc-dhcp-client \
     openssh-server \
     sudo \
     nano \
     wget \
     ca-certificates \
-    iputils-ping 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+    iputils-ping \
+    zstd 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+
+# Try to install DHCP client (different package names in different Ubuntu versions)
+apt-get install -y -qq --no-install-recommends isc-dhcp-client 2>/dev/null || \
+apt-get install -y -qq --no-install-recommends dhcpcd5 2>/dev/null || \
+echo "Note: Using systemd-networkd for DHCP (default in Ubuntu 24.04)"
 
 # Install optional packages (don't fail if unavailable)
 echo "Installing optional packages..."
@@ -665,19 +673,26 @@ run_chroot_setup() {
     
     # Mount necessary filesystems
     mount --bind /dev /mnt/usb/dev
+    mount --bind /dev/pts /mnt/usb/dev/pts
     mount --bind /proc /mnt/usb/proc
     mount --bind /sys /mnt/usb/sys
+    
+    # Set up environment to reduce warnings
+    export DEBIAN_FRONTEND=noninteractive
     
     # Run setup script
     chroot /mnt/usb /tmp/setup.sh 2>&1 | \
         while IFS= read -r line; do
-            # Filter out verbose package installation output
-            if [[ ! "$line" =~ ^(Get:|Fetched|Reading|Building|Selecting|Preparing|Unpacking|Setting) ]]; then
+            # Filter out verbose package installation output and known warnings
+            if [[ ! "$line" =~ ^(Get:|Fetched|Reading|Building|Selecting|Preparing|Unpacking|Setting) ]] && \
+               [[ ! "$line" =~ "dpkg-preconfigure: unable to re-open stdin" ]] && \
+               [[ ! "$line" =~ "E: Can not write log" ]]; then
                 echo "$line"
             fi
         done
     
     # Unmount
+    umount /mnt/usb/dev/pts
     umount /mnt/usb/dev
     umount /mnt/usb/proc
     umount /mnt/usb/sys
