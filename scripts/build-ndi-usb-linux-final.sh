@@ -145,6 +145,7 @@ apt-get install -y -qq --no-install-recommends \
     udev \
     iproute2 \
     net-tools \
+    bridge-utils \
     isc-dhcp-client \
     openssh-server \
     sudo \
@@ -180,16 +181,42 @@ EOFHOSTS
 # Set root password
 echo "root:NewLevel123!" | chpasswd
 
-# Configure network for DHCP
+# Configure network bridge for both ethernet interfaces
 mkdir -p /etc/systemd/network
-cat > /etc/systemd/network/20-dhcp.network << EOFNET
+
+# Create bridge device
+cat > /etc/systemd/network/10-br0.netdev << EOFBRIDGE
+[NetDev]
+Name=br0
+Kind=bridge
+
+[Bridge]
+STP=false
+EOFBRIDGE
+
+# Configure physical interfaces to join bridge
+cat > /etc/systemd/network/20-eth.network << EOFETH
 [Match]
 Name=en*
 Name=eth*
 
 [Network]
+Bridge=br0
+EOFETH
+
+# Configure bridge for DHCP
+cat > /etc/systemd/network/30-br0.network << EOFBR0
+[Match]
+Name=br0
+
+[Network]
 DHCP=yes
-EOFNET
+IPForward=yes
+
+[DHCP]
+RouteMetric=10
+UseDomains=yes
+EOFBR0
 
 systemctl enable systemd-networkd
 systemctl enable systemd-resolved
@@ -319,12 +346,15 @@ cat > /root/.profile << EOFPROFILE
 # Show NDI Bridge status on login
 clear
 echo "=== NDI Bridge System ==="
-echo "IP: \$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1 || echo 'No IP yet')"
+echo "IP: \$(ip -4 addr show dev br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1 || echo 'No IP yet')"
 echo ""
 echo "Commands:"
 echo "  ndi-bridge-help    - Show all commands"
 echo "  ndi-bridge-info    - System status" 
 echo "  ndi-bridge-logs    - Follow NDI logs"
+echo ""
+echo "Network: Both ethernet ports are bridged (br0)"
+echo "         You can connect to either port"
 echo ""
 echo "Service status:"
 systemctl status ndi-bridge --no-pager --lines=3 2>/dev/null || echo "Service not configured"
@@ -456,7 +486,7 @@ cat > /usr/local/bin/ndi-bridge-info << 'EOFINFO'
 #!/bin/bash
 echo "=== NDI Bridge System Info ==="
 echo "Hostname: $(hostname)"
-echo "IP Address: $(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1 || echo 'No IP yet')"
+echo "IP Address: $(ip -4 addr show dev br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1 || echo 'No IP yet')"
 echo ""
 echo "NDI Configuration:"
 cat /etc/ndi-bridge/config
@@ -482,6 +512,8 @@ echo "  ndi-bridge-info         - Display system information and status"
 echo "  ndi-bridge-set-name     - Set the NDI source name"
 echo "  ndi-bridge-set-hostname - Change system hostname"  
 echo "  ndi-bridge-update       - Update the ndi-bridge binary"
+echo "  ndi-bridge-logs         - Follow NDI Bridge service logs"
+echo "  ndi-bridge-netstat      - Show network bridge status"
 echo "  ndi-bridge-netmon       - Network bandwidth monitor (if available)"
 echo "  ndi-bridge-rw           - Mount filesystem read-write (for maintenance)"
 echo "  ndi-bridge-ro           - Mount filesystem read-only (default)"
@@ -506,6 +538,25 @@ echo "Following NDI Bridge logs (Ctrl+C to exit)..."
 journalctl -u ndi-bridge -f --no-pager
 EOFLOGS
 chmod +x /usr/local/bin/ndi-bridge-logs
+
+# Network bridge status helper
+cat > /usr/local/bin/ndi-bridge-netstat << 'EOFNETSTAT'
+#!/bin/bash
+echo "=== Network Bridge Status ==="
+echo ""
+echo "Bridge interfaces:"
+bridge link show 2>/dev/null || ip link show type bridge
+echo ""
+echo "IP configuration:"
+ip addr show br0 2>/dev/null || echo "Bridge not configured"
+echo ""
+echo "Physical interfaces:"
+ip -br link show | grep -E "^(en|eth)" || echo "No ethernet interfaces found"
+echo ""
+echo "Bridge forwarding database:"
+bridge fdb show br br0 2>/dev/null | head -20
+EOFNETSTAT
+chmod +x /usr/local/bin/ndi-bridge-netstat
 
 # Network monitoring wrapper
 cat > /usr/local/bin/ndi-bridge-netmon << 'EOFNETMON'
