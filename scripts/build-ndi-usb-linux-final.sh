@@ -177,10 +177,9 @@ apt-get install -y -qq --no-install-recommends v4l-utils 2>/dev/null || \
 apt-get install -y -qq --no-install-recommends v4l2-tools 2>/dev/null || \
 apt-get install -y -qq --no-install-recommends v4l2loopback-utils 2>/dev/null || true
 
-# Network monitoring tools (optional)
-apt-get install -y -qq --no-install-recommends nload 2>/dev/null || true
-apt-get install -y -qq --no-install-recommends iftop 2>/dev/null || true
-apt-get install -y -qq --no-install-recommends bmon 2>/dev/null || true
+# Network monitoring tools
+echo "Installing network monitoring tools..."
+apt-get install -y -qq --no-install-recommends nload iftop bmon 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Set hostname
 echo "ndi-bridge" > /etc/hostname
@@ -369,7 +368,10 @@ Type=idle
 EOFGETTY1
 
 # Create ndi-logs user that automatically shows logs
-useradd -m -s /bin/bash ndi-logs
+useradd -m -s /bin/bash ndi-logs || echo "Note: ndi-logs user already exists"
+# Ensure home directory exists
+mkdir -p /home/ndi-logs
+chown ndi-logs:ndi-logs /home/ndi-logs
 cat > /home/ndi-logs/.profile << 'EOFNDILOGS'
 # Automatically show NDI logs on TTY1
 echo -e "\033[2J\033[H"  # Clear screen
@@ -378,6 +380,7 @@ echo "Switch to TTY2 (Alt+F2) for system menu"
 echo ""
 exec journalctl -u ndi-bridge -f --no-pager
 EOFNDILOGS
+chown ndi-logs:ndi-logs /home/ndi-logs/.profile
 
 # Configure TTY2 with welcome screen and auto-login
 mkdir -p /etc/systemd/system/getty@tty2.service.d
@@ -416,7 +419,7 @@ echo "╚═══════════════════════�
 echo -e "\033[0m"
 echo -e "\033[1;36mSystem Information:\033[0m"
 echo "  Hostname:   \$(hostname)"
-echo "  IP Address: \$(ip -4 addr show dev br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || echo 'No IP yet')"
+echo "  IP Address: \$(timeout 5 sh -c 'while ! ip -4 addr show dev br0 2>/dev/null | grep -q inet; do sleep 0.5; done; ip -4 addr show dev br0 2>/dev/null | grep -oP \"(?<=inet\\s)\\d+(\\.\\d+){3}\"' || echo 'Waiting for DHCP...')"
 echo "  Uptime:     \$(uptime -p)"
 echo ""
 echo -e "\033[1;36mNetwork Configuration:\033[0m"
