@@ -280,7 +280,7 @@ done
 EOFRUN
 chmod +x /opt/ndi-bridge/run.sh
 
-# Systemd service with console output
+# Systemd service (output to journal only, not console)
 cat > /etc/systemd/system/ndi-bridge.service << EOFSERVICE
 [Unit]
 Description=NDI Bridge
@@ -292,11 +292,8 @@ Type=simple
 Restart=always
 RestartSec=5
 ExecStart=/opt/ndi-bridge/run.sh
-StandardOutput=journal+console
-StandardError=journal+console
-TTYPath=/dev/tty1
-TTYReset=yes
-TTYVHangup=yes
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -304,12 +301,7 @@ EOFSERVICE
 
 systemctl enable ndi-bridge
 
-# Configure tmpfs for volatile directories
-cat >> /etc/fstab << EOFTMPFS
-tmpfs /tmp tmpfs defaults,noatime,mode=1777,size=256M 0 0
-tmpfs /var/log tmpfs defaults,noatime,mode=0755,size=512M 0 0
-tmpfs /var/tmp tmpfs defaults,noatime,mode=1777,size=64M 0 0
-EOFTMPFS
+# Configure tmpfs for volatile directories - moved to main fstab section below
 
 # Create systemd service to setup log directories on boot
 cat > /etc/systemd/system/setup-logs.service << EOFLOGSVC
@@ -340,13 +332,15 @@ EOFGETTY
 
 # Enable normal login on other TTYs (2-6)
 for tty in 2 3 4 5 6; do
-    mkdir -p /etc/systemd/system/getty@tty\${tty}.service.d
-    cat > /etc/systemd/system/getty@tty\${tty}.service.d/override.conf << EOFGETTY2
+    mkdir -p /etc/systemd/system/getty@tty${tty}.service.d
+    cat > /etc/systemd/system/getty@tty${tty}.service.d/override.conf << EOFGETTY2
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --noclear %I \$TERM
 Type=idle
 EOFGETTY2
+    # Enable the getty service for this TTY
+    systemctl enable getty@tty${tty}
 done
 
 # Create profile script to show status on console (but don't auto-follow logs)
@@ -624,10 +618,14 @@ EOFSETUP
     # Now add the fstab entries with the actual UUIDs
     cat >> /mnt/usb/tmp/setup.sh << EOFFSTAB
 
-# Create fstab with actual device UUIDs
+# Create fstab with actual device UUIDs and tmpfs mounts
 cat > /etc/fstab << EOFFSTAB2
 UUID=$UUID_ROOT / ext4 ro,noatime,errors=remount-ro 0 1
 UUID=$UUID_EFI /boot/efi vfat umask=0077 0 1
+tmpfs /tmp tmpfs defaults,noatime,mode=1777,size=256M 0 0
+tmpfs /var/log tmpfs defaults,noatime,mode=0755,size=512M 0 0
+tmpfs /var/tmp tmpfs defaults,noatime,mode=1777,size=64M 0 0
+tmpfs /var/lib/systemd tmpfs defaults,noatime,mode=0755,size=64M 0 0
 EOFFSTAB2
 
 # Configure power failure resistance
