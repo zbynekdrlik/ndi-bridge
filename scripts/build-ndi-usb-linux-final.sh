@@ -426,7 +426,7 @@ echo "  â€¢ Chain devices through second port"
 echo ""
 echo -e "\033[1;36mAvailable Commands:\033[0m"
 echo -e "  \033[1;33mndi-bridge-info\033[0m         - Display system status"
-echo -e "  \033[1;33mndi-bridge-set-device-name\033[0m - Set device name (hostname & NDI)"
+echo -e "  \033[1;33mndi-bridge-set-name\033[0m     - Set device name (hostname & NDI)"
 echo -e "  \033[1;33mndi-bridge-update\033[0m       - Update NDI binary"
 echo -e "  \033[1;33mndi-bridge-logs\033[0m         - View NDI logs"
 echo -e "  \033[1;33mndi-bridge-netstat\033[0m      - Network bridge status"
@@ -443,12 +443,12 @@ systemctl is-active ndi-bridge >/dev/null 2>&1 && echo -e "  Status: \033[1;32mâ
 echo ""
 EOFPROFILE
 
-# Unified device name setter (replaces separate set-name and set-hostname)
-cat > /usr/local/bin/ndi-bridge-set-device-name << 'EOFDEVNAME'
+# Unified device name setter
+cat > /usr/local/bin/ndi-bridge-set-name << 'EOFDEVNAME'
 #!/bin/bash
 # NDI Bridge Device Name Setter
 # Sets both hostname and NDI name in a unified way
-# Usage: ndi-bridge-set-device-name <simple-name>
+# Usage: ndi-bridge-set-name <simple-name>
 
 set -e
 
@@ -474,9 +474,9 @@ warn() {
 
 # Check usage
 if [ $# -eq 0 ]; then
-    echo "Usage: ndi-bridge-set-device-name <simple-name>"
+    echo "Usage: ndi-bridge-set-name <simple-name>"
     echo ""
-    echo "Example: ndi-bridge-set-device-name cam1"
+    echo "Example: ndi-bridge-set-name cam1"
     echo "         This will set:"
     echo "         - Hostname: ndi-bridge-cam1"
     echo "         - NDI Name: NDI Bridge Cam1"
@@ -593,7 +593,7 @@ log ""
 log "Device name update complete!"
 log "The NDI source should be immediately visible as '$NDI_NAME' in NDI applications."
 EOFDEVNAME
-chmod +x /usr/local/bin/ndi-bridge-set-device-name
+chmod +x /usr/local/bin/ndi-bridge-set-name
 
 # Helper to remount filesystem
 cat > /usr/local/bin/ndi-bridge-rw << 'EOFRW'
@@ -611,26 +611,6 @@ echo "Filesystem mounted read-only."
 EOFRO
 chmod +x /usr/local/bin/ndi-bridge-ro
 
-# Legacy compatibility - redirect to new unified command
-cat > /usr/local/bin/ndi-bridge-set-name << 'EOFLEGACY1'
-#!/bin/bash
-echo "Note: This command is deprecated. Use 'ndi-bridge-set-device-name' instead."
-echo "Example: ndi-bridge-set-device-name cam1"
-echo ""
-echo "The new command sets both hostname and NDI name in a unified way."
-exit 1
-EOFLEGACY1
-chmod +x /usr/local/bin/ndi-bridge-set-name
-
-cat > /usr/local/bin/ndi-bridge-set-hostname << 'EOFLEGACY2'
-#!/bin/bash
-echo "Note: This command is deprecated. Use 'ndi-bridge-set-device-name' instead."
-echo "Example: ndi-bridge-set-device-name cam1"
-echo ""
-echo "The new command sets both hostname and NDI name in a unified way."
-exit 1
-EOFLEGACY2
-chmod +x /usr/local/bin/ndi-bridge-set-hostname
 
 # Update ndi-bridge binary helper
 cat > /usr/local/bin/ndi-bridge-update << 'EOFUPDATE'
@@ -710,7 +690,7 @@ echo "=== NDI Bridge System Commands ==="
 echo ""
 echo "Available commands:"
 echo "  ndi-bridge-info         - Display system information and status"
-echo "  ndi-bridge-set-device-name - Set device name (hostname & NDI)"    
+echo "  ndi-bridge-set-name     - Set device name (hostname & NDI)"    
 echo "  ndi-bridge-update       - Update the ndi-bridge binary"
 echo "  ndi-bridge-logs         - Follow NDI Bridge service logs"
 echo "  ndi-bridge-netstat      - Show network bridge status"
