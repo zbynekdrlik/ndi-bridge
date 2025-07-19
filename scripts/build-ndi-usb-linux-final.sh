@@ -165,8 +165,11 @@ echo "Note: Using systemd-networkd for DHCP (default in Ubuntu 24.04)"
 # Install optional packages (don't fail if unavailable)
 echo "Installing optional packages..."
 apt-get install -y -qq --no-install-recommends \
+    avahi-daemon \
+    avahi-utils \
     libavahi-common3 \
     libavahi-client3 \
+    libnss-mdns \
     htop 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Try to install v4l2 tools with different package names
@@ -234,6 +237,41 @@ if [ -f /etc/ssh/sshd_config ]; then
     sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
     systemctl enable ssh
 fi
+
+# Enable Avahi for NDI discovery
+systemctl enable avahi-daemon 2>/dev/null || true
+
+# Configure Avahi to work on our bridge
+mkdir -p /etc/avahi
+cat > /etc/avahi/avahi-daemon.conf << 'EOFAVAHI'
+[server]
+use-ipv4=yes
+use-ipv6=yes
+allow-interfaces=br0
+deny-interfaces=lo
+ratelimit-interval-usec=1000000
+ratelimit-burst=1000
+
+[wide-area]
+enable-wide-area=yes
+
+[publish]
+publish-addresses=yes
+publish-hinfo=yes
+publish-workstation=no
+publish-domain=yes
+
+[reflector]
+enable-reflector=no
+
+[rlimits]
+rlimit-core=0
+rlimit-data=4194304
+rlimit-fsize=0
+rlimit-nofile=768
+rlimit-stack=4194304
+rlimit-nproc=3
+EOFAVAHI
 
 # Create NDI directories
 mkdir -p /opt/ndi-bridge /etc/ndi-bridge
