@@ -202,7 +202,7 @@ done
 EOFRUN
 chmod +x /opt/ndi-bridge/run.sh
 
-# Systemd service
+# Systemd service with console output
 cat > /etc/systemd/system/ndi-bridge.service << EOFSERVICE
 [Unit]
 Description=NDI Bridge
@@ -214,14 +214,38 @@ Type=simple
 Restart=always
 RestartSec=5
 ExecStart=/opt/ndi-bridge/run.sh
-StandardOutput=journal
-StandardError=journal
+StandardOutput=journal+console
+StandardError=journal+console
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
 
 [Install]
 WantedBy=multi-user.target
 EOFSERVICE
 
 systemctl enable ndi-bridge
+
+# Configure auto-login on TTY1 to show ndi-bridge output
+mkdir -p /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/override.conf << EOFGETTY
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin root --noclear %I \$TERM
+Type=idle
+EOFGETTY
+
+# Create profile script to show ndi-bridge logs on console
+cat > /root/.profile << EOFPROFILE
+# Show NDI Bridge status on login
+clear
+echo "=== NDI Bridge System ==="
+echo "IP: \$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1)"
+echo ""
+echo "Following NDI Bridge logs (Ctrl+C to exit to shell)..."
+echo ""
+journalctl -u ndi-bridge -f --no-pager
+EOFPROFILE
 
 # NDI name updater
 cat > /usr/local/bin/set-ndi-name << 'EOFNAME'
