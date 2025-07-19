@@ -135,7 +135,8 @@ apt-get install -y --no-install-recommends \
     iputils-ping \
     libavahi-common3 \
     libavahi-client3 \
-    v4l-utils
+    v4l-utils \
+    htop
 
 # Set hostname
 echo "ndi-bridge" > /etc/hostname
@@ -267,16 +268,17 @@ clear
 echo "=== NDI Bridge System ==="
 echo "IP: \$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1)"
 echo ""
+echo "Type 'ndi-bridge-help' for available commands"
 echo "Following NDI Bridge logs (Ctrl+C to exit to shell)..."
 echo ""
 journalctl -u ndi-bridge -f --no-pager
 EOFPROFILE
 
 # NDI name updater (handles read-only filesystem)
-cat > /usr/local/bin/set-ndi-name << 'EOFNAME'
+cat > /usr/local/bin/ndi-bridge-set-name << 'EOFNAME'
 #!/bin/bash
 if [ $# -eq 0 ]; then
-    echo "Usage: set-ndi-name <name>"
+    echo "Usage: ndi-bridge-set-name <name>"
     exit 1
 fi
 # Remount root as read-write
@@ -288,29 +290,29 @@ mount -o remount,ro /
 systemctl restart ndi-bridge
 echo "NDI name set to: $1"
 EOFNAME
-chmod +x /usr/local/bin/set-ndi-name
+chmod +x /usr/local/bin/ndi-bridge-set-name
 
 # Helper to remount filesystem
-cat > /usr/local/bin/rw << 'EOFRW'
+cat > /usr/local/bin/ndi-bridge-rw << 'EOFRW'
 #!/bin/bash
 mount -o remount,rw /
-echo "Filesystem mounted read-write. Use 'ro' to return to read-only."
+echo "Filesystem mounted read-write. Use 'ndi-bridge-ro' to return to read-only."
 EOFRW
-chmod +x /usr/local/bin/rw
+chmod +x /usr/local/bin/ndi-bridge-rw
 
-cat > /usr/local/bin/ro << 'EOFRO'
+cat > /usr/local/bin/ndi-bridge-ro << 'EOFRO'
 #!/bin/bash
 sync
 mount -o remount,ro /
 echo "Filesystem mounted read-only."
 EOFRO
-chmod +x /usr/local/bin/ro
+chmod +x /usr/local/bin/ndi-bridge-ro
 
 # Update hostname helper
-cat > /usr/local/bin/set-hostname << 'EOFHOST'
+cat > /usr/local/bin/ndi-bridge-set-hostname << 'EOFHOST'
 #!/bin/bash
 if [ $# -eq 0 ]; then
-    echo "Usage: set-hostname <hostname>"
+    echo "Usage: ndi-bridge-set-hostname <hostname>"
     echo "Current hostname: $(hostname)"
     exit 1
 fi
@@ -339,14 +341,14 @@ mount -o remount,ro /
 echo "Hostname changed to: $NEW_HOSTNAME"
 echo "Reboot recommended for full effect"
 EOFHOST
-chmod +x /usr/local/bin/set-hostname
+chmod +x /usr/local/bin/ndi-bridge-set-hostname
 
 # Update ndi-bridge binary helper
-cat > /usr/local/bin/update-ndi-bridge << 'EOFUPDATE'
+cat > /usr/local/bin/ndi-bridge-update << 'EOFUPDATE'
 #!/bin/bash
 if [ $# -eq 0 ]; then
-    echo "Usage: update-ndi-bridge <path-to-new-binary>"
-    echo "Example: update-ndi-bridge /tmp/ndi-bridge"
+    echo "Usage: ndi-bridge-update <path-to-new-binary>"
+    echo "Example: ndi-bridge-update /tmp/ndi-bridge"
     exit 1
 fi
 
@@ -390,10 +392,10 @@ systemctl start ndi-bridge
 echo "Update complete!"
 echo "Check status: systemctl status ndi-bridge"
 EOFUPDATE
-chmod +x /usr/local/bin/update-ndi-bridge
+chmod +x /usr/local/bin/ndi-bridge-update
 
 # System info helper
-cat > /usr/local/bin/ndi-info << 'EOFINFO'
+cat > /usr/local/bin/ndi-bridge-info << 'EOFINFO'
 #!/bin/bash
 echo "=== NDI Bridge System Info ==="
 echo "Hostname: $(hostname)"
@@ -411,7 +413,30 @@ echo ""
 echo "Filesystem Status:"
 mount | grep " / " | grep -q "ro" && echo "Root: read-only (protected)" || echo "Root: read-write (UNSAFE)"
 EOFINFO
-chmod +x /usr/local/bin/ndi-info
+chmod +x /usr/local/bin/ndi-bridge-info
+
+# Create help command to list all ndi-bridge commands
+cat > /usr/local/bin/ndi-bridge-help << 'EOFHELP'
+#!/bin/bash
+echo "=== NDI Bridge System Commands ==="
+echo ""
+echo "Available commands:"
+echo "  ndi-bridge-info         - Display system information and status"
+echo "  ndi-bridge-set-name     - Set the NDI source name"
+echo "  ndi-bridge-set-hostname - Change system hostname"  
+echo "  ndi-bridge-update       - Update the ndi-bridge binary"
+echo "  ndi-bridge-rw           - Mount filesystem read-write (for maintenance)"
+echo "  ndi-bridge-ro           - Mount filesystem read-only (default)"
+echo "  ndi-bridge-help         - Show this help message"
+echo ""
+echo "Other useful commands:"
+echo "  htop                    - System resource monitor"
+echo "  journalctl -u ndi-bridge -f  - Follow service logs"
+echo "  systemctl restart ndi-bridge  - Restart the service"
+echo ""
+echo "Tab completion works! Type 'ndi-bridge-' and press TAB"
+EOFHELP
+chmod +x /usr/local/bin/ndi-bridge-help
 
 # Configure GRUB with 2 second timeout for fast boot
 cat > /etc/default/grub << EOFGRUB
