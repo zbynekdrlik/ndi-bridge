@@ -136,7 +136,10 @@ apt-get install -y --no-install-recommends \
     libavahi-common3 \
     libavahi-client3 \
     v4l-utils \
-    htop
+    htop \
+    iftop \
+    bmon \
+    nload
 
 # Set hostname
 echo "ndi-bridge" > /etc/hostname
@@ -425,18 +428,35 @@ echo "  ndi-bridge-info         - Display system information and status"
 echo "  ndi-bridge-set-name     - Set the NDI source name"
 echo "  ndi-bridge-set-hostname - Change system hostname"  
 echo "  ndi-bridge-update       - Update the ndi-bridge binary"
+echo "  ndi-bridge-netmon       - Network bandwidth monitor (graphical)"
 echo "  ndi-bridge-rw           - Mount filesystem read-write (for maintenance)"
 echo "  ndi-bridge-ro           - Mount filesystem read-only (default)"
 echo "  ndi-bridge-help         - Show this help message"
 echo ""
 echo "Other useful commands:"
 echo "  htop                    - System resource monitor"
+echo "  nload                   - Network bandwidth monitor (graphical)"
+echo "  iftop                   - Network connections monitor"
+echo "  bmon                    - Network bandwidth monitor (detailed)"
 echo "  journalctl -u ndi-bridge -f  - Follow service logs"
 echo "  systemctl restart ndi-bridge  - Restart the service"
 echo ""
 echo "Tab completion works! Type 'ndi-bridge-' and press TAB"
 EOFHELP
 chmod +x /usr/local/bin/ndi-bridge-help
+
+# Network monitoring wrapper
+cat > /usr/local/bin/ndi-bridge-netmon << 'EOFNET'
+#!/bin/bash
+echo "=== NDI Bridge Network Monitor ==="
+echo ""
+echo "Starting network bandwidth monitor..."
+echo "Press 'q' to quit, arrow keys to switch interfaces"
+echo ""
+# Use nload as it has the nicest graphs and shows both in/out
+nload -u M
+EOFNET
+chmod +x /usr/local/bin/ndi-bridge-netmon
 
 # Configure GRUB with 2 second timeout for fast boot
 cat > /etc/default/grub << EOFGRUB
