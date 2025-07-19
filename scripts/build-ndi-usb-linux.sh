@@ -192,11 +192,14 @@ while [ ! -e "$DEVICE" ]; do
     sleep 2
 done
 
-# Main loop with restart
+# Create log directory
+mkdir -p /var/log/ndi-bridge
+
+# Main loop with restart and logging
 while true; do
-    echo "Starting NDI Bridge: $DEVICE -> $NDI_NAME"
-    LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-bridge "$DEVICE" "$NDI_NAME"
-    echo "NDI Bridge exited, restarting in 5 seconds..."
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NDI Bridge: $DEVICE -> $NDI_NAME"
+    LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-bridge "$DEVICE" "$NDI_NAME" 2>&1 | tee -a /var/log/ndi-bridge/ndi-bridge.log
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] NDI Bridge exited, restarting in 5 seconds..." | tee -a /var/log/ndi-bridge/ndi-bridge.log
     sleep 5
 done
 EOFRUN
@@ -225,6 +228,20 @@ WantedBy=multi-user.target
 EOFSERVICE
 
 systemctl enable ndi-bridge
+
+# Configure log rotation for ndi-bridge
+cat > /etc/logrotate.d/ndi-bridge << EOFROTATE
+/var/log/ndi-bridge/*.log {
+    daily
+    rotate 7
+    maxsize 100M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 root root
+}
+EOFROTATE
 
 # Configure auto-login on TTY1 to show ndi-bridge output
 mkdir -p /etc/systemd/system/getty@tty1.service.d
