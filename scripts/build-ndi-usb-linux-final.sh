@@ -321,45 +321,88 @@ EOFLOGSVC
 
 systemctl enable setup-logs
 
-# Configure auto-login on TTY1 to show ndi-bridge output
+# Configure TTY1 to show NDI logs automatically
 mkdir -p /etc/systemd/system/getty@tty1.service.d
-cat > /etc/systemd/system/getty@tty1.service.d/override.conf << EOFGETTY
+cat > /etc/systemd/system/getty@tty1.service.d/override.conf << EOFGETTY1
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin ndi-logs --noclear %I \$TERM
+Type=idle
+EOFGETTY1
+
+# Create ndi-logs user that automatically shows logs
+useradd -m -s /bin/bash ndi-logs
+cat > /home/ndi-logs/.profile << 'EOFNDILOGS'
+# Automatically show NDI logs on TTY1
+echo -e "\033[2J\033[H"  # Clear screen
+echo "=== NDI Bridge Live Logs ==="
+echo "Switch to TTY2 (Alt+F2) for system menu"
+echo ""
+exec journalctl -u ndi-bridge -f --no-pager
+EOFNDILOGS
+
+# Configure TTY2 with welcome screen and auto-login
+mkdir -p /etc/systemd/system/getty@tty2.service.d
+cat > /etc/systemd/system/getty@tty2.service.d/override.conf << EOFGETTY2
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --autologin root --noclear %I \$TERM
 Type=idle
-EOFGETTY
+EOFGETTY2
 
-# Enable normal login on other TTYs (2-6)
-for tty in 2 3 4 5 6; do
+# Enable normal login on other TTYs (3-6)
+for tty in 3 4 5 6; do
     mkdir -p /etc/systemd/system/getty@tty${tty}.service.d
-    cat > /etc/systemd/system/getty@tty${tty}.service.d/override.conf << EOFGETTY2
+    cat > /etc/systemd/system/getty@tty${tty}.service.d/override.conf << EOFGETTY
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --noclear %I \$TERM
 Type=idle
-EOFGETTY2
+EOFGETTY
     # Enable the getty service for this TTY
     systemctl enable getty@tty${tty}
 done
 
-# Create profile script to show status on console (but don't auto-follow logs)
+# Enable TTY1 and TTY2
+systemctl enable getty@tty1
+systemctl enable getty@tty2
+
+# Create profile script for root (shown on TTY2)
 cat > /root/.profile << EOFPROFILE
-# Show NDI Bridge status on login
+# Show NDI Bridge welcome screen
 clear
-echo "=== NDI Bridge System ==="
-echo "IP: \$(ip -4 addr show dev br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1 || echo 'No IP yet')"
+echo -e "\033[1;32m"
+echo "╔═══════════════════════════════════════════════════════════════╗"
+echo "║                      NDI Bridge System                        ║"
+echo "╚═══════════════════════════════════════════════════════════════╝"
+echo -e "\033[0m"
+echo -e "\033[1;36mSystem Information:\033[0m"
+echo "  Hostname:   \$(hostname)"
+echo "  IP Address: \$(ip -4 addr show dev br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || echo 'No IP yet')"
+echo "  Uptime:     \$(uptime -p)"
 echo ""
-echo "Commands:"
-echo "  ndi-bridge-help    - Show all commands"
-echo "  ndi-bridge-info    - System status" 
-echo "  ndi-bridge-logs    - Follow NDI logs"
+echo -e "\033[1;36mNetwork Configuration:\033[0m"
+echo "  • Both ethernet ports are bridged (br0)"
+echo "  • Connect cable to either port"
+echo "  • Chain devices through second port"
 echo ""
-echo "Network: Both ethernet ports are bridged (br0)"
-echo "         You can connect to either port"
+echo -e "\033[1;36mAvailable Commands:\033[0m"
+echo -e "  \033[1;33mndi-bridge-info\033[0m         - Display system status"
+echo -e "  \033[1;33mndi-bridge-set-name\033[0m     - Set NDI source name"
+echo -e "  \033[1;33mndi-bridge-set-hostname\033[0m - Change system hostname"
+echo -e "  \033[1;33mndi-bridge-update\033[0m       - Update NDI binary"
+echo -e "  \033[1;33mndi-bridge-logs\033[0m         - View NDI logs"
+echo -e "  \033[1;33mndi-bridge-netstat\033[0m      - Network bridge status"
+echo -e "  \033[1;33mndi-bridge-netmon\033[0m       - Network bandwidth monitor"
+echo -e "  \033[1;33mndi-bridge-help\033[0m         - Show all commands"
 echo ""
-echo "Service status:"
-systemctl status ndi-bridge --no-pager --lines=3 2>/dev/null || echo "Service not configured"
+echo -e "\033[1;36mConsole Switching:\033[0m"
+echo "  • TTY1 (Alt+F1) - Live NDI logs"
+echo "  • TTY2 (Alt+F2) - This menu"
+echo "  • TTY3-6 (Alt+F3-F6) - Additional terminals"
+echo ""
+echo -e "\033[1;32mNDI Service:\033[0m"
+systemctl is-active ndi-bridge >/dev/null 2>&1 && echo -e "  Status: \033[1;32m●\033[0m Running" || echo -e "  Status: \033[1;31m●\033[0m Stopped"
 echo ""
 EOFPROFILE
 
@@ -587,19 +630,59 @@ fi
 EOFNETMON
 chmod +x /usr/local/bin/ndi-bridge-netmon
 
-# Configure GRUB with 2 second timeout for fast boot
+# Configure GRUB with custom theme and colors
 cat > /etc/default/grub << EOFGRUB
 GRUB_DEFAULT=0
-GRUB_TIMEOUT=2
+GRUB_TIMEOUT=3
 GRUB_TIMEOUT_STYLE=menu
-GRUB_DISTRIBUTOR="NDI Bridge Linux"
-GRUB_CMDLINE_LINUX_DEFAULT="quiet"
+GRUB_DISTRIBUTOR="NDI Bridge"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
 GRUB_CMDLINE_LINUX=""
+# Custom colors - dark theme with green accent
+GRUB_COLOR_NORMAL="light-gray/black"
+GRUB_COLOR_HIGHLIGHT="light-green/dark-gray"
+# Disable graphical terminal for cleaner look
+GRUB_TERMINAL_OUTPUT="console"
+# Custom background (solid black)
+GRUB_BACKGROUND=""
 EOFGRUB
+
+# Create custom GRUB theme
+mkdir -p /boot/grub
+cat > /boot/grub/custom.cfg << 'EOFCUSTOM'
+# NDI Bridge GRUB Theme
+set color_normal=light-gray/black
+set color_highlight=light-green/dark-gray
+set menu_color_normal=light-gray/black
+set menu_color_highlight=light-green/dark-gray
+
+# Clear screen and set clean appearance
+clear
+set gfxmode=auto
+set gfxpayload=keep
+terminal_output console
+EOFCUSTOM
 
 # Configure ldconfig for NDI
 echo "/usr/local/lib" > /etc/ld.so.conf.d/ndi.conf
 ldconfig
+
+# Create a clean MOTD for SSH logins
+cat > /etc/motd << 'EOFMOTD'
+
+╔═══════════════════════════════════════════════════════════════╗
+║                      NDI Bridge System                        ║
+╚═══════════════════════════════════════════════════════════════╝
+
+  TTY1 (Alt+F1) - Live NDI logs
+  TTY2 (Alt+F2) - System menu
+  
+  Type 'ndi-bridge-help' for available commands.
+
+EOFMOTD
+
+# Disable unnecessary MOTD scripts
+chmod -x /etc/update-motd.d/* 2>/dev/null || true
 
 # Reduce swappiness
 echo "vm.swappiness=10" >> /etc/sysctl.conf
