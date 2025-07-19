@@ -2,72 +2,95 @@
 
 ## CRITICAL CURRENT STATE
 **⚠️ EXACTLY WHERE WE ARE RIGHT NOW:**
-- [x] Currently working on: Media Foundation latency optimization v1.6.7
-- [x] Waiting for: User to test v1.6.7 (removed sleep in capture loop)
-- [x] SUCCESS: Achieved 8 frames latency on Windows Media Foundation!
+- [x] Currently working on: Diagnosing FPS issue with v2.1.3
+- [x] Waiting for: User to test v2.1.3 with frame timing diagnostics
+- [ ] Blocked by: Need to understand why device delivers <30 FPS instead of 60
 
 ## Implementation Status
-- Phase: **Latency Fix** - Media Foundation optimizations
-- Step: v1.6.7 COMPLETE - Target achieved!
-- Status: TESTED_AND_WORKING
-- Version: 1.6.7
+- Phase: **Linux V4L2 Frame Rate Diagnosis** - v2.1.3 ready
+- Step: Added detailed frame timing diagnostics
+- Status: IMPLEMENTED_NOT_TESTED (diagnostics version)
+- Version: 2.1.3 (frame timing diagnostics)
 
-## Media Foundation Latency Fix - COMPLETE ✅
-**v1.6.6 Results**:
-- Reduced latency from 14 frames to 10 frames
-- Improvements:
-  - NDI clock_video=false (immediate delivery)
-  - Removed 5ms sleep (initially)
-  - Added MF low-latency attributes
+## v2.1.3 Diagnostic Details
+**Problem**:
+- Device configured for 60fps but only delivering 17-31 FPS
+- No frames dropped, but frames arrive irregularly
+- Need to understand if it's device/driver/USB issue
 
-**v1.6.7 Results**:
-- ✅ Reduced latency from 10 frames to 8 frames!
-- ✅ Removed remaining 5ms sleep in capture loop
-- ✅ Now uses tight loop when no sample available
-- ✅ TARGET ACHIEVED: Back to reference implementation performance
+**v2.1.3 Diagnostics Include**:
+1. ✅ Frame gap measurement (time between frames)
+2. ✅ EAGAIN counting (busy-wait iterations)
+3. ✅ Frame gap warnings (>25ms = missing frames)
+4. ✅ Overall FPS tracking
+5. ✅ Max frame gap reporting
+6. ✅ Frame timing logs every 100 frames
 
-## Key Learnings from Media Foundation Fix
-1. **NDI clock_video=false** is CRITICAL for low latency
-2. **No sleeps in capture loops** - tight loops are essential
-3. **Media Foundation attributes** help reduce internal buffering
-4. **Threading still adds 1-2 frames** but acceptable for now
+## Quick Test Instructions
+```bash
+# Pull the latest diagnostics and test:
+cd ~/ndi-test/ndi-bridge
+git pull
+./test-n100.sh
+```
 
-## Next Goal: Linux V4L2 Latency Fix
-**Current Linux Performance**:
-- v1.5.0: Multi-threaded pipeline with 12 frames latency
-- Despite being "optimized", it's worse than Windows!
-- Target: Reduce from 12 frames to 8 frames
+## What to Look For in v2.1.3 Logs
+- **Frame gap warnings**: "Large frame gap detected: XXms"
+- **EAGAIN counts**: Shows how many times we check between frames
+- **Actual FPS**: Should show why it's not 60
+- **Max frame gap**: Largest gap between frames
 
-**Suspected Issues in Linux Implementation**:
-1. **Multi-threading overhead** (3 threads might be overkill)
-2. **Frame queues** between threads add buffering
-3. **Possible sleeps** in capture or processing loops
-4. **NDI clock settings** might not be optimized
-5. **V4L2 buffer count** might be too high
+If frame gaps are consistently >16.67ms, the device isn't delivering 60fps.
 
-**Action Plan for Next Thread**:
-1. Analyze v4l2_capture.cpp for sleep/delay patterns
-2. Check NDI sender configuration (clock_video setting)
-3. Review multi-threaded pipeline - might need simplification
-4. Examine frame queue depths and buffering
-5. Consider single-threaded option like Media Foundation
+## Test Results History
+- v2.0.0: Implementation issues
+- v2.1.0: 3 buffer bug
+- v2.1.0 fix1: 23-29 FPS with 1ms poll
+- v2.1.1: 16-28 FPS with 0ms poll + yield  
+- v2.1.2: 17-31 FPS with pure busy-wait
+- v2.1.3: TESTING with diagnostics
 
-## Repository State
+## Possible Root Causes
+1. **USB Bandwidth** - USB 2.0 vs 3.0?
+2. **Device/Driver** - Not actually capable of 60fps?
+3. **Format Issue** - YUYV 1080p60 too much bandwidth?
+4. **V4L2 Config** - Missing some setting?
+
+## Linux V4L2 Implementation
+**Current v2.1.x**:
+- 2 buffers (minimum)
+- Pure busy-wait
+- CPU affinity to core 3
+- RT priority 90
+- Memory locked
+- Zero-copy YUYV->NDI
+
+## Repository State  
 - Main branch: v1.6.5
-- Open PRs: #12 (README update), #13 (latency fix)
-- Current branch: fix/media-foundation-latency (v1.6.7)
+- Current branch: fix/linux-v4l2-latency (v2.1.3)
+- Latest commit: Frame timing diagnostics
+- Open PR: #15 (Linux latency fix)
 - Windows latency: FIXED (8 frames) ✅
-- Linux latency: TO BE FIXED (12 frames) ❌
+- Linux FPS issue: DIAGNOSING 🔍
 
 ## Next Steps
-1. Update PR #13 with v1.6.7 success
-2. Merge PR #13 to main
-3. Create new branch: fix/linux-v4l2-latency
-4. Apply learnings from Windows to Linux implementation
+1. **IMMEDIATE**: Run v2.1.3 and analyze frame timing
+2. Check if frame gaps are consistent or variable
+3. Look for patterns in EAGAIN counts
+4. Determine if it's a device limitation
 
-## Quick Reference
-- Current version: 1.6.7
-- Branch: fix/media-foundation-latency
-- PR: #13
-- Windows latency: 8 frames ✅
-- Linux latency: 12 frames (needs fixing)
+Possible solutions:
+- Try lower resolution (720p60?)
+- Try different format (NV12?)
+- Check USB port (2.0 vs 3.0)
+- Try different capture device
+
+## Key Diagnostics to Report
+- Frame gap pattern (consistent or variable?)
+- Max frame gap value
+- EAGAIN count patterns
+- Any error messages
+- USB port type being used
+
+## Technical Note
+At 60fps, frames should arrive every ~16.67ms. If we see consistent gaps of 33ms, the device is actually running at 30fps. Variable gaps suggest USB bandwidth or driver issues.

@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.16)
-project(ndi-bridge VERSION 1.6.7 LANGUAGES CXX)
+
+# Read version from version.h to have single source of truth
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/common/version.h" version_file)
+string(REGEX MATCH "VERSION_MAJOR ([0-9]+)" _ ${version_file})
+set(VERSION_MAJOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "VERSION_MINOR ([0-9]+)" _ ${version_file})
+set(VERSION_MINOR ${CMAKE_MATCH_1})
+string(REGEX MATCH "VERSION_PATCH ([0-9]+)" _ ${version_file})
+set(VERSION_PATCH ${CMAKE_MATCH_1})
+
+project(ndi-bridge VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH} LANGUAGES CXX)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)

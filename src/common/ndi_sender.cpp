@@ -153,6 +153,9 @@ bool NdiSender::sendFrame(const FrameInfo& frame) {
             yuyv_to_uyvy_buffer_.resize(buffer_size);
         }
         
+        // Time the conversion
+        auto conv_start = std::chrono::high_resolution_clock::now();
+        
         // Convert YUYV to UYVY with optimized byte swap
         const uint8_t* src = static_cast<const uint8_t*>(frame.data);
         uint8_t* dst = yuyv_to_uyvy_buffer_.data();
@@ -165,13 +168,19 @@ bool NdiSender::sendFrame(const FrameInfo& frame) {
             convertYUYVtoUYVY_Scalar(src, dst, frame.width, frame.height);
         }
         
+        auto conv_end = std::chrono::high_resolution_clock::now();
+        double conv_us = std::chrono::duration<double, std::micro>(conv_end - conv_start).count();
+        
         ndi_frame.p_data = yuyv_to_uyvy_buffer_.data();
         ndi_frame.line_stride_in_bytes = frame.width * 2;
         ndi_frame.FourCC = NDIlib_FourCC_type_UYVY;
         
-        // Log once for performance tracking
+        // Log once for performance tracking with timing
         if (!yuyv_conversion_logged_) {
             Logger::info("NDI sender: Using direct YUYV->UYVY conversion (zero-copy optimization)");
+            Logger::info("  Conversion time: " + std::to_string(conv_us) + "µs for " + 
+                        std::to_string(frame.width) + "x" + std::to_string(frame.height) + 
+                        " (" + std::to_string(conv_us * 1000.0 / (frame.width * frame.height)) + "ns/pixel)");
             yuyv_conversion_logged_ = true;
         }
     } else {
@@ -209,10 +218,19 @@ bool NdiSender::sendFrame(const FrameInfo& frame) {
     ndi_frame.frame_format_type = NDIlib_frame_format_type_progressive;
     ndi_frame.p_metadata = nullptr;
 
-    // Send the frame
+    // Send the frame with timing
+    auto send_start = std::chrono::high_resolution_clock::now();
     NDIlib_send_send_video_v2(ndi_send_instance_, &ndi_frame);
+    auto send_end = std::chrono::high_resolution_clock::now();
+    double send_us = std::chrono::duration<double, std::micro>(send_end - send_start).count();
     
     frames_sent_++;
+    
+    // Log detailed timing every 600 frames (10 seconds at 60fps)
+    if (frames_sent_ % 600 == 0) {
+        Logger::info("NDI Send timing: " + std::to_string(send_us) + "µs");
+    }
+    
     return true;
 }
 
