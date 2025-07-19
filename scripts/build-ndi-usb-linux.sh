@@ -306,6 +306,113 @@ echo "Filesystem mounted read-only."
 EOFRO
 chmod +x /usr/local/bin/ro
 
+# Update hostname helper
+cat > /usr/local/bin/set-hostname << 'EOFHOST'
+#!/bin/bash
+if [ $# -eq 0 ]; then
+    echo "Usage: set-hostname <hostname>"
+    echo "Current hostname: $(hostname)"
+    exit 1
+fi
+
+NEW_HOSTNAME="$1"
+
+# Remount as read-write
+mount -o remount,rw /
+
+# Update hostname files
+echo "$NEW_HOSTNAME" > /etc/hostname
+sed -i "s/127.0.1.1.*/127.0.1.1 $NEW_HOSTNAME/" /etc/hosts
+
+# Update NDI name if not explicitly set
+if grep -q 'NDI_NAME=""' /etc/ndi-bridge/config; then
+    echo "Hostname will be used as NDI name"
+fi
+
+# Apply hostname immediately
+hostname "$NEW_HOSTNAME"
+
+# Remount as read-only
+sync
+mount -o remount,ro /
+
+echo "Hostname changed to: $NEW_HOSTNAME"
+echo "Reboot recommended for full effect"
+EOFHOST
+chmod +x /usr/local/bin/set-hostname
+
+# Update ndi-bridge binary helper
+cat > /usr/local/bin/update-ndi-bridge << 'EOFUPDATE'
+#!/bin/bash
+if [ $# -eq 0 ]; then
+    echo "Usage: update-ndi-bridge <path-to-new-binary>"
+    echo "Example: update-ndi-bridge /tmp/ndi-bridge"
+    exit 1
+fi
+
+NEW_BINARY="$1"
+
+if [ ! -f "$NEW_BINARY" ]; then
+    echo "Error: File not found: $NEW_BINARY"
+    exit 1
+fi
+
+# Check if binary is executable
+if [ ! -x "$NEW_BINARY" ]; then
+    echo "Making binary executable..."
+    chmod +x "$NEW_BINARY"
+fi
+
+# Stop service
+echo "Stopping ndi-bridge service..."
+systemctl stop ndi-bridge
+
+# Remount as read-write
+mount -o remount,rw /
+
+# Backup old binary
+echo "Backing up current binary..."
+cp /opt/ndi-bridge/ndi-bridge /opt/ndi-bridge/ndi-bridge.bak
+
+# Copy new binary
+echo "Installing new binary..."
+cp "$NEW_BINARY" /opt/ndi-bridge/ndi-bridge
+chmod +x /opt/ndi-bridge/ndi-bridge
+
+# Remount as read-only
+sync
+mount -o remount,ro /
+
+# Start service
+echo "Starting ndi-bridge service..."
+systemctl start ndi-bridge
+
+echo "Update complete!"
+echo "Check status: systemctl status ndi-bridge"
+EOFUPDATE
+chmod +x /usr/local/bin/update-ndi-bridge
+
+# System info helper
+cat > /usr/local/bin/ndi-info << 'EOFINFO'
+#!/bin/bash
+echo "=== NDI Bridge System Info ==="
+echo "Hostname: $(hostname)"
+echo "IP Address: $(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1)"
+echo ""
+echo "NDI Configuration:"
+cat /etc/ndi-bridge/config
+echo ""
+echo "Service Status:"
+systemctl status ndi-bridge --no-pager --lines=5
+echo ""
+echo "Binary Version:"
+/opt/ndi-bridge/ndi-bridge --version 2>/dev/null || echo "Version info not available"
+echo ""
+echo "Filesystem Status:"
+mount | grep " / " | grep -q "ro" && echo "Root: read-only (protected)" || echo "Root: read-write (UNSAFE)"
+EOFINFO
+chmod +x /usr/local/bin/ndi-info
+
 # Configure GRUB with 2 second timeout for fast boot
 cat > /etc/default/grub << EOFGRUB
 GRUB_DEFAULT=0
