@@ -101,9 +101,9 @@ mount_filesystems() {
 
 # Install base system
 install_base_system() {
-    log "Installing Ubuntu 22.04 base system (this will take 5-10 minutes)..."
+    log "Installing Ubuntu 24.04 base system (this will take 5-10 minutes)..."
     log "Progress: "
-    debootstrap --arch=amd64 jammy /mnt/usb http://archive.ubuntu.com/ubuntu/ 2>&1 | \
+    debootstrap --arch=amd64 noble /mnt/usb http://archive.ubuntu.com/ubuntu/ 2>&1 | \
         while IFS= read -r line; do
             echo -n "."
         done
