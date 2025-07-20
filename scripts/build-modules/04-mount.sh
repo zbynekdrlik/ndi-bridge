@@ -7,12 +7,12 @@ mount_filesystems() {
     # Create mount point
     mkdir -p /mnt/usb
     
-    # Mount root partition
-    mount ${USB_DEVICE}2 /mnt/usb
+    # Mount root partition (now partition 3)
+    mount ${USB_DEVICE}3 /mnt/usb
     
-    # Create and mount EFI partition
+    # Create and mount EFI partition (now partition 2)
     mkdir -p /mnt/usb/boot/efi
-    mount ${USB_DEVICE}1 /mnt/usb/boot/efi
+    mount ${USB_DEVICE}2 /mnt/usb/boot/efi
     
     log "Filesystems mounted"
 }

@@ -14,12 +14,16 @@ partition_usb() {
     # Create GPT partition table
     parted -s $USB_DEVICE mklabel gpt
     
-    # Create EFI partition (512MB)
-    parted -s $USB_DEVICE mkpart primary fat32 1MiB 513MiB
-    parted -s $USB_DEVICE set 1 esp on
+    # Create BIOS boot partition (1MB) for legacy BIOS with GPT
+    parted -s $USB_DEVICE mkpart primary 1MiB 2MiB
+    parted -s $USB_DEVICE set 1 bios_grub on
+    
+    # Create EFI partition (512MB) for UEFI
+    parted -s $USB_DEVICE mkpart primary fat32 2MiB 514MiB
+    parted -s $USB_DEVICE set 2 esp on
     
     # Create root partition (rest of space)
-    parted -s $USB_DEVICE mkpart primary ext4 513MiB 100%
+    parted -s $USB_DEVICE mkpart primary ext4 514MiB 100%
     
     # Wait for partitions to appear
     sleep 2
@@ -28,8 +32,9 @@ partition_usb() {
     
     # Format partitions
     log "Formatting partitions..."
-    mkfs.fat -F32 ${USB_DEVICE}1
-    mkfs.ext4 -F ${USB_DEVICE}2
+    # No need to format BIOS boot partition
+    mkfs.fat -F32 ${USB_DEVICE}2  # EFI partition
+    mkfs.ext4 -F ${USB_DEVICE}3   # Root partition
     
     log "Partitioning complete"
 }

@@ -5,6 +5,109 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.5] - 2025-07-20
+
+### Added
+- **USB Hot-plug Recovery**: Automatic recovery when USB capture devices disconnect/reconnect
+  - Added `has_error_` flag clearing in V4L2 capture restart
+  - 100ms USB stabilization delay for reliable reconnection
+  - Frame monitoring detects stalled capture (5-second timeout)
+  - Automatic service restart on USB disconnection
+- **Bootable USB Build System v1.2.3**:
+  - Modular build architecture with 13 separate modules
+  - Helper scripts for system management
+  - TTY auto-refresh for IP display
+  - Network monitoring tools included
+  - 0-second GRUB timeout for instant boot
+  - Power button disabled for always-on operation
+
+### Changed
+- **Password**: Default root password changed from "NewLevel123!" to "newlevel"
+- **Build Script Structure**: Refactored monolithic script into modular components
+  - `00-variables.sh` through `13-helper-scripts-inline.sh`
+  - Easier maintenance and debugging
+  - Consistent error handling across modules
+
+### Fixed
+- **USB Reconnection**: V4L2 capture now properly recovers after USB disconnect
+  - Error flag wasn't being cleared, preventing restart
+  - Added proper error state reset in `startCapture()`
+- **TTY Console Issues**:
+  - TTY1 now shows logs properly (was permission error)
+  - TTY2 displays correct IP after boot (was empty)
+  - Fixed POSIX compatibility (removed grep -oP)
+  - Created proper bash scripts instead of inline commands
+
+### Technical Details
+- USB recovery tested on real hardware (10.77.8.100-102)
+- Build time reduced to ~4 minutes with proper logging
+- Helper scripts created in chroot for proper permissions
+- Network bridge (br0) combines both ethernet ports
+
+## [2.1.4] - 2025-07-20
+
+### Fixed
+- **Frame Monitoring**: Initial implementation of USB disconnect detection
+  - Added frame counter tracking in AppController
+  - 5-second timeout triggers restart if no frames received
+  - Sets restart_requested_ flag for graceful recovery
+
+### Known Issues
+- USB reconnection not working (fixed in v2.1.5)
+- Error flag prevents restart after disconnect
+
+## [2.1.0] - 2025-07-19
+
+### Added
+- **Bootable USB Appliance**: Complete Linux system for NDI Bridge
+  - Ubuntu 24.04 LTS base system
+  - Auto-starting NDI Bridge service
+  - Network bridge configuration for dual ethernet
+  - TTY1: Live logs display
+  - TTY2: System information and menu
+  - SSH access with password authentication
+  - Helper scripts for management
+- **Build Script Versioning**: Added version tracking to USB build scripts
+  - Started at v1.0.0
+  - Version displayed in build output
+  - Incremented with each significant change
+
+### Changed
+- **Architecture**: Improved error handling across all capture types
+  - Consistent error reporting
+  - Better recovery mechanisms
+  - Improved logging throughout
+
+### Technical Details
+- USB build creates complete bootable system in ~10-15 minutes
+- Supports UEFI and Legacy BIOS boot
+- Read-write filesystem (can be made read-only)
+- Minimal Ubuntu installation (~1GB)
+
+## [2.0.0] - 2025-07-18
+
+### Added
+- **Multi-threaded Architecture**: Complete rewrite for professional deployment
+  - Separate threads for capture, processing, and network operations
+  - Thread-safe communication with proper synchronization
+  - Improved stability for 24/7 operation
+- **Enhanced Error Recovery**:
+  - Automatic restart on capture failures
+  - Device reconnection handling
+  - Comprehensive error reporting
+  - Service-friendly operation
+
+### Changed
+- **Major Version Bump**: Reflects architectural changes
+  - Not backward compatible with 1.x configuration
+  - New threading model
+  - Enhanced reliability features
+
+### Performance
+- Maintained low latency while improving stability
+- Better resource management
+- Suitable for production deployment
+
 ## [1.7.0] - 2025-07-17
 
 ### Added
@@ -572,6 +675,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[2.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v2.1.4...v2.1.5
+[2.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v2.1.0...v2.1.4
+[2.1.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.7.0...v2.0.0
 [1.7.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.7...v1.7.0
 [1.6.7]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.6...v1.6.7
 [1.6.6]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.5...v1.6.6

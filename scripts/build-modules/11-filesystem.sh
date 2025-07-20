@@ -9,15 +9,19 @@ configure_filesystem() {
 # Configure fstab with tmpfs for volatile directories
 cat > /etc/fstab << EOFFSTAB
 # /etc/fstab: static file system information
-UUID=$(blkid -s UUID -o value ${USB_DEVICE}2) / ext4 errors=remount-ro 0 1
-UUID=$(blkid -s UUID -o value ${USB_DEVICE}1) /boot/efi vfat umask=0077 0 1
+UUID=$(blkid -s UUID -o value ${USB_DEVICE}3) / ext4 errors=remount-ro 0 1
+UUID=$(blkid -s UUID -o value ${USB_DEVICE}2) /boot/efi vfat umask=0077 0 1
 tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
 tmpfs /var/log tmpfs defaults,nosuid,nodev,size=100M 0 0
 tmpfs /var/tmp tmpfs defaults,nosuid,nodev 0 0
 EOFFSTAB
 
-# Install and configure GRUB
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu
+# Install GRUB for both UEFI and legacy BIOS
+# Install for UEFI
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --removable || true
+
+# Install for legacy BIOS
+grub-install --target=i386-pc ${USB_DEVICE} || true
 
 # Configure GRUB with custom theme and colors
 cat > /etc/default/grub << EOFGRUB

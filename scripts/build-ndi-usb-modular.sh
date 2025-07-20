@@ -22,6 +22,7 @@ source "$SCRIPT_DIR/build-modules/10-tty-config.sh"
 source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
 source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
 source "$SCRIPT_DIR/build-modules/13-helper-scripts-inline.sh"
+source "$SCRIPT_DIR/build-modules/14-power-resistance.sh"
 
 # Copy NDI files
 copy_ndi_files() {
@@ -54,6 +55,8 @@ assemble_configuration() {
     configure_ndi_service
     configure_ttys
     configure_filesystem
+    configure_power_resistance
+    configure_readonly_root
     create_all_helper_scripts
     
     # Replace the version placeholder
@@ -96,6 +99,10 @@ run_chroot_setup() {
 cleanup() {
     log "Cleaning up..."
     rm -f /mnt/usb/tmp/configure-system.sh
+    
+    # Apply filesystem tuning after chroot
+    tune_filesystem
+    
     sync
 }
 

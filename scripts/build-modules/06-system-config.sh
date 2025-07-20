@@ -19,6 +19,8 @@ apt-get install -y -qq --no-install-recommends \
     linux-headers-generic \
     grub-efi-amd64 \
     grub-efi-amd64-signed \
+    grub-pc \
+    grub-pc-bin \
     shim-signed \
     systemd \
     systemd-sysv \
