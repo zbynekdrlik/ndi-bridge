@@ -4,7 +4,7 @@
 # Power failure resistant, auto-starting NDI video bridge
 # Uses Ubuntu 24.04 LTS for compatibility with NDI-Bridge binary
 #
-# Build Script Version: 1.1.1
+# Build Script Version: 1.1.2
 # Last Updated: 2025-07-20
 
 set -e
@@ -282,7 +282,7 @@ mkdir -p /opt/ndi-bridge /etc/ndi-bridge
 
 # Save build information
 echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > /etc/ndi-bridge/build-date
-echo "1.1.1" > /etc/ndi-bridge/build-script-version
+echo "1.1.2" > /etc/ndi-bridge/build-script-version
 
 # NDI configuration
 cat > /etc/ndi-bridge/config << 'EOFCONFIG'
@@ -381,13 +381,23 @@ useradd -m -s /bin/bash ndi-logs || echo "Note: ndi-logs user already exists"
 # Ensure home directory exists
 mkdir -p /home/ndi-logs
 chown ndi-logs:ndi-logs /home/ndi-logs
-cat > /home/ndi-logs/.profile << 'EOFNDILOGS'
-# Automatically show NDI logs on TTY1
-echo -e "\033[2J\033[H"  # Clear screen
+# Create log viewer script
+cat > /usr/local/bin/ndi-bridge-show-logs << 'EOFLOGS'
+#!/bin/bash
+# Show NDI Bridge logs on TTY1
+clear
 echo "=== NDI Bridge Live Logs ==="
 echo "Switch to TTY2 (Alt+F2) for system menu"
+echo "Press Ctrl+C to stop following logs"
 echo ""
-exec journalctl -u ndi-bridge -f --no-pager
+journalctl -u ndi-bridge -f --no-pager
+EOFLOGS
+chmod +x /usr/local/bin/ndi-bridge-show-logs
+
+# Create simple .profile that calls the log viewer
+cat > /home/ndi-logs/.profile << 'EOFNDILOGS'
+# Show logs on TTY1
+/usr/local/bin/ndi-bridge-show-logs
 EOFNDILOGS
 chown ndi-logs:ndi-logs /home/ndi-logs/.profile
 
@@ -417,8 +427,9 @@ done
 systemctl enable getty@tty1
 systemctl enable getty@tty2
 
-# Create profile script for root (shown on TTY2)
-cat > /root/.profile << EOFPROFILE
+# Create welcome script for TTY2
+cat > /usr/local/bin/ndi-bridge-welcome << 'EOFWELCOME'
+#!/bin/bash
 # Show NDI Bridge welcome screen
 clear
 echo -e "\033[1;32m"
@@ -433,7 +444,7 @@ echo "  Uptime:     \$(uptime -p)"
 echo ""
 echo -e "\033[1;36mSoftware Versions:\033[0m"
 echo "  NDI-Bridge: \$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' || echo 'Unknown')"
-echo "  Build Script: 1.1.1"
+echo "  Build Script: 1.1.2"
 echo ""
 echo -e "\033[1;36mNetwork Configuration:\033[0m"
 echo "  • Both ethernet ports are bridged (br0)"
@@ -457,6 +468,13 @@ echo ""
 echo -e "\033[1;32mNDI Service:\033[0m"
 systemctl is-active ndi-bridge >/dev/null 2>&1 && echo -e "  Status: \033[1;32m●\033[0m Running" || echo -e "  Status: \033[1;31m●\033[0m Stopped"
 echo ""
+EOFWELCOME
+chmod +x /usr/local/bin/ndi-bridge-welcome
+
+# Create simple .profile that calls the welcome script
+cat > /root/.profile << 'EOFPROFILE'
+# Call the welcome script
+/usr/local/bin/ndi-bridge-welcome
 EOFPROFILE
 
 # Unified device name setter
