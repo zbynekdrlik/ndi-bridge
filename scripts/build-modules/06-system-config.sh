@@ -12,18 +12,38 @@ set -e
 # Prevent interactive prompts
 export DEBIAN_FRONTEND=noninteractive
 
+echo "Configuring APT repositories..."
+# Enable universe repository for additional packages
+cat > /etc/apt/sources.list << EOFAPT
+deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
+EOFAPT
+
 echo "Installing essential packages..."
-apt-get update
+apt-get update -qq
+# Fix any held packages before installing
+dpkg --configure -a 2>/dev/null || true
+apt-get install -f -y -qq 2>/dev/null || true
+# Install systemd first to ensure it's available
+apt-get install -y -qq --no-install-recommends systemd systemd-sysv 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+# Install kernel and boot-related packages first
+echo "Installing kernel and bootloader packages..."
 apt-get install -y -qq --no-install-recommends \
     linux-image-generic \
     linux-headers-generic \
-    grub-efi-amd64 \
-    grub-efi-amd64-signed \
-    grub-pc \
-    grub-pc-bin \
-    shim-signed \
-    systemd \
-    systemd-sysv \
+    initramfs-tools \
+    initramfs-tools-core 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+
+# Install GRUB packages (UEFI only, same as obsolete script)
+echo "Installing GRUB packages..."
+apt-get install -y -qq --no-install-recommends \
+    grub-efi-amd64 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+
+# Install remaining system packages
+echo "Installing system packages..."
+apt-get install -y -qq --no-install-recommends \
     udev \
     iproute2 \
     net-tools \
@@ -56,9 +76,15 @@ apt-get install -y -qq --no-install-recommends v4l-utils 2>/dev/null || \
 apt-get install -y -qq --no-install-recommends v4l2-tools 2>/dev/null || \
 apt-get install -y -qq --no-install-recommends v4l2loopback-utils 2>/dev/null || true
 
-# Network monitoring tools - FORCE installation without --no-install-recommends
+# Network monitoring tools
 echo "Installing network monitoring tools..."
-apt-get install -y nload iftop bmon || echo "Warning: Some network tools may not be available"
+# Update package list again to ensure universe packages are available
+apt-get update -qq
+# Install each tool separately to identify which ones fail
+for tool in nload iftop bmon; do
+    echo "  Installing $tool..."
+    apt-get install -y -qq --no-install-recommends $tool 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || echo "  Warning: $tool not available"
+done
 
 # Clean up
 apt-get clean

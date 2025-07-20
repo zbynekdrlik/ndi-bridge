@@ -33,7 +33,7 @@ echo "Starting build..." | tee -a $LOG_FILE
 echo "You can monitor progress with: tail -f $LOG_FILE" | tee -a $LOG_FILE
 echo "" | tee -a $LOG_FILE
 
-# Run the modular build script
+# Run the modular build script (final script is obsolete)
 ./scripts/build-ndi-usb-modular.sh $USB_DEVICE 2>&1 | tee -a $LOG_FILE
 
 # Check exit status

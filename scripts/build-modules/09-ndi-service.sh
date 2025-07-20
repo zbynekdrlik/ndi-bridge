@@ -74,7 +74,11 @@ StandardError=journal
 WantedBy=multi-user.target
 EOFSERVICE
 
-systemctl enable ndi-bridge
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable ndi-bridge
+else
+    update-rc.d ndi-bridge enable 2>/dev/null || true
+fi
 
 # Create systemd service to setup log directories on boot
 cat > /etc/systemd/system/setup-logs.service << EOFLOGSVC
@@ -92,7 +96,11 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOFLOGSVC
 
-systemctl enable setup-logs
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable setup-logs
+else
+    update-rc.d setup-logs enable 2>/dev/null || true
+fi
 
 EOFNDI
 }

@@ -4,24 +4,28 @@
 configure_filesystem() {
     log "Configuring filesystem and bootloader..."
     
-    cat >> /mnt/usb/tmp/configure-system.sh << 'EOFFS'
+    # Get UUIDs BEFORE creating the script
+    local UUID_ROOT=$(blkid -s UUID -o value ${USB_DEVICE}2)
+    local UUID_EFI=$(blkid -s UUID -o value ${USB_DEVICE}1)
+    
+    cat >> /mnt/usb/tmp/configure-system.sh << EOFFS
 
 # Configure fstab with tmpfs for volatile directories
 cat > /etc/fstab << EOFFSTAB
 # /etc/fstab: static file system information
-UUID=$(blkid -s UUID -o value ${USB_DEVICE}3) / ext4 errors=remount-ro 0 1
-UUID=$(blkid -s UUID -o value ${USB_DEVICE}2) /boot/efi vfat umask=0077 0 1
+UUID=$UUID_ROOT / ext4 errors=remount-ro 0 1
+UUID=$UUID_EFI /boot/efi vfat umask=0077 0 1
 tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
 tmpfs /var/log tmpfs defaults,nosuid,nodev,size=100M 0 0
 tmpfs /var/tmp tmpfs defaults,nosuid,nodev 0 0
 EOFFSTAB
 
 # Install GRUB for both UEFI and legacy BIOS
-# Install for UEFI
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu --removable || true
+echo "Installing GRUB bootloader..."
 
-# Install for legacy BIOS
-grub-install --target=i386-pc ${USB_DEVICE} || true
+# Install GRUB (UEFI only, matching obsolete script)
+echo "Installing GRUB..."
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=NDIBRIDGE --removable 2>&1 | head -50
 
 # Configure GRUB with custom theme and colors
 cat > /etc/default/grub << EOFGRUB
@@ -43,7 +47,12 @@ set menu_color_normal=white/black
 set menu_color_highlight=black/green
 EOFGRUBCUSTOM
 
-update-grub
+echo "Updating GRUB configuration..."
+update-grub 2>&1 | head -20
+
+# Update initramfs for all kernels
+echo "Updating initramfs..."
+update-initramfs -u -k all 2>&1 | head -20
 
 # Configure systemd for read-only root (prepare for future)
 cat > /etc/systemd/system/remount-rw.service << EOFREMOUNT

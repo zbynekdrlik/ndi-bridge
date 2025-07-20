@@ -58,7 +58,11 @@ ROOT_UUID=\$(blkid -s UUID -o value ${USB_DEVICE}3)
 sed -i "s|UUID=.* / ext4 .*|UUID=\$ROOT_UUID / ext4 ro,noatime,errors=remount-ro 0 1|" /etc/fstab
 
 # Enable the remount service we created earlier (it was commented out)
-systemctl enable remount-rw.service 2>/dev/null || true
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable remount-rw.service 2>/dev/null || true
+else
+    update-rc.d remount-rw enable 2>/dev/null || true
+fi
 
 EOFREADONLY
 }

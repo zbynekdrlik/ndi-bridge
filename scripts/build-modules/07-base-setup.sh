@@ -36,7 +36,11 @@ if [ -f /etc/ssh/sshd_config ]; then
     sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
     sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
     sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
-    systemctl enable ssh
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl enable ssh
+    else
+        update-rc.d ssh enable 2>/dev/null || true
+    fi
 fi
 
 EOFBASE

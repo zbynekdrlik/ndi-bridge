@@ -43,11 +43,18 @@ RouteMetric=10
 UseDomains=yes
 EOFBR0
 
-systemctl enable systemd-networkd
-systemctl enable systemd-resolved
-
-# Enable Avahi for NDI discovery
-systemctl enable avahi-daemon 2>/dev/null || true
+# Enable services (use different methods based on what's available)
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable systemd-networkd 2>/dev/null || true
+    systemctl enable systemd-resolved 2>/dev/null || true
+    # Enable Avahi for NDI discovery
+    systemctl enable avahi-daemon 2>/dev/null || true
+else
+    # Use update-rc.d as fallback for sysvinit
+    update-rc.d systemd-networkd enable 2>/dev/null || true
+    update-rc.d systemd-resolved enable 2>/dev/null || true
+    update-rc.d avahi-daemon enable 2>/dev/null || true
+fi
 
 # Configure Avahi to work on our bridge
 mkdir -p /etc/avahi
