@@ -1,0 +1,30 @@
+#!/bin/bash
+# Show network bridge status
+
+echo "Network Bridge Status"
+echo "===================="
+echo ""
+
+# Bridge status
+echo "Bridge Interface (br0):"
+ip -s link show br0
+echo ""
+
+# Bridge members
+echo "Bridge Members:"
+bridge link show
+echo ""
+
+# IP configuration
+echo "IP Configuration:"
+ip addr show br0
+echo ""
+
+# Routing table
+echo "Routing Table:"
+ip route
+echo ""
+
+# Connection status
+echo "Active Connections:"
+ss -tuln | grep -E "^(tcp|udp)" | head -20
