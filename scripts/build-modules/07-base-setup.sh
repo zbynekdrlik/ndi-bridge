@@ -14,7 +14,7 @@ cat > /etc/hosts << EOFHOSTS
 EOFHOSTS
 
 # Set root password
-echo "root:NewLevel123!" | chpasswd
+echo "root:${ROOT_PASSWORD}" | chpasswd
 
 # Disable power button shutdown
 mkdir -p /etc/systemd/logind.conf.d/

@@ -3,7 +3,7 @@
 # This module defines all global variables used throughout the build process
 
 # Build Script Version
-BUILD_SCRIPT_VERSION="1.2.2"
+BUILD_SCRIPT_VERSION="1.2.3"
 BUILD_SCRIPT_DATE="2025-07-20"
 
 # Configuration
@@ -22,7 +22,7 @@ UBUNTU_VERSION="noble"  # 24.04 LTS
 UBUNTU_ARCH="amd64"
 
 # Default credentials
-ROOT_PASSWORD="NewLevel123!"
+ROOT_PASSWORD="newlevel"
 
 # Network configuration
 DEFAULT_HOSTNAME="ndi-bridge"

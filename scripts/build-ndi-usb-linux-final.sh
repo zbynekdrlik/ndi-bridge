@@ -192,7 +192,7 @@ cat > /etc/hosts << EOFHOSTS
 EOFHOSTS
 
 # Set root password
-echo "root:NewLevel123!" | chpasswd
+echo "root:newlevel" | chpasswd
 
 # Disable power button shutdown
 mkdir -p /etc/systemd/logind.conf.d/
@@ -1011,7 +1011,7 @@ main() {
     unmount_all
     
     log "Build complete! You can now boot from the USB drive."
-    log "Default credentials: root / NewLevel123!"
+    log "Default credentials: root / newlevel"
     log ""
     log "The system will:"
     log "  - Boot automatically"
