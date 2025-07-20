@@ -149,6 +149,10 @@ bool V4L2Capture::startCapture(const std::string& device_name) {
     // Reset statistics
     stats_.reset();
     
+    // Clear any previous errors
+    has_error_ = false;
+    last_error_.clear();
+    
     // ALWAYS start EXTREME capture thread
     should_stop_ = false;
     capturing_ = true;
@@ -239,6 +243,9 @@ bool V4L2Capture::initializeDevice(const std::string& device_path) {
         setError("Failed to open device " + device_path + ": " + strerror(errno));
         return false;
     }
+    
+    // Small delay to ensure USB device is fully ready after reconnection
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     
     Logger::info("V4L2Capture: Opened device: " + device_path);
     return true;

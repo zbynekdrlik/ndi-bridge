@@ -3,6 +3,9 @@
 # Creates a complete bootable USB Linux system with NDI-Bridge
 # Power failure resistant, auto-starting NDI video bridge
 # Uses Ubuntu 24.04 LTS for compatibility with NDI-Bridge binary
+#
+# Build Script Version: 1.0.0
+# Last Updated: 2025-07-20
 
 set -e
 
@@ -277,6 +280,10 @@ EOFAVAHI
 # Create NDI directories
 mkdir -p /opt/ndi-bridge /etc/ndi-bridge
 
+# Save build information
+echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > /etc/ndi-bridge/build-date
+echo "1.0.0" > /etc/ndi-bridge/build-script-version
+
 # NDI configuration
 cat > /etc/ndi-bridge/config << 'EOFCONFIG'
 DEVICE="/dev/video0"
@@ -423,6 +430,10 @@ echo -e "\033[1;36mSystem Information:\033[0m"
 echo "  Hostname:   \$(hostname)"
 echo "  IP Address: \$(timeout 5 sh -c 'while ! ip -4 addr show dev br0 2>/dev/null | grep -q inet; do sleep 0.5; done; ip -4 addr show dev br0 2>/dev/null | grep -oP \"(?<=inet\\s)\\d+(\\.\\d+){3}\"' || echo 'Waiting for DHCP...')"
 echo "  Uptime:     \$(uptime -p)"
+echo ""
+echo -e "\033[1;36mSoftware Versions:\033[0m"
+echo "  NDI-Bridge: \$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' || echo 'Unknown')"
+echo "  Build Script: 1.0.0"
 echo ""
 echo -e "\033[1;36mNetwork Configuration:\033[0m"
 echo "  • Both ethernet ports are bridged (br0)"
@@ -681,7 +692,9 @@ echo ""
 echo "Service Status:"
 systemctl status ndi-bridge --no-pager --lines=5 2>/dev/null || echo "Service not available"
 echo ""
-echo "Binary Version: 2.1.3"
+echo "NDI-Bridge Binary Version: $(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo 'Unknown')"
+echo "Build Script Version: 1.0.0"
+echo "Build Date: $(cat /etc/ndi-bridge/build-date 2>/dev/null || echo 'Unknown')"
 echo ""
 echo "Filesystem Status:"
 mount | grep " / " | grep -q "ro" && echo "Root: read-only (protected)" || echo "Root: read-write (UNSAFE)"
