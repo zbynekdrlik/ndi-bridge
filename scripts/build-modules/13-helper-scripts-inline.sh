@@ -22,7 +22,12 @@ echo "╚═══════════════════════�
 echo -e "\033[0m"
 echo -e "\033[1;36mSystem Information:\033[0m"
 echo "  Hostname:   $(hostname)"
-echo "  IP Address: $(ip -4 addr show dev br0 2>/dev/null | awk '/inet/ {print $2}' | cut -d/ -f1 | head -1 || echo 'Waiting for DHCP...')"
+IP_ADDR=$(ip -4 addr show dev br0 2>/dev/null | awk '/inet/ {print $2}' | cut -d/ -f1 | head -1)
+if [ -z "$IP_ADDR" ]; then
+    echo -e "  IP Address: \033[1;33mWaiting for DHCP...\033[0m"
+else
+    echo "  IP Address: $IP_ADDR"
+fi
 echo "  Uptime:     $(uptime -p)"
 echo ""
 echo -e "\033[1;36mSoftware Versions:\033[0m"

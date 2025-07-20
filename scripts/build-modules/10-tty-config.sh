@@ -63,10 +63,19 @@ done
 # Enable TTY2 only (TTY1 uses ndi-logs service)
 systemctl enable getty@tty2
 
-# Create simple .profile that calls the welcome script
+# Create .profile that shows welcome and refreshes every 5 seconds
 cat > /root/.profile << 'EOFPROFILE'
-# Call the welcome script
-/usr/local/bin/ndi-bridge-welcome
+# Show welcome screen with auto-refresh
+while true; do
+    /usr/local/bin/ndi-bridge-welcome
+    # Wait for key press or timeout after 5 seconds
+    read -t 5 -n 1 -s -r -p "" key
+    if [[ $? -eq 0 ]]; then
+        # Key was pressed, exit loop and give shell
+        break
+    fi
+    # No key pressed, refresh screen
+done
 EOFPROFILE
 
 # Install helper scripts inside chroot
@@ -97,7 +106,12 @@ echo "╚═══════════════════════�
 echo -e "\033[0m"
 echo -e "\033[1;36mSystem Information:\033[0m"
 echo "  Hostname:   \$(hostname)"
-echo "  IP Address: \$(ip -4 addr show dev br0 2>/dev/null | awk '/inet/ {print \$2}' | cut -d/ -f1 | head -1 || echo 'Waiting for DHCP...')"
+IP_ADDR=\$(ip -4 addr show dev br0 2>/dev/null | awk '/inet/ {print \$2}' | cut -d/ -f1 | head -1)
+if [ -z "\$IP_ADDR" ]; then
+    echo -e "  IP Address: \033[1;33mWaiting for DHCP...\033[0m (auto-refresh)"
+else
+    echo "  IP Address: \$IP_ADDR"
+fi
 echo "  Uptime:     \$(uptime -p)"
 echo ""
 echo -e "\033[1;36mSoftware Versions:\033[0m"
@@ -126,6 +140,7 @@ echo ""
 echo -e "\033[1;32mNDI Service:\033[0m"
 systemctl is-active ndi-bridge >/dev/null 2>&1 && echo -e "  Status: \033[1;32m●\033[0m Running" || echo -e "  Status: \033[1;31m●\033[0m Stopped"
 echo ""
+echo -e "\033[0;90mPress any key for shell prompt (auto-refresh every 5s)\033[0m"
 EOFWELCOME
 chmod +x /usr/local/bin/ndi-bridge-welcome
 
