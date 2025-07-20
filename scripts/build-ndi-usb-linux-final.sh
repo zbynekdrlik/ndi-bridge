@@ -4,7 +4,7 @@
 # Power failure resistant, auto-starting NDI video bridge
 # Uses Ubuntu 24.04 LTS for compatibility with NDI-Bridge binary
 #
-# Build Script Version: 1.0.0
+# Build Script Version: 1.1.1
 # Last Updated: 2025-07-20
 
 set -e
@@ -282,7 +282,7 @@ mkdir -p /opt/ndi-bridge /etc/ndi-bridge
 
 # Save build information
 echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > /etc/ndi-bridge/build-date
-echo "1.0.0" > /etc/ndi-bridge/build-script-version
+echo "1.1.1" > /etc/ndi-bridge/build-script-version
 
 # NDI configuration
 cat > /etc/ndi-bridge/config << 'EOFCONFIG'
@@ -428,12 +428,12 @@ echo "╚═══════════════════════�
 echo -e "\033[0m"
 echo -e "\033[1;36mSystem Information:\033[0m"
 echo "  Hostname:   \$(hostname)"
-echo "  IP Address: \$(timeout 5 sh -c 'while ! ip -4 addr show dev br0 2>/dev/null | grep -q inet; do sleep 0.5; done; ip -4 addr show dev br0 2>/dev/null | grep -oP \"(?<=inet\\s)\\d+(\\.\\d+){3}\"' || echo 'Waiting for DHCP...')"
+echo "  IP Address: \$(ip -4 addr show dev br0 2>/dev/null | grep inet | awk '{print \$2}' | cut -d/ -f1 || echo 'Waiting for DHCP...')"
 echo "  Uptime:     \$(uptime -p)"
 echo ""
 echo -e "\033[1;36mSoftware Versions:\033[0m"
 echo "  NDI-Bridge: \$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' || echo 'Unknown')"
-echo "  Build Script: 1.0.0"
+echo "  Build Script: 1.1.1"
 echo ""
 echo -e "\033[1;36mNetwork Configuration:\033[0m"
 echo "  • Both ethernet ports are bridged (br0)"
@@ -684,7 +684,7 @@ cat > /usr/local/bin/ndi-bridge-info << 'EOFINFO'
 #!/bin/bash
 echo "=== NDI Bridge System Info ==="
 echo "Hostname: $(hostname)"
-echo "IP Address: $(ip -4 addr show dev br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' || ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v 127.0.0.1 | head -1 || echo 'No IP yet')"
+echo "IP Address: $(ip -4 addr show dev br0 2>/dev/null | grep inet | awk '{print $2}' | cut -d/ -f1 || ip -4 addr show | grep inet | grep -v 127.0.0.1 | head -1 | awk '{print $2}' | cut -d/ -f1 || echo 'No IP yet')"
 echo ""
 echo "NDI Configuration:"
 cat /etc/ndi-bridge/config
@@ -953,12 +953,9 @@ main() {
     
     check_prerequisites
     
-    # Confirm with user
+    # Warning about data erasure
     warn "This will ERASE ALL DATA on $USB_DEVICE"
-    read -p "Are you sure you want to continue? (yes/no): " confirm
-    if [ "$confirm" != "yes" ]; then
-        error "Aborted by user"
-    fi
+    log "Proceeding with USB creation..."
     
     partition_usb
     mount_filesystems
