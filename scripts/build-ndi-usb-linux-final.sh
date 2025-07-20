@@ -4,7 +4,7 @@
 # Power failure resistant, auto-starting NDI video bridge
 # Uses Ubuntu 24.04 LTS for compatibility with NDI-Bridge binary
 #
-# Build Script Version: 1.1.2
+# Build Script Version: 1.1.3
 # Last Updated: 2025-07-20
 
 set -e
@@ -194,6 +194,21 @@ EOFHOSTS
 # Set root password
 echo "root:NewLevel123!" | chpasswd
 
+# Disable power button shutdown
+mkdir -p /etc/systemd/logind.conf.d/
+cat > /etc/systemd/logind.conf.d/00-disable-power-key.conf << 'EOFPOWERKEY'
+[Login]
+HandlePowerKey=ignore
+HandlePowerKeyLongPress=ignore
+HandleSuspendKey=ignore
+HandleHibernateKey=ignore
+HandleLidSwitch=ignore
+HandleLidSwitchExternalPower=ignore
+HandleLidSwitchDocked=ignore
+HandleRebootKey=ignore
+HandleRebootKeyLongPress=ignore
+EOFPOWERKEY
+
 # Configure network bridge for both ethernet interfaces
 mkdir -p /etc/systemd/network
 
@@ -282,7 +297,7 @@ mkdir -p /opt/ndi-bridge /etc/ndi-bridge
 
 # Save build information
 echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > /etc/ndi-bridge/build-date
-echo "1.1.2" > /etc/ndi-bridge/build-script-version
+echo "1.1.3" > /etc/ndi-bridge/build-script-version
 
 # NDI configuration
 cat > /etc/ndi-bridge/config << 'EOFCONFIG'
@@ -367,20 +382,37 @@ EOFLOGSVC
 
 systemctl enable setup-logs
 
-# Configure TTY1 to show NDI logs automatically
-mkdir -p /etc/systemd/system/getty@tty1.service.d
-cat > /etc/systemd/system/getty@tty1.service.d/override.conf << EOFGETTY1
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin ndi-logs --noclear %I \$TERM
-Type=idle
-EOFGETTY1
+# Configure TTY1 to show NDI logs automatically using systemd service
+cat > /etc/systemd/system/ndi-logs@.service << 'EOFLOGSERVICE'
+[Unit]
+Description=NDI Logs on %I
+After=systemd-user-sessions.service plymouth-quit-wait.service
+After=rc-local.service
+Before=getty.target
+IgnoreOnIsolate=yes
 
-# Create ndi-logs user that automatically shows logs
-useradd -m -s /bin/bash ndi-logs || echo "Note: ndi-logs user already exists"
-# Ensure home directory exists
-mkdir -p /home/ndi-logs
-chown ndi-logs:ndi-logs /home/ndi-logs
+[Service]
+Type=idle
+ExecStart=/usr/local/bin/ndi-bridge-show-logs
+Restart=always
+User=root
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+UtmpIdentifier=%I
+UtmpMode=login
+
+[Install]
+WantedBy=getty.target
+DefaultInstance=tty1
+EOFLOGSERVICE
+
+# Disable getty on tty1 and enable our service
+systemctl disable getty@tty1
+systemctl enable ndi-logs@tty1
 # Create log viewer script
 cat > /usr/local/bin/ndi-bridge-show-logs << 'EOFLOGS'
 #!/bin/bash
@@ -394,12 +426,7 @@ journalctl -u ndi-bridge -f --no-pager
 EOFLOGS
 chmod +x /usr/local/bin/ndi-bridge-show-logs
 
-# Create simple .profile that calls the log viewer
-cat > /home/ndi-logs/.profile << 'EOFNDILOGS'
-# Show logs on TTY1
-/usr/local/bin/ndi-bridge-show-logs
-EOFNDILOGS
-chown ndi-logs:ndi-logs /home/ndi-logs/.profile
+# No profile needed for systemd service
 
 # Configure TTY2 with welcome screen and auto-login
 mkdir -p /etc/systemd/system/getty@tty2.service.d
@@ -423,8 +450,7 @@ EOFGETTY
     systemctl enable getty@tty${tty}
 done
 
-# Enable TTY1 and TTY2
-systemctl enable getty@tty1
+# Enable TTY2 only (TTY1 uses ndi-logs service)
 systemctl enable getty@tty2
 
 # Create welcome script for TTY2
@@ -439,12 +465,12 @@ echo "╚═══════════════════════�
 echo -e "\033[0m"
 echo -e "\033[1;36mSystem Information:\033[0m"
 echo "  Hostname:   \$(hostname)"
-echo "  IP Address: \$(ip -4 addr show dev br0 2>/dev/null | grep inet | awk '{print \$2}' | cut -d/ -f1 || echo 'Waiting for DHCP...')"
+echo "  IP Address: \$(ip -4 addr show dev br0 2>/dev/null | awk '/inet/ {print \$2}' | cut -d/ -f1 | head -1 || echo 'Waiting for DHCP...')"
 echo "  Uptime:     \$(uptime -p)"
 echo ""
 echo -e "\033[1;36mSoftware Versions:\033[0m"
-echo "  NDI-Bridge: \$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' || echo 'Unknown')"
-echo "  Build Script: 1.1.2"
+echo "  NDI-Bridge: \$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if(\$i ~ /[0-9]+\\.[0-9]+\\.[0-9]+/) print \$i}' || echo 'Unknown')"
+echo "  Build Script: 1.1.3"
 echo ""
 echo -e "\033[1;36mNetwork Configuration:\033[0m"
 echo "  • Both ethernet ports are bridged (br0)"
@@ -804,7 +830,7 @@ chmod +x /usr/local/bin/ndi-bridge-netmon
 # Configure GRUB with custom theme and colors
 cat > /etc/default/grub << EOFGRUB
 GRUB_DEFAULT=0
-GRUB_TIMEOUT=3
+GRUB_TIMEOUT=0
 GRUB_TIMEOUT_STYLE=menu
 GRUB_DISTRIBUTOR="NDI Bridge"
 GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
