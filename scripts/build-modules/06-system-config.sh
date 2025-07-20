@@ -54,9 +54,9 @@ apt-get install -y -qq --no-install-recommends v4l-utils 2>/dev/null || \
 apt-get install -y -qq --no-install-recommends v4l2-tools 2>/dev/null || \
 apt-get install -y -qq --no-install-recommends v4l2loopback-utils 2>/dev/null || true
 
-# Network monitoring tools
+# Network monitoring tools - FORCE installation without --no-install-recommends
 echo "Installing network monitoring tools..."
-apt-get install -y -qq --no-install-recommends nload iftop bmon 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+apt-get install -y nload iftop bmon || echo "Warning: Some network tools may not be available"
 
 # Clean up
 apt-get clean

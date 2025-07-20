@@ -21,6 +21,7 @@ source "$SCRIPT_DIR/build-modules/09-ndi-service.sh"
 source "$SCRIPT_DIR/build-modules/10-tty-config.sh"
 source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
 source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
+source "$SCRIPT_DIR/build-modules/13-helper-scripts-inline.sh"
 
 # Copy NDI files
 copy_ndi_files() {
@@ -53,6 +54,7 @@ assemble_configuration() {
     configure_ndi_service
     configure_ttys
     configure_filesystem
+    create_all_helper_scripts
     
     # Replace the version placeholder
     sed -i "s/BUILD_SCRIPT_VERSION_PLACEHOLDER/$BUILD_SCRIPT_VERSION/" /mnt/usb/tmp/configure-system.sh

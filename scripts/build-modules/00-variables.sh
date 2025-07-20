@@ -3,7 +3,7 @@
 # This module defines all global variables used throughout the build process
 
 # Build Script Version
-BUILD_SCRIPT_VERSION="1.2.0"
+BUILD_SCRIPT_VERSION="1.2.1"
 BUILD_SCRIPT_DATE="2025-07-20"
 
 # Configuration
