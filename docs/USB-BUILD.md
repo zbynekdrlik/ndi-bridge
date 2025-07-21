@@ -52,7 +52,11 @@ cd ..
 2. **Create Bootable USB**
 ```bash
 # Replace /dev/sdX with your USB device (use lsblk to find it)
-sudo ./scripts/build-ndi-usb-modular.sh /dev/sdX
+# This wrapper script provides automatic logging
+sudo ./build-usb-with-log.sh /dev/sdX
+
+# Or run directly without logging:
+# sudo ./scripts/build-ndi-usb-modular.sh /dev/sdX
 ```
 
 3. **Wait for Build**
@@ -165,14 +169,14 @@ NDI_NAME=""            # Empty = use hostname
 
 To build multiple USB drives:
 ```bash
-# First USB
-sudo ./scripts/build-ndi-usb-modular.sh /dev/sdb
-
-# Second USB
-sudo ./scripts/build-ndi-usb-modular.sh /dev/sdc
-
-# With logging
+# First USB (with automatic logging)
 sudo ./build-usb-with-log.sh /dev/sdb
+
+# Second USB (with automatic logging)
+sudo ./build-usb-with-log.sh /dev/sdc
+
+# Each build creates a timestamped log in build-logs/
+# Monitor progress with: tail -f build-logs/usb-build-*.log
 ```
 
 ## Troubleshooting

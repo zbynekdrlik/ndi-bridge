@@ -93,8 +93,8 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc)
 cd ..
 
-# Create bootable USB (requires root)
-sudo ./scripts/build-ndi-usb-modular.sh /dev/sdX  # Replace sdX with your USB device
+# Create bootable USB (requires root, with automatic logging)
+sudo ./build-usb-with-log.sh /dev/sdX  # Replace sdX with your USB device
 ```
 
 This creates a complete NDI Bridge appliance that:
