@@ -5,6 +5,210 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.6] - 2025-07-21
+
+### Added
+- **Modular USB Build System v1.3.1**:
+  - Fixed boot issues - USB now boots properly
+  - Fixed TTY2 welcome screen with proper color display
+  - Added TERM=linux to .profile for console compatibility
+  - Power failure resistance features maintained
+
+### Changed
+- **Build System Architecture**:
+  - Simplified partition layout (removed unnecessary BIOS boot partition)
+  - Fixed UUID capture before chroot execution
+  - Improved systemctl command compatibility in chroot
+  - Better error handling during package installation
+
+### Fixed
+- **Boot Issues**:
+  - Fixed GRUB installation for UEFI-only systems
+  - Fixed partition numbering (EFI on 1, root on 2)
+  - Removed conflicting grub-pc packages
+  - Added missing initramfs-tools package
+- **TTY2 Display**:
+  - Fixed heredoc escaping in build script
+  - Fixed color escape sequences (using printf for compatibility)
+  - Fixed welcome script syntax errors
+  - Auto-refresh now works properly with colors
+
+### Removed
+- Obsolete documentation and build scripts
+- Unnecessary BIOS boot partition
+- Conflicting GRUB packages
+
+## [2.1.5] - 2025-07-20
+
+### Added
+- **USB Hot-plug Recovery**: Automatic recovery when USB capture devices disconnect/reconnect
+  - Added `has_error_` flag clearing in V4L2 capture restart
+  - 100ms USB stabilization delay for reliable reconnection
+  - Frame monitoring detects stalled capture (5-second timeout)
+  - Automatic service restart on USB disconnection
+- **Bootable USB Build System v1.2.3**:
+  - Modular build architecture with 13 separate modules
+  - Helper scripts for system management
+  - TTY auto-refresh for IP display
+  - Network monitoring tools included
+  - 0-second GRUB timeout for instant boot
+  - Power button disabled for always-on operation
+
+### Changed
+- **Password**: Default root password changed from "NewLevel123!" to "newlevel"
+- **Build Script Structure**: Refactored monolithic script into modular components
+  - `00-variables.sh` through `13-helper-scripts-inline.sh`
+  - Easier maintenance and debugging
+  - Consistent error handling across modules
+
+### Fixed
+- **USB Reconnection**: V4L2 capture now properly recovers after USB disconnect
+  - Error flag wasn't being cleared, preventing restart
+  - Added proper error state reset in `startCapture()`
+- **TTY Console Issues**:
+  - TTY1 now shows logs properly (was permission error)
+  - TTY2 displays correct IP after boot (was empty)
+  - Fixed POSIX compatibility (removed grep -oP)
+  - Created proper bash scripts instead of inline commands
+
+### Technical Details
+- USB recovery tested on real hardware (10.77.8.100-102)
+- Build time reduced to ~4 minutes with proper logging
+- Helper scripts created in chroot for proper permissions
+- Network bridge (br0) combines both ethernet ports
+
+## [2.1.4] - 2025-07-20
+
+### Fixed
+- **Frame Monitoring**: Initial implementation of USB disconnect detection
+  - Added frame counter tracking in AppController
+  - 5-second timeout triggers restart if no frames received
+  - Sets restart_requested_ flag for graceful recovery
+
+### Known Issues
+- USB reconnection not working (fixed in v2.1.5)
+- Error flag prevents restart after disconnect
+
+## [2.1.0] - 2025-07-19
+
+### Added
+- **Bootable USB Appliance**: Complete Linux system for NDI Bridge
+  - Ubuntu 24.04 LTS base system
+  - Auto-starting NDI Bridge service
+  - Network bridge configuration for dual ethernet
+  - TTY1: Live logs display
+  - TTY2: System information and menu
+  - SSH access with password authentication
+  - Helper scripts for management
+- **Build Script Versioning**: Added version tracking to USB build scripts
+  - Started at v1.0.0
+  - Version displayed in build output
+  - Incremented with each significant change
+
+### Changed
+- **Architecture**: Improved error handling across all capture types
+  - Consistent error reporting
+  - Better recovery mechanisms
+  - Improved logging throughout
+
+### Technical Details
+- USB build creates complete bootable system in ~10-15 minutes
+- Supports UEFI and Legacy BIOS boot
+- Read-write filesystem (can be made read-only)
+- Minimal Ubuntu installation (~1GB)
+
+## [2.0.0] - 2025-07-18
+
+### Added
+- **Multi-threaded Architecture**: Complete rewrite for professional deployment
+  - Separate threads for capture, processing, and network operations
+  - Thread-safe communication with proper synchronization
+  - Improved stability for 24/7 operation
+- **Enhanced Error Recovery**:
+  - Automatic restart on capture failures
+  - Device reconnection handling
+  - Comprehensive error reporting
+  - Service-friendly operation
+
+### Changed
+- **Major Version Bump**: Reflects architectural changes
+  - Not backward compatible with 1.x configuration
+  - New threading model
+  - Enhanced reliability features
+
+### Performance
+- Maintained low latency while improving stability
+- Better resource management
+- Suitable for production deployment
+
+## [1.7.0] - 2025-07-17
+
+### Added
+- **Linux V4L2 Low Latency Mode**: Aggressive optimizations for minimal latency
+  - New `--low-latency` command-line option
+  - Forces single-threaded operation
+  - Reduces V4L2 buffer count to 4 (minimum stable)
+  - Uses immediate polling (0ms timeout)
+  - Minimizes queue depths to 2/1
+  - Interactive mode prompts for performance options
+- **Single-Threaded V4L2 Option**: Direct capture-to-send pipeline
+  - New `--single-thread` command-line option
+  - Eliminates inter-thread queues and synchronization
+  - Reduces latency by ~2-3 frames
+  - Lower CPU usage for simple capture scenarios
+- **End-to-End Latency Tracking**: Comprehensive latency measurement
+  - Tracks time from frame capture to NDI send
+  - Reports average and maximum E2E latency
+  - Available in both single and multi-threaded modes
+
+### Changed
+- **V4L2 Buffer Management**: Optimized for low latency
+  - Normal mode: 6 buffers (reduced from 10)
+  - Low latency mode: 4 buffers (minimum stable)
+  - Dynamic buffer count based on mode
+- **Queue Depths**: Reduced for faster processing
+  - Capture queue: 3 (reduced from 5), 2 in low latency
+  - Convert queue: 2 (reduced from 5), 1 in low latency
+  - Minimal buffering while maintaining stability
+- **Polling Strategy**: Immediate response
+  - Multi-threaded: 0ms timeout (was 1ms)
+  - Single-threaded: 1ms timeout (was 5ms)
+  - Low latency: 0ms timeout (immediate)
+
+### Fixed
+- **Thread Sleep Removal**: Eliminated all sleep delays
+  - Convert thread: Removed 100μs sleep when queue empty
+  - Send thread: Removed 100μs sleep when queue empty
+  - Now uses tight polling loops for immediate response
+  - Saves ~1-2 frames of latency
+
+### Performance
+- **Target Achievement**: Linux V4L2 now matches Windows performance
+  - Expected: 8 frames latency (down from 12)
+  - Single-threaded mode: Lowest possible latency
+  - Multi-threaded mode: Better for high CPU load scenarios
+  - Zero-copy YUYV path maintained
+
+### Technical Details
+- Tight polling loops eliminate scheduling delays
+- Reduced buffer counts minimize V4L2 driver queuing
+- Single-threaded mode follows Windows Media Foundation design
+- Multi-threaded mode optimized for Intel N100 4-core CPUs
+- All optimizations maintain 60 FPS capture rate
+
+## [1.6.7] - 2025-07-17
+
+### Fixed
+- **Media Foundation Final Optimization**: Achieved 8 frames latency target
+  - Removed remaining 5ms sleep in capture loop
+  - Now uses tight loop when no sample available
+  - Matches reference implementation performance
+
+### Performance
+- Windows latency: 14 → 10 → 8 frames (complete fix)
+- Back to reference implementation performance levels
+- Ready to apply learnings to Linux implementation
+
 ## [1.6.6] - 2025-07-17
 
 ### Fixed
@@ -504,6 +708,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic architecture design
 - Documentation framework
 
+[2.1.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v2.1.4...v2.1.5
+[2.1.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v2.1.0...v2.1.4
+[2.1.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.7.0...v2.0.0
+[1.7.0]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.7...v1.7.0
+[1.6.7]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.6...v1.6.7
 [1.6.6]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.5...v1.6.6
 [1.6.5]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.4...v1.6.5
 [1.6.4]: https://github.com/zbynekdrlik/ndi-bridge/compare/v1.6.3...v1.6.4

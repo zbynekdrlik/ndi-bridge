@@ -1,0 +1,47 @@
+#!/bin/bash
+# Show all available NDI Bridge commands
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║                    NDI Bridge Commands                        ║${NC}"
+echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+echo -e "${CYAN}System Information:${NC}"
+echo -e "  ${YELLOW}ndi-bridge-info${NC}         - Display comprehensive system status"
+echo -e "  ${YELLOW}ndi-bridge-logs${NC}         - View NDI Bridge service logs"
+echo ""
+
+echo -e "${CYAN}Configuration:${NC}"
+echo -e "  ${YELLOW}ndi-bridge-set-name${NC}     - Set device name (hostname & NDI name)"
+echo -e "  ${YELLOW}ndi-bridge-update${NC}       - Update NDI Bridge binary"
+echo ""
+
+echo -e "${CYAN}Network Monitoring:${NC}"
+echo -e "  ${YELLOW}ndi-bridge-netstat${NC}      - Show network bridge status"
+echo -e "  ${YELLOW}ndi-bridge-netmon${NC}       - Monitor network bandwidth in real-time"
+echo ""
+
+echo -e "${CYAN}Service Control:${NC}"
+echo -e "  ${YELLOW}systemctl start ndi-bridge${NC}   - Start NDI Bridge service"
+echo -e "  ${YELLOW}systemctl stop ndi-bridge${NC}    - Stop NDI Bridge service"
+echo -e "  ${YELLOW}systemctl restart ndi-bridge${NC} - Restart NDI Bridge service"
+echo -e "  ${YELLOW}systemctl status ndi-bridge${NC}  - Check service status"
+echo ""
+
+echo -e "${CYAN}Console Switching:${NC}"
+echo "  • TTY1 (Alt+F1) - Live NDI logs"
+echo "  • TTY2 (Alt+F2) - System menu"
+echo "  • TTY3-6 (Alt+F3-F6) - Additional terminals"
+echo ""
+
+echo -e "${CYAN}System Commands:${NC}"
+echo -e "  ${YELLOW}ip addr${NC}                 - Show network interfaces"
+echo -e "  ${YELLOW}htop${NC}                    - System resource monitor"
+echo -e "  ${YELLOW}v4l2-ctl --list-devices${NC} - List video devices"
+echo ""

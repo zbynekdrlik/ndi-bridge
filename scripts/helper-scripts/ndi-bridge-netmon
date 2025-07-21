@@ -1,0 +1,40 @@
+#!/bin/bash
+# Network bandwidth monitor
+
+echo "Network Bandwidth Monitor"
+echo "========================"
+echo ""
+
+# Check which tool is available
+if command -v nload >/dev/null 2>&1; then
+    echo "Starting nload (press 'q' to quit)..."
+    sleep 1
+    nload br0
+elif command -v iftop >/dev/null 2>&1; then
+    echo "Starting iftop (press 'q' to quit)..."
+    echo "Note: Run with sudo if permission denied"
+    sleep 1
+    iftop -i br0
+elif command -v bmon >/dev/null 2>&1; then
+    echo "Starting bmon (press 'q' to quit)..."
+    sleep 1
+    bmon -p br0
+else
+    echo "No network monitoring tool found."
+    echo "Using basic statistics (updates every 2 seconds, Ctrl+C to stop):"
+    echo ""
+    
+    # Basic monitoring loop
+    while true; do
+        RX1=$(cat /sys/class/net/br0/statistics/rx_bytes)
+        TX1=$(cat /sys/class/net/br0/statistics/tx_bytes)
+        sleep 2
+        RX2=$(cat /sys/class/net/br0/statistics/rx_bytes)
+        TX2=$(cat /sys/class/net/br0/statistics/tx_bytes)
+        
+        RX_RATE=$(( ($RX2 - $RX1) / 2 / 1024 ))
+        TX_RATE=$(( ($TX2 - $TX1) / 2 / 1024 ))
+        
+        printf "\r[br0] RX: %6d KB/s   TX: %6d KB/s   " $RX_RATE $TX_RATE
+    done
+fi

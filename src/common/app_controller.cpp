@@ -4,6 +4,10 @@
 #include <sstream>
 #include <iomanip>
 
+#ifdef __linux__
+#include "linux/v4l2/v4l2_capture.h"
+#endif
+
 namespace ndi_bridge {
 
 // Constants
@@ -301,6 +305,18 @@ void AppController::shutdown() {
     // Stop capture first
     if (capture_device_) {
         capture_device_->stopCapture();
+        
+        // v2.1.4: Full device reset on recovery to handle USB reconnection
+        // The capture device must be recreated to get fresh file descriptors
+        if (retry_count_ > 0) {
+            // We're in a recovery scenario - recreate the capture device
+            // For now, we only support V4L2 on Linux
+            #ifdef __linux__
+            capture_device_.reset();
+            capture_device_ = std::make_unique<v4l2::V4L2Capture>();
+            reportStatus("Recreated capture device for recovery");
+            #endif
+        }
     }
     
     // Then shutdown NDI

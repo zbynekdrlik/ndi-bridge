@@ -1,83 +1,70 @@
 # NDI Bridge
 
-[![Version](https://img.shields.io/badge/version-1.6.5-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
+[![Version](https://img.shields.io/badge/version-2.1.6-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capture devices to NDI (Network Device Interface) streams. It enables seamless integration of HDMI capture cards, webcams, and professional video equipment into IP-based video workflows.
 
-## 🚀 Performance Highlights (v1.6.5)
+## 🚀 Latest Updates (v2.1.6)
 
-- **Sub-millisecond latency**: 0.73ms average on Linux, ~40-50ms reduction on DeckLink
-- **Zero-copy pipeline**: 100% direct memory access for UYVY and BGRA formats
-- **Multi-threaded architecture**: Parallel capture, conversion, and transmission
-- **AVX2 optimizations**: Hardware-accelerated format conversion
-- **Lock-free queues**: Minimal thread contention
-- **DeckLink optimization**: Direct callback mode with pre-allocated buffers
+- **Fixed Boot Issues**: USB systems now boot properly with correct partition layout
+- **Fixed TTY2 Display**: Welcome screen shows with proper colors and auto-refresh
+- **USB Hot-plug Recovery**: Automatic recovery when USB capture devices are disconnected/reconnected
+- **Bootable USB Appliance**: Ready-to-deploy Linux system with auto-starting NDI Bridge
+- **Improved Stability**: Enhanced error handling and frame monitoring
+- **Network Bridge**: Dual ethernet port support for daisy-chaining devices
 
 ## Features
 
-### Current Features (v1.6.5)
+### Current Features (v2.1.6)
+- ✅ **USB Hot-plug Recovery** - Automatically restarts when devices disconnect/reconnect
+- ✅ **Bootable USB System** - Complete Linux appliance for dedicated NDI Bridge boxes
 - ✅ **Ultra-low latency pipeline** with multi-threading (Linux)
 - ✅ **Media Foundation** capture support (Windows)
 - ✅ **DeckLink** capture support with extreme latency optimization (Windows)
-  - Direct callback mode bypassing frame queues
-  - True zero-copy for UYVY and BGRA formats
-  - Pre-allocated conversion buffers
-  - 100% zero-copy performance achieved
 - ✅ **V4L2** capture support with zero-copy optimization (Linux)
 - ✅ **AVX2 SIMD Optimizations** for format conversion
 - ✅ **Multi-threaded pipeline** with CPU core affinity (Linux)
 - ✅ **Lock-free frame queues** for thread communication
-- ✅ **Zero-copy format support**:
-  - YUYV/YUY2 with AVX2-accelerated byte swapping
-  - UYVY direct to NDI (no conversion needed)
-  - BGRA direct to NDI (no conversion needed)
-- ✅ **Cross-platform support** (Windows and Linux)
-- ✅ **Interactive device selection** with numbered menu
-- ✅ **Command-line interface** with flexible parameters
-- ✅ **Automatic device reconnection** on disconnect
-- ✅ **Professional streaming features**:
-  - Sub-millisecond latency (0.73ms on Intel N100)
-  - Hardware-accelerated capture
-  - Zero-copy frame handling
-  - Real-time format conversion
-  - Automatic format detection
-- ✅ **Robust error handling** with descriptive messages
-- ✅ **Comprehensive logging** with performance metrics
-- ✅ **V4L2 format support**: YUYV, UYVY, NV12, RGB24, BGR24
-- ✅ **Thread performance monitoring** and statistics
+- ✅ **Zero-copy format support**: YUYV, UYVY, BGRA
+- ✅ **Automatic device reconnection** with frame monitoring
+- ✅ **Network bridge configuration** for dual ethernet ports
+- ✅ **Web-based monitoring** (TTY console interface)
+- ✅ **Remote management** via SSH
 
-### Planned Features
-- 📋 **Audio capture** and synchronization
-- 📋 **Configuration files** for saved setups
-- 📋 **Web UI** for remote control
-- 📋 **Hardware timestamping** for precision sync
-- 📋 **GPU acceleration** for format conversion
-- 📋 **DeckLink support for Linux**
+### USB Appliance Features
+- ✅ Read-only root filesystem (power failure safe)
+- ✅ Automatic NDI Bridge startup
+- ✅ Network bridge for daisy-chaining
+- ✅ TTY1: Live NDI logs display
+- ✅ TTY2: System status and menu
+- ✅ Helper commands for management
+- ✅ 0-second boot time (GRUB timeout)
+- ✅ Power button disabled (always-on operation)
 
 ## Quick Start
 
-### Prerequisites
+### Option 1: Build from Source
 
-#### Windows
+#### Prerequisites
+
+**Windows**
 - Windows 10/11
 - [NDI SDK 5.0+](https://ndi.tv/sdk/) (NDI 6 SDK recommended)
 - Visual Studio 2019+ or MinGW-w64
 - CMake 3.16+
-- [Blackmagic DeckLink SDK](https://www.blackmagicdesign.com/support) (optional, for DeckLink support)
+- [Blackmagic DeckLink SDK](https://www.blackmagicdesign.com/support) (optional)
 
-#### Linux
+**Linux**
 - Ubuntu 20.04+ or equivalent
 - [NDI SDK for Linux](https://ndi.tv/sdk/)
 - GCC 9+ or Clang 10+
 - CMake 3.16+
-- V4L2 development files (usually included in kernel headers)
-- AVX2-capable CPU for optimizations (Intel 4th gen+ or AMD Zen+)
+- V4L2 development files
 
-### Building
+#### Building
 
-#### Windows
 ```bash
 # Clone repository
 git clone https://github.com/zbynekdrlik/ndi-bridge.git
@@ -90,258 +77,202 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 
 # Build
-cmake --build . --config Release
+cmake --build . --config Release   # Windows
+make -j$(nproc)                    # Linux
 ```
 
-#### Linux
-```bash
-# Install dependencies
-sudo apt-get update
-sudo apt-get install build-essential cmake git
+### Option 2: Create Bootable USB Appliance (Recommended)
 
-# Clone repository
-git clone https://github.com/zbynekdrlik/ndi-bridge.git
+```bash
+# On Ubuntu 22.04 or newer
 cd ndi-bridge
 
-# Download and install NDI SDK for Linux
-# Follow instructions from https://ndi.tv/sdk/
-# Set NDI_SDK_DIR environment variable or install to system paths
-
-# Create build directory
+# Build the binary first
 mkdir build && cd build
-
-# Configure (AVX2 enabled by default)
 cmake -DCMAKE_BUILD_TYPE=Release ..
-
-# Build
 make -j$(nproc)
+cd ..
+
+# Create bootable USB (requires root, with automatic logging)
+sudo ./build-usb-with-log.sh /dev/sdX  # Replace sdX with your USB device
 ```
 
-For DeckLink support on Windows, see [DeckLink Setup Guide](docs/decklink-sdk-setup.md).
+This creates a complete NDI Bridge appliance that:
+- Boots directly into NDI Bridge
+- Auto-detects and uses the first video capture device
+- Provides network access via DHCP
+- Shows live logs on console
 
-### Basic Usage
+## Usage
 
-#### Windows
+### Command Line
+
 ```bash
-# Interactive mode (shows device menu)
-ndi-bridge.exe
-
-# Direct mode with device name
-ndi-bridge.exe "USB Video Device" "My NDI Stream"
-
-# Using command-line options
-ndi-bridge.exe -t mf -d "Elgato HD60" -n "Gaming PC"
-
-# DeckLink device
-ndi-bridge.exe -t dl -d "DeckLink SDI" -n "Studio Camera"
-
-# List available devices
-ndi-bridge.exe -t mf --list-devices  # List webcams
-ndi-bridge.exe -t dl --list-devices  # List DeckLink devices
-```
-
-#### Linux
-```bash
-# Interactive mode
+# Interactive device selection
 ./ndi-bridge
 
-# Direct mode with device path
-./ndi-bridge /dev/video0 "My NDI Stream"
+# Direct device specification
+./ndi-bridge /dev/video0 "Camera 1"          # Linux
+ndi-bridge.exe "USB Video Device" "Camera 1" # Windows
 
-# Using named parameters
-./ndi-bridge -t v4l2 -d /dev/video0 -n "USB Camera"
-
-# Using device name search
-./ndi-bridge -d "HD Webcam" -n "Conference Room"
-
-# List available devices
-./ndi-bridge --list-devices
-
-# Run with verbose logging to see performance metrics
-./ndi-bridge -d /dev/video0 -v
+# With parameters
+./ndi-bridge -d /dev/video0 -n "Studio Camera" -v
 ```
+
+### USB Appliance
+
+1. Boot from the USB drive
+2. Connect video capture device
+3. Connect network cable (either ethernet port)
+4. System automatically:
+   - Gets IP via DHCP
+   - Starts streaming as "ndi-bridge" (or custom name)
+   - Shows logs on TTY1 (Alt+F1)
+   - Shows status on TTY2 (Alt+F2)
+
+#### Default Credentials
+- Username: `root`
+- Password: `newlevel`
+
+#### Helper Commands
+- `ndi-bridge-info` - Display system status
+- `ndi-bridge-set-name <name>` - Set device/stream name
+- `ndi-bridge-logs` - View service logs
+- `ndi-bridge-netstat` - Network bridge status
+- `ndi-bridge-help` - Show all commands
 
 ## Command-Line Options
 
-| Option | Description | Default |  
-|--------|-------------|---------|  
-| `-t, --type <type>` | Capture type: Windows: `mf` or `dl`, Linux: `v4l2` | Interactive selection |
-| `-d, --device <n>` | Capture device name or path | Interactive selection |
-| `-n, --ndi-name <n>` | NDI stream name | "NDI Bridge" |
-| `-l, --list-devices` | List available devices and exit | - |
-| `-v, --verbose` | Enable verbose logging with performance metrics | Disabled |
-| `-h, --help` | Show help message | - |
-| `-r, --retry <sec>` | Retry interval in seconds | 5 |
-| `-m, --max-retries <n>` | Maximum retry attempts (-1 = infinite) | -1 |
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-t, --type <type>` | Capture type: `mf`, `dl`, `v4l2` | Auto-detect |
+| `-d, --device <path>` | Device path or name | Interactive |
+| `-n, --ndi-name <name>` | NDI stream name | Hostname |
+| `-v, --verbose` | Enable verbose logging | Disabled |
+| `--version` | Show version | - |
+| `-h, --help` | Show help | - |
 
-## Architecture
+## Network Configuration
 
-### v1.5.0 Multi-threaded Pipeline (Linux)
+The USB appliance creates a network bridge (br0) combining both ethernet ports:
+- Either port can be used for network connection
+- Second port can daisy-chain to another device
+- DHCP client on bridge interface
+- Avahi/mDNS for discovery
 
-```
-┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Capture    │────▶│   Convert    │────▶│    Send     │
-│  Thread     │     │   Thread     │     │   Thread    │
-│  (Core 1)   │     │  (Core 2)    │     │  (Core 3)   │
-└─────────────┘     └──────────────┘     └─────────────┘
-       │                    │                    │
-       └────────────────────┴────────────────────┘
-                            │
-                    ┌───────────────┐
-                    │  Lock-free    │
-                    │    Queues     │
-                    └───────────────┘
-```
+## Building USB Systems
 
-### Key Components
-
-- **Multi-threaded Pipeline** - Parallel processing with CPU affinity
-- **Lock-free Queues** - Zero-contention frame passing
-- **Zero-copy Path** - Direct V4L2 to NDI for YUYV format
-- **AVX2 Converter** - SIMD-optimized format conversion
-- **Thread Pool** - Managed thread lifecycle with monitoring
-- **Capture Interface** - Unified API for all capture devices
-- **App Controller** - Orchestrates capture and streaming
-- **NDI Sender** - Handles NDI protocol and transmission
-- **Logger** - Thread-safe logging with timestamps
-
-## Performance Metrics
-
-### Linux (Intel N100 - v1.5.0)
-- **Average Latency**: 0.73ms (capture to NDI output)
-- **Thread Performance**:
-  - Capture: 1.04ms average
-  - Convert: 0.10ms average (AVX2 optimized)
-  - Send: 0.38ms average
-- **Frame Rate**: 60 FPS sustained
-- **Frame Drops**: < 0.1%
-- **CPU Usage**: < 15% total across 3 cores
-
-### DeckLink (Windows - v1.6.5)
-- **Latency Reduction**: ~40-50ms vs standard implementations
-- **Zero-copy Performance**: 100% for UYVY and BGRA formats
-- **Direct Callback**: 100% (bypasses frame queue entirely)
-- **Frame Rate**: 60 FPS sustained
-- **Frame Drops**: 0%
-
-### Performance Evolution
-| Version | Latency | Improvement |
-|---------|---------|-------------|
-| v1.0.0 | 16.068ms | Baseline |
-| v1.4.0 | 7.621ms | -52% (Zero-copy) |
-| v1.5.0 | 0.730ms | -95.5% (Multi-threaded) |
-| v1.6.0 | ~40-50ms reduction | DeckLink optimization |
-| v1.6.5 | 100% zero-copy | BGRA support added |
-
-## Supported Devices
-
-### Media Foundation (Windows)
-- USB webcams
-- USB HDMI capture cards (Elgato, AVerMedia, etc.)
-- NZXT Signal HD60
-- DirectShow compatible devices
-
-### DeckLink (Windows)
-- All Blackmagic DeckLink cards
-- DeckLink Mini series
-- DeckLink SDI series
-- DeckLink Studio series
-- Automatic format detection
-- No-signal handling
-- Zero-copy for UYVY (YCbCr 422) and BGRA (RGB 444) formats
-
-### V4L2 (Linux)
-- USB webcams
-- USB HDMI capture devices (NZXT, Elgato, etc.)
-- V4L2 compatible devices
-- Format support: YUYV, UYVY, NV12, RGB24, BGR24
-- Zero-copy YUYV direct to NDI
-- Multi-threaded pipeline with sub-millisecond latency
-
-## Optimization Guide
-
-### Linux Performance Tuning
-
-#### CPU Affinity
-The multi-threaded pipeline automatically assigns threads to CPU cores:
-- Core 0: Reserved for system
-- Core 1: Capture thread
-- Core 2: Conversion thread
-- Core 3: Send thread
-
-#### Real-time Priority
-For lowest latency, run with elevated privileges:
+### Quick Build
 ```bash
-sudo ./ndi-bridge -d /dev/video0 -n "Low Latency Stream"
+sudo ./scripts/build-ndi-usb-modular.sh /dev/sdb
 ```
 
-#### CPU Governor
-Set CPU to performance mode:
-```bash
-sudo cpupower frequency-set -g performance
-```
+### Build System Features
+- Modular build scripts in `scripts/build-modules/`
+- Helper scripts in `scripts/helper-scripts/`
+- Version tracking (currently v1.2.3)
+- Comprehensive logging to `build-logs/`
+- ~10-15 minute build time
 
-#### Verify AVX2 Support
-```bash
-lscpu | grep avx2
-```
+### Customization
+Edit variables in `scripts/build-modules/00-variables.sh`:
+- `ROOT_PASSWORD` - Default root password
+- `DEFAULT_HOSTNAME` - Default hostname
+- `UBUNTU_VERSION` - Ubuntu release to use
+
+## Performance
+
+### Linux V4L2 (v2.1.6)
+- **Latency**: < 1ms capture to NDI
+- **Zero-copy**: YUYV/UYVY direct to NDI
+- **CPU Usage**: < 15% on modern CPUs
+- **Reliability**: Automatic USB recovery
+- **USB Boot**: Fixed boot and TTY display issues
+
+### Windows DeckLink (v1.6.5)
+- **Latency**: ~40-50ms reduction vs standard
+- **Zero-copy**: 100% for UYVY/BGRA
+- **Frame drops**: 0%
 
 ## Troubleshooting
 
-### No devices found
-#### Windows
-- Ensure capture device is connected
-- Check Windows Device Manager
-- Try running as Administrator
-- Update device drivers
-- For DeckLink: Install Desktop Video drivers
+### USB Device Not Found
+- Check `ls -la /dev/video*`
+- Verify USB connection
+- Check `dmesg` for errors
+- Try different USB port
 
-#### Linux
-- Check device permissions: `ls -la /dev/video*`
-- Add user to video group: `sudo usermod -a -G video $USER`
-- Verify device with: `v4l2-ctl --list-devices`
-- Check dmesg for USB device detection
+### No Network Connection
+- Check cable connection
+- Verify DHCP server available
+- Check `ip addr show br0`
+- Try static IP if needed
 
-### Performance issues
-- Verify AVX2 support with `lscpu | grep avx2`
-- Check CPU frequency scaling
-- Monitor with `htop` to verify thread distribution
-- Review verbose logs for bottlenecks
-- Ensure Release build configuration
+### Stream Not Visible
+- Verify network connectivity
+- Check firewall settings
+- Ensure same subnet as NDI clients
+- Check stream name in NDI tools
 
-### V4L2 specific issues (Linux)
-- Check supported formats: `v4l2-ctl -d /dev/video0 --list-formats`
-- Verify device capabilities: `v4l2-ctl -d /dev/video0 --all`
-- Test capture: `v4l2-ctl --stream-mmap --stream-count=100`
-- For YUYV devices, verify zero-copy path in logs
+### USB Recovery Issues
+If device doesn't recover after reconnect:
+- Check system logs: `journalctl -u ndi-bridge`
+- Manually restart: `systemctl restart ndi-bridge`
+- Verify USB power management settings
+
+## Development
+
+### Repository Structure
+```
+ndi-bridge/
+├── src/                    # Source code
+│   ├── common/            # Shared components
+│   ├── windows/           # Windows-specific
+│   └── linux/             # Linux-specific
+├── scripts/               # Build and utility scripts
+│   ├── build-modules/     # Modular USB build system
+│   └── helper-scripts/    # System management tools
+├── build/                 # Build output (git-ignored)
+└── docs/                  # Documentation
+```
+
+### Key Components
+- `AppController` - Main application logic
+- `V4L2Capture` - Linux video capture
+- `MediaFoundation` - Windows capture
+- `DeckLinkCapture` - Professional capture
+- `NDISender` - NDI transmission
+
+### Recent Changes (v2.1.6)
+- Fixed USB boot issues - systems now boot properly
+- Fixed TTY2 welcome screen with color support
+- Fixed partition layout and GRUB installation
+- Improved build script with proper heredoc escaping
+- Cleaned up obsolete documentation
+- Maintained USB hot-plug recovery and all v2.1.5 features
 
 ## Contributing
 
-Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-### Development Setup
-
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create feature branch (`git checkout -b feature/name`)
+3. Commit changes (`git commit -am 'Add feature'`)
+4. Push branch (`git push origin feature/name`)
+5. Open Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
-
-## Acknowledgments
-
-- NewTek/Vizrt for the NDI SDK
-- Blackmagic Design for DeckLink SDK
-- V4L2 community for Linux video support
-- Intel for AVX2 technology
-- Contributors and testers
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-For issues, questions, or contributions:
-- Open an issue on [GitHub](https://github.com/zbynekdrlik/ndi-bridge/issues)
-- Check existing issues for solutions
-- Include logs with `-v` flag when reporting issues
+- Open an [issue](https://github.com/zbynekdrlik/ndi-bridge/issues)
+- Include logs with `-v` flag
+- Specify OS and device details
+- Check existing issues first
+
+## Acknowledgments
+
+- NewTek/Vizrt for NDI SDK
+- Blackmagic Design for DeckLink SDK
+- V4L2 community
+- All contributors and testers
