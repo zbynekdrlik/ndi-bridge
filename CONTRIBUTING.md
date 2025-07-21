@@ -12,6 +12,25 @@ We welcome contributions to the NDI Bridge project! This document provides guide
 6. Push to your fork
 7. Create a Pull Request
 
+## Areas for Contribution
+
+### Code Improvements
+- Performance optimizations
+- Bug fixes
+- New capture device support
+- Platform compatibility improvements
+
+### Documentation
+- Improving clarity of existing docs
+- Adding examples and tutorials
+- Translating documentation
+
+### Testing
+- Adding unit tests
+- Integration testing
+- Performance benchmarking
+- Device compatibility testing
+
 ## Development Guidelines
 
 ### Code Style
@@ -30,15 +49,19 @@ We welcome contributions to the NDI Bridge project! This document provides guide
 
 ### Testing
 
-- Add tests for new features
-- Ensure all tests pass before submitting PR
+- Test new features thoroughly
+- Ensure no regressions in existing functionality
 - Test on both Windows and Linux if possible
+- For USB builds, test on real hardware
+- Verify USB hot-plug recovery works
 
 ### Documentation
 
 - Update documentation for any API changes
 - Add comments for complex logic
 - Update README if adding new features
+- Keep CHANGELOG.md updated
+- Document any new build requirements
 
 ## Pull Request Process
 
@@ -54,6 +77,29 @@ We welcome contributions to the NDI Bridge project! This document provides guide
 - Welcome newcomers and help them get started
 - Focus on constructive criticism
 - Assume good intentions
+
+## Building and Testing
+
+### Local Build
+```bash
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+make -j$(nproc)  # Linux
+cmake --build . --config Debug  # Windows
+```
+
+### Running Tests
+```bash
+# Run the binary with test devices
+./ndi-bridge --verbose
+
+# Test USB hot-plug recovery
+# 1. Start NDI Bridge
+# 2. Disconnect USB device
+# 3. Wait for recovery attempt
+# 4. Reconnect device
+# 5. Verify stream resumes
+```
 
 ## Questions?
 

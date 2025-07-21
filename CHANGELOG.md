@@ -5,6 +5,39 @@ All notable changes to the NDI Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.6] - 2025-07-21
+
+### Added
+- **Modular USB Build System v1.3.1**:
+  - Fixed boot issues - USB now boots properly
+  - Fixed TTY2 welcome screen with proper color display
+  - Added TERM=linux to .profile for console compatibility
+  - Power failure resistance features maintained
+
+### Changed
+- **Build System Architecture**:
+  - Simplified partition layout (removed unnecessary BIOS boot partition)
+  - Fixed UUID capture before chroot execution
+  - Improved systemctl command compatibility in chroot
+  - Better error handling during package installation
+
+### Fixed
+- **Boot Issues**:
+  - Fixed GRUB installation for UEFI-only systems
+  - Fixed partition numbering (EFI on 1, root on 2)
+  - Removed conflicting grub-pc packages
+  - Added missing initramfs-tools package
+- **TTY2 Display**:
+  - Fixed heredoc escaping in build script
+  - Fixed color escape sequences (using printf for compatibility)
+  - Fixed welcome script syntax errors
+  - Auto-refresh now works properly with colors
+
+### Removed
+- Obsolete documentation and build scripts
+- Unnecessary BIOS boot partition
+- Conflicting GRUB packages
+
 ## [2.1.5] - 2025-07-20
 
 ### Added

@@ -1,22 +1,23 @@
 # NDI Bridge
 
-[![Version](https://img.shields.io/badge/version-2.1.5-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
+[![Version](https://img.shields.io/badge/version-2.1.6-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capture devices to NDI (Network Device Interface) streams. It enables seamless integration of HDMI capture cards, webcams, and professional video equipment into IP-based video workflows.
 
-## 🚀 Latest Updates (v2.1.5)
+## 🚀 Latest Updates (v2.1.6)
 
+- **Fixed Boot Issues**: USB systems now boot properly with correct partition layout
+- **Fixed TTY2 Display**: Welcome screen shows with proper colors and auto-refresh
 - **USB Hot-plug Recovery**: Automatic recovery when USB capture devices are disconnected/reconnected
 - **Bootable USB Appliance**: Ready-to-deploy Linux system with auto-starting NDI Bridge
 - **Improved Stability**: Enhanced error handling and frame monitoring
 - **Network Bridge**: Dual ethernet port support for daisy-chaining devices
-- **Zero Configuration**: Plug-and-play operation with DHCP and auto-discovery
 
 ## Features
 
-### Current Features (v2.1.5)
+### Current Features (v2.1.6)
 - ✅ **USB Hot-plug Recovery** - Automatically restarts when devices disconnect/reconnect
 - ✅ **Bootable USB System** - Complete Linux appliance for dedicated NDI Bridge boxes
 - ✅ **Ultra-low latency pipeline** with multi-threading (Linux)
@@ -181,11 +182,12 @@ Edit variables in `scripts/build-modules/00-variables.sh`:
 
 ## Performance
 
-### Linux V4L2 (v2.1.5)
+### Linux V4L2 (v2.1.6)
 - **Latency**: < 1ms capture to NDI
 - **Zero-copy**: YUYV/UYVY direct to NDI
 - **CPU Usage**: < 15% on modern CPUs
 - **Reliability**: Automatic USB recovery
+- **USB Boot**: Fixed boot and TTY display issues
 
 ### Windows DeckLink (v1.6.5)
 - **Latency**: ~40-50ms reduction vs standard
@@ -241,12 +243,13 @@ ndi-bridge/
 - `DeckLinkCapture` - Professional capture
 - `NDISender` - NDI transmission
 
-### Recent Changes
-- Added USB hot-plug recovery mechanism
-- Created modular USB build system
-- Implemented frame monitoring for device detection
-- Added network bridge configuration
-- Improved error handling and logging
+### Recent Changes (v2.1.6)
+- Fixed USB boot issues - systems now boot properly
+- Fixed TTY2 welcome screen with color support
+- Fixed partition layout and GRUB installation
+- Improved build script with proper heredoc escaping
+- Cleaned up obsolete documentation
+- Maintained USB hot-plug recovery and all v2.1.5 features
 
 ## Contributing
 

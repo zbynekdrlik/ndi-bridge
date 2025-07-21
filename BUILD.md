@@ -11,6 +11,7 @@ This guide covers building NDI Bridge from source on various platforms.
   - [macOS](#macos-not-supported)
 - [Build Options](#build-options)
 - [Troubleshooting](#troubleshooting)
+- [USB Appliance Build](#usb-appliance-build)
 
 ## Prerequisites
 
@@ -273,8 +274,25 @@ cmake --build . --config Release
 # Use Release/ndi-bridge.exe
 ```
 
+## USB Appliance Build
+
+To create a bootable USB appliance that runs NDI Bridge automatically:
+
+```bash
+# Build the binary first
+mkdir -p build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
+cd ..
+
+# Create bootable USB (requires root)
+sudo ./scripts/build-ndi-usb-modular.sh /dev/sdX  # Replace sdX with your USB device
+```
+
+For detailed USB build instructions, see [USB Build Guide](docs/USB-BUILD.md).
+
 ## Next Steps
 
-- For USB appliance creation, see [USB Build Guide](docs/USB-BUILD.md)
+- For USB appliance details, see [USB Build Guide](docs/USB-BUILD.md)
 - For usage instructions, see [README.md](README.md)
 - For development, see [CONTRIBUTING.md](CONTRIBUTING.md)

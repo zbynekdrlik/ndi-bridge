@@ -81,6 +81,7 @@ The build system is organized into modules in `scripts/build-modules/`:
 - `11-filesystem.sh` - Filesystem and bootloader
 - `12-helper-scripts.sh` - Helper script installation
 - `13-helper-scripts-inline.sh` - Inline helper creation
+- `14-power-resistance.sh` - Power failure resistance features
 
 ### Helper Scripts
 Management scripts in `scripts/helper-scripts/`:
@@ -232,7 +233,9 @@ v4l2-ctl --list-devices
 ## Version History
 
 ### Build Script Versions
-- v1.2.3 - Current modular system
+- v1.3.1 - Fixed boot issues, TTY2 colors, partition layout
+- v1.3.0 - Power failure resistance improvements
+- v1.2.3 - Modular system with helper scripts
 - v1.2.2 - TTY auto-refresh for IP
 - v1.2.1 - Helper script fixes
 - v1.2.0 - Modular refactoring
@@ -243,6 +246,7 @@ v4l2-ctl --list-devices
 - v1.0.0 - Initial USB build
 
 ### NDI Bridge Versions
+- v2.1.6 - Fixed TTY2 display and boot issues
 - v2.1.5 - USB hot-plug recovery
 - v2.1.4 - Frame monitoring
 - v2.1.0 - Error handling improvements
