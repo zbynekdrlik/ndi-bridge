@@ -42,6 +42,7 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 - ✅ Helper commands for management
 - ✅ 0-second boot time (GRUB timeout)
 - ✅ Power button disabled (always-on operation)
+- ✅ High-precision time synchronization (PTP/NTP) for optimal NDI frame sync
 
 ## Quick Start
 
