@@ -23,13 +23,28 @@ partition_usb() {
     
     # Wait for partitions to appear
     sleep 2
-    partprobe $USB_DEVICE
+    partprobe $USB_DEVICE 2>/dev/null || true
+    
+    # Create partition mappings using kpartx (needed for WSL/loop devices)
+    log "Creating partition mappings..."
+    kpartx -av $USB_DEVICE
     sleep 2
+    
+    # Determine partition device names
+    if [[ $USB_DEVICE == /dev/loop* ]]; then
+        # For loop devices, use kpartx mappings
+        PART1="/dev/mapper/$(basename $USB_DEVICE)p1"
+        PART2="/dev/mapper/$(basename $USB_DEVICE)p2"
+    else
+        # For real USB devices, use standard naming
+        PART1="${USB_DEVICE}1"
+        PART2="${USB_DEVICE}2"
+    fi
     
     # Format partitions
     log "Formatting partitions..."
-    mkfs.fat -F32 ${USB_DEVICE}1  # EFI partition
-    mkfs.ext4 -F ${USB_DEVICE}2   # Root partition
+    mkfs.fat -F32 $PART1  # EFI partition
+    mkfs.ext4 -F $PART2   # Root partition
     
     log "Partitioning complete"
 }

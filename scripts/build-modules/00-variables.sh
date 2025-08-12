@@ -9,7 +9,7 @@ BUILD_SCRIPT_DATE="2025-07-20"
 # Configuration
 USB_DEVICE="${1:-/dev/sdb}"
 NDI_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-bridge"
-NDI_SDK_PATH="$(dirname "$0")/../../NDI SDK for Linux"
+NDI_SDK_PATH="$(dirname "$0")/../NDI SDK for Linux"
 
 # Colors for output
 RED='\033[0;31m'

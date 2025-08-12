@@ -20,9 +20,9 @@ source "$SCRIPT_DIR/build-modules/08-network.sh"
 source "$SCRIPT_DIR/build-modules/09-ndi-service.sh"
 source "$SCRIPT_DIR/build-modules/10-tty-config.sh"
 source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
+source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
 source "$SCRIPT_DIR/build-modules/12-time-sync.sh"
-source "$SCRIPT_DIR/build-modules/13-helper-scripts.sh"
-source "$SCRIPT_DIR/build-modules/14-helper-scripts-inline.sh"
+source "$SCRIPT_DIR/build-modules/13-helper-scripts-inline.sh"
 source "$SCRIPT_DIR/build-modules/14-power-resistance.sh"
 
 # Copy NDI files
