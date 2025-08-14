@@ -214,15 +214,8 @@ else
     echo -e "  PTP Client: \\033[1;31m●\\033[0m Stopped"
 fi
 
-# Check PHC2SYS status (not needed with software timestamping)
-# Check if we're using software timestamping
-if pgrep -f "ptp4l.*-S" >/dev/null 2>&1 || grep -q "time_stamping.*software" /etc/linuxptp/ptp4l.conf 2>/dev/null; then
-    echo -e "  PHC2SYS:    \\033[1;90m●\\033[0m Not needed (software timestamps)"
-elif systemctl is-active phc2sys >/dev/null 2>&1; then
-    echo -e "  PHC2SYS:    \\033[1;32m●\\033[0m Running"
-else
-    echo -e "  PHC2SYS:    \\033[1;31m●\\033[0m Stopped"
-fi
+# PHC2SYS not needed for this hardware (software timestamping only)
+# Removed from display as hardware doesn't support hardware timestamping
 
 # Check NTP/Chrony status and get accuracy
 if systemctl is-active chrony >/dev/null 2>&1; then
