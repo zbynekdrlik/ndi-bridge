@@ -197,8 +197,8 @@ if systemctl is-active ptp4l >/dev/null 2>&1; then
         # Get latest offset in nanoseconds and convert to milliseconds
         OFFSET_NS=$(echo "$PTP_LOG" | grep "master offset" | tail -1 | awk '{print $4}')
         if [ -n "$OFFSET_NS" ]; then
-            # Convert nanoseconds to milliseconds with 3 decimal places
-            OFFSET_MS=$(echo "scale=3; $OFFSET_NS / 1000000" | bc 2>/dev/null || echo "0")
+            # Convert nanoseconds to milliseconds using awk (more portable than bc)
+            OFFSET_MS=$(echo "$OFFSET_NS" | awk '{printf "%.3f", $1/1000000}')
             echo -e "  PTP Client: \\033[1;32m●\\033[0m Synchronized (offset: ${OFFSET_MS}ms)"
         else
             echo -e "  PTP Client: \\033[1;32m●\\033[0m Synchronized to PTP master"
@@ -234,9 +234,9 @@ if systemctl is-active chrony >/dev/null 2>&1; then
         NTP_OFFSET_VAL=$(echo "$NTP_TRACKING" | grep "System time" | awk '{print $4}')
         NTP_OFFSET_UNIT=$(echo "$NTP_TRACKING" | grep "System time" | awk '{print $5}')
         if [ -n "$NTP_OFFSET_VAL" ]; then
-            # Convert to milliseconds based on unit
+            # Convert to milliseconds based on unit using awk
             if [[ "$NTP_OFFSET_UNIT" == "seconds" ]]; then
-                NTP_OFFSET_MS=$(echo "scale=3; $NTP_OFFSET_VAL * 1000" | bc 2>/dev/null || echo "0")
+                NTP_OFFSET_MS=$(echo "$NTP_OFFSET_VAL" | awk '{printf "%.3f", $1*1000}')
             else
                 # Already in smaller units, use as is
                 NTP_OFFSET_MS="$NTP_OFFSET_VAL"
@@ -263,9 +263,9 @@ if command -v chronyc >/dev/null 2>&1; then
     TIME_ACCURACY_VAL=$(chronyc tracking 2>/dev/null | grep "RMS offset" | awk '{print $4}' | head -1)
     TIME_ACCURACY_UNIT=$(chronyc tracking 2>/dev/null | grep "RMS offset" | awk '{print $5}' | head -1)
     if [ -n "$TIME_ACCURACY_VAL" ] && [ "$TIME_ACCURACY_VAL" != "0.000000000" ]; then
-        # Convert to milliseconds
+        # Convert to milliseconds using awk
         if [[ "$TIME_ACCURACY_UNIT" == "seconds" ]]; then
-            TIME_ACCURACY_MS=$(echo "scale=3; $TIME_ACCURACY_VAL * 1000" | bc 2>/dev/null || echo "0")
+            TIME_ACCURACY_MS=$(echo "$TIME_ACCURACY_VAL" | awk '{printf "%.3f", $1*1000}')
         else
             TIME_ACCURACY_MS="$TIME_ACCURACY_VAL"
         fi
