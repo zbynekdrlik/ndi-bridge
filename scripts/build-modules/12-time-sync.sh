@@ -192,10 +192,101 @@ logdir /var/log/chrony
 minsources 2
 EOFCHRONY
 
-# Enable chrony
-systemctl enable chrony || echo "Warning: chronyd service not available, trying chronyd"
-systemctl enable chronyd 2>/dev/null || true
+# Install but DO NOT auto-enable chrony - it will be managed by coordination script
+# systemctl enable chrony || echo "Warning: chronyd service not available, trying chronyd"
+# systemctl enable chronyd 2>/dev/null || true
+echo "Chrony installed but not enabled - will be managed by PTP coordination"
 
+# Create PTP/NTP coordination service
+cat > /etc/systemd/system/time-sync-coordinator.service << 'EOFCOORD'
+[Unit]
+Description=PTP/NTP Coordination Service
+After=network-online.target ptp4l.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/time-sync-coordinator
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOFCOORD
+
+# Create coordination script
+cat > /usr/local/bin/time-sync-coordinator << 'EOFCOORDSCRIPT'
+#!/bin/bash
+# PTP/NTP Coordination Service
+# Disables NTP when PTP is synchronized, enables NTP as fallback when PTP fails
+
+LOG_TAG="time-sync-coordinator"
+PTP_SYNC_THRESHOLD=0.001  # 1ms - consider PTP synchronized if offset < 1ms
+CHECK_INTERVAL=60         # Check every 60 seconds
+
+log_msg() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$LOG_TAG] $1"
+    logger -t "$LOG_TAG" "$1"
+}
+
+is_ptp_synchronized() {
+    # Check if ptp4l service is running
+    if ! systemctl is-active ptp4l >/dev/null 2>&1; then
+        return 1
+    fi
+    
+    # Check recent PTP logs for synchronization
+    local ptp_log=$(journalctl -u ptp4l -n 10 --no-pager -o cat 2>/dev/null | grep "master offset" | tail -1)
+    
+    if [[ -z "$ptp_log" ]]; then
+        return 1
+    fi
+    
+    # Extract offset in nanoseconds and check if within threshold
+    local offset_ns=$(echo "$ptp_log" | awk '{print $4}' | tr -d '-')
+    local offset_ms=$(echo "$offset_ns" | awk '{printf "%.6f", $1/1000000}')
+    
+    # Check if offset is within threshold (less than 1ms)
+    if awk -v offset="$offset_ms" -v thresh="$PTP_SYNC_THRESHOLD" 'BEGIN { exit (offset < thresh) ? 0 : 1 }'; then
+        log_msg "PTP synchronized: offset ${offset_ms}ms (< ${PTP_SYNC_THRESHOLD}ms)"
+        return 0
+    else
+        log_msg "PTP offset too high: ${offset_ms}ms (> ${PTP_SYNC_THRESHOLD}ms)"
+        return 1
+    fi
+}
+
+manage_services() {
+    if is_ptp_synchronized; then
+        # PTP is working well - disable NTP
+        if systemctl is-active chrony >/dev/null 2>&1 || systemctl is-active chronyd >/dev/null 2>&1; then
+            log_msg "PTP synchronized - disabling NTP services"
+            systemctl stop chrony 2>/dev/null || true
+            systemctl stop chronyd 2>/dev/null || true
+        fi
+    else
+        # PTP is not synchronized - enable NTP as fallback
+        if ! systemctl is-active chrony >/dev/null 2>&1 && ! systemctl is-active chronyd >/dev/null 2>&1; then
+            log_msg "PTP not synchronized - enabling NTP as fallback"
+            systemctl start chrony 2>/dev/null || systemctl start chronyd 2>/dev/null || true
+        fi
+    fi
+}
+
+log_msg "Starting PTP/NTP coordination service"
+
+while true; do
+    manage_services
+    sleep $CHECK_INTERVAL
+done
+EOFCOORDSCRIPT
+
+chmod +x /usr/local/bin/time-sync-coordinator
+
+# Enable the coordination service
+systemctl enable time-sync-coordinator
+
+echo "Time synchronization coordination configured"
 echo "Time synchronization configuration completed"
 EOFPTP
 

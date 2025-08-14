@@ -186,62 +186,65 @@ echo ""
 
 echo -e "\\033[1;36mTime Synchronization:\\033[0m"
 echo "  Current Time: $(date +'%Y-%m-%d %H:%M:%S %Z')"
-# Check PTP4L status
-if systemctl is-active ptp4l >/dev/null 2>&1; then
-    # Check last 50 lines for current state
-    PTP_LOG=$(journalctl -u ptp4l -n 50 --no-pager -o cat 2>/dev/null)
+
+# Check coordination service status
+if systemctl is-active time-sync-coordinator >/dev/null 2>&1; then
+    echo -e "  Coordinator: \\033[1;32m●\\033[0m Managing PTP/NTP coordination"
     
-    # Check if we're in SLAVE state or actively syncing
-    if echo "$PTP_LOG" | grep -q "port 1.*SLAVE"; then
-        echo -e "  PTP Client: \\033[1;32m●\\033[0m Synchronized to PTP master"
-    elif echo "$PTP_LOG" | grep -q "master offset.*freq.*path delay"; then
-        # Get latest offset in nanoseconds and convert to milliseconds
-        OFFSET_NS=$(echo "$PTP_LOG" | grep "master offset" | tail -1 | awk '{print $4}')
-        if [ -n "$OFFSET_NS" ]; then
-            # Convert nanoseconds to milliseconds using awk (more portable than bc)
+    # Determine which service is currently active
+    PTP_ACTIVE=false
+    NTP_ACTIVE=false
+    
+    if systemctl is-active ptp4l >/dev/null 2>&1; then
+        # Check if PTP is actually synchronized (not just running)
+        PTP_LOG=$(journalctl -u ptp4l -n 10 --no-pager -o cat 2>/dev/null | grep "master offset" | tail -1)
+        if [ -n "$PTP_LOG" ]; then
+            OFFSET_NS=$(echo "$PTP_LOG" | awk '{print $4}' | tr -d '-')
             OFFSET_MS=$(echo "$OFFSET_NS" | awk '{printf "%.3f", $1/1000000}')
-            echo -e "  PTP Client: \\033[1;32m●\\033[0m Synchronized (offset: ${OFFSET_MS}ms)"
-        else
-            echo -e "  PTP Client: \\033[1;32m●\\033[0m Synchronized to PTP master"
-        fi
-    elif echo "$PTP_LOG" | grep -q "LISTENING"; then
-        echo -e "  PTP Client: \\033[1;33m●\\033[0m Listening (no PTP master found)"
-    elif echo "$PTP_LOG" | grep -q "selected local clock.*as best master"; then
-        echo -e "  PTP Client: \\033[1;33m●\\033[0m No master found (acting as local master)"
-    else
-        echo -e "  PTP Client: \\033[1;33m●\\033[0m Running"
-    fi
-else
-    echo -e "  PTP Client: \\033[1;31m●\\033[0m Stopped"
-fi
-
-# PHC2SYS not needed for this hardware (software timestamping only)
-# Removed from display as hardware doesn't support hardware timestamping
-
-# Check NTP/Chrony status and get accuracy
-if systemctl is-active chrony >/dev/null 2>&1; then
-    NTP_TRACKING=$(chronyc tracking 2>/dev/null)
-    if echo "$NTP_TRACKING" | grep -q "Reference ID.*7F7F0101"; then
-        echo -e "  NTP Client: \\033[1;33m●\\033[0m Local time (no internet NTP)"
-    else
-        # Extract offset value and convert to milliseconds
-        NTP_OFFSET_VAL=$(echo "$NTP_TRACKING" | grep "System time" | awk '{print $4}')
-        NTP_OFFSET_UNIT=$(echo "$NTP_TRACKING" | grep "System time" | awk '{print $5}')
-        if [ -n "$NTP_OFFSET_VAL" ]; then
-            # Convert to milliseconds based on unit using awk
-            if [[ "$NTP_OFFSET_UNIT" == "seconds" ]]; then
-                NTP_OFFSET_MS=$(echo "$NTP_OFFSET_VAL" | awk '{printf "%.3f", $1*1000}')
-            else
-                # Already in smaller units, use as is
-                NTP_OFFSET_MS="$NTP_OFFSET_VAL"
+            # Consider synchronized if offset < 1ms
+            if awk -v offset="$OFFSET_MS" 'BEGIN { exit (offset < 1) ? 0 : 1 }'; then
+                PTP_ACTIVE=true
+                echo -e "  Active Mode: \\033[1;32mPTP\\033[0m (High Precision)"
+                echo -e "  PTP Offset: \\033[1;32m${OFFSET_MS}ms\\033[0m"
             fi
-            echo -e "  NTP Client: \\033[1;32m●\\033[0m Synchronized (offset: ${NTP_OFFSET_MS}ms)"
-        else
-            echo -e "  NTP Client: \\033[1;33m●\\033[0m Running (acquiring sync)"
         fi
     fi
+    
+    if [ "$PTP_ACTIVE" = false ]; then
+        if systemctl is-active chrony >/dev/null 2>&1 || systemctl is-active chronyd >/dev/null 2>&1; then
+            NTP_ACTIVE=true
+            echo -e "  Active Mode: \\033[1;33mNTP\\033[0m (Fallback)"
+            # Get NTP accuracy if available
+            NTP_TRACKING=$(chronyc tracking 2>/dev/null)
+            NTP_OFFSET_VAL=$(echo "$NTP_TRACKING" | grep "System time" | awk '{print $4}' 2>/dev/null)
+            if [ -n "$NTP_OFFSET_VAL" ]; then
+                echo -e "  NTP Offset: \\033[1;33m${NTP_OFFSET_VAL}ms\\033[0m"
+            fi
+        else
+            echo -e "  Active Mode: \\033[1;31mNone\\033[0m (No sync available)"
+        fi
+    fi
+    
+    # Show PTP status (whether active or not)
+    if systemctl is-active ptp4l >/dev/null 2>&1; then
+        if [ "$PTP_ACTIVE" = true ]; then
+            echo -e "  PTP Service: \\033[1;32m●\\033[0m Running (Active)"
+        else
+            echo -e "  PTP Service: \\033[1;33m●\\033[0m Running (Standby)"
+        fi
+    else
+        echo -e "  PTP Service: \\033[1;31m●\\033[0m Stopped"
+    fi
+    
 else
-    echo -e "  NTP Client: \\033[1;31m●\\033[0m Stopped"
+    echo -e "  Coordinator: \\033[1;31m●\\033[0m Not running (legacy mode)"
+    # Fall back to old display logic for systems without coordinator
+    if systemctl is-active ptp4l >/dev/null 2>&1; then
+        echo -e "  PTP Client: \\033[1;32m●\\033[0m Running"
+    fi
+    if systemctl is-active chrony >/dev/null 2>&1 || systemctl is-active chronyd >/dev/null 2>&1; then
+        echo -e "  NTP Client: \\033[1;33m●\\033[0m Running (may conflict with PTP)"
+    fi
 fi
 
 # Show system clock synchronization status
