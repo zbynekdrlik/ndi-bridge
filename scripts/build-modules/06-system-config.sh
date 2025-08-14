@@ -122,6 +122,15 @@ systemctl disable NetworkManager 2>/dev/null || true
 # Remove WiFi packages if they were installed
 apt-get remove -y -qq wpasupplicant wireless-tools network-manager 2>/dev/null || true
 
+# Configure timezone to Europe/Prague (CEST)
+echo "Configuring timezone..."
+timedatectl set-timezone Europe/Prague || {
+    # Fallback method if timedatectl fails
+    ln -sf /usr/share/zoneinfo/Europe/Prague /etc/localtime
+    echo "Europe/Prague" > /etc/timezone
+}
+echo "Timezone configured: $(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone)"
+
 # Clean up
 apt-get clean
 rm -rf /var/lib/apt/lists/*
