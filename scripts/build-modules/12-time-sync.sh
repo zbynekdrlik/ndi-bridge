@@ -26,7 +26,7 @@ step_threshold		1
 first_step_threshold	0.001
 time_stamping		software
 
-[eth0]
+[eth1]
 EOFGPTP
 
 # Create master ptp4l configuration (for systems that should act as master)
@@ -41,7 +41,7 @@ serverOnly		1
 priority1		10
 
 # Network interface
-[eth0]
+[eth1]
 EOFMASTER
 
 # Create ptp4l systemd service
