@@ -185,6 +185,7 @@ systemctl is-active ndi-bridge >/dev/null 2>&1 && echo -e "  Status: \\033[1;32m
 echo ""
 
 echo -e "\\033[1;36mTime Synchronization:\\033[0m"
+echo "  Current Time: $(date +'%Y-%m-%d %H:%M:%S %Z')"
 # Check PTP4L status
 if systemctl is-active ptp4l >/dev/null 2>&1; then
     # Check last 50 lines for current state
