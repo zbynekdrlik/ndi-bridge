@@ -24,7 +24,7 @@ echo "Creating disk image: $IMAGE_FILE ($IMAGE_SIZE)" | tee -a $LOG_FILE
 
 # Create sparse file
 echo "Creating $IMAGE_SIZE disk image..." | tee -a $LOG_FILE
-dd if=/dev/zero of="$IMAGE_FILE" bs=1 count=0 seek=$IMAGE_SIZE 2>&1 | tee -a $LOG_FILE
+dd if=/dev/zero of="$IMAGE_FILE" bs=1 count=0 seek=$IMAGE_SIZE >> $LOG_FILE 2>&1
 
 # Create loop device
 echo "Setting up loop device..." | tee -a $LOG_FILE
@@ -41,6 +41,14 @@ cleanup() {
         kpartx -d "$LOOP_DEVICE" 2>/dev/null || true
         losetup -d "$LOOP_DEVICE" 2>/dev/null || true
     fi
+    
+    # Clean up any remaining loop devices associated with our image file
+    if [ -f "$IMAGE_FILE" ]; then
+        for loop in $(losetup -a | grep "$IMAGE_FILE" | cut -d: -f1); do
+            echo "Detaching additional loop device: $loop" | tee -a $LOG_FILE
+            losetup -d "$loop" 2>/dev/null || true
+        done
+    fi
 }
 trap cleanup EXIT
 
@@ -51,7 +59,7 @@ echo "" | tee -a $LOG_FILE
 
 # Run the modular build script with loop device
 # Save all output to log file but only show errors and progress to console
-./scripts/build-ndi-usb-modular.sh $LOOP_DEVICE > $LOG_FILE 2>&1 &
+./scripts/build-ndi-usb-modular.sh $LOOP_DEVICE >> $LOG_FILE 2>&1 &
 BUILD_PID=$!
 
 # Monitor the build and show only important messages

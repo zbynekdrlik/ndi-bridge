@@ -32,8 +32,181 @@ echo "  ndi-bridge-logs      - View logs"
 echo "  ndi-bridge-update    - Update binary"
 echo "  ndi-bridge-netstat   - Network status"
 echo "  ndi-bridge-netmon    - Network monitor"
+echo "  ndi-bridge-timesync  - Time synchronization status"
 EOF
     chmod +x /mnt/usb/usr/local/bin/ndi-bridge-help
+
+    # Create comprehensive time synchronization status script
+    cat > /mnt/usb/usr/local/bin/ndi-bridge-timesync << 'EOFTIMESYNC'
+#!/bin/bash
+# NDI Bridge Time Synchronization Status
+
+clear
+echo -e "\033[1;36m╔═════════════════════════════════════════════════════════════════════════╗\033[0m"
+echo -e "\033[1;36m║                    NDI Bridge Time Synchronization Status               ║\033[0m"
+echo -e "\033[1;36m╚═════════════════════════════════════════════════════════════════════════╝\033[0m"
+echo ""
+
+# System Time Information
+echo -e "\033[1;32mSystem Time Information:\033[0m"
+echo "  Current Time: $(date)"
+echo "  Timezone:     $(timedatectl status | grep 'Time zone' | cut -d: -f2 | xargs)"
+echo "  Uptime:       $(uptime -p)"
+echo ""
+
+# PTP4L Status
+echo -e "\033[1;32mPTP (Precision Time Protocol) Status:\033[0m"
+if systemctl is-active ptp4l >/dev/null 2>&1; then
+    echo -e "  Service Status: \033[1;32mRunning\033[0m"
+    
+    # Get recent PTP logs
+    PTP_LOGS=$(journalctl -u ptp4l -n 10 --no-pager -o cat 2>/dev/null)
+    
+    if echo "$PTP_LOGS" | grep -q "LISTENING"; then
+        echo -e "  PTP State:      \033[1;33mLISTENING\033[0m (client-only mode, no master found)"
+        echo "  Description:    Waiting for PTP master on network"
+    elif echo "$PTP_LOGS" | grep -q "SLAVE"; then
+        echo -e "  PTP State:      \033[1;32mSLAVE\033[0m (synchronized to master)"
+        # Try to extract offset information
+        OFFSET_INFO=$(echo "$PTP_LOGS" | grep "offset" | tail -1)
+        if [ -n "$OFFSET_INFO" ]; then
+            echo "  Last Offset:    $OFFSET_INFO"
+        fi
+    elif echo "$PTP_LOGS" | grep -q "MASTER"; then
+        echo -e "  PTP State:      \033[1;31mMASTER\033[0m (ERROR: should be client-only)"
+        echo "  Description:    Configuration error - acting as master instead of client"
+    else
+        echo -e "  PTP State:      \033[1;33mUNKNOWN\033[0m"
+    fi
+    
+    # Interface information
+    echo "  Interface:      eth0"
+    echo "  Transport:      UDPv4"
+    echo "  Domain:         0"
+    
+    # Show recent log entries
+    echo ""
+    echo "  Recent PTP Log Entries:"
+    echo "$PTP_LOGS" | tail -5 | sed 's/^/    /'
+else
+    echo -e "  Service Status: \033[1;31mStopped\033[0m"
+fi
+
+echo ""
+
+# PHC2SYS Status
+echo -e "\033[1;32mPHC2SYS (Hardware Clock Sync) Status:\033[0m"
+if systemctl is-active phc2sys >/dev/null 2>&1; then
+    echo -e "  Service Status: \033[1;32mRunning\033[0m"
+elif systemctl is-failed phc2sys >/dev/null 2>&1; then
+    echo -e "  Service Status: \033[1;33mNot Required\033[0m (software timestamping mode)"
+    echo "  Description:    PHC2SYS not needed when using software timestamps"
+else
+    echo -e "  Service Status: \033[1;31mStopped\033[0m"
+fi
+
+echo ""
+
+# NTP/Chrony Status
+echo -e "\033[1;32mNTP (Network Time Protocol) Status:\033[0m"
+if systemctl is-active chrony >/dev/null 2>&1; then
+    echo -e "  Service Status: \033[1;32mRunning\033[0m"
+    
+    if command -v chronyc >/dev/null 2>&1; then
+        # Get detailed tracking information
+        TRACKING=$(chronyc tracking 2>/dev/null)
+        
+        if [ -n "$TRACKING" ]; then
+            echo ""
+            echo "  Detailed NTP Tracking:"
+            
+            REF_ID=$(echo "$TRACKING" | grep "Reference ID" | cut -d: -f2 | xargs)
+            STRATUM=$(echo "$TRACKING" | grep "Stratum" | cut -d: -f2 | xargs)
+            SYSTEM_TIME=$(echo "$TRACKING" | grep "System time" | cut -d: -f2 | xargs)
+            LAST_OFFSET=$(echo "$TRACKING" | grep "Last offset" | cut -d: -f2 | xargs)
+            RMS_OFFSET=$(echo "$TRACKING" | grep "RMS offset" | cut -d: -f2 | xargs)
+            FREQUENCY=$(echo "$TRACKING" | grep "Frequency" | cut -d: -f2 | xargs)
+            
+            if [ "$REF_ID" = "7F7F0101 ()" ]; then
+                echo -e "    Reference:      \033[1;33mLocal Clock\033[0m (no external NTP sources)"
+                echo "    Status:         Free-running (no network time sync)"
+            else
+                echo -e "    Reference ID:   \033[1;32m$REF_ID\033[0m"
+                echo "    Status:         Synchronized to external NTP"
+            fi
+            
+            echo "    Stratum:        $STRATUM"
+            echo "    System Offset:  $SYSTEM_TIME"
+            echo "    Last Offset:    $LAST_OFFSET"
+            echo "    RMS Offset:     $RMS_OFFSET"
+            echo "    Frequency:      $FREQUENCY"
+        fi
+        
+        # Show NTP sources
+        SOURCES=$(chronyc sources 2>/dev/null)
+        if [ -n "$SOURCES" ] && ! echo "$SOURCES" | grep -q "^$"; then
+            echo ""
+            echo "  NTP Sources:"
+            echo "$SOURCES" | sed 's/^/    /'
+        fi
+    fi
+else
+    echo -e "  Service Status: \033[1;31mStopped\033[0m"
+fi
+
+echo ""
+
+# System Clock Synchronization
+echo -e "\033[1;32mSystem Clock Synchronization:\033[0m"
+TIMEDATECTL_OUTPUT=$(timedatectl status 2>/dev/null)
+if [ -n "$TIMEDATECTL_OUTPUT" ]; then
+    if echo "$TIMEDATECTL_OUTPUT" | grep -q "System clock synchronized: yes"; then
+        echo -e "  Status: \033[1;32mSynchronized\033[0m"
+    else
+        echo -e "  Status: \033[1;33mNot Synchronized\033[0m"
+    fi
+    
+    NTP_SERVICE=$(echo "$TIMEDATECTL_OUTPUT" | grep "NTP service" | cut -d: -f2 | xargs)
+    echo "  NTP Service: $NTP_SERVICE"
+fi
+
+echo ""
+
+# Time Accuracy Summary
+echo -e "\033[1;32mTime Accuracy Summary:\033[0m"
+if command -v chronyc >/dev/null 2>&1; then
+    RMS_OFFSET=$(chronyc tracking 2>/dev/null | grep "RMS offset" | awk '{print $4}')
+    if [ -n "$RMS_OFFSET" ] && [ "$RMS_OFFSET" != "0.000000000" ]; then
+        # Convert to more readable units
+        if echo "$RMS_OFFSET" | grep -q "e-"; then
+            echo -e "  Estimated Accuracy: \033[1;32m< 1 microsecond\033[0m (excellent)"
+        elif [ "$(echo "$RMS_OFFSET" | cut -d. -f1)" = "0" ]; then
+            # Less than 1 second
+            MS_OFFSET=$(echo "$RMS_OFFSET * 1000" | bc 2>/dev/null | cut -d. -f1)
+            if [ -n "$MS_OFFSET" ] && [ "$MS_OFFSET" -lt 100 ]; then
+                echo -e "  Estimated Accuracy: \033[1;32m±${MS_OFFSET}ms\033[0m (good)"
+            else
+                echo -e "  Estimated Accuracy: \033[1;33m±$RMS_OFFSET seconds\033[0m"
+            fi
+        else
+            echo -e "  Estimated Accuracy: \033[1;33m±$RMS_OFFSET seconds\033[0m"
+        fi
+    else
+        echo "  Estimated Accuracy: Unknown"
+    fi
+else
+    echo "  Accuracy information not available"
+fi
+
+echo ""
+echo -e "\033[1;36mTime Sync Recommendations:\033[0m"
+echo "  • For best accuracy: Connect to network with PTP master"
+echo "  • For good accuracy: Ensure internet access for NTP"
+echo "  • Current mode: PTP client-only with NTP fallback"
+echo ""
+echo "Commands: journalctl -u ptp4l, journalctl -u chrony, chronyc sources"
+EOFTIMESYNC
+    chmod +x /mnt/usb/usr/local/bin/ndi-bridge-timesync
 }
 
 export -f install_helper_scripts create_inline_helper_scripts

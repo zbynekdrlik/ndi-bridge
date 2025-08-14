@@ -41,6 +41,8 @@ IPForward=yes
 [DHCP]
 RouteMetric=10
 UseDomains=yes
+# Use DHCP-provided DNS (systemd-resolved will handle fallback)
+UseDNS=yes
 EOFBR0
 
 # Enable services (use different methods based on what's available)

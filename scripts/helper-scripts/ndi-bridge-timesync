@@ -1,0 +1,99 @@
+#!/bin/bash
+# Display detailed time synchronization status
+
+echo -e "\033[1;36m╔═══════════════════════════════════════════════════════════════╗\033[0m"
+echo -e "\033[1;36m║              Time Synchronization Status                      ║\033[0m"
+echo -e "\033[1;36m╚═══════════════════════════════════════════════════════════════╝\033[0m"
+echo ""
+
+# PTP Status
+echo -e "\033[1;33mPTP (Precision Time Protocol) Status:\033[0m"
+if systemctl is-active ptp4l >/dev/null 2>&1; then
+    # Check last 50 lines for current state
+    PTP_LOG=$(journalctl -u ptp4l -n 50 --no-pager -o cat 2>/dev/null)
+    
+    # Check if we're in SLAVE state or actively syncing
+    if echo "$PTP_LOG" | grep -q "port 1.*SLAVE"; then
+        echo -e "  Service:    \033[1;32m●\033[0m Running"
+        echo -e "  State:      \033[1;32mSLAVE\033[0m (Synchronized to PTP master)"
+    elif echo "$PTP_LOG" | grep -q "master offset.*freq.*path delay"; then
+        echo -e "  Service:    \033[1;32m●\033[0m Running"
+        echo -e "  State:      \033[1;32mSYNCING\033[0m (Actively synchronizing)"
+        # Get latest offset and path delay
+        LATEST=$(echo "$PTP_LOG" | grep "master offset" | tail -1)
+        OFFSET=$(echo "$LATEST" | awk '{print $4}')
+        FREQ=$(echo "$LATEST" | awk '{print $6}')
+        DELAY=$(echo "$LATEST" | awk '{print $9}')
+        echo -e "  Offset:     ${OFFSET} ns"
+        echo -e "  Frequency:  ${FREQ} ppb"
+        echo -e "  Path Delay: ${DELAY} ns"
+    elif echo "$PTP_LOG" | grep -q "LISTENING"; then
+        echo -e "  Service:    \033[1;33m●\033[0m Running"
+        echo -e "  State:      \033[1;33mLISTENING\033[0m (No PTP master found)"
+    elif echo "$PTP_LOG" | grep -q "selected local clock.*as best master"; then
+        echo -e "  Service:    \033[1;33m●\033[0m Running"
+        echo -e "  State:      \033[1;31mLOCAL MASTER\033[0m (No external master found)"
+    else
+        echo -e "  Service:    \033[1;33m●\033[0m Running"
+        echo -e "  State:      Unknown"
+    fi
+    
+    # Show last few PTP messages
+    echo ""
+    echo "  Recent PTP messages:"
+    journalctl -u ptp4l -n 5 --no-pager -o short | sed 's/^/    /'
+else
+    echo -e "  Service:    \033[1;31m●\033[0m Stopped"
+fi
+
+echo ""
+
+# PHC2SYS Status
+echo -e "\033[1;33mPHC2SYS (Hardware Clock Sync) Status:\033[0m"
+if systemctl is-active phc2sys >/dev/null 2>&1; then
+    echo -e "  Service:    \033[1;32m●\033[0m Running"
+    echo "  Recent messages:"
+    journalctl -u phc2sys -n 5 --no-pager -o short | sed 's/^/    /'
+elif systemctl is-failed phc2sys >/dev/null 2>&1; then
+    echo -e "  Service:    \033[1;33m●\033[0m Not needed (software timestamps in use)"
+else
+    echo -e "  Service:    \033[1;31m●\033[0m Stopped"
+fi
+
+echo ""
+
+# NTP/Chrony Status
+echo -e "\033[1;33mNTP (Network Time Protocol) Status:\033[0m"
+if systemctl is-active chrony >/dev/null 2>&1 || systemctl is-active chronyd >/dev/null 2>&1; then
+    echo -e "  Service:    \033[1;32m●\033[0m Running"
+    if command -v chronyc >/dev/null 2>&1; then
+        echo "  Chrony tracking:"
+        chronyc tracking 2>/dev/null | grep -E "Reference ID|System time|Last offset|RMS offset|Frequency|Residual freq|Skew" | sed 's/^/    /'
+        echo ""
+        echo "  Time sources:"
+        chronyc sources 2>/dev/null | head -10 | sed 's/^/    /'
+    fi
+else
+    echo -e "  Service:    \033[1;31m●\033[0m Stopped"
+fi
+
+echo ""
+
+# System Clock Status
+echo -e "\033[1;33mSystem Clock Status:\033[0m"
+timedatectl status 2>/dev/null | grep -E "Local time|Universal time|RTC time|Time zone|System clock synchronized|NTP service" | sed 's/^/  /'
+
+echo ""
+echo -e "\033[1;36m═══════════════════════════════════════════════════════════════\033[0m"
+
+# Configuration files
+echo -e "\033[1;33mConfiguration Files:\033[0m"
+echo "  PTP Config: /etc/linuxptp/gPTP.cfg"
+if [ -f /etc/linuxptp/gPTP.cfg ]; then
+    echo "  PTP Transport: $(grep network_transport /etc/linuxptp/gPTP.cfg | awk '{print $2}')"
+fi
+echo "  Chrony Config: /etc/chrony/chrony.conf"
+
+echo ""
+echo -e "\033[1;36m═══════════════════════════════════════════════════════════════\033[0m"
+echo -e "\033[0;90mPress 'q' to quit, or wait for auto-refresh...\033[0m"

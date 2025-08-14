@@ -86,6 +86,42 @@ for tool in nload iftop bmon; do
     apt-get install -y -qq --no-install-recommends $tool 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || echo "  Warning: $tool not available"
 done
 
+# Disable WiFi completely (NDI Bridge needs Ethernet only)
+echo "Disabling WiFi and wireless modules..."
+# Blacklist iwlwifi and related modules to prevent boot hangs
+cat > /etc/modprobe.d/blacklist-wifi.conf << EOFWIFI
+# Disable all WiFi modules for NDI Bridge appliance
+# This prevents boot hangs with iwlwifi on Intel systems
+blacklist iwlwifi
+blacklist iwldvm
+blacklist iwlmvm
+blacklist mac80211
+blacklist cfg80211
+blacklist rfkill
+blacklist bluetooth
+blacklist btusb
+blacklist ath9k
+blacklist ath9k_common
+blacklist ath9k_hw
+blacklist ath
+blacklist wl
+blacklist b43
+blacklist b43legacy
+blacklist ssb
+blacklist bcm43xx
+blacklist brcm80211
+blacklist brcmfmac
+blacklist brcmsmac
+blacklist tg3
+EOFWIFI
+
+# Also disable WiFi services
+systemctl disable wpa_supplicant 2>/dev/null || true
+systemctl disable NetworkManager 2>/dev/null || true
+
+# Remove WiFi packages if they were installed
+apt-get remove -y -qq wpasupplicant wireless-tools network-manager 2>/dev/null || true
+
 # Clean up
 apt-get clean
 rm -rf /var/lib/apt/lists/*

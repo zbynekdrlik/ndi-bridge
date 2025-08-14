@@ -50,11 +50,18 @@ configure_readonly_root() {
     log "Configuring read-only root filesystem..."
     
     # This needs to be done after chroot, so we add it to the end of configure-system.sh
-    cat >> /mnt/usb/tmp/configure-system.sh << 'EOFREADONLY'
+    # Determine the correct root partition device outside heredoc
+    if [[ $USB_DEVICE == /dev/loop* ]]; then
+        ROOT_PARTITION="/dev/mapper/$(basename $USB_DEVICE)p2"
+    else
+        ROOT_PARTITION="${USB_DEVICE}2"
+    fi
+    
+    cat >> /mnt/usb/tmp/configure-system.sh << EOFREADONLY
 
 # Configure filesystem for read-only operation
 # First update fstab to mount root as read-only
-ROOT_UUID=\$(blkid -s UUID -o value ${USB_DEVICE}3)
+ROOT_UUID=\$(blkid -s UUID -o value $ROOT_PARTITION)
 sed -i "s|UUID=.* / ext4 .*|UUID=\$ROOT_UUID / ext4 ro,noatime,errors=remount-ro 0 1|" /etc/fstab
 
 # Enable the remount service we created earlier (it was commented out)
