@@ -201,8 +201,8 @@ if systemctl is-active time-sync-coordinator >/dev/null 2>&1; then
         if [ -n "$PTP_LOG" ]; then
             OFFSET_NS=$(echo "$PTP_LOG" | awk '{print $4}' | tr -d '-')
             OFFSET_MS=$(echo "$OFFSET_NS" | awk '{printf "%.3f", $1/1000000}')
-            # Consider synchronized if offset < 1ms
-            if awk -v offset="$OFFSET_MS" 'BEGIN { exit (offset < 1) ? 0 : 1 }'; then
+            # Consider synchronized if offset < 100µs (0.1ms)
+            if awk -v offset="$OFFSET_MS" 'BEGIN { exit (offset < 0.1) ? 0 : 1 }'; then
                 PTP_ACTIVE=true
                 echo -e "  Active Mode: \\033[1;32mPTP\\033[0m (High Precision)"
                 echo -e "  PTP Offset: \\033[1;32m${OFFSET_MS}ms\\033[0m"
@@ -213,7 +213,7 @@ if systemctl is-active time-sync-coordinator >/dev/null 2>&1; then
     if [ "$PTP_ACTIVE" = false ]; then
         if systemctl is-active chrony >/dev/null 2>&1 || systemctl is-active chronyd >/dev/null 2>&1; then
             NTP_ACTIVE=true
-            echo -e "  Active Mode: \\033[1;33mNTP\\033[0m (Fallback)"
+            echo -e "  Active Mode: \\033[1;33mNTP\\033[0m (PTP unavailable - using fallback)"
             # Get NTP accuracy if available
             NTP_TRACKING=$(chronyc tracking 2>/dev/null)
             NTP_OFFSET_VAL=$(echo "$NTP_TRACKING" | grep "System time" | awk '{print $4}' 2>/dev/null)
@@ -222,6 +222,21 @@ if systemctl is-active time-sync-coordinator >/dev/null 2>&1; then
             fi
         else
             echo -e "  Active Mode: \\033[1;31mNone\\033[0m (No sync available)"
+        fi
+    fi
+    
+    # Show NTP status with explanation
+    if systemctl is-active chrony >/dev/null 2>&1 || systemctl is-active chronyd >/dev/null 2>&1; then
+        if [ "$PTP_ACTIVE" = true ]; then
+            echo -e "  NTP Service: \\033[1;90m●\\033[0m Stopped (PTP active - avoiding conflict)"
+        else
+            echo -e "  NTP Service: \\033[1;33m●\\033[0m Running (fallback mode)"
+        fi
+    else
+        if [ "$PTP_ACTIVE" = true ]; then
+            echo -e "  NTP Service: \\033[1;90m●\\033[0m Stopped (PTP active - avoiding conflict)"
+        else
+            echo -e "  NTP Service: \\033[1;31m●\\033[0m Stopped (starting fallback...)"
         fi
     fi
     

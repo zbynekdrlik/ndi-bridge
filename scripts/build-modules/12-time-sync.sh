@@ -221,7 +221,7 @@ cat > /usr/local/bin/time-sync-coordinator << 'EOFCOORDSCRIPT'
 # Disables NTP when PTP is synchronized, enables NTP as fallback when PTP fails
 
 LOG_TAG="time-sync-coordinator"
-PTP_SYNC_THRESHOLD=0.001  # 1ms - consider PTP synchronized if offset < 1ms
+PTP_SYNC_THRESHOLD=0.1    # 100µs - consider PTP synchronized if offset < 100µs
 CHECK_INTERVAL=60         # Check every 60 seconds
 
 log_msg() {
