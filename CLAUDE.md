@@ -148,6 +148,32 @@ ndi-bridge.exe "USB Video Device" "Camera 1" # Windows
 - Centralized logging with verbosity levels
 - Version logging and startup information
 
+## Testing and Network Connectivity
+
+### mDNS/Bonjour Testing in WSL
+**⚠️ IMPORTANT: mDNS (*.local) addresses do NOT work in WSL**
+- `ping hostname.local` will fail in WSL due to mDNS resolver limitations
+- **Alternative testing methods for mDNS functionality:**
+  1. Ask the user to test from Windows host: `ping hostname.local`
+  2. Use direct IP address: Get IP with `ip addr show br0` on the NDI Bridge box
+  3. Use `avahi-browse -a -t` on another Linux machine to verify mDNS advertisements
+  4. Check NDI Studio Monitor on Windows to verify NDI device discovery
+  5. Use SSH with IP address instead of mDNS name when testing from WSL
+
+### Network Testing Commands
+```bash
+# From WSL - use IP addresses
+sshpass -p 'newlevel' ssh root@10.77.9.XXX "command"
+
+# Ask user to test from Windows PowerShell/CMD:
+# ping ndi-bridge.local
+# ping shortname.local
+
+# Verify mDNS is working on the box itself:
+ssh root@IP "avahi-browse -a -t | grep -i ndi"
+ssh root@IP "systemctl status avahi-daemon"
+```
+
 ## USB Appliance System
 
 The project includes a complete bootable USB build system that creates a dedicated NDI Bridge appliance:
