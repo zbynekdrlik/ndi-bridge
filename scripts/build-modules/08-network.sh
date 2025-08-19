@@ -70,12 +70,13 @@ allow-interfaces=br0
 deny-interfaces=lo
 ratelimit-interval-usec=1000000
 ratelimit-burst=1000
-publish-a-on-ipv6=no
 
 [wide-area]
 enable-wide-area=yes
 
 [publish]
+publish-aaaa-on-ipv4=no
+publish-a-on-ipv6=no
 publish-addresses=yes
 publish-hinfo=yes
 publish-workstation=no
