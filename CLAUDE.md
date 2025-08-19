@@ -5,13 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Important Build Guidelines
 
 ### Version Management
-- **ALWAYS increment the BUILD_SCRIPT_VERSION** in `scripts/build-modules/00-variables.sh` when making changes to the USB build system
-- The build timestamp is automatically generated and displayed on the console to track when each image was created
-- This helps identify which version of the image is running on deployed devices
+- **⚠️ MANDATORY: Before EVERY `build-image-for-rufus.sh` run, you MUST increment BUILD_SCRIPT_VERSION** in `scripts/build-modules/00-variables.sh`
+- This version appears on the second console (tty2) of the NDI Bridge box, allowing identification of which image version is deployed
+- The build timestamp is automatically generated and displayed alongside the version on the console
+- **Why this matters:** Without incrementing the version, you cannot distinguish between different builds on deployed devices
 - Format: Major.Minor.Patch (e.g., 1.5.0)
   - Major: Breaking changes to the build system
-  - Minor: New features or significant improvements
+  - Minor: New features or significant improvements  
   - Patch: Bug fixes and minor adjustments
+- **The version and build date are shown on tty2 console of the physical NDI Bridge box**
 
 ## Quick Environment Setup
 
@@ -47,13 +49,27 @@ cmake --build . --config Debug  # Windows
 ```
 
 ### USB Appliance Build (Linux/WSL)
-```bash
-# Create bootable USB image for Rufus (WSL-compatible)
-sudo ./build-image-for-rufus.sh
 
-# OR: Direct USB creation (native Linux)
-sudo ./build-usb-with-log.sh /dev/sdX  # Replace sdX with USB device
+**⚠️ CRITICAL: Build Script Output Handling**
+- **NEVER run `build-image-for-rufus.sh` with direct console output** - it causes Claude to crash due to excessive binary dump output
+- **ALWAYS redirect output to a file and monitor the file separately**
+- The script produces large amounts of binary data that must not be displayed directly
+
+```bash
+# CORRECT: Create bootable USB image with output redirection
+sudo ./build-image-for-rufus.sh > build-rufus.log 2>&1 &
+# Monitor progress in separate terminal or with:
+tail -f build-rufus.log | grep -E "(Step|Progress|Error|Warning|Complete)"
+
+# OR: Direct USB creation (native Linux) - also redirect output
+sudo ./build-usb-with-log.sh /dev/sdX > build-usb.log 2>&1  # Replace sdX with USB device
 ```
+
+**Monitoring Build Progress:**
+- Use `tail -f` with grep filters to track specific events
+- Check file size periodically: `ls -lh *.img`
+- Monitor system resources: `htop` or `top` to ensure build is running
+- Expected build time: 10-20 minutes depending on system
 
 ### Build Options
 - `BUILD_TESTS=ON/OFF` - Build unit tests (default: OFF)

@@ -91,21 +91,9 @@ cat > /etc/avahi/services/ndi-bridge-alias.service << EOFALIAS
 </service-group>
 EOFALIAS
 
-# Update NDI service advertisement with actual NDI name
-cat > /etc/avahi/services/ndi-bridge.service << EOFNDISERVICE
-<?xml version="1.0" standalone='no'?>
-<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
-<service-group>
-  <name>${NEW_NAME} (NDI)</name>
-  <service>
-    <type>_ndi._tcp</type>
-    <port>5960</port>
-    <txt-record>name=${NEW_NAME}</txt-record>
-    <txt-record>groups=public</txt-record>
-    <txt-record>model=NDI Bridge</txt-record>
-  </service>
-</service-group>
-EOFNDISERVICE
+# NOTE: NDI service advertisement is handled by the NDI Bridge application itself
+# Remove any old NDI service file that might exist
+rm -f /etc/avahi/services/ndi-bridge.service 2>/dev/null || true
 
 # Update HTTP service advertisement with device name
 cat > /etc/avahi/services/ndi-bridge-http.service << EOFHTTPSERVICE

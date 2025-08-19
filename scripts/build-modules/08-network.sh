@@ -121,21 +121,8 @@ EOFNSS
 # Create Avahi services directory
 mkdir -p /etc/avahi/services
 
-# Create a default NDI service advertisement template
-# This will be updated when the NDI name is set
-cat > /etc/avahi/services/ndi-bridge.service << 'EOFNDISERVICE'
-<?xml version="1.0" standalone='no'?>
-<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
-<service-group>
-  <name>NDI Bridge</name>
-  <service>
-    <type>_ndi._tcp</type>
-    <port>5960</port>
-    <txt-record>name=NDI Bridge</txt-record>
-    <txt-record>groups=public</txt-record>
-  </service>
-</service-group>
-EOFNDISERVICE
+# NOTE: NDI service advertisement is handled by the NDI Bridge application itself
+# We only create the HTTP service advertisement for the web interface
 
 # Create HTTP service advertisement for future web interface
 cat > /etc/avahi/services/ndi-bridge-http.service << 'EOFHTTPSERVICE'
