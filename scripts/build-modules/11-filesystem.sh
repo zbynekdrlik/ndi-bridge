@@ -4,9 +4,20 @@
 configure_filesystem() {
     log "Configuring filesystem and bootloader..."
     
+    # Determine partition device names (same logic as partition script)
+    if [[ $USB_DEVICE == /dev/loop* ]]; then
+        # For loop devices, use kpartx mappings
+        local PART1="/dev/mapper/$(basename $USB_DEVICE)p1"
+        local PART2="/dev/mapper/$(basename $USB_DEVICE)p2"
+    else
+        # For real USB devices, use standard naming
+        local PART1="${USB_DEVICE}1"
+        local PART2="${USB_DEVICE}2"
+    fi
+    
     # Get UUIDs BEFORE creating the script
-    local UUID_ROOT=$(blkid -s UUID -o value ${USB_DEVICE}2)
-    local UUID_EFI=$(blkid -s UUID -o value ${USB_DEVICE}1)
+    local UUID_ROOT=$(blkid -s UUID -o value $PART2)
+    local UUID_EFI=$(blkid -s UUID -o value $PART1)
     
     cat >> /mnt/usb/tmp/configure-system.sh << EOFFS
 
@@ -18,7 +29,12 @@ UUID=$UUID_EFI /boot/efi vfat umask=0077 0 1
 tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
 tmpfs /var/log tmpfs defaults,nosuid,nodev,size=100M 0 0
 tmpfs /var/tmp tmpfs defaults,nosuid,nodev 0 0
+tmpfs /var/lib/systemd tmpfs defaults,nosuid,nodev,size=50M 0 0
 EOFFSTAB
+
+# Create systemd directory structure that will be mounted as tmpfs
+mkdir -p /var/lib/systemd
+chmod 755 /var/lib/systemd
 
 # Install GRUB for both UEFI and legacy BIOS
 echo "Installing GRUB bootloader..."
@@ -33,7 +49,7 @@ GRUB_DEFAULT=0
 GRUB_TIMEOUT=0
 GRUB_TIMEOUT_STYLE=menu
 GRUB_DISTRIBUTOR="NDI Bridge"
-GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX_DEFAULT="modprobe.blacklist=iwlwifi,iwldvm,iwlmvm,mac80211,cfg80211 net.ifnames=0"
 GRUB_CMDLINE_LINUX=""
 GRUB_TERMINAL_OUTPUT="console"
 EOFGRUB

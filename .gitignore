@@ -59,3 +59,20 @@ Thumbs.db
 # Configuration files (local)
 *.conf.local
 ndi-bridge.conf
+
+# NDI SDK and related files
+NDI SDK for Linux/
+ndi-sdk-linux.tar.gz
+Install_NDI_SDK_v6_Linux.sh
+
+# USB images (large binary files)
+*.img
+ndi-bridge*.img
+
+# Downloaded tools
+rufus.exe
+plink.exe
+ndi-tools.exe
+
+# Claude/Cline local files
+.claude/

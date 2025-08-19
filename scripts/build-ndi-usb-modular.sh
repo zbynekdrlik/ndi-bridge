@@ -21,6 +21,7 @@ source "$SCRIPT_DIR/build-modules/09-ndi-service.sh"
 source "$SCRIPT_DIR/build-modules/10-tty-config.sh"
 source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
 source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
+source "$SCRIPT_DIR/build-modules/12-time-sync.sh"
 source "$SCRIPT_DIR/build-modules/13-helper-scripts-inline.sh"
 source "$SCRIPT_DIR/build-modules/14-power-resistance.sh"
 
@@ -52,6 +53,7 @@ assemble_configuration() {
     configure_system
     setup_base_system
     configure_network
+    configure_time_sync
     configure_ndi_service
     configure_ttys
     configure_filesystem

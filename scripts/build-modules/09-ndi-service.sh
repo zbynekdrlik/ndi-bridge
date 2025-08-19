@@ -40,6 +40,33 @@ while [ ! -e "$DEVICE" ]; do
     sleep 2
 done
 
+# Check time synchronization before starting NDI Bridge
+# This ensures optimal frame synchronization quality
+check_time_sync() {
+    # First try PTP sync check
+    if command -v check_clocks &> /dev/null; then
+        if check_clocks &> /dev/null; then
+            echo "Time synchronization verified via PTP"
+            return 0
+        fi
+    fi
+    
+    # Fallback to chrony if available
+    if command -v chronyc &> /dev/null; then
+        if chronyc tracking | grep -q "System time.*within.*offset"; then
+            echo "Time synchronization verified via NTP"
+            return 0
+        fi
+    fi
+    
+    # If we can't verify sync, log a warning but continue
+    echo "Warning: Could not verify time synchronization status"
+    echo "For optimal NDI frame sync, ensure PTP or NTP is properly configured"
+    return 0
+}
+
+check_time_sync
+
 # Main loop with restart and logging to tmpfs
 while true; do
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NDI Bridge: $DEVICE -> $NDI_NAME"
