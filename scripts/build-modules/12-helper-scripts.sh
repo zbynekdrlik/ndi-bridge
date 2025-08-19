@@ -33,6 +33,7 @@ echo "  ndi-bridge-update    - Update binary"
 echo "  ndi-bridge-netstat   - Network status"
 echo "  ndi-bridge-netmon    - Network monitor"
 echo "  ndi-bridge-timesync  - Time synchronization status"
+echo "  ndi-bridge-web       - Web interface control"
 EOF
     chmod +x /mnt/usb/usr/local/bin/ndi-bridge-help
 

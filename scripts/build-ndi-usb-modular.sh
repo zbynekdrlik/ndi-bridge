@@ -23,6 +23,7 @@ source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
 source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
 source "$SCRIPT_DIR/build-modules/12-time-sync.sh"
 source "$SCRIPT_DIR/build-modules/14-power-resistance.sh"
+source "$SCRIPT_DIR/build-modules/15-web-interface.sh"
 
 # Copy NDI files
 copy_ndi_files() {
@@ -58,6 +59,7 @@ assemble_configuration() {
     configure_filesystem
     configure_power_resistance
     configure_readonly_root
+    setup_web_interface
     
     # Replace the version placeholder
     sed -i "s/BUILD_SCRIPT_VERSION_PLACEHOLDER/$BUILD_SCRIPT_VERSION/" /mnt/usb/tmp/configure-system.sh
