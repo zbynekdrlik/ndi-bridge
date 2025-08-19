@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Build Guidelines
+
+### Version Management
+- **⚠️ MANDATORY: Before EVERY `build-image-for-rufus.sh` run, you MUST increment BUILD_SCRIPT_VERSION** in `scripts/build-modules/00-variables.sh`
+- This version appears on the second console (tty2) of the NDI Bridge box, allowing identification of which image version is deployed
+- The build timestamp is automatically generated and displayed alongside the version on the console
+- **Why this matters:** Without incrementing the version, you cannot distinguish between different builds on deployed devices
+- Format: Major.Minor.Patch (e.g., 1.5.0)
+  - Major: Breaking changes to the build system
+  - Minor: New features or significant improvements  
+  - Patch: Bug fixes and minor adjustments
+- **The version and build date are shown on tty2 console of the physical NDI Bridge box**
+
 ## Quick Environment Setup
 
 **ALWAYS run this first on a new machine:**
@@ -36,13 +49,27 @@ cmake --build . --config Debug  # Windows
 ```
 
 ### USB Appliance Build (Linux/WSL)
-```bash
-# Create bootable USB image for Rufus (WSL-compatible)
-sudo ./build-image-for-rufus.sh
 
-# OR: Direct USB creation (native Linux)
-sudo ./build-usb-with-log.sh /dev/sdX  # Replace sdX with USB device
+**⚠️ CRITICAL: Build Script Output Handling**
+- **NEVER run `build-image-for-rufus.sh` with direct console output** - it causes Claude to crash due to excessive binary dump output
+- **ALWAYS redirect output to a file and monitor the file separately**
+- The script produces large amounts of binary data that must not be displayed directly
+
+```bash
+# CORRECT: Create bootable USB image with output redirection
+sudo ./build-image-for-rufus.sh > build-rufus.log 2>&1 &
+# Monitor progress in separate terminal or with:
+tail -f build-rufus.log | grep -E "(Step|Progress|Error|Warning|Complete)"
+
+# OR: Direct USB creation (native Linux) - also redirect output
+sudo ./build-usb-with-log.sh /dev/sdX > build-usb.log 2>&1  # Replace sdX with USB device
 ```
+
+**Monitoring Build Progress:**
+- Use `tail -f` with grep filters to track specific events
+- Check file size periodically: `ls -lh *.img`
+- Monitor system resources: `htop` or `top` to ensure build is running
+- Expected build time: 10-20 minutes depending on system
 
 ### Build Options
 - `BUILD_TESTS=ON/OFF` - Build unit tests (default: OFF)
@@ -120,6 +147,32 @@ ndi-bridge.exe "USB Video Device" "Camera 1" # Windows
 **Logger** (`src/common/logger.h`)
 - Centralized logging with verbosity levels
 - Version logging and startup information
+
+## Testing and Network Connectivity
+
+### mDNS/Bonjour Testing in WSL
+**⚠️ IMPORTANT: mDNS (*.local) addresses do NOT work in WSL**
+- `ping hostname.local` will fail in WSL due to mDNS resolver limitations
+- **Alternative testing methods for mDNS functionality:**
+  1. Ask the user to test from Windows host: `ping hostname.local`
+  2. Use direct IP address: Get IP with `ip addr show br0` on the NDI Bridge box
+  3. Use `avahi-browse -a -t` on another Linux machine to verify mDNS advertisements
+  4. Check NDI Studio Monitor on Windows to verify NDI device discovery
+  5. Use SSH with IP address instead of mDNS name when testing from WSL
+
+### Network Testing Commands
+```bash
+# From WSL - use IP addresses
+sshpass -p 'newlevel' ssh root@10.77.9.XXX "command"
+
+# Ask user to test from Windows PowerShell/CMD:
+# ping ndi-bridge.local
+# ping shortname.local
+
+# Verify mDNS is working on the box itself:
+ssh root@IP "avahi-browse -a -t | grep -i ndi"
+ssh root@IP "systemctl status avahi-daemon"
+```
 
 ## USB Appliance System
 

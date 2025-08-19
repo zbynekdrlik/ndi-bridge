@@ -22,7 +22,6 @@ source "$SCRIPT_DIR/build-modules/10-tty-config.sh"
 source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
 source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
 source "$SCRIPT_DIR/build-modules/12-time-sync.sh"
-source "$SCRIPT_DIR/build-modules/13-helper-scripts-inline.sh"
 source "$SCRIPT_DIR/build-modules/14-power-resistance.sh"
 
 # Copy NDI files
@@ -59,7 +58,6 @@ assemble_configuration() {
     configure_filesystem
     configure_power_resistance
     configure_readonly_root
-    create_all_helper_scripts
     
     # Replace the version placeholder
     sed -i "s/BUILD_SCRIPT_VERSION_PLACEHOLDER/$BUILD_SCRIPT_VERSION/" /mnt/usb/tmp/configure-system.sh
