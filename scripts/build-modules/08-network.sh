@@ -65,7 +65,7 @@ cat > /etc/avahi/avahi-daemon.conf << 'EOFAVAHI'
 host-name=ndi-bridge
 domain-name=local
 use-ipv4=yes
-use-ipv6=yes
+use-ipv6=no
 allow-interfaces=br0
 deny-interfaces=lo
 ratelimit-interval-usec=1000000

@@ -134,6 +134,42 @@ systemctl restart ndi-bridge
 if systemctl is-active --quiet avahi-daemon; then
     log "Restarting Avahi daemon..."
     systemctl restart avahi-daemon
+    
+    # Create and start avahi-alias service for short hostname
+    log "Setting up mDNS alias for ${NEW_NAME}.local..."
+    
+    # Kill any existing avahi-publish processes
+    pkill -f "avahi-publish.*\.local" 2>/dev/null || true
+    
+    # Get the bridge IP
+    BRIDGE_IP=$(ip -4 addr show br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    
+    if [ -n "$BRIDGE_IP" ]; then
+        # Create systemd service for persistent alias
+        cat > /etc/systemd/system/avahi-alias.service << EOFALIASSERVICE
+[Unit]
+Description=Avahi mDNS hostname alias for ${NEW_NAME}
+After=avahi-daemon.service network-online.target
+Wants=avahi-daemon.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/avahi-publish -a -R ${NEW_NAME}.local ${BRIDGE_IP}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOFALIASSERVICE
+        
+        systemctl daemon-reload
+        systemctl enable avahi-alias.service
+        systemctl restart avahi-alias.service
+        
+        log "mDNS alias service configured for ${NEW_NAME}.local -> ${BRIDGE_IP}"
+    else
+        warn "Could not determine bridge IP address, alias service not configured"
+    fi
 fi
 
 # Show success
