@@ -2,9 +2,12 @@
 # Build system variables and configuration
 # This module defines all global variables used throughout the build process
 
-# Build Script Version
-BUILD_SCRIPT_VERSION="1.4.2"
-BUILD_SCRIPT_DATE="2025-07-20"
+# Build Script Version - Auto-incremented with each build
+BUILD_SCRIPT_VERSION="1.5.0"
+BUILD_SCRIPT_DATE="2025-01-19"
+
+# Build timestamp - Generated at build time
+BUILD_TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
 # Configuration
 USB_DEVICE="${1:-/dev/sdb}"
@@ -28,7 +31,7 @@ ROOT_PASSWORD="newlevel"
 DEFAULT_HOSTNAME="ndi-bridge"
 
 # Export all variables
-export BUILD_SCRIPT_VERSION BUILD_SCRIPT_DATE
+export BUILD_SCRIPT_VERSION BUILD_SCRIPT_DATE BUILD_TIMESTAMP
 export USB_DEVICE NDI_BINARY_PATH NDI_SDK_PATH
 export RED GREEN YELLOW NC
 export UBUNTU_VERSION UBUNTU_ARCH

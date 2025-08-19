@@ -38,11 +38,14 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 - ✅ Automatic NDI Bridge startup
 - ✅ Network bridge for daisy-chaining
 - ✅ TTY1: Live NDI logs display
-- ✅ TTY2: System status and menu
+- ✅ TTY2: System status with build timestamp display
 - ✅ Helper commands for management
 - ✅ 0-second boot time (GRUB timeout)
 - ✅ Power button disabled (always-on operation)
 - ✅ High-precision time synchronization (PTP/NTP) for optimal NDI frame sync
+- ✅ **mDNS/Avahi hostname resolution** - Access via `<name>.local` addresses
+- ✅ **NDI service advertisement** - Automatic NDI discovery via mDNS
+- ✅ **Build timestamp tracking** - Shows when each USB image was created
 
 ## Quick Start
 
@@ -137,10 +140,27 @@ ndi-bridge.exe "USB Video Device" "Camera 1" # Windows
 
 #### Helper Commands
 - `ndi-bridge-info` - Display system status
-- `ndi-bridge-set-name <name>` - Set device/stream name
+- `ndi-bridge-set-name <name>` - Set device/stream name and mDNS aliases
 - `ndi-bridge-logs` - View service logs
 - `ndi-bridge-netstat` - Network bridge status
 - `ndi-bridge-help` - Show all commands
+
+#### mDNS Network Access
+Devices are accessible via mDNS/Avahi with automatic hostname resolution:
+
+```bash
+# Set device name (on the appliance)
+sudo ndi-bridge-set-name cam1
+
+# Access from any computer on the network
+ping ndi-bridge-cam1.local  # Full hostname
+ping cam1.local             # Short alias (convenience)
+
+# Future web interface will be available at:
+http://cam1.local           # Port 80
+```
+
+NDI services are also advertised via mDNS for automatic discovery by NDI applications.
 
 ## Command-Line Options
 

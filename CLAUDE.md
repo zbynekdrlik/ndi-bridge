@@ -2,6 +2,17 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important Build Guidelines
+
+### Version Management
+- **ALWAYS increment the BUILD_SCRIPT_VERSION** in `scripts/build-modules/00-variables.sh` when making changes to the USB build system
+- The build timestamp is automatically generated and displayed on the console to track when each image was created
+- This helps identify which version of the image is running on deployed devices
+- Format: Major.Minor.Patch (e.g., 1.5.0)
+  - Major: Breaking changes to the build system
+  - Minor: New features or significant improvements
+  - Patch: Bug fixes and minor adjustments
+
 ## Quick Environment Setup
 
 **ALWAYS run this first on a new machine:**

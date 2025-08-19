@@ -10,7 +10,7 @@ configure_ndi_service() {
 mkdir -p /opt/ndi-bridge /etc/ndi-bridge
 
 # Save build information
-echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC')" > /etc/ndi-bridge/build-date
+echo "BUILD_TIMESTAMP_PLACEHOLDER" > /etc/ndi-bridge/build-timestamp
 echo "BUILD_SCRIPT_VERSION_PLACEHOLDER" > /etc/ndi-bridge/build-script-version
 
 # NDI configuration

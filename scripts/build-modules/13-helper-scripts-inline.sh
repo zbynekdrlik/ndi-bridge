@@ -6,6 +6,10 @@ create_all_helper_scripts() {
     
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFHELPERS'
 
+# Replace placeholders with actual values
+sed -i "s/BUILD_TIMESTAMP_PLACEHOLDER/${BUILD_TIMESTAMP}/" /etc/ndi-bridge/build-timestamp
+sed -i "s/BUILD_SCRIPT_VERSION_PLACEHOLDER/${BUILD_SCRIPT_VERSION}/" /etc/ndi-bridge/build-script-version
+
 # Create all helper scripts
 echo "Installing helper scripts..."
 
@@ -76,7 +80,7 @@ chmod +x /usr/local/bin/ndi-bridge-info
 cat > /usr/local/bin/ndi-bridge-set-name << 'EOFSETNAME'
 #!/bin/bash
 # NDI Bridge Device Name Setter
-# Sets both hostname and NDI name in a unified way
+# Sets hostname, NDI name, and mDNS aliases
 # Usage: ndi-bridge-set-name <simple-name>
 
 set -e
@@ -85,6 +89,7 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Helper functions
@@ -113,6 +118,7 @@ if [ $# -ne 1 ]; then
     echo ""
     echo "This will set:"
     echo "  - Hostname to: ndi-bridge-cam1"
+    echo "  - Short alias: cam1.local"
     echo "  - NDI name to: cam1"
     exit 1
 fi
@@ -131,16 +137,71 @@ FULL_HOSTNAME="ndi-bridge-${NEW_NAME}"
 
 log "Setting device name to: $NEW_NAME"
 log "Full hostname will be: $FULL_HOSTNAME"
+log "Short alias will be: ${NEW_NAME}.local"
 
 # Remount root as read-write
 mount -o remount,rw / 2>/dev/null || true
 
 # Update hostname
 echo "$FULL_HOSTNAME" > /etc/hostname
-sed -i "s/127.0.1.1.*/127.0.1.1 $FULL_HOSTNAME/" /etc/hosts
+sed -i "s/127.0.1.1.*/127.0.1.1 $FULL_HOSTNAME $NEW_NAME/" /etc/hosts
 
 # Update NDI configuration
 sed -i "s/NDI_NAME=.*/NDI_NAME=\"$NEW_NAME\"/" /etc/ndi-bridge/config
+
+# Update Avahi configuration with new hostname
+if [ -f /etc/avahi/avahi-daemon.conf ]; then
+    sed -i "s/^host-name=.*/host-name=$FULL_HOSTNAME/" /etc/avahi/avahi-daemon.conf
+fi
+
+# Create Avahi alias service for short name
+mkdir -p /etc/avahi/services
+cat > /etc/avahi/services/ndi-bridge-alias.service << EOFALIAS
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>${NEW_NAME}</name>
+  <service>
+    <type>_device-info._tcp</type>
+    <subtype>_ndi._sub._device-info._tcp</subtype>
+    <port>0</port>
+    <txt-record>model=NDI Bridge</txt-record>
+    <txt-record>hostname=${FULL_HOSTNAME}</txt-record>
+  </service>
+</service-group>
+EOFALIAS
+
+# Update NDI service advertisement with actual NDI name
+cat > /etc/avahi/services/ndi-bridge.service << EOFNDISERVICE
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>${NEW_NAME} (NDI)</name>
+  <service>
+    <type>_ndi._tcp</type>
+    <port>5960</port>
+    <txt-record>name=${NEW_NAME}</txt-record>
+    <txt-record>groups=public</txt-record>
+    <txt-record>model=NDI Bridge</txt-record>
+  </service>
+</service-group>
+EOFNDISERVICE
+
+# Update HTTP service advertisement with device name
+cat > /etc/avahi/services/ndi-bridge-http.service << EOFHTTPSERVICE
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>${NEW_NAME} Configuration</name>
+  <service>
+    <type>_http._tcp</type>
+    <port>80</port>
+    <txt-record>path=/</txt-record>
+    <txt-record>product=NDI Bridge</txt-record>
+    <txt-record>name=${NEW_NAME}</txt-record>
+  </service>
+</service-group>
+EOFHTTPSERVICE
 
 # Apply hostname immediately
 hostname "$FULL_HOSTNAME"
@@ -149,7 +210,7 @@ hostname "$FULL_HOSTNAME"
 log "Restarting NDI Bridge service..."
 systemctl restart ndi-bridge
 
-# Restart Avahi to advertise new name
+# Restart Avahi to advertise new name and services
 if systemctl is-active --quiet avahi-daemon; then
     log "Restarting Avahi daemon..."
     systemctl restart avahi-daemon
@@ -158,9 +219,18 @@ fi
 # Show success
 log "Device name successfully changed!"
 echo ""
-echo "Summary:"
-echo "  Hostname:  $FULL_HOSTNAME"
-echo "  NDI Name:  $NEW_NAME"
+echo -e "${CYAN}Summary:${NC}"
+echo "  Hostname:      $FULL_HOSTNAME"
+echo "  Short alias:   ${NEW_NAME}.local"
+echo "  NDI Name:      $NEW_NAME"
+echo ""
+echo -e "${CYAN}Network Access:${NC}"
+echo "  - ping ${FULL_HOSTNAME}.local"
+echo "  - ping ${NEW_NAME}.local"
+echo ""
+echo -e "${CYAN}Web Interface (future):${NC}"
+echo "  - http://${FULL_HOSTNAME}.local"
+echo "  - http://${NEW_NAME}.local"
 echo ""
 echo "The device will now appear as '$NEW_NAME' in NDI sources."
 echo "You may need to refresh your NDI receiver application."
