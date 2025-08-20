@@ -1,5 +1,13 @@
 # CLAUDE.md - NDI Bridge Development Guide
 
+## Git Workflow Rules
+
+**ALWAYS CREATE PR EARLY:**
+1. After creating a feature branch, immediately push and create a PR
+2. This enables frequent reviews and feedback during development
+3. Use draft PRs for work in progress: `gh pr create --draft`
+4. Push commits regularly to keep PR updated
+
 ## CRITICAL: USB Image Build Rules
 
 **ALWAYS DO:**
