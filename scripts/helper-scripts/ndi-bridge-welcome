@@ -268,4 +268,4 @@ echo ""
 
 # QUICK ACTIONS - Moved to last position
 echo -e "${CYAN}▶ QUICK ACTIONS${NC}"
-echo "  [L]ogs  [S]et-name  [W]eb  [N]etwork  [T]ime-sync  [H]elp  [Q]uit"
+echo "  [L]ogs  [S]et-name  [N]etwork  [T]ime-sync  [H]elp  [Q]uit"

@@ -30,22 +30,6 @@ while true; do
                     sleep 2
                 fi
                 ;;
-            w)
-                clear
-                IP=$(ip -4 addr show dev br0 2>/dev/null | awk '/inet/ {print $2}' | cut -d/ -f1 | head -1)
-                echo "=== Web Interface ==="
-                echo ""
-                if [ -n "$IP" ]; then
-                    echo "Access at: http://${IP}/"
-                else
-                    echo "Access at: http://$(hostname).local/"
-                fi
-                echo "Username: admin"
-                echo "Password: newlevel"
-                echo ""
-                echo "Press any key to continue..."
-                read -n 1 -s -r
-                ;;
             n)
                 clear
                 echo "=== Network Status ==="
@@ -82,7 +66,6 @@ while true; do
                 echo "Quick Actions:"
                 echo "  L - View NDI Bridge logs"
                 echo "  S - Set NDI stream name"
-                echo "  W - Web interface information"
                 echo "  N - Network status details"
                 echo "  T - Time synchronization status"
                 echo "  H - This help menu"
