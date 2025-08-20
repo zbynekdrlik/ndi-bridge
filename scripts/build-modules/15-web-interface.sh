@@ -254,7 +254,7 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/ttyd -W -p 7681 -i lo -t fontSize=16 -t 'theme={"background": "#1e1e1e"}' /bin/bash --login
+ExecStart=/usr/bin/ttyd -W -p 7681 -i lo /usr/local/bin/ndi-bridge-welcome-loop
 Restart=always
 RestartSec=10
 
