@@ -129,7 +129,8 @@ int showStatus() {
     }
     
     // Show status for each display
-    for (int i = 0; i < 3; i++) {
+    const int MAX_DISPLAYS = 3; // Intel N100 supports 3 displays
+    for (int i = 0; i < MAX_DISPLAYS; i++) {
         std::cout << "Display " << i << " (HDMI-" << (i+1) << "): ";
         
         // Check if NDI is running on this display
@@ -263,6 +264,17 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
             case NDIlib_frame_type_video: {
                 frame_count++;
                 
+                // RAII wrapper to ensure frame is always freed
+                struct FrameGuard {
+                    NDIlib_recv_instance_t recv;
+                    NDIlib_video_frame_v2_t* frame;
+                    ~FrameGuard() {
+                        if (recv && frame) {
+                            NDIlib_recv_free_video_v2(recv, frame);
+                        }
+                    }
+                } guard{receiver.getRecvInstance(), &video_frame};
+                
                 // Display the frame directly - no queuing for lowest latency
                 // NDI typically provides BGRA/BGRX format when we request it
                 PixelFormat format = PixelFormat::BGRA;
@@ -294,9 +306,6 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                 if (!displayed) {
                     frames_dropped++;
                 }
-                
-                // Free the frame
-                NDIlib_recv_free_video_v2(receiver.getRecvInstance(), &video_frame);
                 
                 // Update status every 30 frames (roughly 1 second at 30fps)
                 if (frame_count % 30 == 0) {

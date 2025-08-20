@@ -15,16 +15,24 @@ public:
         : display_id_(display_id)
         , pid_(getpid()) {
         // Ensure status directory exists
-        std::filesystem::create_directories("/var/run/ndi-display");
+        try {
+            std::filesystem::create_directories("/var/run/ndi-display");
+        } catch (const std::exception&) {
+            // Ignore - directory may already exist or /var/run may be read-only
+        }
         
         status_file_ = "/var/run/ndi-display/display-" + 
                       std::to_string(display_id) + ".status";
         temp_file_ = status_file_ + ".tmp";
     }
     
-    ~StatusReporter() {
+    ~StatusReporter() noexcept {
         // Remove status file on exit
-        std::filesystem::remove(status_file_);
+        try {
+            std::filesystem::remove(status_file_);
+        } catch (...) {
+            // Ignore errors in destructor
+        }
     }
     
     void update(const std::string& stream_name, 
@@ -61,7 +69,11 @@ public:
     }
     
     void clear() {
-        std::filesystem::remove(status_file_);
+        try {
+            std::filesystem::remove(status_file_);
+        } catch (const std::exception&) {
+            // Ignore if file doesn't exist
+        }
     }
     
 private:
