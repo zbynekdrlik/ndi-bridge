@@ -2,7 +2,7 @@
 # Web interface setup module - provides browser-based terminal access
 
 setup_web_interface() {
-    log "Setting up web interface with ttyd..."
+    log "Setting up web interface with wetty..."
     
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFWEB'
 
@@ -384,8 +384,8 @@ case "$1" in
             echo -e "  Nginx:     ${RED}Stopped${NC}"
         fi
         
-        # Check ttyd
-        if systemctl is-active --quiet ttyd; then
+        # Check wetty
+        if systemctl is-active --quiet wetty; then
             echo -e "  Terminal:  ${GREEN}Running${NC} (port 7681)"
         else
             echo -e "  Terminal:  ${RED}Stopped${NC}"
@@ -409,21 +409,21 @@ case "$1" in
     restart)
         log "Restarting web interface services..."
         systemctl restart nginx
-        systemctl restart ttyd
+        systemctl restart wetty
         log "Web interface restarted"
         ;;
         
     stop)
         log "Stopping web interface services..."
         systemctl stop nginx
-        systemctl stop ttyd
+        systemctl stop wetty
         log "Web interface stopped"
         ;;
         
     start)
         log "Starting web interface services..."
         systemctl start nginx
-        systemctl start ttyd
+        systemctl start wetty
         log "Web interface started"
         ;;
         
