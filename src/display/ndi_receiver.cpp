@@ -125,19 +125,16 @@ bool NDIReceiver::connect(const std::string& source_name) {
     
     // Find the source
     auto sources = findSources(2000);
-    const NDIlib_source_t* target_source = nullptr;
     
-    for (const auto& src : sources) {
-        if (src.name == source_name) {
-            // We need to get the raw NDIlib_source_t
-            uint32_t num_sources = 0;
-            const NDIlib_source_t* p_sources = NDIlib_find_get_current_sources(find_instance_, &num_sources);
-            for (uint32_t i = 0; i < num_sources; i++) {
-                if (std::string(p_sources[i].p_ndi_name) == source_name) {
-                    target_source = &p_sources[i];
-                    break;
-                }
-            }
+    // Get current sources once
+    uint32_t num_sources = 0;
+    const NDIlib_source_t* p_sources = NDIlib_find_get_current_sources(find_instance_, &num_sources);
+    
+    // Find the matching source
+    const NDIlib_source_t* target_source = nullptr;
+    for (uint32_t i = 0; i < num_sources; i++) {
+        if (p_sources[i].p_ndi_name && std::string(p_sources[i].p_ndi_name) == source_name) {
+            target_source = &p_sources[i];
             break;
         }
     }
@@ -147,9 +144,11 @@ bool NDIReceiver::connect(const std::string& source_name) {
         return false;
     }
     
-    // Create receiver
+    // Create receiver with a copy of the source info
+    NDIlib_source_t source_copy = *target_source;
+    
     NDIlib_recv_create_v3_t recv_create;
-    recv_create.source_to_connect_to = *target_source;
+    recv_create.source_to_connect_to = source_copy;
     recv_create.p_ndi_recv_name = "NDI Display Receiver";
     recv_create.bandwidth = NDIlib_recv_bandwidth_highest;
     recv_create.allow_video_fields = false;

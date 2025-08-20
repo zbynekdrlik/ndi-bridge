@@ -7,6 +7,7 @@
 #include <cstring>
 #include <memory>
 #include <map>
+#include <chrono>
 
 #include "ndi_receiver.h"
 #include "display_output.h"
@@ -209,13 +210,56 @@ int main(int argc, char* argv[]) {
         return 0;
     }
     else if (command == "status") {
-        // TODO: Implement status with stream manager
-        std::cout << "Status functionality not yet implemented\n";
+        StreamManager manager;
+        if (!manager.initialize()) {
+            Logger::error("Failed to initialize stream manager");
+            return 1;
+        }
+        
+        auto mappings = manager.getMappings();
+        
+        if (mappings.empty()) {
+            std::cout << "No active stream mappings\n";
+        } else {
+            std::cout << "\nActive Stream Mappings:\n";
+            std::cout << "----------------------\n";
+            for (const auto& [display_id, stream_name] : mappings) {
+                std::cout << "Display " << display_id << " <- " << stream_name << "\n";
+                
+                // Get stats if available
+                auto stats = manager.getDisplayStats(display_id);
+                if (stats.frames_received > 0) {
+                    std::cout << "  Resolution: " << stats.width << "x" << stats.height << "\n";
+                    std::cout << "  FPS: " << stats.fps << "\n";
+                    std::cout << "  Frames: " << stats.frames_received << " received, " 
+                             << stats.frames_dropped << " dropped\n";
+                }
+            }
+        }
+        
         return 0;
     }
     else if (command == "auto") {
-        // TODO: Implement auto-mapping
-        std::cout << "Auto-mapping functionality not yet implemented\n";
+        StreamManager manager;
+        if (!manager.initialize()) {
+            Logger::error("Failed to initialize stream manager");
+            return 1;
+        }
+        
+        std::cout << "Starting automatic stream mapping...\n";
+        if (!manager.autoMap()) {
+            Logger::error("Auto-mapping failed");
+            return 1;
+        }
+        
+        std::cout << "Auto-mapping successful. Streaming... Press Ctrl+C to stop\n";
+        
+        // Keep running until shutdown
+        while (!g_shutdown) {
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+        }
+        
+        manager.shutdown();
         return 0;
     }
     else if (command == "--help" || command == "-h") {

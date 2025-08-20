@@ -4,6 +4,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <atomic>
 #include <Processing.NDI.Lib.h>
 
 namespace ndi_bridge {
@@ -74,7 +75,7 @@ private:
     
     bool initialized_ = false;
     bool connected_ = false;
-    bool receiving_ = false;
+    std::atomic<bool> receiving_{false};
     
     std::string current_source_name_;
     VideoFrameCallback video_callback_;

@@ -1,6 +1,7 @@
 #include "stream_manager.h"
 #include "../common/logger.h"
 #include <fstream>
+#include <algorithm>
 
 namespace ndi_bridge {
 namespace display {
@@ -49,21 +50,22 @@ bool StreamManager::mapStream(const std::string& stream_name, int display_id) {
     if (it != mappings_.end() && it->second.active) {
         Logger::warning("Display " + std::to_string(display_id) + " already mapped");
         stopReceiving(it->second);
+        mappings_.erase(it);
     }
     
-    // Create new mapping
-    StreamMapping mapping;
+    // Create new mapping directly in the map
+    StreamMapping& mapping = mappings_[display_id];
     mapping.stream_name = stream_name;
     mapping.display_id = display_id;
     mapping.active = false;
     
-    // Start receiving
+    // Start receiving with the mapping now in its final location
     if (!startReceiving(mapping)) {
         Logger::error("Failed to start stream mapping");
+        mappings_.erase(display_id);
         return false;
     }
     
-    mappings_[display_id] = std::move(mapping);
     Logger::info("Mapped stream '" + stream_name + "' to display " + std::to_string(display_id));
     return true;
 }
@@ -94,9 +96,47 @@ std::vector<std::pair<int, std::string>> StreamManager::getMappings() const {
 }
 
 bool StreamManager::autoMap() {
-    // TODO: Implement auto-mapping logic
-    Logger::info("Auto-mapping not yet implemented");
-    return false;
+    Logger::info("Starting auto-mapping of NDI streams to displays");
+    
+    // Find available NDI sources
+    NDIReceiver temp_receiver;
+    if (!temp_receiver.initialize()) {
+        Logger::error("Failed to initialize NDI for auto-mapping");
+        return false;
+    }
+    
+    auto sources = temp_receiver.findSources(5000);
+    if (sources.empty()) {
+        Logger::warning("No NDI sources found for auto-mapping");
+        return false;
+    }
+    
+    // Get available displays
+    auto display = createDisplayOutput();
+    if (!display || !display->initialize()) {
+        Logger::error("Failed to initialize display system for auto-mapping");
+        return false;
+    }
+    
+    auto displays = display->getDisplays();
+    display->shutdown();
+    
+    // Map up to 3 streams to displays
+    int mapped_count = 0;
+    int max_displays = std::min(3, static_cast<int>(displays.size()));
+    int max_sources = std::min(max_displays, static_cast<int>(sources.size()));
+    
+    for (int i = 0; i < max_sources; i++) {
+        if (mapStream(sources[i].name, i)) {
+            Logger::info("Auto-mapped '" + sources[i].name + "' to display " + std::to_string(i));
+            mapped_count++;
+        } else {
+            Logger::warning("Failed to auto-map '" + sources[i].name + "' to display " + std::to_string(i));
+        }
+    }
+    
+    Logger::info("Auto-mapping complete: " + std::to_string(mapped_count) + " streams mapped");
+    return mapped_count > 0;
 }
 
 bool StreamManager::loadConfig(const std::string& path) {
@@ -159,11 +199,14 @@ bool StreamManager::startReceiving(StreamMapping& mapping) {
         return false;
     }
     
+    // Capture display pointer for callback (safe because we control its lifetime)
+    auto* display_ptr = mapping.display.get();
+    
     // Set up frame callback
     mapping.receiver->setVideoFrameCallback(
-        [&mapping](const NDIlib_video_frame_v2_t& frame) {
-            if (mapping.display) {
-                mapping.display->displayFrame(
+        [display_ptr](const NDIlib_video_frame_v2_t& frame) {
+            if (display_ptr) {
+                display_ptr->displayFrame(
                     frame.p_data,
                     frame.xres,
                     frame.yres,
@@ -174,10 +217,15 @@ bool StreamManager::startReceiving(StreamMapping& mapping) {
         }
     );
     
+    // Capture receiver pointer for thread
+    auto* receiver_ptr = mapping.receiver.get();
+    
     // Start receive thread
     mapping.receive_thread = std::make_unique<std::thread>(
-        [&mapping]() {
-            mapping.receiver->startReceiving();
+        [receiver_ptr]() {
+            if (receiver_ptr) {
+                receiver_ptr->startReceiving();
+            }
         }
     );
     
