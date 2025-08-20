@@ -8,8 +8,8 @@ Type=simple
 User=ndi-bridge
 Group=video
 
-# Load configuration for this display
-EnvironmentFile=/etc/ndi-bridge/display-%i.conf
+# Load configuration for this display (optional, - prefix means don't fail if missing)
+EnvironmentFile=-/etc/ndi-bridge/display-%i.conf
 
 # Pre-start checks
 ExecStartPre=/usr/local/bin/ndi-display-console-check %i

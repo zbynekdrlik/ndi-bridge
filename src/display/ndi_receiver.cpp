@@ -65,8 +65,8 @@ void NDIReceiver::shutdown() {
         find_instance_ = nullptr;
     }
     
-    // In single-stream design, we're the only instance - safe to destroy
-    NDIlib_destroy();
+    // Don't call NDIlib_destroy() - other instances may exist in the process
+    // NDI library uses reference counting internally
     initialized_ = false;
     Logger::info("NDI receiver shutdown");
 }
@@ -147,11 +147,9 @@ bool NDIReceiver::connect(const std::string& source_name) {
         return false;
     }
     
-    // Create receiver with a copy of the source info
-    NDIlib_source_t source_copy = *target_source;
-    
+    // Create receiver - NDI will copy the source internally
     NDIlib_recv_create_v3_t recv_create;
-    recv_create.source_to_connect_to = source_copy;
+    recv_create.source_to_connect_to = *target_source;
     recv_create.p_ndi_recv_name = "NDI Display Receiver";
     recv_create.bandwidth = NDIlib_recv_bandwidth_highest;
     recv_create.allow_video_fields = false;

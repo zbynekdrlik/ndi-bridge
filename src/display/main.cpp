@@ -131,9 +131,15 @@ int showStatus() {
     for (int i = 0; i < MAX_DISPLAYS; i++) {
         std::cout << "Display " << i << " (HDMI-" << (i+1) << "): ";
         
-        // Check if NDI is running on this display
+        // Check if NDI is running on this display (try both /var/run and /tmp)
         std::string status_file = "/var/run/ndi-display/display-" + 
                                  std::to_string(i) + ".status";
+        
+        if (!std::filesystem::exists(status_file)) {
+            // Try /tmp fallback
+            status_file = "/tmp/ndi-display/display-" + 
+                         std::to_string(i) + ".status";
+        }
         
         if (std::filesystem::exists(status_file)) {
             // Parse status file

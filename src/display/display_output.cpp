@@ -219,7 +219,9 @@ public:
                 const uint8_t* src_row = data + y * stride;
                 uint8_t* dst_row = fb_ptr_ + ((y + y_offset) * fb_stride) + (x_offset * fb_bpp);
                 
-                for (int x = 0; x < copy_width; x += 2) {
+                // Process pairs of pixels (UYVY format)
+                int uyvy_width = copy_width & ~1; // Round down to even
+                for (int x = 0; x < uyvy_width; x += 2) {
                     // UYVY has 2 pixels in 4 bytes
                     const uint8_t* src = src_row + x * 2;
                     uint8_t y0 = src[1];
@@ -229,9 +231,12 @@ public:
                     
                     // Simple YUV to RGB conversion for first pixel
                     uint8_t* dst0 = dst_row + x * fb_bpp;
-                    int r = y0 + 1.402 * (v - 128);
-                    int g = y0 - 0.344 * (u - 128) - 0.714 * (v - 128);
-                    int b = y0 + 1.772 * (u - 128);
+                    int c = y0 - 16;
+                    int d = u - 128;
+                    int e = v - 128;
+                    int r = (298 * c + 409 * e + 128) >> 8;
+                    int g = (298 * c - 100 * d - 208 * e + 128) >> 8;
+                    int b = (298 * c + 516 * d + 128) >> 8;
                     dst0[0] = std::min(255, std::max(0, r));
                     dst0[1] = std::min(255, std::max(0, g));
                     dst0[2] = std::min(255, std::max(0, b));
@@ -239,13 +244,24 @@ public:
                     // Second pixel
                     if (x + 1 < copy_width) {
                         uint8_t* dst1 = dst_row + (x + 1) * fb_bpp;
-                        r = y1 + 1.402 * (v - 128);
-                        g = y1 - 0.344 * (u - 128) - 0.714 * (v - 128);
-                        b = y1 + 1.772 * (u - 128);
+                        c = y1 - 16;
+                        r = (298 * c + 409 * e + 128) >> 8;
+                        g = (298 * c - 100 * d - 208 * e + 128) >> 8;
+                        b = (298 * c + 516 * d + 128) >> 8;
                         dst1[0] = std::min(255, std::max(0, r));
                         dst1[1] = std::min(255, std::max(0, g));
                         dst1[2] = std::min(255, std::max(0, b));
                     }
+                }
+                
+                // Handle odd width (last pixel without chroma pair)
+                if (copy_width & 1) {
+                    int x = copy_width - 1;
+                    const uint8_t* src = src_row + x * 2;
+                    uint8_t* dst = dst_row + x * fb_bpp;
+                    // Use luma only for last pixel
+                    uint8_t y = (x * 2 < stride) ? src[0] : 128;
+                    dst[0] = dst[1] = dst[2] = y;
                 }
             }
         } else {

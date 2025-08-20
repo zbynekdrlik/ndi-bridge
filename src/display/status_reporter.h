@@ -14,14 +14,21 @@ public:
     StatusReporter(int display_id) 
         : display_id_(display_id)
         , pid_(getpid()) {
-        // Ensure status directory exists
+        // Ensure status directory exists (/var/run is tmpfs, recreated on boot)
+        status_dir_ = "/var/run/ndi-display";
         try {
-            std::filesystem::create_directories("/var/run/ndi-display");
+            std::filesystem::create_directories(status_dir_);
         } catch (const std::exception&) {
-            // Ignore - directory may already exist or /var/run may be read-only
+            // Try /tmp as fallback if /var/run is not writable
+            status_dir_ = "/tmp/ndi-display";
+            try {
+                std::filesystem::create_directories(status_dir_);
+            } catch (const std::exception&) {
+                // Ignore - will fail on write anyway
+            }
         }
         
-        status_file_ = "/var/run/ndi-display/display-" + 
+        status_file_ = status_dir_ + "/display-" + 
                       std::to_string(display_id) + ".status";
         temp_file_ = status_file_ + ".tmp";
     }
@@ -83,6 +90,7 @@ public:
 private:
     int display_id_;
     pid_t pid_;
+    std::string status_dir_;
     std::string status_file_;
     std::string temp_file_;
 };
