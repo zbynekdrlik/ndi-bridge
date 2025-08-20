@@ -30,6 +30,11 @@ server {
     root /var/www/ndi-bridge;
     index index.html;
     
+    # Redirect root to terminal
+    location = / {
+        return 301 /terminal;
+    }
+    
     # Main location - serve static files
     location / {
         try_files $uri $uri/ =404;

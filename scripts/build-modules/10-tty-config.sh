@@ -158,7 +158,7 @@ echo "  Built: $(cat /etc/ndi-bridge/build-timestamp 2>/dev/null || echo 'Unknow
 echo "  Version: $(cat /etc/ndi-bridge/build-script-version 2>/dev/null || echo 'Unknown')"
 echo ""
 echo -e "\\\\033[1;36mSoftware Versions:\\\\033[0m"
-echo "  NDI-Bridge: $(/opt/ndi-bridge/ndi-bridge --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\\\\.[0-9]+\\\\.[0-9]+/) print $i}' || echo 'Unknown')"
+echo "  NDI-Bridge: $(/usr/local/bin/ndi-bridge-version 2>/dev/null || echo 'Unknown')"
 echo ""
 echo -e "\\033[1;36mNetwork Configuration:\\033[0m"
 echo "  • Both ethernet ports are bridged (br0)"
