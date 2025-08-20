@@ -59,21 +59,85 @@ cmake --build . --config Debug  # Windows
 ```bash
 # CORRECT: Create bootable USB image with output redirection (run from repo root)
 cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge
-sudo ./build-image-for-rufus.sh 2>&1 | tee build-logs/build.log | grep -E "(Step|Progress|Error|Warning|Complete|Building|Creating|Installing)"
-
-# Alternative: Run in background and monitor
 sudo ./build-image-for-rufus.sh > build-rufus.log 2>&1 &
-tail -f build-rufus.log | grep -E "(Step|Progress|Error|Warning|Complete)"
 
 # OR: Direct USB creation (native Linux) - also redirect output
 sudo ./build-usb-with-log.sh /dev/sdX > build-usb.log 2>&1  # Replace sdX with USB device
 ```
 
-**Monitoring Build Progress:**
-- Use `tail -f` with grep filters to track specific events
-- Check file size periodically: `ls -lh *.img`
-- Monitor system resources: `htop` or `top` to ensure build is running
-- Expected build time: 10-20 minutes depending on system
+### Monitoring Build Progress (IMPORTANT - Follow this exact sequence)
+
+**The build script automatically creates TWO log files:**
+1. `build-rufus.log` - Simple status messages
+2. `build-logs/image-build-YYYYMMDD-HHMMSS.log` - Detailed build log
+
+**Step-by-step monitoring approach:**
+
+```bash
+# 1. Start the build (as shown above)
+sudo ./build-image-for-rufus.sh > build-rufus.log 2>&1 &
+
+# 2. Note the PID and verify it's running
+ps aux | grep build-image | grep -v grep
+
+# 3. Check which log file was created (wait 5-10 seconds for it to appear)
+ls -la build-logs/image-build-*.log | tail -1
+
+# 4. Monitor build phases by checking filesystem usage (every 1-2 minutes)
+df -h /mnt/usb 2>/dev/null | tail -1
+# Progress indicators:
+#   ~100MB = Starting debootstrap
+#   ~700MB = Installing base system  
+#   ~1.5GB = Installing packages
+#   ~2.5GB = Installing web interface
+#   Unmounted = Build completing
+
+# 5. Check what's currently being installed (useful to know the phase)
+ps aux | grep -E "apt-get|npm|debootstrap" | grep -v grep | head -3
+
+# 6. Verify completion (image file appears when done)
+ls -lh ndi-bridge.img
+
+# 7. Check for loop device cleanup (MUST be empty after build)
+sudo losetup -a | grep ndi-bridge.img
+```
+
+**Build phases and typical timing:**
+- **0-2 min**: Creating image, partitioning, mounting
+- **2-5 min**: Debootstrap installing Ubuntu base (~750MB)
+- **5-8 min**: Installing kernel, GRUB, system packages (~1.5GB)
+- **8-10 min**: Installing web interface (nginx, nodejs, npm, wetty) (~2.5GB)
+- **10-12 min**: Cleanup and filesystem optimization
+- **Total: 10-12 minutes typical, up to 20 minutes on slower systems**
+
+**DO NOT:**
+- Use `tail -f build-rufus.log` continuously (it has minimal output)
+- Use `tee` or `grep` in the build command pipeline (causes cleanup issues)
+- Kill the build process manually (leaves loop devices locked)
+
+**If build seems stuck:**
+```bash
+# Check if it's actually running
+ps aux | grep -E "build|apt-get|npm" | wc -l
+# If > 0, it's still working. Be patient.
+
+# Check disk usage growth
+df -h /mnt/usb
+# If growing, it's working
+```
+
+**After build completes:**
+```bash
+# ALWAYS verify loop devices are cleaned up
+sudo losetup -a | grep ndi-bridge.img
+# Should return nothing (empty)
+
+# If loop devices are still attached (build was interrupted):
+sudo umount -f /mnt/usb 2>/dev/null
+sudo umount -l /mnt/usb 2>/dev/null  
+sudo kpartx -dv /dev/loop0
+sudo losetup -d /dev/loop0
+```
 
 ### Build Options
 - `BUILD_TESTS=ON/OFF` - Build unit tests (default: OFF)
