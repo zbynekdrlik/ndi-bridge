@@ -3,11 +3,9 @@
 #include <vector>
 #include <atomic>
 #include <csignal>
-#include <cstring>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 
 #include "ndi_receiver.h"
 #include "display_output.h"
