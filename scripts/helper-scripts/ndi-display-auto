@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# Auto-map available NDI streams to displays
+#
+
+set -e
+
+echo "Starting automatic NDI stream mapping..."
+echo "========================================"
+echo
+
+# Stop any existing mappings
+echo "Stopping existing display mappings..."
+for i in 0 1 2; do
+    if [ -f "/var/run/ndi-display-$i.pid" ]; then
+        ndi-display-stop $i 2>/dev/null || true
+    fi
+done
+
+# Start the auto-mapping service
+echo "Starting auto-mapping service..."
+sudo systemctl start ndi-display
+
+echo
+echo "Auto-mapping service started."
+echo "Check status with: ndi-display-status"

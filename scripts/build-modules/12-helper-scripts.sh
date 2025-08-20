@@ -10,6 +10,7 @@ install_helper_scripts() {
     if [ -d "$HELPER_DIR" ]; then
         cp -r "$HELPER_DIR"/* /mnt/usb/usr/local/bin/
         chmod +x /mnt/usb/usr/local/bin/ndi-bridge-*
+        chmod +x /mnt/usb/usr/local/bin/ndi-display-*
     else
         warn "Helper scripts directory not found, creating inline..."
         # If helper scripts directory doesn't exist, create them inline

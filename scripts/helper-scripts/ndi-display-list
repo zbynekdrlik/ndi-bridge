@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# List available NDI streams on the network
+#
+
+set -e
+
+echo "Searching for NDI streams on the network..."
+echo "==========================================="
+echo
+
+/usr/local/bin/ndi-display list
+
+echo
+echo "To display a stream, use:"
+echo "  ndi-display-show \"<stream_name>\" <display_number>"
+echo
+echo "Example:"
+echo "  ndi-display-show \"Camera 1\" 0"

@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# Stop displaying on a specific output
+#
+
+set -e
+
+# Check arguments
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <display_number>"
+    echo
+    echo "Example:"
+    echo "  $0 0   # Stop display 0"
+    exit 1
+fi
+
+DISPLAY_NUM="$1"
+PID_FILE="/var/run/ndi-display-$DISPLAY_NUM.pid"
+
+if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        echo "Stopping display $DISPLAY_NUM (PID: $PID)..."
+        kill "$PID"
+        rm -f "$PID_FILE"
+        echo "Display $DISPLAY_NUM stopped."
+    else
+        echo "Display $DISPLAY_NUM is not running (stale PID file)"
+        rm -f "$PID_FILE"
+    fi
+else
+    echo "Display $DISPLAY_NUM is not running"
+fi
