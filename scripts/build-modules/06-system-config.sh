@@ -70,7 +70,8 @@ apt-get install -y -qq --no-install-recommends \
     libavahi-common3 \
     libavahi-client3 \
     libnss-mdns \
-    htop 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+    htop \
+    tmux 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Try to install v4l2 tools with different package names
 apt-get install -y -qq --no-install-recommends v4l-utils 2>/dev/null || \
