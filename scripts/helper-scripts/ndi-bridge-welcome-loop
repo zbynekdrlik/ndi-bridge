@@ -1,0 +1,15 @@
+#!/bin/bash
+# Auto-refreshing welcome screen
+while true; do
+    /usr/local/bin/ndi-bridge-welcome
+    # Wait for key press or timeout after 5 seconds
+    read -t 5 -n 1 -s -r -p "" key
+    if [[ $? -eq 0 ]]; then
+        # Key was pressed, clear screen and give shell
+        clear
+        echo "Type 'ndi-bridge-welcome-loop' to return to auto-refreshing menu"
+        echo ""
+        break
+    fi
+    # No key pressed, loop continues and refreshes screen
+done

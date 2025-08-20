@@ -85,31 +85,15 @@ export TERM=linux
 /usr/local/bin/ndi-bridge-welcome-loop
 EOFPROFILE
 
-# Create auto-refreshing welcome loop script
-cat > /usr/local/bin/ndi-bridge-welcome-loop << 'EOFWELCOMELOOP'
-#!/bin/bash
-# Auto-refreshing welcome screen
-while true; do
-    /usr/local/bin/ndi-bridge-welcome
-    # Wait for key press or timeout after 5 seconds
-    read -t 5 -n 1 -s -r -p "" key
-    if [[ $? -eq 0 ]]; then
-        # Key was pressed, clear screen and give shell
-        clear
-        echo "Type 'ndi-bridge-welcome-loop' to return to auto-refreshing menu"
-        echo ""
-        break
-    fi
-    # No key pressed, loop continues and refreshes screen
-done
-EOFWELCOMELOOP
-chmod +x /usr/local/bin/ndi-bridge-welcome-loop
+# All helper scripts (welcome, show-logs, welcome-loop) are installed from
+# helper-scripts directory - don't create them inline here!
+# Just ensure they're executable
+chmod +x /usr/local/bin/ndi-bridge-show-logs 2>/dev/null || true
+chmod +x /usr/local/bin/ndi-bridge-welcome 2>/dev/null || true
+chmod +x /usr/local/bin/ndi-bridge-welcome-loop 2>/dev/null || true
 
-# Install helper scripts inside chroot
-mkdir -p /usr/local/bin
-
-# Create ndi-bridge-show-logs script
-cat > /usr/local/bin/ndi-bridge-show-logs << 'EOFSHOWLOGS'
+# Skip the old inline script content (kept for heredoc structure)
+cat > /dev/null << 'EOFSHOWLOGS'
 #!/bin/bash
 # Show NDI Bridge logs on TTY1
 clear
@@ -119,16 +103,7 @@ echo "Press Ctrl+C to stop following logs"
 echo ""
 journalctl -u ndi-bridge -f --no-pager
 EOFSHOWLOGS
-chmod +x /usr/local/bin/ndi-bridge-show-logs
 
-# Welcome script is now installed from helper-scripts
-# Skip inline creation to avoid overwriting the updated version
-# Just ensure it's executable
-if [ -f /usr/local/bin/ndi-bridge-welcome ]; then
-    chmod +x /usr/local/bin/ndi-bridge-welcome
-fi
-
-# Skip the old inline script content
 cat > /dev/null << 'EOFWELCOME'
 echo -e "\\033[0m"
 echo -e "\\033[1;36mSystem Information:\\033[0m"
