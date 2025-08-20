@@ -70,6 +70,9 @@ public:
     };
     Stats getStats() const;
     
+    // Get raw NDI receiver instance for direct use (low latency)
+    NDIlib_recv_instance_t getRecvInstance() const { return recv_instance_; }
+    
 private:
     NDIlib_find_instance_t find_instance_ = nullptr;
     NDIlib_recv_instance_t recv_instance_ = nullptr;

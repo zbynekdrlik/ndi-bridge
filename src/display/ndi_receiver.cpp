@@ -1,5 +1,4 @@
 #include "ndi_receiver.h"
-#include "ndi_manager.h"
 #include "../common/logger.h"
 #include <chrono>
 #include <thread>
@@ -44,7 +43,7 @@ bool NDIReceiver::initialize() {
         return true;
     }
     
-    if (!NDIManager::getInstance().initialize()) {
+    if (!NDIlib_initialize()) {
         Logger::error("Failed to initialize NDI library");
         return false;
     }
@@ -69,8 +68,8 @@ void NDIReceiver::shutdown() {
         find_instance_ = nullptr;
     }
     
-    // Use the NDIManager to properly handle NDI library lifecycle
-    NDIManager::getInstance().shutdown();
+    // Destroy NDI library (single instance, so this is safe)
+    NDIlib_destroy();
     
     initialized_ = false;
     Logger::info("NDI receiver shutdown");

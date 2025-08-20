@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# Pre-start check for ndi-display service
+# Ensures console is not active on the target display
+#
+
+DISPLAY_ID=$1
+
+if [ -z "$DISPLAY_ID" ]; then
+    echo "Error: Display ID not provided"
+    exit 1
+fi
+
+# Check if console is active on this display
+VTCON_PATH="/sys/class/vtconsole/vtcon${DISPLAY_ID}/bind"
+
+if [ -f "$VTCON_PATH" ]; then
+    if [ "$(cat $VTCON_PATH)" = "1" ]; then
+        echo "Error: Console is active on display ${DISPLAY_ID}"
+        echo "Run: sudo ndi-display-console-manager disable ${DISPLAY_ID}"
+        exit 1
+    fi
+fi
+
+# Check if display device exists
+if [ ! -e "/dev/dri/card0" ] && [ ! -e "/dev/fb${DISPLAY_ID}" ]; then
+    echo "Warning: No display device found for display ${DISPLAY_ID}"
+    # Don't fail, as this might be normal in some setups
+fi
+
+exit 0

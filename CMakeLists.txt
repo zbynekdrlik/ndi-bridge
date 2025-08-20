@@ -269,11 +269,9 @@ if(PLATFORM_LINUX)
         src/display/main.cpp
         src/display/ndi_receiver.cpp
         src/display/ndi_receiver.h
-        src/display/ndi_manager.h
+        src/display/status_reporter.h
         src/display/display_output.h
         src/display/display_output.cpp
-        src/display/stream_manager.cpp
-        src/display/stream_manager.h
         src/common/logger.cpp
         src/common/logger.h
         src/common/version.h

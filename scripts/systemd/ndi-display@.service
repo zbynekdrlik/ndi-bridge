@@ -1,0 +1,44 @@
+[Unit]
+Description=NDI Display %i - Receive and display NDI stream on HDMI %i
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ndi-bridge
+Group=video
+
+# Load configuration for this display
+EnvironmentFile=/etc/ndi-bridge/display-%i.conf
+
+# Pre-start checks
+ExecStartPre=/usr/local/bin/ndi-display-console-check %i
+
+# Main service - stream name from config, display ID from instance
+ExecStart=/usr/local/bin/ndi-display "${STREAM_NAME}" %i
+
+# Restart on failure
+Restart=on-failure
+RestartSec=5
+
+# Resource limits
+LimitNOFILE=65536
+LimitRTPRIO=95
+LimitMEMLOCK=infinity
+
+# CPU scheduling for real-time video
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=80
+
+# Allow access to display devices
+SupplementaryGroups=video render
+DeviceAllow=/dev/dri/card* rw
+DeviceAllow=/dev/fb* rw
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ndi-display-%i
+
+[Install]
+WantedBy=multi-user.target

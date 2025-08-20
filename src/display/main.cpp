@@ -1,17 +1,17 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <thread>
 #include <atomic>
 #include <csignal>
 #include <cstring>
-#include <memory>
-#include <map>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 
 #include "ndi_receiver.h"
 #include "display_output.h"
-#include "stream_manager.h"
+#include "status_reporter.h"
 #include "../common/logger.h"
 #include "../common/version.h"
 
@@ -29,19 +29,16 @@ void signalHandler(int signal) {
 }
 
 void printUsage(const char* program) {
-    std::cout << "NDI Display - Show NDI streams on HDMI outputs\n";
+    std::cout << "NDI Display - Single stream to display receiver\n";
     std::cout << "Version: " << NDI_BRIDGE_VERSION << "\n\n";
     std::cout << "Usage:\n";
+    std::cout << "  " << program << " <stream_name> <display_id>  # Receive and display\n";
     std::cout << "  " << program << " list                        # List available NDI streams\n";
     std::cout << "  " << program << " displays                    # List available displays\n";
-    std::cout << "  " << program << " show <stream> <display>     # Show stream on display\n";
-    std::cout << "  " << program << " stop <display>              # Stop playback on display\n";
-    std::cout << "  " << program << " status                      # Show current mappings\n";
-    std::cout << "  " << program << " auto                        # Auto-map first 3 streams to displays\n";
+    std::cout << "  " << program << " status                      # Show all displays status\n";
     std::cout << "\nExamples:\n";
+    std::cout << "  " << program << " \"Camera 1\" 0                # Show Camera 1 on display 0\n";
     std::cout << "  " << program << " list\n";
-    std::cout << "  " << program << " show \"Camera 1\" 0\n";
-    std::cout << "  " << program << " stop 0\n";
 }
 
 int listStreams() {
@@ -68,6 +65,7 @@ int listStreams() {
         }
     }
     
+    receiver.shutdown();
     return 0;
 }
 
@@ -84,11 +82,24 @@ int listDisplays() {
     std::cout << "------------------\n";
     for (const auto& disp : displays) {
         std::cout << "Display " << disp.id << ": " << disp.connector;
+        
+        // Check if console is active on this display
+        std::string vtcon_path = "/sys/class/vtconsole/vtcon" + 
+                                 std::to_string(disp.id) + "/bind";
+        bool console_active = false;
+        if (std::filesystem::exists(vtcon_path)) {
+            std::ifstream f(vtcon_path);
+            std::string value;
+            if (f >> value && value == "1") {
+                console_active = true;
+            }
+        }
+        
         if (disp.connected) {
             std::cout << " [" << disp.width << "x" << disp.height 
                      << " @ " << disp.refresh_rate << "Hz]";
-            if (disp.active) {
-                std::cout << " *ACTIVE*";
+            if (console_active) {
+                std::cout << " *CONSOLE*";
             }
         } else {
             std::cout << " [Not connected]";
@@ -96,10 +107,96 @@ int listDisplays() {
         std::cout << "\n";
     }
     
+    display->shutdown();
     return 0;
 }
 
-int showStream(const std::string& stream_name, int display_id) {
+int showStatus() {
+    std::cout << "NDI Display System Status\n";
+    std::cout << "=========================\n\n";
+    
+    // Check console policy
+    std::string policy_file = "/etc/ndi-bridge/display-policy.conf";
+    int console_display = 0;
+    if (std::filesystem::exists(policy_file)) {
+        std::ifstream f(policy_file);
+        std::string line;
+        while (std::getline(f, line)) {
+            if (line.find("CONSOLE_DISPLAY=") == 0) {
+                console_display = std::stoi(line.substr(16));
+            }
+        }
+    }
+    
+    // Show status for each display
+    for (int i = 0; i < 3; i++) {
+        std::cout << "Display " << i << " (HDMI-" << (i+1) << "): ";
+        
+        // Check if NDI is running on this display
+        std::string status_file = "/var/run/ndi-display/display-" + 
+                                 std::to_string(i) + ".status";
+        
+        if (std::filesystem::exists(status_file)) {
+            // Parse status file
+            std::ifstream f(status_file);
+            std::string line;
+            std::string stream_name, resolution, fps, bitrate;
+            uint64_t frames_received = 0, frames_dropped = 0;
+            
+            while (std::getline(f, line)) {
+                if (line.find("STREAM_NAME=") == 0) {
+                    stream_name = line.substr(12);
+                    // Remove quotes
+                    stream_name.erase(0, 1);
+                    stream_name.erase(stream_name.length() - 1);
+                } else if (line.find("RESOLUTION=") == 0) {
+                    resolution = line.substr(11);
+                } else if (line.find("FPS=") == 0) {
+                    fps = line.substr(4);
+                } else if (line.find("BITRATE=") == 0) {
+                    bitrate = line.substr(8);
+                } else if (line.find("FRAMES_RECEIVED=") == 0) {
+                    frames_received = std::stoull(line.substr(16));
+                } else if (line.find("FRAMES_DROPPED=") == 0) {
+                    frames_dropped = std::stoull(line.substr(15));
+                }
+            }
+            
+            std::cout << stream_name << "\n";
+            std::cout << "  Resolution: " << resolution << " @ " << fps << " fps\n";
+            std::cout << "  Bitrate: " << bitrate << " Mbps\n";
+            std::cout << "  Frames: " << frames_received << " received, " 
+                     << frames_dropped << " dropped\n";
+        } else if (i == console_display) {
+            std::cout << "Linux Console (TTY)\n";
+        } else {
+            std::cout << "Not active\n";
+        }
+        std::cout << "\n";
+    }
+    
+    std::cout << "Console Policy: Display " << console_display 
+              << " reserved for console\n";
+    std::cout << "Emergency Access: SSH or Ctrl+Alt+F1\n";
+    
+    return 0;
+}
+
+int receiveAndDisplay(const std::string& stream_name, int display_id) {
+    // Check if console is active on this display
+    std::string vtcon_path = "/sys/class/vtconsole/vtcon" + 
+                            std::to_string(display_id) + "/bind";
+    if (std::filesystem::exists(vtcon_path)) {
+        std::ifstream f(vtcon_path);
+        std::string value;
+        if (f >> value && value == "1") {
+            Logger::error("Console is active on display " + std::to_string(display_id));
+            Logger::error("Run: ndi-display-config " + std::to_string(display_id) + 
+                         " to configure this display");
+            return 1;
+        }
+    }
+    
     // Initialize receiver
     NDIReceiver receiver;
     if (!receiver.initialize()) {
@@ -107,8 +204,8 @@ int showStream(const std::string& stream_name, int display_id) {
         return 1;
     }
     
-    // Find and connect to source
-    std::cout << "Connecting to '" << stream_name << "'...\n";
+    // Connect to stream
+    Logger::info("Connecting to '" + stream_name + "'...");
     if (!receiver.connect(stream_name)) {
         Logger::error("Failed to connect to stream: " + stream_name);
         return 1;
@@ -128,51 +225,116 @@ int showStream(const std::string& stream_name, int display_id) {
     }
     
     auto disp_info = display->getCurrentDisplay();
-    std::cout << "Displaying on " << disp_info.connector 
-              << " (" << disp_info.width << "x" << disp_info.height << ")\n";
+    Logger::info("Displaying on " + disp_info.connector + 
+                " (" + std::to_string(disp_info.width) + "x" + 
+                std::to_string(disp_info.height) + ")");
     
-    // Capture display pointer (safe because we control its lifetime in this function)
-    auto* display_ptr = display.get();
+    // Status reporter
+    StatusReporter status(display_id);
     
-    // Set up video frame callback
-    receiver.setVideoFrameCallback(
-        [display_ptr](const NDIlib_video_frame_v2_t& frame) {
-            // Display the frame
-            if (display_ptr) {
-                display_ptr->displayFrame(
-                    frame.p_data,
-                    frame.xres,
-                    frame.yres,
-                    PixelFormat::BGRA,
-                    frame.line_stride_in_bytes
-                );
-            }
-        }
-    );
+    // Frame statistics
+    uint64_t frame_count = 0;
+    uint64_t frames_dropped = 0;
+    auto start_time = std::chrono::steady_clock::now();
+    auto last_status_update = start_time;
     
-    // Start receiving in separate thread
-    std::thread receive_thread([&receiver]() {
-        receiver.startReceiving();
-    });
+    Logger::info("Starting receive loop... Press Ctrl+C to stop");
     
-    std::cout << "Streaming... Press Ctrl+C to stop\n";
-    
-    // Main loop
+    // Main receive loop - single threaded for low latency
     while (!g_shutdown) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        NDIlib_video_frame_v2_t video_frame;
+        NDIlib_audio_frame_v2_t audio_frame;
+        NDIlib_metadata_frame_t metadata_frame;
         
-        // Print stats periodically
-        auto stats = receiver.getStats();
-        if (stats.frames_received % 60 == 0 && stats.frames_received > 0) {
-            Logger::info("Frames: " + std::to_string(stats.frames_received) + 
-                        " (" + std::to_string(stats.fps) + " fps)");
+        // Capture with 100ms timeout
+        NDIlib_frame_type_e frame_type = NDIlib_recv_capture_v2(
+            receiver.getRecvInstance(),
+            &video_frame,
+            &audio_frame,
+            &metadata_frame,
+            100
+        );
+        
+        switch (frame_type) {
+            case NDIlib_frame_type_video: {
+                frame_count++;
+                
+                // Display the frame directly - no queuing for lowest latency
+                bool displayed = display->displayFrame(
+                    video_frame.p_data,
+                    video_frame.xres,
+                    video_frame.yres,
+                    PixelFormat::BGRA,
+                    video_frame.line_stride_in_bytes
+                );
+                
+                if (!displayed) {
+                    frames_dropped++;
+                }
+                
+                // Free the frame
+                NDIlib_recv_free_video_v2(receiver.getRecvInstance(), &video_frame);
+                
+                // Update status every 30 frames (roughly 1 second at 30fps)
+                if (frame_count % 30 == 0) {
+                    auto now = std::chrono::steady_clock::now();
+                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now - last_status_update).count();
+                    
+                    if (elapsed > 0) {
+                        float fps = 30.0f * 1000.0f / elapsed;
+                        float bitrate_mbps = (video_frame.line_stride_in_bytes * 
+                                            video_frame.yres * fps * 8) / 1000000.0f;
+                        
+                        status.update(stream_name, 
+                                    video_frame.xres, video_frame.yres,
+                                    fps, bitrate_mbps,
+                                    frame_count, frames_dropped);
+                        
+                        last_status_update = now;
+                        
+                        // Log periodically
+                        if (frame_count % 300 == 0) {
+                            Logger::info("Frames: " + std::to_string(frame_count) + 
+                                       " (" + std::to_string(fps) + " fps)");
+                        }
+                    }
+                }
+                break;
+            }
+            
+            case NDIlib_frame_type_audio:
+                // We ignore audio
+                NDIlib_recv_free_audio_v2(receiver.getRecvInstance(), &audio_frame);
+                break;
+                
+            case NDIlib_frame_type_metadata:
+                // We ignore metadata
+                NDIlib_recv_free_metadata(receiver.getRecvInstance(), &metadata_frame);
+                break;
+                
+            case NDIlib_frame_type_error:
+                Logger::error("NDI receive error");
+                frames_dropped++;
+                break;
+                
+            default:
+                // No data
+                break;
         }
     }
     
     // Clean shutdown
-    receiver.stopReceiving();
-    receive_thread.join();
+    Logger::info("Shutting down...");
     display->clearDisplay();
+    display->closeDisplay();
+    display->shutdown();
+    receiver.disconnect();
+    receiver.shutdown();
+    status.clear();
+    
+    Logger::info("Total frames: " + std::to_string(frame_count) + 
+               ", dropped: " + std::to_string(frames_dropped));
     
     return 0;
 }
@@ -190,97 +352,43 @@ int main(int argc, char* argv[]) {
     
     std::string command = argv[1];
     
+    // Single argument commands
     if (command == "list") {
         return listStreams();
     }
     else if (command == "displays") {
         return listDisplays();
     }
-    else if (command == "show") {
-        if (argc != 4) {
-            std::cerr << "Usage: " << argv[0] << " show <stream> <display>\n";
-            return 1;
-        }
-        std::string stream = argv[2];
-        int display = std::stoi(argv[3]);
-        return showStream(stream, display);
-    }
-    else if (command == "stop") {
-        if (argc != 3) {
-            std::cerr << "Usage: " << argv[0] << " stop <display>\n";
-            return 1;
-        }
-        
-        int display_id = std::stoi(argv[2]);
-        
-        // This command is meant to be used with the shell script
-        // which manages the PID files. For standalone use, we just
-        // inform the user about the proper usage.
-        std::cout << "Note: The 'stop' command is designed to work with the system service.\n";
-        std::cout << "To stop a display managed by the service, use: ndi-display-stop " << display_id << "\n";
-        std::cout << "To stop all displays, use: sudo systemctl stop ndi-display\n";
-        return 0;
-    }
     else if (command == "status") {
-        StreamManager manager;
-        if (!manager.initialize()) {
-            Logger::error("Failed to initialize stream manager");
-            return 1;
-        }
-        
-        auto mappings = manager.getMappings();
-        
-        if (mappings.empty()) {
-            std::cout << "No active stream mappings\n";
-        } else {
-            std::cout << "\nActive Stream Mappings:\n";
-            std::cout << "----------------------\n";
-            for (const auto& [display_id, stream_name] : mappings) {
-                std::cout << "Display " << display_id << " <- " << stream_name << "\n";
-                
-                // Get stats if available
-                auto stats = manager.getDisplayStats(display_id);
-                if (stats.frames_received > 0) {
-                    std::cout << "  Resolution: " << stats.width << "x" << stats.height << "\n";
-                    std::cout << "  FPS: " << stats.fps << "\n";
-                    std::cout << "  Frames: " << stats.frames_received << " received, " 
-                             << stats.frames_dropped << " dropped\n";
-                }
-            }
-        }
-        
-        return 0;
-    }
-    else if (command == "auto") {
-        StreamManager manager;
-        if (!manager.initialize()) {
-            Logger::error("Failed to initialize stream manager");
-            return 1;
-        }
-        
-        std::cout << "Starting automatic stream mapping...\n";
-        if (!manager.autoMap()) {
-            Logger::error("Auto-mapping failed");
-            return 1;
-        }
-        
-        std::cout << "Auto-mapping successful. Streaming... Press Ctrl+C to stop\n";
-        
-        // Keep running until shutdown
-        while (!g_shutdown) {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-        
-        manager.shutdown();
-        return 0;
+        return showStatus();
     }
     else if (command == "--help" || command == "-h") {
         printUsage(argv[0]);
         return 0;
     }
-    else {
-        std::cerr << "Unknown command: " << command << "\n";
-        printUsage(argv[0]);
-        return 1;
+    
+    // Main operation: receive and display
+    if (argc == 3) {
+        std::string stream_name = argv[1];
+        int display_id;
+        
+        try {
+            display_id = std::stoi(argv[2]);
+        } catch (...) {
+            std::cerr << "Error: Invalid display ID\n";
+            printUsage(argv[0]);
+            return 1;
+        }
+        
+        if (display_id < 0 || display_id > 2) {
+            std::cerr << "Error: Display ID must be 0, 1, or 2\n";
+            return 1;
+        }
+        
+        return receiveAndDisplay(stream_name, display_id);
     }
+    
+    std::cerr << "Error: Invalid arguments\n";
+    printUsage(argv[0]);
+    return 1;
 }
