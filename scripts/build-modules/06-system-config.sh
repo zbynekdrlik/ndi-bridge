@@ -52,6 +52,7 @@ apt-get install -y -qq --no-install-recommends \
     sudo \
     nano \
     wget \
+    curl \
     ca-certificates \
     iputils-ping \
     zstd 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
