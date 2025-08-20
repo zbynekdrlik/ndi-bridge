@@ -178,6 +178,13 @@ echo "  Hostname:    $(hostname)"
 echo "  Uptime:      $(uptime -p | sed 's/up //')"
 echo ""
 
+# NETWORK CONFIGURATION
+echo -e "${CYAN}▶ NETWORK CONFIGURATION${NC}"
+echo "  • Both ethernet ports are bridged (br0)"
+echo "  • Connect cable to either port"
+echo "  • Chain devices through second port"
+echo ""
+
 # BUILD INFO
 echo -e "${CYAN}▶ BUILD INFO${NC}"
 echo "  NDI Bridge:  v$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo 'Unknown')"
