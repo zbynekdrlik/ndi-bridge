@@ -37,7 +37,7 @@ server {
     
     # Terminal proxy to wetty
     location /terminal/ {
-        proxy_pass http://127.0.0.1:7681;
+        proxy_pass http://127.0.0.1:7681/terminal;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
