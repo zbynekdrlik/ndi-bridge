@@ -10,9 +10,12 @@ while true; do
         case "${key,,}" in  # Convert to lowercase
             l)
                 clear
-                echo "=== NDI Bridge Logs (Press Ctrl+C to return) ==="
+                echo "=== NDI Bridge Logs (Recent 100 lines) ==="
                 echo ""
-                journalctl -u ndi-bridge -f
+                journalctl -u ndi-bridge -n 100 --no-pager | less
+                echo ""
+                echo "Press any key to return to dashboard..."
+                read -n 1 -s -r
                 ;;
             s)
                 clear
