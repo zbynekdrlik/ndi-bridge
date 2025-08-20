@@ -153,11 +153,11 @@ else
 fi
 echo "  Uptime:     $(uptime -p)"
 echo ""
-echo -e "\\\\033[1;36mBuild Information:\\\\033[0m"
+echo -e "\\033[1;36mBuild Information:\\033[0m"
 echo "  Built: $(cat /etc/ndi-bridge/build-timestamp 2>/dev/null || echo 'Unknown')"
 echo "  Version: $(cat /etc/ndi-bridge/build-script-version 2>/dev/null || echo 'Unknown')"
 echo ""
-echo -e "\\\\033[1;36mSoftware Versions:\\\\033[0m"
+echo -e "\\033[1;36mSoftware Versions:\\033[0m"
 echo "  NDI-Bridge: $(/usr/local/bin/ndi-bridge-version 2>/dev/null || echo 'Unknown')"
 echo ""
 echo -e "\\033[1;36mNetwork Configuration:\\033[0m"

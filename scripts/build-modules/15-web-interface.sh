@@ -314,10 +314,28 @@ mkdir -p /var/log/nginx
 chown -R www-data:www-data /var/lib/nginx
 chown -R www-data:www-data /var/log/nginx
 
+# Create systemd service to ensure nginx directories exist on tmpfs
+cat > /etc/systemd/system/nginx-tmpfs-dirs.service << 'EOFNGINXTMPFS'
+[Unit]
+Description=Create nginx directories on tmpfs
+Before=nginx.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'mkdir -p /var/log/nginx /var/lib/nginx/{body,proxy,fastcgi,uwsgi,scgi} && chown -R www-data:www-data /var/log/nginx /var/lib/nginx'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOFNGINXTMPFS
+
 # Enable services
 systemctl daemon-reload
+systemctl enable nginx-tmpfs-dirs
 systemctl enable nginx
 systemctl enable wetty
+systemctl start nginx-tmpfs-dirs
 systemctl start nginx
 systemctl start wetty
 
