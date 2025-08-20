@@ -3,9 +3,7 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include <functional>
 #include <atomic>
-#include <mutex>
 #include <Processing.NDI.Lib.h>
 
 namespace ndi_bridge {
@@ -21,8 +19,6 @@ struct NDISource {
     NDISource(const NDIlib_source_t& source);
 };
 
-// Callback for when a video frame is received
-using VideoFrameCallback = std::function<void(const NDIlib_video_frame_v2_t&)>;
 
 class NDIReceiver {
 public:
@@ -51,24 +47,6 @@ public:
     // Get current source name
     std::string getCurrentSourceName() const { return current_source_name_; }
     
-    // Set callback for video frames
-    void setVideoFrameCallback(VideoFrameCallback callback) { video_callback_ = callback; }
-    
-    // Start receiving (blocking call - run in separate thread)
-    void startReceiving();
-    
-    // Stop receiving
-    void stopReceiving();
-    
-    // Get statistics
-    struct Stats {
-        uint64_t frames_received = 0;
-        uint64_t frames_dropped = 0;
-        int width = 0;
-        int height = 0;
-        float fps = 0.0f;
-    };
-    Stats getStats() const;
     
     // Get raw NDI receiver instance for direct use (low latency)
     NDIlib_recv_instance_t getRecvInstance() const { return recv_instance_; }
@@ -79,13 +57,8 @@ private:
     
     bool initialized_ = false;
     bool connected_ = false;
-    std::atomic<bool> receiving_{false};
     
     std::string current_source_name_;
-    VideoFrameCallback video_callback_;
-    
-    mutable std::mutex stats_mutex_;
-    Stats stats_;
 };
 
 } // namespace display

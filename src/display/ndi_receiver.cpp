@@ -1,7 +1,5 @@
 #include "ndi_receiver.h"
 #include "../common/logger.h"
-#include <chrono>
-#include <thread>
 
 namespace ndi_bridge {
 namespace display {
@@ -33,7 +31,6 @@ NDIReceiver::NDIReceiver() {
 }
 
 NDIReceiver::~NDIReceiver() {
-    stopReceiving();
     disconnect();
     shutdown();
 }
@@ -68,9 +65,7 @@ void NDIReceiver::shutdown() {
         find_instance_ = nullptr;
     }
     
-    // Destroy NDI library (single instance, so this is safe)
-    NDIlib_destroy();
-    
+    // Note: We don't call NDIlib_destroy() here as multiple instances may exist
     initialized_ = false;
     Logger::info("NDI receiver shutdown");
 }
@@ -175,8 +170,6 @@ bool NDIReceiver::connect(const std::string& source_name) {
 }
 
 void NDIReceiver::disconnect() {
-    stopReceiving();
-    
     if (recv_instance_) {
         NDIlib_recv_destroy(recv_instance_);
         recv_instance_ = nullptr;
@@ -185,93 +178,9 @@ void NDIReceiver::disconnect() {
     connected_ = false;
     current_source_name_.clear();
     
-    // Reset stats
-    {
-        std::lock_guard<std::mutex> lock(stats_mutex_);
-        stats_ = Stats();
-    }
-    
     Logger::info("Disconnected from NDI source");
 }
 
-void NDIReceiver::startReceiving() {
-    if (!connected_) {
-        Logger::error("Not connected to any source");
-        return;
-    }
-    
-    receiving_ = true;
-    Logger::info("Starting NDI reception");
-    
-    while (receiving_ && connected_) {
-        NDIlib_video_frame_v2_t video_frame;
-        NDIlib_audio_frame_v2_t audio_frame;
-        NDIlib_metadata_frame_t metadata_frame;
-        
-        // Capture with 100ms timeout
-        NDIlib_frame_type_e frame_type = NDIlib_recv_capture_v2(
-            recv_instance_, 
-            &video_frame, 
-            &audio_frame, 
-            &metadata_frame, 
-            100
-        );
-        
-        switch (frame_type) {
-            case NDIlib_frame_type_video:
-                // Update stats
-                {
-                    std::lock_guard<std::mutex> lock(stats_mutex_);
-                    stats_.frames_received++;
-                    stats_.width = video_frame.xres;
-                    stats_.height = video_frame.yres;
-                    stats_.fps = static_cast<float>(video_frame.frame_rate_N) / video_frame.frame_rate_D;
-                }
-                
-                // Call callback if set
-                if (video_callback_) {
-                    video_callback_(video_frame);
-                }
-                
-                // Free the frame
-                NDIlib_recv_free_video_v2(recv_instance_, &video_frame);
-                break;
-                
-            case NDIlib_frame_type_audio:
-                // We ignore audio for now
-                NDIlib_recv_free_audio_v2(recv_instance_, &audio_frame);
-                break;
-                
-            case NDIlib_frame_type_metadata:
-                // We ignore metadata for now
-                NDIlib_recv_free_metadata(recv_instance_, &metadata_frame);
-                break;
-                
-            case NDIlib_frame_type_error:
-                Logger::error("NDI receive error");
-                {
-                    std::lock_guard<std::mutex> lock(stats_mutex_);
-                    stats_.frames_dropped++;
-                }
-                break;
-                
-            default:
-                // No data or other types
-                break;
-        }
-    }
-    
-    Logger::info("NDI reception stopped");
-}
-
-void NDIReceiver::stopReceiving() {
-    receiving_ = false;
-}
-
-NDIReceiver::Stats NDIReceiver::getStats() const {
-    std::lock_guard<std::mutex> lock(stats_mutex_);
-    return stats_;
-}
 
 } // namespace display
 } // namespace ndi_bridge

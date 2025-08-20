@@ -146,9 +146,13 @@ int showStatus() {
             while (std::getline(f, line)) {
                 if (line.find("STREAM_NAME=") == 0) {
                     stream_name = line.substr(12);
-                    // Remove quotes
-                    stream_name.erase(0, 1);
-                    stream_name.erase(stream_name.length() - 1);
+                    // Remove quotes if present
+                    if (!stream_name.empty() && stream_name[0] == '"') {
+                        stream_name.erase(0, 1);
+                    }
+                    if (!stream_name.empty() && stream_name.back() == '"') {
+                        stream_name.pop_back();
+                    }
                 } else if (line.find("RESOLUTION=") == 0) {
                     resolution = line.substr(11);
                 } else if (line.find("FPS=") == 0) {
@@ -260,11 +264,30 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                 frame_count++;
                 
                 // Display the frame directly - no queuing for lowest latency
+                // NDI typically provides BGRA/BGRX format when we request it
+                PixelFormat format = PixelFormat::BGRA;
+                
+                // Check actual format if needed
+                switch (video_frame.FourCC) {
+                    case NDIlib_FourCC_type_BGRA:
+                    case NDIlib_FourCC_type_BGRX:
+                        format = PixelFormat::BGRA;
+                        break;
+                    case NDIlib_FourCC_type_UYVY:
+                    case NDIlib_FourCC_type_UYVA:
+                        format = PixelFormat::UYVY;
+                        break;
+                    default:
+                        // Default to BGRA as we requested it
+                        format = PixelFormat::BGRA;
+                        break;
+                }
+                
                 bool displayed = display->displayFrame(
                     video_frame.p_data,
                     video_frame.xres,
                     video_frame.yres,
-                    PixelFormat::BGRA,
+                    format,
                     video_frame.line_stride_in_bytes
                 );
                 
@@ -283,7 +306,9 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                     
                     if (elapsed > 0) {
                         float fps = 30.0f * 1000.0f / elapsed;
-                        float bitrate_mbps = (video_frame.line_stride_in_bytes * 
+                        // Calculate actual data size, not including padding
+                        int bytes_per_pixel = 4; // BGRA is 4 bytes
+                        float bitrate_mbps = (video_frame.xres * bytes_per_pixel * 
                                             video_frame.yres * fps * 8) / 1000000.0f;
                         
                         status.update(stream_name, 
@@ -318,8 +343,12 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                 frames_dropped++;
                 break;
                 
+            case NDIlib_frame_type_none:
+                // Timeout - normal, just continue
+                break;
+                
             default:
-                // No data
+                // Other frame types we don't handle
                 break;
         }
     }
