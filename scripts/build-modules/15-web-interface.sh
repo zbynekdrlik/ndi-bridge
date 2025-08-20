@@ -35,9 +35,9 @@ server {
         try_files $uri $uri/ =404;
     }
     
-    # Terminal proxy to wetty with WebSocket support
-    location /terminal {
-        proxy_pass http://127.0.0.1:7681/;
+    # Terminal proxy to wetty - handle with and without trailing slash
+    location ~ ^/terminal {
+        proxy_pass http://127.0.0.1:7681;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -50,22 +50,6 @@ server {
         # Disable buffering for WebSocket
         proxy_buffering off;
         proxy_request_buffering off;
-        
-        # WebSocket specific
-        proxy_connect_timeout 7d;
-        proxy_send_timeout 7d;
-    }
-    
-    # WebSocket endpoint for wetty
-    location /socket.io/ {
-        proxy_pass http://127.0.0.1:7681/socket.io/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
     
     # API endpoints for future use
@@ -305,7 +289,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base / --command /usr/local/bin/ndi-bridge-tmux-session
+ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base /terminal --command /usr/local/bin/ndi-bridge-tmux-session
 Restart=always
 RestartSec=10
 Environment="NODE_ENV=production"
