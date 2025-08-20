@@ -13,10 +13,10 @@ mkdir -p /opt/ndi-bridge /etc/ndi-bridge
 echo "BUILD_TIMESTAMP_PLACEHOLDER" > /etc/ndi-bridge/build-timestamp
 echo "BUILD_SCRIPT_VERSION_PLACEHOLDER" > /etc/ndi-bridge/build-script-version
 
-# NDI configuration
-cat > /etc/ndi-bridge/config << 'EOFCONFIG'
+# NDI configuration - use hostname as default NDI name
+cat > /etc/ndi-bridge/config << EOFCONFIG
 DEVICE="/dev/video0"
-NDI_NAME=""
+NDI_NAME="NDI Bridge \$(cat /etc/hostname 2>/dev/null || echo 'Device')"
 EOFCONFIG
 
 # NDI runner script

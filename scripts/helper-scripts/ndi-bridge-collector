@@ -7,18 +7,35 @@ mkdir -p /var/run/ndi-bridge
 
 # Main collection loop
 while true; do
-    # 1. Get current FPS from last metrics entry
-    METRICS=$(journalctl -u ndi-bridge -n 200 --no-pager 2>/dev/null | grep "METRICS|" | tail -1)
-    if [ -n "$METRICS" ]; then
-        FPS=$(echo "$METRICS" | sed -n 's/.*FPS:\([0-9.]*\).*/\1/p')
-        FRAMES=$(echo "$METRICS" | sed -n 's/.*FRAMES:\([0-9]*\).*/\1/p')
-        DROPPED=$(echo "$METRICS" | sed -n 's/.*DROPPED:\([0-9]*\).*/\1/p')
-        LATENCY=$(echo "$METRICS" | sed -n 's/.*LATENCY:\([0-9.]*\).*/\1/p')
-        
-        echo "$FPS" > /var/run/ndi-bridge/fps_current
-        echo "$FRAMES" > /var/run/ndi-bridge/frames_total
-        echo "$DROPPED" > /var/run/ndi-bridge/frames_dropped
-        [ -n "$LATENCY" ] && echo "$LATENCY" > /var/run/ndi-bridge/latency_ms
+    # 1. Get current FPS from last metrics entry (only if recent)
+    METRICS_LINE=$(journalctl -u ndi-bridge -n 200 --no-pager 2>/dev/null | grep "METRICS|" | tail -1)
+    if [ -n "$METRICS_LINE" ]; then
+        # Extract timestamp and check if recent (within 5 seconds)
+        METRICS_TIME=$(echo "$METRICS_LINE" | cut -d' ' -f1-3)
+        if [ -n "$METRICS_TIME" ]; then
+            METRICS_EPOCH=$(date -d "$METRICS_TIME" +%s 2>/dev/null || echo "0")
+            NOW_EPOCH=$(date +%s)
+            AGE=$((NOW_EPOCH - METRICS_EPOCH))
+            
+            # Only use metrics if less than 5 seconds old
+            if [ "$AGE" -lt 5 ]; then
+                FPS=$(echo "$METRICS_LINE" | sed -n 's/.*FPS:\([0-9.]*\).*/\1/p')
+                FRAMES=$(echo "$METRICS_LINE" | sed -n 's/.*FRAMES:\([0-9]*\).*/\1/p')
+                DROPPED=$(echo "$METRICS_LINE" | sed -n 's/.*DROPPED:\([0-9]*\).*/\1/p')
+                LATENCY=$(echo "$METRICS_LINE" | sed -n 's/.*LATENCY:\([0-9.]*\).*/\1/p')
+                
+                echo "$FPS" > /var/run/ndi-bridge/fps_current
+                echo "$FRAMES" > /var/run/ndi-bridge/frames_total
+                echo "$DROPPED" > /var/run/ndi-bridge/frames_dropped
+                [ -n "$LATENCY" ] && echo "$LATENCY" > /var/run/ndi-bridge/latency_ms
+            else
+                # Metrics are stale - clear them
+                echo "0.00" > /var/run/ndi-bridge/fps_current
+                echo "0" > /var/run/ndi-bridge/frames_total
+                echo "0" > /var/run/ndi-bridge/frames_dropped
+                echo "N/A" > /var/run/ndi-bridge/latency_ms
+            fi
+        fi
     fi
     
     # 2. Get 10-minute FPS history and calculate average
@@ -53,10 +70,16 @@ while true; do
         echo "0" > /var/run/ndi-bridge/network_mbps
     fi
     
-    # 4. Check capture state
-    if systemctl is-active --quiet ndi-bridge; then
-        # Check if actually capturing (has recent metrics)
-        LAST_METRIC_TIME=$(journalctl -u ndi-bridge -n 1 --no-pager 2>/dev/null | grep "METRICS|" | head -1 | cut -d' ' -f1-3)
+    # 4. Check capture state and device status
+    # First check if the configured device exists
+    DEVICE=$(cat /etc/ndi-bridge/config 2>/dev/null | grep DEVICE | cut -d'"' -f2 || echo "/dev/video0")
+    
+    if [ ! -e "$DEVICE" ]; then
+        # Device doesn't exist
+        echo "NO_DEVICE" > /var/run/ndi-bridge/capture_state
+    elif systemctl is-active --quiet ndi-bridge; then
+        # Service is running, check if actually capturing (has recent metrics)
+        LAST_METRIC_TIME=$(journalctl -u ndi-bridge -n 10 --no-pager 2>/dev/null | grep "METRICS|" | tail -1 | cut -d' ' -f1-3)
         if [ -n "$LAST_METRIC_TIME" ]; then
             # Check if metric is recent (within last 5 seconds)
             LAST_EPOCH=$(date -d "$LAST_METRIC_TIME" +%s 2>/dev/null || echo "0")
@@ -66,7 +89,13 @@ while true; do
             if [ "$DIFF" -lt 5 ]; then
                 echo "CAPTURING" > /var/run/ndi-bridge/capture_state
             else
-                echo "IDLE" > /var/run/ndi-bridge/capture_state
+                # Check for recent errors
+                RECENT_ERROR=$(journalctl -u ndi-bridge -n 5 --no-pager 2>/dev/null | grep -E "ERROR|Failed to open device")
+                if [ -n "$RECENT_ERROR" ]; then
+                    echo "ERROR" > /var/run/ndi-bridge/capture_state
+                else
+                    echo "IDLE" > /var/run/ndi-bridge/capture_state
+                fi
             fi
         else
             echo "STARTING" > /var/run/ndi-bridge/capture_state

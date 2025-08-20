@@ -447,6 +447,10 @@ void V4L2Capture::captureThreadExtreme() {
             // Timeout - check if we missed a frame
             if (now > next_frame_time + frame_duration) {
                 dropped_frames++;
+                {
+                    std::lock_guard<std::mutex> lock(stats_mutex_);
+                    stats_.frames_dropped++;  // Update the actual stats!
+                }
                 next_frame_time = now; // Reset timing
             }
             continue;
@@ -456,6 +460,12 @@ void V4L2Capture::captureThreadExtreme() {
         auto dequeue_start = std::chrono::high_resolution_clock::now();
         if (ioctl(fd_, VIDIOC_DQBUF, &v4l2_buf) < 0) {
             if (errno == EAGAIN) continue;
+            // Critical error - count as dropped frame and break
+            {
+                std::lock_guard<std::mutex> lock(stats_mutex_);
+                stats_.frames_dropped++;
+            }
+            dropped_frames++;
             setError("Failed to dequeue buffer: " + std::string(strerror(errno)));
             break;
         }
