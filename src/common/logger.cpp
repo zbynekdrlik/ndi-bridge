@@ -35,6 +35,22 @@ void Logger::logVersion(const std::string& version) {
     info(msg.str());
 }
 
+void Logger::metrics(double fps, uint64_t frames, uint64_t dropped, double latency_ms) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    // Format: [timestamp] METRICS|FPS:xx.xx|FRAMES:xxxxx|DROPPED:x|LATENCY:x.x
+    std::cout << "[" << getCurrentTimestamp() << "] METRICS|"
+              << "FPS:" << std::fixed << std::setprecision(2) << fps << "|"
+              << "FRAMES:" << frames << "|"
+              << "DROPPED:" << dropped;
+    
+    if (latency_ms >= 0) {
+        std::cout << "|LATENCY:" << std::fixed << std::setprecision(1) << latency_ms;
+    }
+    
+    std::cout << std::endl;
+}
+
 void Logger::log(Level level, const std::string& message) {
     std::lock_guard<std::mutex> lock(mutex_);
     

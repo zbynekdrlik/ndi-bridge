@@ -274,16 +274,6 @@ EOFTMUX
 
 chmod +x /usr/local/bin/ndi-bridge-tmux-session
 
-# Create version wrapper to prevent ndi-bridge --version from hanging
-cat > /usr/local/bin/ndi-bridge-version << 'EOFVERSION'
-#!/bin/bash
-# Safe wrapper to get NDI Bridge version
-# ndi-bridge --version tries to start the full app, so we use timeout
-timeout 0.5 /opt/ndi-bridge/ndi-bridge --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) {print $i; exit}}'
-EOFVERSION
-
-chmod +x /usr/local/bin/ndi-bridge-version
-
 # Create wetty systemd service
 cat > /etc/systemd/system/wetty.service << 'EOFWETTY'
 [Unit]

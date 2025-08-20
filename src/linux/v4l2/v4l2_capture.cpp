@@ -536,6 +536,12 @@ void V4L2Capture::captureThreadExtreme() {
                         " (measured over " + std::to_string(fps_window) + " frames)" +
                         ", max frame gap: " + std::to_string(max_frame_gap_ms) + "ms");
             
+            // Emit metrics for monitoring (every ~2 seconds at 60fps)
+            {
+                std::lock_guard<std::mutex> lock(stats_mutex_);
+                Logger::metrics(actual_fps, stats_.frames_captured, stats_.frames_dropped, stats_.avg_e2e_latency_ms);
+            }
+            
             // Reset max frame gap
             max_frame_gap_ms = 0.0;
             
