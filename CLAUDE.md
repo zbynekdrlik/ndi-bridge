@@ -54,22 +54,31 @@ cmake --build . --config Debug  # Windows
 - **NEVER run `build-image-for-rufus.sh` with direct console output** - it causes Claude to crash due to excessive binary dump output
 - **ALWAYS redirect output to a file and monitor the file separately**
 - The script produces large amounts of binary data that must not be displayed directly
+- **Script location**: The script is in the repository root directory, NOT in scripts/
 
 ```bash
-# CORRECT: Create bootable USB image with output redirection
+# CORRECT: Create bootable USB image with output redirection (run from repo root)
+cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge
 sudo ./build-image-for-rufus.sh > build-rufus.log 2>&1 &
-# Monitor progress in separate terminal or with:
-tail -f build-rufus.log | grep -E "(Step|Progress|Error|Warning|Complete)"
 
 # OR: Direct USB creation (native Linux) - also redirect output
 sudo ./build-usb-with-log.sh /dev/sdX > build-usb.log 2>&1  # Replace sdX with USB device
 ```
 
-**Monitoring Build Progress:**
-- Use `tail -f` with grep filters to track specific events
-- Check file size periodically: `ls -lh *.img`
-- Monitor system resources: `htop` or `top` to ensure build is running
-- Expected build time: 10-20 minutes depending on system
+### Monitoring Build Progress
+
+```bash
+# Start build with output redirection (takes 10-20 minutes)
+sudo ./build-image-for-rufus.sh > build-rufus.log 2>&1 &
+
+# Monitor progress by checking disk usage (shows build phase)
+watch -n 30 'df -h /mnt/usb 2>/dev/null | tail -1'
+
+# Build completes when ndi-bridge.img appears (4GB file)
+ls -lh ndi-bridge.img
+```
+
+**Important:** After build, verify loop devices are cleaned: `sudo losetup -a` should show nothing.
 
 ### Build Options
 - `BUILD_TESTS=ON/OFF` - Build unit tests (default: OFF)
@@ -94,6 +103,7 @@ ndi-bridge.exe "USB Video Device" "Camera 1" # Windows
 - `ndi-bridge-logs` - View service logs  
 - `ndi-bridge-set-name <name>` - Set NDI stream name
 - `ndi-bridge-netstat` - Network bridge status
+- `ndi-bridge-web` - Web interface control (status, restart, password management)
 
 ## Architecture Overview
 
@@ -233,3 +243,92 @@ Management tools for USB appliance:
 - PTP (Precision Time Protocol) support for sub-microsecond accuracy
 - NTP fallback for general network time sync  
 - Critical for frame-accurate NDI streaming in professional environments
+
+## Read-Only Filesystem and Power Resistance
+
+### Design Philosophy
+The NDI Bridge USB appliance is designed with **extreme power-outage resistance** as a primary goal:
+- **Read-only root filesystem** prevents corruption during unexpected power loss
+- **tmpfs overlays** provide writable areas in RAM that are lost on reboot (by design)
+- **No persistent state changes** - configuration changes require explicit remount to read-write
+- **Automatic recovery** - system always boots to a known good state
+
+### Read-Only Filesystem Architecture
+```
+/ (root)          - Read-only ext4 filesystem
+├── /tmp          - tmpfs (RAM, cleared on reboot)
+├── /var/log      - tmpfs (RAM, logs lost on reboot)
+├── /var/lib      - Partially tmpfs for runtime state
+└── /run          - tmpfs (RAM, runtime state)
+```
+
+### Important Considerations for Development
+When adding features that require file writes:
+1. **Nginx**: Requires writable directories for proxy buffering
+   - Solution: Create `/var/lib/nginx/*` directories after boot
+   - Disable proxy buffering with `proxy_buffering off`
+
+2. **Service configurations**: Must handle read-only filesystem
+   - Solution: Create required directories in tmpfs during boot
+   - Use systemd tmpfiles.d for automatic directory creation
+
+3. **Log files**: Written to tmpfs, lost on reboot
+   - This is intentional for power-outage resistance
+   - Use `journalctl` for persistent system logs (stored in RAM)
+
+4. **Configuration changes**: Require explicit remount
+   - Use `ndi-bridge-rw` to temporarily mount as read-write
+   - Use `ndi-bridge-ro` to return to read-only mode
+   - Changes persist only when saved during read-write mode
+
+## Web Interface
+
+### Overview
+The NDI Bridge includes a web-based management interface accessible via HTTP:
+- **Authentication**: HTTP Basic Auth (username: admin, password: newlevel)
+- **Terminal Access**: Full bash terminal via wetty (Node.js-based web terminal)
+- **Persistent Sessions**: Uses tmux for session persistence across browser connections
+- **Shared Sessions**: All browsers connect to the same tmux session
+
+### Web Interface Components
+1. **Nginx**: Reverse proxy and authentication
+   - Serves static landing page
+   - Proxies WebSocket connections to wetty
+   - Handles HTTP Basic Authentication
+
+2. **Wetty**: Web-based terminal emulator
+   - Node.js application using xterm.js
+   - Connects to tmux session wrapper
+   - Supports full terminal features including Ctrl-C
+
+3. **Tmux**: Terminal multiplexer for persistence
+   - Single shared session named "ndi-bridge"
+   - Maintains state across browser disconnections
+   - Allows multiple browsers to view same session
+
+### Access Methods
+```bash
+# Web Interface URLs
+http://ndi-bridge-devicename.local/     # mDNS hostname
+http://shortname.local/                  # Short alias (if configured)
+http://10.77.9.xxx/                      # Direct IP address
+
+# Terminal endpoint
+http://hostname/terminal/                # Opens persistent tmux session
+```
+
+### Known Limitations
+1. **ndi-bridge --version** hangs when called directly
+   - Workaround: `/usr/local/bin/ndi-bridge-version` wrapper with timeout
+   - The binary tries to start the full application instead of just showing version
+
+2. **mDNS in WSL**: *.local addresses don't resolve in WSL
+   - Test from Windows host or use IP addresses
+   - Use `avahi-browse` to verify mDNS advertisements
+
+### Web Interface Files
+- `/etc/nginx/sites-available/ndi-bridge` - Nginx configuration
+- `/etc/nginx/.htpasswd` - Authentication file
+- `/usr/local/bin/ndi-bridge-tmux-session` - Tmux session wrapper
+- `/usr/local/bin/ndi-bridge-web` - Web interface management script
+- `/var/www/ndi-bridge/index.html` - Landing page
