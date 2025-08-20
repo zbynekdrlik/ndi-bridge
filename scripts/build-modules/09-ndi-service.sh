@@ -13,10 +13,10 @@ mkdir -p /opt/ndi-bridge /etc/ndi-bridge
 echo "BUILD_TIMESTAMP_PLACEHOLDER" > /etc/ndi-bridge/build-timestamp
 echo "BUILD_SCRIPT_VERSION_PLACEHOLDER" > /etc/ndi-bridge/build-script-version
 
-# NDI configuration
-cat > /etc/ndi-bridge/config << 'EOFCONFIG'
+# NDI configuration - use hostname as default NDI name
+cat > /etc/ndi-bridge/config << EOFCONFIG
 DEVICE="/dev/video0"
-NDI_NAME=""
+NDI_NAME="NDI Bridge \$(cat /etc/hostname 2>/dev/null || echo 'Device')"
 EOFCONFIG
 
 # NDI runner script
@@ -127,6 +127,31 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl enable setup-logs
 else
     update-rc.d setup-logs enable 2>/dev/null || true
+fi
+
+# Create systemd service for metrics collector
+cat > /etc/systemd/system/ndi-bridge-collector.service << EOFCOLLECTOR
+[Unit]
+Description=NDI Bridge Metrics Collector
+After=ndi-bridge.service
+Wants=ndi-bridge.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ndi-bridge-collector
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOFCOLLECTOR
+
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable ndi-bridge-collector
+else
+    update-rc.d ndi-bridge-collector enable 2>/dev/null || true
 fi
 
 EOFNDI

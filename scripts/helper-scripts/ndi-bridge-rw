@@ -1,0 +1,4 @@
+#!/bin/bash
+# Mount filesystem read-write
+mount -o remount,rw /
+echo "Filesystem mounted read-write. Remember to run 'ndi-bridge-ro' when done!"

@@ -55,6 +55,15 @@ public:
      */
     static void logVersion(const std::string& version);
 
+    /**
+     * Log structured metrics for monitoring
+     * @param fps Current frames per second
+     * @param frames Total frames captured
+     * @param dropped Total frames dropped
+     * @param latency_ms Optional latency in milliseconds
+     */
+    static void metrics(double fps, uint64_t frames, uint64_t dropped, double latency_ms = -1);
+
 private:
     static void log(Level level, const std::string& message);
     static std::string getCurrentTimestamp();

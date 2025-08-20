@@ -60,6 +60,12 @@ void printUsage(const char* program_name) {
 } // anonymous namespace
 
 int main(int argc, char* argv[]) {
+    // Check for --version BEFORE any initialization (no latency impact)
+    if (argc == 2 && std::string(argv[1]) == "--version") {
+        std::cout << "NDI Bridge v" << NDI_BRIDGE_VERSION << std::endl;
+        return 0;
+    }
+    
     // Log version on startup
     ndi_bridge::Logger::logVersion(NDI_BRIDGE_VERSION);
     ndi_bridge::Logger::info("Ultra-Low Latency NDI Bridge starting...");

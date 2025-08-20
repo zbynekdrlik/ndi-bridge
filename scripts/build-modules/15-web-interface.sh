@@ -30,18 +30,8 @@ server {
     root /var/www/ndi-bridge;
     index index.html;
     
-    # Redirect root to terminal
-    location = / {
-        return 301 /terminal;
-    }
-    
-    # Main location - serve static files
+    # Proxy everything to wetty terminal
     location / {
-        try_files $uri $uri/ =404;
-    }
-    
-    # Terminal proxy to wetty - handle with and without trailing slash
-    location ~ ^/terminal {
         proxy_pass http://127.0.0.1:7681;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -254,7 +244,7 @@ EOFHTML
 # Create tmux session wrapper for shared persistent sessions
 cat > /usr/local/bin/ndi-bridge-tmux-session << 'EOFTMUX'
 #!/bin/bash
-# Persistent tmux session - SHARED across all connections
+# Persistent tmux session - shared across all connections
 
 SESSION="ndi-bridge"
 
@@ -263,26 +253,15 @@ if ! tmux has-session -t $SESSION 2>/dev/null; then
     # Create new session only if it doesn't exist
     tmux new-session -d -s $SESSION
     
-    # Start with bash shell
-    tmux send-keys -t $SESSION "clear" C-m
+    # Start with welcome loop
     tmux send-keys -t $SESSION "/usr/local/bin/ndi-bridge-welcome-loop" C-m
 fi
 
-# ALWAYS attach to the existing session (multiple browsers share it)
+# Attach to the existing session (multiple connections share the same view)
 exec tmux attach-session -t $SESSION
 EOFTMUX
 
 chmod +x /usr/local/bin/ndi-bridge-tmux-session
-
-# Create version wrapper to prevent ndi-bridge --version from hanging
-cat > /usr/local/bin/ndi-bridge-version << 'EOFVERSION'
-#!/bin/bash
-# Safe wrapper to get NDI Bridge version
-# ndi-bridge --version tries to start the full app, so we use timeout
-timeout 0.5 /opt/ndi-bridge/ndi-bridge --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) {print $i; exit}}'
-EOFVERSION
-
-chmod +x /usr/local/bin/ndi-bridge-version
 
 # Create wetty systemd service
 cat > /etc/systemd/system/wetty.service << 'EOFWETTY'
@@ -294,7 +273,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base /terminal --command /usr/local/bin/ndi-bridge-tmux-session
+ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base / --command /usr/local/bin/ndi-bridge-tmux-session
 Restart=always
 RestartSec=10
 Environment="NODE_ENV=production"
