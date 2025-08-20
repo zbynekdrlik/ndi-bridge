@@ -60,7 +60,7 @@ ln -s /etc/nginx/sites-available/ndi-bridge /etc/nginx/sites-enabled/
 # Create password file for nginx (user: admin, password: newlevel)
 # Password hash for 'newlevel': generated with htpasswd
 echo 'admin:$apr1$7qPdJqOr$mKl9kUEO9kVCZ.l5TqF8M/' > /etc/nginx/.htpasswd
-chmod 600 /etc/nginx/.htpasswd
+chmod 644 /etc/nginx/.htpasswd
 
 # Create web root directory
 mkdir -p /var/www/ndi-bridge
@@ -257,6 +257,14 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOFTTYD
+
+# Create nginx writable directories for read-only filesystem
+mkdir -p /var/lib/nginx/body
+mkdir -p /var/lib/nginx/proxy
+mkdir -p /var/lib/nginx/fastcgi
+mkdir -p /var/lib/nginx/uwsgi
+mkdir -p /var/lib/nginx/scgi
+chown -R www-data:www-data /var/lib/nginx
 
 # Enable services
 systemctl daemon-reload
