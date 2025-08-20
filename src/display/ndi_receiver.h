@@ -5,6 +5,7 @@
 #include <memory>
 #include <functional>
 #include <atomic>
+#include <mutex>
 #include <Processing.NDI.Lib.h>
 
 namespace ndi_bridge {
@@ -67,7 +68,7 @@ public:
         int height = 0;
         float fps = 0.0f;
     };
-    Stats getStats() const { return stats_; }
+    Stats getStats() const;
     
 private:
     NDIlib_find_instance_t find_instance_ = nullptr;
@@ -80,6 +81,7 @@ private:
     std::string current_source_name_;
     VideoFrameCallback video_callback_;
     
+    mutable std::mutex stats_mutex_;
     Stats stats_;
 };
 

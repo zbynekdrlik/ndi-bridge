@@ -131,17 +131,22 @@ int showStream(const std::string& stream_name, int display_id) {
     std::cout << "Displaying on " << disp_info.connector 
               << " (" << disp_info.width << "x" << disp_info.height << ")\n";
     
+    // Capture display pointer (safe because we control its lifetime in this function)
+    auto* display_ptr = display.get();
+    
     // Set up video frame callback
     receiver.setVideoFrameCallback(
-        [&display](const NDIlib_video_frame_v2_t& frame) {
+        [display_ptr](const NDIlib_video_frame_v2_t& frame) {
             // Display the frame
-            display->displayFrame(
-                frame.p_data,
-                frame.xres,
-                frame.yres,
-                PixelFormat::BGRA,
-                frame.line_stride_in_bytes
-            );
+            if (display_ptr) {
+                display_ptr->displayFrame(
+                    frame.p_data,
+                    frame.xres,
+                    frame.yres,
+                    PixelFormat::BGRA,
+                    frame.line_stride_in_bytes
+                );
+            }
         }
     );
     
@@ -205,8 +210,15 @@ int main(int argc, char* argv[]) {
             std::cerr << "Usage: " << argv[0] << " stop <display>\n";
             return 1;
         }
-        // TODO: Implement stop functionality with stream manager
-        std::cout << "Stop functionality not yet implemented\n";
+        
+        int display_id = std::stoi(argv[2]);
+        
+        // This command is meant to be used with the shell script
+        // which manages the PID files. For standalone use, we just
+        // inform the user about the proper usage.
+        std::cout << "Note: The 'stop' command is designed to work with the system service.\n";
+        std::cout << "To stop a display managed by the service, use: ndi-display-stop " << display_id << "\n";
+        std::cout << "To stop all displays, use: sudo systemctl stop ndi-display\n";
         return 0;
     }
     else if (command == "status") {

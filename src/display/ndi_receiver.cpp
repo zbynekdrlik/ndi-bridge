@@ -1,4 +1,5 @@
 #include "ndi_receiver.h"
+#include "ndi_manager.h"
 #include "../common/logger.h"
 #include <chrono>
 #include <thread>
@@ -43,7 +44,7 @@ bool NDIReceiver::initialize() {
         return true;
     }
     
-    if (!NDIlib_initialize()) {
+    if (!NDIManager::getInstance().initialize()) {
         Logger::error("Failed to initialize NDI library");
         return false;
     }
@@ -58,14 +59,21 @@ void NDIReceiver::shutdown() {
         return;
     }
     
+    // Ensure we're disconnected before shutting down
+    if (connected_) {
+        disconnect();
+    }
+    
     if (find_instance_) {
         NDIlib_find_destroy(find_instance_);
         find_instance_ = nullptr;
     }
     
-    NDIlib_destroy();
+    // Use the NDIManager to properly handle NDI library lifecycle
+    NDIManager::getInstance().shutdown();
+    
     initialized_ = false;
-    Logger::info("NDI library shutdown");
+    Logger::info("NDI receiver shutdown");
 }
 
 std::vector<NDISource> NDIReceiver::findSources(int timeout_ms) {
@@ -177,7 +185,12 @@ void NDIReceiver::disconnect() {
     
     connected_ = false;
     current_source_name_.clear();
-    stats_ = Stats();
+    
+    // Reset stats
+    {
+        std::lock_guard<std::mutex> lock(stats_mutex_);
+        stats_ = Stats();
+    }
     
     Logger::info("Disconnected from NDI source");
 }
@@ -208,10 +221,13 @@ void NDIReceiver::startReceiving() {
         switch (frame_type) {
             case NDIlib_frame_type_video:
                 // Update stats
-                stats_.frames_received++;
-                stats_.width = video_frame.xres;
-                stats_.height = video_frame.yres;
-                stats_.fps = static_cast<float>(video_frame.frame_rate_N) / video_frame.frame_rate_D;
+                {
+                    std::lock_guard<std::mutex> lock(stats_mutex_);
+                    stats_.frames_received++;
+                    stats_.width = video_frame.xres;
+                    stats_.height = video_frame.yres;
+                    stats_.fps = static_cast<float>(video_frame.frame_rate_N) / video_frame.frame_rate_D;
+                }
                 
                 // Call callback if set
                 if (video_callback_) {
@@ -234,7 +250,10 @@ void NDIReceiver::startReceiving() {
                 
             case NDIlib_frame_type_error:
                 Logger::error("NDI receive error");
-                stats_.frames_dropped++;
+                {
+                    std::lock_guard<std::mutex> lock(stats_mutex_);
+                    stats_.frames_dropped++;
+                }
                 break;
                 
             default:
@@ -248,6 +267,11 @@ void NDIReceiver::startReceiving() {
 
 void NDIReceiver::stopReceiving() {
     receiving_ = false;
+}
+
+NDIReceiver::Stats NDIReceiver::getStats() const {
+    std::lock_guard<std::mutex> lock(stats_mutex_);
+    return stats_;
 }
 
 } // namespace display

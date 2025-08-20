@@ -15,8 +15,15 @@ apt-get install -y --no-install-recommends \
     libgl1-mesa-glx \
     mesa-utils
 
+# Create ndi-bridge user if it doesn't exist
+if ! id -u ndi-bridge >/dev/null 2>&1; then
+    useradd -r -s /bin/false -d /var/lib/ndi-bridge -m ndi-bridge
+    usermod -a -G video,audio,render ndi-bridge
+fi
+
 # Create NDI Display configuration directory
 mkdir -p /etc/ndi-bridge
+chown -R ndi-bridge:ndi-bridge /etc/ndi-bridge
 
 # Default display configuration
 cat > /etc/ndi-bridge/display-config.json << 'EOFCONFIG'
