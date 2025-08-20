@@ -121,15 +121,15 @@ journalctl -u ndi-bridge -f --no-pager
 EOFSHOWLOGS
 chmod +x /usr/local/bin/ndi-bridge-show-logs
 
-# Create ndi-bridge-welcome script
-cat > /usr/local/bin/ndi-bridge-welcome << 'EOFWELCOME'
-#!/bin/bash
-# Show NDI Bridge welcome screen
-clear
-echo -e "\\033[1;32m"
-echo "╔═══════════════════════════════════════════════════════════════╗"
-echo "║                      NDI Bridge System                        ║"
-echo "╚═══════════════════════════════════════════════════════════════╝"
+# Welcome script is now installed from helper-scripts
+# Skip inline creation to avoid overwriting the updated version
+# Just ensure it's executable
+if [ -f /usr/local/bin/ndi-bridge-welcome ]; then
+    chmod +x /usr/local/bin/ndi-bridge-welcome
+fi
+
+# Skip the old inline script content
+cat > /dev/null << 'EOFWELCOME'
 echo -e "\\033[0m"
 echo -e "\\033[1;36mSystem Information:\\033[0m"
 echo "  Hostname:   $(hostname)"
@@ -297,7 +297,7 @@ fi
 echo ""
 echo -e "\\033[0;90mPress any key for shell prompt (auto-refresh every 5s)\\033[0m"
 EOFWELCOME
-chmod +x /usr/local/bin/ndi-bridge-welcome
+# chmod line removed - welcome script handled by helper-scripts
 
 EOFTTY
 }
