@@ -52,6 +52,9 @@ GRUB_DISTRIBUTOR="NDI Bridge"
 GRUB_CMDLINE_LINUX_DEFAULT="modprobe.blacklist=iwlwifi,iwldvm,iwlmvm,mac80211,cfg80211 net.ifnames=0"
 GRUB_CMDLINE_LINUX=""
 GRUB_TERMINAL_OUTPUT="console"
+# Fix: Disable 30-second delay after improper shutdown/power loss
+# Without this, GRUB waits 30 seconds after any unclean shutdown (common in production)
+GRUB_RECORDFAIL_TIMEOUT=0
 EOFGRUB
 
 # Custom GRUB colors
