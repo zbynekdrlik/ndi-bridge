@@ -110,6 +110,8 @@ EOFSERVICE
 if [ -f /mnt/usb/ndi-display ]; then
     cp /mnt/usb/ndi-display /opt/ndi-bridge/
     chmod +x /opt/ndi-bridge/ndi-display
+    # Create symlink for helper scripts
+    ln -sf /opt/ndi-bridge/ndi-display /usr/local/bin/ndi-display
 else
     log "Warning: ndi-display binary not found"
 fi

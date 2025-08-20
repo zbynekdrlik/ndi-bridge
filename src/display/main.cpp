@@ -18,13 +18,13 @@
 using namespace ndi_bridge;
 using namespace ndi_bridge::display;
 
-// Global shutdown flag
+// Global shutdown flag with proper memory ordering
 std::atomic<bool> g_shutdown(false);
 
 void signalHandler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
         Logger::info("Shutdown requested...");
-        g_shutdown = true;
+        g_shutdown.store(true, std::memory_order_release);
     }
 }
 
@@ -246,7 +246,7 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
     Logger::info("Starting receive loop... Press Ctrl+C to stop");
     
     // Main receive loop - single threaded for low latency
-    while (!g_shutdown) {
+    while (!g_shutdown.load(std::memory_order_acquire)) {
         NDIlib_video_frame_v2_t video_frame;
         NDIlib_audio_frame_v2_t audio_frame;
         NDIlib_metadata_frame_t metadata_frame;
@@ -264,34 +264,27 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
             case NDIlib_frame_type_video: {
                 frame_count++;
                 
-                // RAII wrapper to ensure frame is always freed
-                struct FrameGuard {
-                    NDIlib_recv_instance_t recv;
-                    NDIlib_video_frame_v2_t* frame;
-                    ~FrameGuard() {
-                        if (recv && frame) {
-                            NDIlib_recv_free_video_v2(recv, frame);
-                        }
-                    }
-                } guard{receiver.getRecvInstance(), &video_frame};
-                
                 // Display the frame directly - no queuing for lowest latency
                 // NDI typically provides BGRA/BGRX format when we request it
                 PixelFormat format = PixelFormat::BGRA;
+                int bytes_per_pixel = 4;
                 
                 // Check actual format if needed
                 switch (video_frame.FourCC) {
                     case NDIlib_FourCC_type_BGRA:
                     case NDIlib_FourCC_type_BGRX:
                         format = PixelFormat::BGRA;
+                        bytes_per_pixel = 4;
                         break;
                     case NDIlib_FourCC_type_UYVY:
                     case NDIlib_FourCC_type_UYVA:
                         format = PixelFormat::UYVY;
+                        bytes_per_pixel = 2; // UYVY is 2 bytes per pixel
                         break;
                     default:
                         // Default to BGRA as we requested it
                         format = PixelFormat::BGRA;
+                        bytes_per_pixel = 4;
                         break;
                 }
                 
@@ -307,16 +300,19 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                     frames_dropped++;
                 }
                 
-                // Update status every 30 frames (roughly 1 second at 30fps)
-                if (frame_count % 30 == 0) {
+                // Free the frame
+                NDIlib_recv_free_video_v2(receiver.getRecvInstance(), &video_frame);
+                
+                // Update status approximately every second
+                // Use time-based updates instead of frame-based
+                if (frame_count % 30 == 0) { // TODO: Make time-based instead
                     auto now = std::chrono::steady_clock::now();
                     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         now - last_status_update).count();
                     
                     if (elapsed > 0) {
                         float fps = 30.0f * 1000.0f / elapsed;
-                        // Calculate actual data size, not including padding
-                        int bytes_per_pixel = 4; // BGRA is 4 bytes
+                        // Calculate actual data size using correct bytes per pixel
                         float bitrate_mbps = (video_frame.xres * bytes_per_pixel * 
                                             video_frame.yres * fps * 8) / 1000000.0f;
                         

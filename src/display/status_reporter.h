@@ -64,8 +64,12 @@ public:
         
         f.close();
         
-        // Atomic rename
-        std::filesystem::rename(temp_file_, status_file_);
+        // Atomic rename with exception safety
+        try {
+            std::filesystem::rename(temp_file_, status_file_);
+        } catch (const std::exception&) {
+            // Ignore rename failures - status update is non-critical
+        }
     }
     
     void clear() {

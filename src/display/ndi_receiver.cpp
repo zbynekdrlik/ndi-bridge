@@ -65,7 +65,8 @@ void NDIReceiver::shutdown() {
         find_instance_ = nullptr;
     }
     
-    // Note: We don't call NDIlib_destroy() here as multiple instances may exist
+    // In single-stream design, we're the only instance - safe to destroy
+    NDIlib_destroy();
     initialized_ = false;
     Logger::info("NDI receiver shutdown");
 }
