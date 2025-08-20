@@ -6,9 +6,10 @@ setup_web_interface() {
     
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFWEB'
 
-# Install ttyd and nginx for web interface
+# Install wetty dependencies and nginx for web interface
 apt-get update
-apt-get install -y ttyd nginx
+apt-get install -y nginx nodejs npm
+npm install -g wetty@2.0.2
 
 # Disable default nginx site
 rm -f /etc/nginx/sites-enabled/default
@@ -34,9 +35,9 @@ server {
         try_files $uri $uri/ =404;
     }
     
-    # Terminal proxy to ttyd
+    # Terminal proxy to wetty
     location /terminal/ {
-        proxy_pass http://127.0.0.1:7681/;
+        proxy_pass http://127.0.0.1:7681;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -245,22 +246,58 @@ cat > /var/www/ndi-bridge/index.html << 'EOFHTML'
 </html>
 EOFHTML
 
-# Create ttyd systemd service
-cat > /etc/systemd/system/ttyd.service << 'EOFTTYD'
+# Create tmux session wrapper for shared persistent sessions
+cat > /usr/local/bin/ndi-bridge-tmux-session << 'EOFTMUX'
+#!/bin/bash
+# Persistent tmux session - SHARED across all connections
+
+SESSION="ndi-bridge"
+
+# Check if tmux session exists
+if ! tmux has-session -t $SESSION 2>/dev/null; then
+    # Create new session only if it doesn't exist
+    tmux new-session -d -s $SESSION
+    
+    # Start with bash shell
+    tmux send-keys -t $SESSION "clear" C-m
+    tmux send-keys -t $SESSION "/usr/local/bin/ndi-bridge-welcome-loop" C-m
+fi
+
+# ALWAYS attach to the existing session (multiple browsers share it)
+exec tmux attach-session -t $SESSION
+EOFTMUX
+
+chmod +x /usr/local/bin/ndi-bridge-tmux-session
+
+# Create version wrapper to prevent ndi-bridge --version from hanging
+cat > /usr/local/bin/ndi-bridge-version << 'EOFVERSION'
+#!/bin/bash
+# Safe wrapper to get NDI Bridge version
+# ndi-bridge --version tries to start the full app, so we use timeout
+timeout 0.5 /opt/ndi-bridge/ndi-bridge --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) {print $i; exit}}'
+EOFVERSION
+
+chmod +x /usr/local/bin/ndi-bridge-version
+
+# Create wetty systemd service
+cat > /etc/systemd/system/wetty.service << 'EOFWETTY'
 [Unit]
-Description=ttyd - Web Terminal
+Description=Wetty Web Terminal
 After=network.target
 
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/ttyd -W -p 7681 -i lo /usr/local/bin/ndi-bridge-welcome-loop
+WorkingDirectory=/root
+ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base /terminal --command /usr/local/bin/ndi-bridge-tmux-session
 Restart=always
 RestartSec=10
+Environment="NODE_ENV=production"
+Environment="TERM=xterm-256color"
 
 [Install]
 WantedBy=multi-user.target
-EOFTTYD
+EOFWETTY
 
 # Create nginx writable directories for read-only filesystem
 mkdir -p /var/lib/nginx/body
@@ -273,9 +310,9 @@ chown -R www-data:www-data /var/lib/nginx
 # Enable services
 systemctl daemon-reload
 systemctl enable nginx
-systemctl enable ttyd
+systemctl enable wetty
 systemctl start nginx
-systemctl start ttyd
+systemctl start wetty
 
 # Create helper script for web interface management
 cat > /usr/local/bin/ndi-bridge-web << 'EOFWEBHELPER'
