@@ -8,7 +8,7 @@ setup_web_interface() {
 
 # Install wetty dependencies and nginx for web interface
 apt-get update
-apt-get install -y nginx nodejs npm
+apt-get install -y nginx nodejs npm apache2-utils
 npm install -g wetty@2.0.2
 
 # Disable default nginx site
@@ -63,8 +63,8 @@ EOFNGINX
 ln -s /etc/nginx/sites-available/ndi-bridge /etc/nginx/sites-enabled/
 
 # Create password file for nginx (user: admin, password: newlevel)
-# Password hash for 'newlevel': generated with htpasswd
-echo 'admin:$apr1$7qPdJqOr$mKl9kUEO9kVCZ.l5TqF8M/' > /etc/nginx/.htpasswd
+# Using htpasswd to generate the password file
+htpasswd -b -c /etc/nginx/.htpasswd admin newlevel
 chmod 644 /etc/nginx/.htpasswd
 
 # Create web root directory
@@ -305,7 +305,9 @@ mkdir -p /var/lib/nginx/proxy
 mkdir -p /var/lib/nginx/fastcgi
 mkdir -p /var/lib/nginx/uwsgi
 mkdir -p /var/lib/nginx/scgi
+mkdir -p /var/log/nginx
 chown -R www-data:www-data /var/lib/nginx
+chown -R www-data:www-data /var/log/nginx
 
 # Enable services
 systemctl daemon-reload

@@ -61,8 +61,9 @@ assemble_configuration() {
     configure_readonly_root
     setup_web_interface
     
-    # Replace the version placeholder
+    # Replace the version and timestamp placeholders
     sed -i "s/BUILD_SCRIPT_VERSION_PLACEHOLDER/$BUILD_SCRIPT_VERSION/" /mnt/usb/tmp/configure-system.sh
+    sed -i "s/BUILD_TIMESTAMP_PLACEHOLDER/$BUILD_TIMESTAMP/" /mnt/usb/tmp/configure-system.sh
 }
 
 # Run setup in chroot
