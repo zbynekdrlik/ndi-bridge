@@ -62,6 +62,8 @@ while true; do
             d)
                 if [ -x /opt/ndi-bridge/ndi-display ]; then
                     # Launch the new clean display configuration menu directly
+                    # Set TERM if not already set (needed for tput in the script)
+                    [ -z "$TERM" ] && export TERM=xterm
                     /usr/local/bin/ndi-display-config
                 else
                     clear
