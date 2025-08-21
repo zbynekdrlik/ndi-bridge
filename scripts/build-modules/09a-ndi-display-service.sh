@@ -110,9 +110,9 @@ ln -sf /opt/ndi-bridge/ndi-display /usr/local/bin/ndi-display 2>/dev/null || tru
 #   - ndi-display-monitor
 # All these scripts are maintained as separate files for modularity.
 
-# Enable monitor service
-systemctl daemon-reload
-systemctl enable ndi-display-monitor
+# Enable monitor service (using systemd preset or manual symlink)
+# systemctl isn't available in chroot, create enable symlink manually
+ln -sf /etc/systemd/system/ndi-display-monitor.service /etc/systemd/system/multi-user.target.wants/ndi-display-monitor.service
 
 EOFNDIDISPLAY
 
