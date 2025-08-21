@@ -355,7 +355,8 @@ EOF
     stop_display_process ${display_id}
     
     # Enable service while filesystem is still RW
-    sudo systemctl enable ndi-display@${display_id} 2>/dev/null
+    sudo systemctl enable ndi-display@${display_id}
+    sync  # Ensure filesystem writes are completed
     
     # Return to read-only
     /usr/local/bin/ndi-bridge-ro
