@@ -2,6 +2,7 @@
 
 #include <string>
 #include <fstream>
+#include <iomanip>
 #include <chrono>
 #include <filesystem>
 #include <unistd.h>
@@ -59,8 +60,8 @@ public:
         f << "DISPLAY_ID=" << display_id_ << "\n";
         f << "PID=" << pid_ << "\n";
         f << "RESOLUTION=" << width << "x" << height << "\n";
-        f << "FPS=" << fps << "\n";
-        f << "BITRATE=" << bitrate_mbps << "\n";
+        f << std::fixed << std::setprecision(1) << "FPS=" << fps << "\n";
+        f << std::fixed << std::setprecision(1) << "BITRATE=" << bitrate_mbps << "\n";
         f << "FRAMES_RECEIVED=" << frames_received << "\n";
         f << "FRAMES_DROPPED=" << frames_dropped << "\n";
         

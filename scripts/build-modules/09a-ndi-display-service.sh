@@ -4,16 +4,26 @@
 configure_ndi_display_service() {
     log "Configuring NDI Display service (single-stream design)..."
     
+    # Copy NDI Display binary BEFORE chroot (so it's accessible)
+    if [ -f build/bin/ndi-display ]; then
+        mkdir -p /mnt/usb/opt/ndi-bridge
+        cp build/bin/ndi-display /mnt/usb/opt/ndi-bridge/
+        chmod +x /mnt/usb/opt/ndi-bridge/ndi-display
+        log "NDI Display binary copied"
+    else
+        log "Warning: ndi-display binary not found"
+    fi
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFNDIDISPLAY'
 
 # Install DRM/KMS libraries for display output
-apt-get install -y --no-install-recommends \
+apt-get install -y -qq --no-install-recommends \
     libdrm2 \
     libdrm-dev \
     libgbm1 \
     libgl1-mesa-dri \
     libgl1-mesa-glx \
-    mesa-utils
+    mesa-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building\|^Unpacking\|^Setting up\|Processing triggers\|database" || true
 
 # Create ndi-bridge user if it doesn't exist
 if ! id -u ndi-bridge >/dev/null 2>&1; then
@@ -70,8 +80,8 @@ Type=simple
 User=ndi-bridge
 Group=video
 
-# Load configuration for this display
-EnvironmentFile=/etc/ndi-bridge/display-%i.conf
+# Load configuration for this display (optional with '-' prefix)
+EnvironmentFile=-/etc/ndi-bridge/display-%i.conf
 
 # Pre-start checks
 ExecStartPre=/usr/local/bin/ndi-display-console-check %i
@@ -106,15 +116,8 @@ SyslogIdentifier=ndi-display-%i
 WantedBy=multi-user.target
 EOFSERVICE
 
-# Copy NDI Display binary
-if [ -f /mnt/usb/ndi-display ]; then
-    cp /mnt/usb/ndi-display /opt/ndi-bridge/
-    chmod +x /opt/ndi-bridge/ndi-display
-    # Create symlink for helper scripts
-    ln -sf /opt/ndi-bridge/ndi-display /usr/local/bin/ndi-display
-else
-    log "Warning: ndi-display binary not found"
-fi
+# Symlink for ndi-display will be created inside chroot
+ln -sf /opt/ndi-bridge/ndi-display /usr/local/bin/ndi-display 2>/dev/null || true
 
 # Helper Scripts Installation
 # ============================
@@ -741,6 +744,84 @@ echo "  ndi-display-show <stream> <id> - Show stream on display"
 echo "  ndi-display-stop <id>         - Stop NDI on display"
 echo "  ndi-display-console-manager   - Manage console allocation"
 EOFHELP
+
+# Create display monitor service that checks HDMI connections
+cat > /etc/systemd/system/ndi-display-monitor.service << 'EOFMON'
+[Unit]
+Description=NDI Display Connection Monitor
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ndi-display-monitor
+Restart=always
+RestartSec=5
+StandardOutput=null
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOFMON
+
+# Create monitor script
+cat > /usr/local/bin/ndi-display-monitor << 'EOFMONSCRIPT'
+#!/bin/bash
+# Monitor HDMI connections and write status
+
+while true; do
+    # Check if ndi-display binary exists
+    if [ -x /opt/ndi-bridge/ndi-display ]; then
+        # Create status directory if needed
+        mkdir -p /var/run/ndi-display 2>/dev/null || mkdir -p /tmp/ndi-display
+        
+        # Use appropriate directory
+        STATUS_DIR="/var/run/ndi-display"
+        if [ ! -w "$STATUS_DIR" ]; then
+            STATUS_DIR="/tmp/ndi-display"
+        fi
+        
+        # Get display connections and write to file
+        /opt/ndi-bridge/ndi-display displays 2>/dev/null > "${STATUS_DIR}/hdmi-connections.tmp"
+        
+        # Parse the output and create simple status files
+        for i in 0 1 2; do
+            HDMI_NUM=$((i + 1))
+            CONNECTION_FILE="${STATUS_DIR}/hdmi-${i}.connection"
+            
+            # Check if display is connected from the output
+            # Looking for format: "Display 0: HDMI-A-1 [1920x1080 @ 60Hz]"
+            if grep -q "Display ${i}:.*\[.*x.*Hz\]" "${STATUS_DIR}/hdmi-connections.tmp" 2>/dev/null; then
+                # Extract resolution and refresh rate with better parsing
+                LINE=$(grep "Display ${i}:" "${STATUS_DIR}/hdmi-connections.tmp")
+                RESOLUTION=$(echo "$LINE" | sed -n 's/.*\[\([0-9]*x[0-9]*\).*/\1/p')
+                REFRESH=$(echo "$LINE" | sed -n 's/.*@ \([0-9.]*\)Hz.*/\1/p')
+                
+                echo "CONNECTED=true" > "$CONNECTION_FILE"
+                echo "RESOLUTION=$RESOLUTION" >> "$CONNECTION_FILE"
+                echo "REFRESH_RATE=$REFRESH" >> "$CONNECTION_FILE"
+                echo "HDMI_PORT=$HDMI_NUM" >> "$CONNECTION_FILE"
+                echo "TIMESTAMP=$(date +%s)" >> "$CONNECTION_FILE"
+            else
+                echo "CONNECTED=false" > "$CONNECTION_FILE"
+                echo "HDMI_PORT=$HDMI_NUM" >> "$CONNECTION_FILE"
+                echo "TIMESTAMP=$(date +%s)" >> "$CONNECTION_FILE"
+            fi
+        done
+        
+        # Clean up temp file
+        rm -f "${STATUS_DIR}/hdmi-connections.tmp"
+    fi
+    
+    # Sleep for 5 seconds before next check
+    sleep 5
+done
+EOFMONSCRIPT
+
+chmod +x /usr/local/bin/ndi-display-monitor
+
+# Enable monitor service
+systemctl daemon-reload
+systemctl enable ndi-display-monitor
 
 EOFNDIDISPLAY
 

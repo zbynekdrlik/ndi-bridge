@@ -7,9 +7,9 @@ setup_web_interface() {
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFWEB'
 
 # Install wetty dependencies and nginx for web interface
-apt-get update
-apt-get install -y nginx nodejs npm apache2-utils
-npm install -g wetty@2.0.2
+apt-get update -qq 2>&1 | grep -v "^Get:\|^Hit:\|^Reading" || true
+apt-get install -y -qq nginx nodejs npm apache2-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building\|^Unpacking\|^Setting up\|Processing triggers\|database" || true
+npm install -g wetty@2.0.2 2>&1 | grep -v "^npm notice\|^npm WARN" || true
 
 # Disable default nginx site
 rm -f /etc/nginx/sites-enabled/default

@@ -272,6 +272,7 @@ if(PLATFORM_LINUX)
         src/display/status_reporter.h
         src/display/display_output.h
         src/display/display_output.cpp
+        src/display/drm_display_output.cpp
         src/common/logger.cpp
         src/common/logger.h
         src/common/version.h
@@ -289,11 +290,17 @@ if(PLATFORM_LINUX)
         ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
     
+    # Include DRM headers
+    target_include_directories(ndi-display PRIVATE 
+        /usr/include/libdrm
+    )
+    
     # Link libraries for ndi-display
+    # Note: Requires libdrm-dev package on Ubuntu/Debian (apt-get install libdrm-dev)
     target_link_libraries(ndi-display PRIVATE
         ${NDI_LIBRARY}
         pthread
-        # drm      # For DRM/KMS display output (will add when implementing actual display)
+        drm      # For DRM/KMS display output with hardware scaling
     )
     
     # Set version definitions

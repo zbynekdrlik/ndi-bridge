@@ -17,6 +17,7 @@ struct DisplayInfo {
     float refresh_rate;
     bool connected;
     bool active;
+    uint32_t connector_id = 0; // DRM connector ID (for DRM/KMS)
 };
 
 // Frame format

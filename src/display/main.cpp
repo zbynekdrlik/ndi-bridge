@@ -21,7 +21,7 @@ std::atomic<bool> g_shutdown(false);
 
 void signalHandler(int signal) {
     if (signal == SIGINT || signal == SIGTERM) {
-        Logger::info("Shutdown requested...");
+        // CRITICAL: Don't call Logger from signal handler (not async-signal-safe)
         g_shutdown.store(true, std::memory_order_release);
     }
 }
@@ -113,6 +113,14 @@ int showStatus() {
     std::cout << "NDI Display System Status\n";
     std::cout << "=========================\n\n";
     
+    // First check physical display connections
+    auto display = createDisplayOutput();
+    std::vector<DisplayInfo> displays;
+    if (display && display->initialize()) {
+        displays = display->getDisplays();
+        display->shutdown();
+    }
+    
     // Check console policy
     std::string policy_file = "/etc/ndi-bridge/display-policy.conf";
     int console_display = 0;
@@ -126,10 +134,17 @@ int showStatus() {
         }
     }
     
-    // Show status for each display
-    const int MAX_DISPLAYS = 3; // Intel N100 supports 3 displays
-    for (int i = 0; i < MAX_DISPLAYS; i++) {
+    // Show status for each display (up to 3 which is common for Intel iGPUs)
+    // Could be made configurable if needed for systems with more displays
+    const int max_displays = std::max(3, static_cast<int>(displays.size()));
+    for (int i = 0; i < max_displays; i++) {
         std::cout << "Display " << i << " (HDMI-" << (i+1) << "): ";
+        
+        // Show physical connection status
+        if (i < static_cast<int>(displays.size()) && displays[i].connected) {
+            std::cout << "[Connected: " << displays[i].width << "x" << displays[i].height 
+                     << " @ " << displays[i].refresh_rate << "Hz] ";
+        }
         
         // Check if NDI is running on this display (try both /var/run and /tmp)
         std::string status_file = "/var/run/ndi-display/display-" + 
@@ -171,15 +186,23 @@ int showStatus() {
                 }
             }
             
-            std::cout << stream_name << "\n";
+            std::cout << "\n";
+            std::cout << "  Stream: " << stream_name << "\n";
             std::cout << "  Resolution: " << resolution << " @ " << fps << " fps\n";
             std::cout << "  Bitrate: " << bitrate << " Mbps\n";
             std::cout << "  Frames: " << frames_received << " received, " 
                      << frames_dropped << " dropped\n";
         } else if (i == console_display) {
-            std::cout << "Linux Console (TTY)\n";
+            std::cout << "\n  Linux Console (TTY)\n";
+        } else if (i < static_cast<int>(displays.size()) && displays[i].connected) {
+            std::cout << "\n  No active stream\n";
         } else {
-            std::cout << "Not active\n";
+            std::cout << "[Not connected]\n";
+        }
+        
+        // Close display info properly
+        if (!(i < static_cast<int>(displays.size()) && displays[i].connected)) {
+            std::cout << "\n";
         }
         std::cout << "\n";
     }
@@ -244,6 +267,8 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
     // Frame statistics
     uint64_t frame_count = 0;
     uint64_t frames_dropped = 0;
+    uint64_t last_frame_count = 0;
+    int status_counter = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto last_status_update = start_time;
     
@@ -251,13 +276,19 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
     
     // Main receive loop - single threaded for low latency
     while (!g_shutdown.load(std::memory_order_acquire)) {
-        NDIlib_video_frame_v2_t video_frame;
-        NDIlib_audio_frame_v2_t audio_frame;
-        NDIlib_metadata_frame_t metadata_frame;
+        NDIlib_video_frame_v2_t video_frame = {};  // CRITICAL: Must zero-initialize
+        NDIlib_audio_frame_v2_t audio_frame = {};   // CRITICAL: Must zero-initialize
+        NDIlib_metadata_frame_t metadata_frame = {}; // CRITICAL: Must zero-initialize
         
         // Capture with 100ms timeout
+        auto recv_instance = receiver.getRecvInstance();
+        if (!recv_instance) {
+            Logger::error("Receiver instance lost");
+            break;
+        }
+        
         NDIlib_frame_type_e frame_type = NDIlib_recv_capture_v2(
-            receiver.getRecvInstance(),
+            recv_instance,
             &video_frame,
             &audio_frame,
             &metadata_frame,
@@ -271,67 +302,74 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                 // Display the frame directly - no queuing for lowest latency
                 // NDI typically provides BGRA/BGRX format when we request it
                 PixelFormat format = PixelFormat::BGRA;
-                int bytes_per_pixel = 4;
                 
                 // Check actual format if needed
                 switch (video_frame.FourCC) {
                     case NDIlib_FourCC_type_BGRA:
                     case NDIlib_FourCC_type_BGRX:
                         format = PixelFormat::BGRA;
-                        bytes_per_pixel = 4;
                         break;
                     case NDIlib_FourCC_type_UYVY:
                     case NDIlib_FourCC_type_UYVA:
                         format = PixelFormat::UYVY;
-                        bytes_per_pixel = 2; // UYVY is 2 bytes per pixel
                         break;
                     default:
                         // Default to BGRA as we requested it
                         format = PixelFormat::BGRA;
-                        bytes_per_pixel = 4;
                         break;
                 }
                 
-                bool displayed = display->displayFrame(
-                    video_frame.p_data,
-                    video_frame.xres,
-                    video_frame.yres,
-                    format,
-                    video_frame.line_stride_in_bytes
-                );
+                // Validate frame data before displaying
+                bool displayed = false;
+                if (video_frame.p_data && video_frame.xres > 0 && video_frame.yres > 0) {
+                    displayed = display->displayFrame(
+                        video_frame.p_data,
+                        video_frame.xres,
+                        video_frame.yres,
+                        format,
+                        video_frame.line_stride_in_bytes
+                    );
+                } else {
+                    Logger::warning("Invalid frame data received from NDI");
+                }
                 
                 if (!displayed) {
                     frames_dropped++;
                 }
                 
-                // Free the frame
-                NDIlib_recv_free_video_v2(receiver.getRecvInstance(), &video_frame);
+                // Free the frame (using cached instance)
+                NDIlib_recv_free_video_v2(recv_instance, &video_frame);
                 
-                // Update status approximately every second
-                // Use time-based updates instead of frame-based
-                if (frame_count % 30 == 0) { // TODO: Make time-based instead
-                    auto now = std::chrono::steady_clock::now();
-                    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-                        now - last_status_update).count();
+                // Update status every second (time-based)
+                auto now = std::chrono::steady_clock::now();
+                auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - last_status_update).count();
+                
+                if (elapsed_ms >= 1000) {  // Update every second
+                    // Calculate FPS based on frames in this interval
+                    uint64_t frames_in_interval = frame_count - last_frame_count;
+                    float fps = (frames_in_interval * 1000.0f) / elapsed_ms;
                     
-                    if (elapsed > 0) {
-                        float fps = 30.0f * 1000.0f / elapsed;
-                        // Calculate actual data size using correct bytes per pixel
-                        float bitrate_mbps = (video_frame.xres * bytes_per_pixel * 
-                                            video_frame.yres * fps * 8) / 1000000.0f;
-                        
-                        status.update(stream_name, 
-                                    video_frame.xres, video_frame.yres,
-                                    fps, bitrate_mbps,
-                                    frame_count, frames_dropped);
-                        
-                        last_status_update = now;
-                        
-                        // Log periodically
-                        if (frame_count % 300 == 0) {
-                            Logger::info("Frames: " + std::to_string(frame_count) + 
-                                       " (" + std::to_string(fps) + " fps)");
-                        }
+                    // Calculate NDI network bitrate (typical NDI compression ratios)
+                    // NDI uses roughly 100-150 Mbps for 1080p60, 25-50 Mbps for 1080p30
+                    // This is much lower than raw data rate due to NDI compression
+                    float pixels_per_sec = (float)video_frame.xres * video_frame.yres * fps;
+                    // Estimate based on typical NDI compression (about 2-3 bits per pixel)
+                    float bitrate_mbps = (pixels_per_sec * 2.5f) / 1000000.0f;
+                    
+                    status.update(stream_name, 
+                                video_frame.xres, video_frame.yres,
+                                fps, bitrate_mbps,
+                                frame_count, frames_dropped);
+                    
+                    last_status_update = now;
+                    last_frame_count = frame_count;
+                    
+                    // Log every 10 seconds
+                    if (++status_counter >= 10) {
+                        Logger::info("Frames: " + std::to_string(frame_count) + 
+                                   " (" + std::to_string(fps) + " fps)");
+                        status_counter = 0;
                     }
                 }
                 break;
@@ -339,12 +377,12 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
             
             case NDIlib_frame_type_audio:
                 // We ignore audio
-                NDIlib_recv_free_audio_v2(receiver.getRecvInstance(), &audio_frame);
+                NDIlib_recv_free_audio_v2(recv_instance, &audio_frame);
                 break;
                 
             case NDIlib_frame_type_metadata:
                 // We ignore metadata
-                NDIlib_recv_free_metadata(receiver.getRecvInstance(), &metadata_frame);
+                NDIlib_recv_free_metadata(recv_instance, &metadata_frame);
                 break;
                 
             case NDIlib_frame_type_error:
@@ -363,13 +401,18 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
     }
     
     // Clean shutdown
+    if (g_shutdown.load(std::memory_order_acquire)) {
+        Logger::info("Shutdown requested...");
+    }
     Logger::info("Shutting down...");
+    
+    // Clear display before closing
     display->clearDisplay();
-    display->closeDisplay();
-    display->shutdown();
-    receiver.disconnect();
-    receiver.shutdown();
-    status.clear();
+    
+    // Destructors will handle cleanup
+    // display destructor calls shutdown()
+    // receiver destructor calls disconnect() and shutdown()
+    // status destructor removes status file
     
     Logger::info("Total frames: " + std::to_string(frame_count) + 
                ", dropped: " + std::to_string(frames_dropped));

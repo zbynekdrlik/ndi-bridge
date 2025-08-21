@@ -13,22 +13,24 @@
 **ALWAYS DO:**
 1. Run from repository ROOT: `cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge`
 2. Increment version: Edit `scripts/build-modules/00-variables.sh` → `BUILD_SCRIPT_VERSION`
-3. Redirect output: `sudo ./build-image-for-rufus.sh > build.log 2>&1 &`
+3. Run build: `sudo ./build-image-for-rufus.sh` (auto-redirects to log)
 4. Monitor logs: `tail -f build-logs/image-build-*.log`
 
 **NEVER DO:**
 - Run build from `build/` directory (causes "file not found" errors)
-- Run build without output redirection (crashes terminal)
 - Forget to increment version (can't identify deployed devices)
 
 **Build takes 10-15 minutes. Image output: `ndi-bridge.img` (4GB)**
 
 ## Quick Commands
 
-### Application Build
+### Application Build (AUTO-APPROVED)
 ```bash
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+# ALWAYS build from existing build directory
+cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/build
+# For specific target (e.g., after display changes):
+make ndi-display -j$(nproc)
+# For full rebuild:
 make -j$(nproc)
 ```
 
@@ -78,6 +80,36 @@ ndi-bridge-ro           # Return to read-only
 | mDNS fails in WSL | Use IP address or test from Windows |
 | --version hangs | Fixed in main.cpp - exits before init |
 | Scripts not updating | Removed inline scripts from 10-tty-config.sh |
+
+## NDI Display System (v1.6.8+)
+
+### Display Output Architecture
+
+The NDI display system uses DRM/KMS (Direct Rendering Manager/Kernel Mode Setting) exclusively:
+
+**Hardware-Accelerated DRM/KMS** (Optimized for Intel N100)
+   - Uses GPU hardware planes for scaling when available
+   - Zero-copy scaling from Full HD NDI streams to 4K displays
+   - Supports Intel UHD Graphics (24 EU) hardware acceleration
+   - Automatic aspect ratio preservation with letterboxing
+   - Double buffering with page flipping for smooth playback
+   - Falls back to software scaling within DRM if hardware planes unavailable
+   - CPU-based bilinear scaling when needed
+
+### Scaling and Resolution Support
+
+The display system automatically handles resolution mismatches:
+- **Full HD NDI → 4K Display**: Hardware-accelerated upscaling
+- **4K NDI → Full HD Display**: Hardware-accelerated downscaling
+- **Aspect Ratio Preservation**: Automatic letterboxing/pillarboxing
+- **Intel N100 Optimization**: Uses GPU planes for zero-copy scaling
+
+### Key Features
+- Single-threaded, low-latency design (matches capture philosophy)
+- One binary per stream-display pair for simplicity
+- Automatic display detection and EDID parsing
+- Real-time status reporting to /var/run/ndi-display/
+- Console management with proper TTY allocation
 
 ## Architecture Notes
 

@@ -1,0 +1,70 @@
+================================================================================
+                           NDI DISPLAY CONFIGURATION
+================================================================================
+
+Display Status Overview
+
+  HDMI-1 (Display 0) [CONSOLE]
+    Monitor:  Not connected
+    NDI:      Not configured
+
+  HDMI-2 (Display 1)
+    Monitor:  1920x1080 @ 60Hz
+    NDI:      RESOLUME-SNV (cg-obs) (1920x1080@30fps)
+
+  HDMI-3 (Display 2)
+    Monitor:  Not connected
+    NDI:      Not configured
+
+────────────────────────────────────────────────────────────────────────────────
+Actions:
+  1-3 - Configure HDMI 1-3
+  r   - Refresh status
+  q   - Quit
+
+Select: 2
+
+================================================================================
+                           NDI DISPLAY CONFIGURATION
+================================================================================
+
+Configure HDMI-2 (Display 1)
+
+Current Status:
+  Monitor:  1920x1080 @ 60Hz
+  NDI:      RESOLUME-SNV (cg-obs) (1920x1080@30fps)
+
+Options:
+  1 - Assign NDI stream to this display
+  2 - Remove NDI stream (disable display)
+  3 - Reserve for Linux console
+
+  0 - Back to overview
+
+Select option: 1
+
+================================================================================
+                           NDI DISPLAY CONFIGURATION  
+================================================================================
+
+Select NDI Stream
+
+Searching for NDI streams...
+
+Available NDI Streams:
+  0: RESOLUME-SNV (cg-obs) (10.77.9.59:5961)
+  1: MBC-SNV (10.77.9.38:5961)
+  2: Camera 1 (10.77.9.50:5961)
+  3: Camera 2 (10.77.9.51:5961)
+
+Enter the stream number or full name (0 to cancel):
+> 1
+
+Assign 'MBC-SNV' to HDMI-2?
+(y/n): 
+> y
+
+Applying configuration...
+✓ Configuration applied successfully
+
+Press Enter to continue...

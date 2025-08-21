@@ -129,6 +129,7 @@ install_build_deps() {
         "libswscale-dev"
         "libv4l-dev"
         "v4l-utils"
+        "libdrm-dev"  # For DRM/KMS display output with hardware scaling (v1.6.8+)
     )
     
     # USB creation dependencies

@@ -59,6 +59,18 @@ while true; do
                 echo "Press any key to continue..."
                 read -n 1 -s -r
                 ;;
+            d)
+                if [ -x /opt/ndi-bridge/ndi-display ]; then
+                    # Launch the new clean display configuration menu directly
+                    /usr/local/bin/ndi-display-config
+                else
+                    clear
+                    echo "Display support not installed"
+                    echo ""
+                    echo "Press any key to continue..."
+                    read -n 1 -s -r
+                fi
+                ;;
             h)
                 clear
                 echo "=== NDI Bridge Help ==="
@@ -68,6 +80,7 @@ while true; do
                 echo "  S - Set NDI stream name"
                 echo "  N - Network status details"
                 echo "  T - Time synchronization status"
+                echo "  D - Display configuration (NDI → HDMI)"
                 echo "  H - This help menu"
                 echo "  Q - Exit to shell"
                 echo ""

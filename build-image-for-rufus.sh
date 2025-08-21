@@ -6,91 +6,126 @@ set -e
 # Create log file with timestamp
 LOG_FILE="build-logs/image-build-$(date +%Y%m%d-%H%M%S).log"
 mkdir -p build-logs
-echo "Starting image build at $(date)" | tee $LOG_FILE
-echo "Log file: $LOG_FILE" | tee -a $LOG_FILE
-echo "----------------------------------------" | tee -a $LOG_FILE
+
+# Auto-redirect all output to log file if running in terminal
+# This prevents terminal crashes from verbose output
+if [ -t 1 ]; then
+    echo "Auto-redirecting output to: $LOG_FILE"
+    echo "Monitor progress with: tail -f $LOG_FILE"
+    exec >> "$LOG_FILE" 2>&1
+fi
+echo "Starting image build at $(date)"
+echo "Log file: $LOG_FILE"
+echo "----------------------------------------"
 
 # Check if running as root
 if [ "$(id -u)" != "0" ]; then 
-    echo "ERROR: This script must be run as root (use sudo)" | tee -a $LOG_FILE
+    echo "ERROR: This script must be run as root (use sudo)"
     exit 1
 fi
+
+# Check for required binaries - build them if missing
+echo "Checking for required binaries..."
+if [ ! -f "build/bin/ndi-bridge" ] || [ ! -f "build/bin/ndi-display" ]; then
+    echo "ERROR: Required binaries missing. Building them now..."
+    if [ ! -d "build" ]; then
+        mkdir build
+        cd build
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        cd ..
+    fi
+    cd build
+    make -j$(nproc)
+    cd ..
+    
+    # Verify binaries exist after build
+    if [ ! -f "build/bin/ndi-bridge" ] || [ ! -f "build/bin/ndi-display" ]; then
+        echo "ERROR: Failed to build required binaries"
+        echo "Please run: cd build && make -j\$(nproc)"
+        exit 1
+    fi
+fi
+echo "✓ ndi-bridge binary found"
+echo "✓ ndi-display binary found"
 
 # Create image file (4GB should be enough)
 IMAGE_FILE="${1:-ndi-bridge.img}"
 IMAGE_SIZE="4G"
 
-echo "Creating disk image: $IMAGE_FILE ($IMAGE_SIZE)" | tee -a $LOG_FILE
+echo "Creating disk image: $IMAGE_FILE ($IMAGE_SIZE)"
 
 # Create sparse file
-echo "Creating $IMAGE_SIZE disk image..." | tee -a $LOG_FILE
-dd if=/dev/zero of="$IMAGE_FILE" bs=1 count=0 seek=$IMAGE_SIZE >> $LOG_FILE 2>&1
+echo "Creating $IMAGE_SIZE disk image..."
+dd if=/dev/zero of="$IMAGE_FILE" bs=1 count=0 seek=$IMAGE_SIZE 2>&1
 
 # Create loop device
-echo "Setting up loop device..." | tee -a $LOG_FILE
+echo "Setting up loop device..."
 LOOP_DEVICE=$(losetup --find --show "$IMAGE_FILE")
-echo "Loop device: $LOOP_DEVICE" | tee -a $LOG_FILE
+echo "Loop device: $LOOP_DEVICE"
 
 # Cleanup function
 cleanup() {
-    echo "Cleaning up..." | tee -a $LOG_FILE
+    echo "Cleaning up..."
+    
+    # First unmount all the special filesystems that might be mounted
+    umount /mnt/usb/dev/pts 2>/dev/null || true
+    umount /mnt/usb/proc 2>/dev/null || true
+    umount /mnt/usb/sys 2>/dev/null || true
+    umount /mnt/usb/dev 2>/dev/null || true
+    umount /mnt/usb/boot/efi 2>/dev/null || true
+    umount /mnt/usb/boot 2>/dev/null || true
+    umount /mnt/usb 2>/dev/null || true
+    
+    # Remove device mapper entries
+    dmsetup remove /dev/mapper/loop*p* 2>/dev/null || true
+    
+    # Clean up kpartx mappings for all loops
+    for loop in $(losetup -a | grep "$IMAGE_FILE" | cut -d: -f1); do
+        kpartx -d "$loop" 2>/dev/null || true
+    done
+    
+    # Now detach loop devices
     if [ -n "$LOOP_DEVICE" ]; then
-        # Try to unmount and remove kpartx mappings first
-        umount /mnt/usb/boot/efi 2>/dev/null || true
-        umount /mnt/usb 2>/dev/null || true
-        kpartx -d "$LOOP_DEVICE" 2>/dev/null || true
         losetup -d "$LOOP_DEVICE" 2>/dev/null || true
     fi
     
     # Clean up any remaining loop devices associated with our image file
     if [ -f "$IMAGE_FILE" ]; then
         for loop in $(losetup -a | grep "$IMAGE_FILE" | cut -d: -f1); do
-            echo "Detaching additional loop device: $loop" | tee -a $LOG_FILE
+            echo "Detaching loop device: $loop"
             losetup -d "$loop" 2>/dev/null || true
         done
     fi
 }
 trap cleanup EXIT
 
-echo "" | tee -a $LOG_FILE
-echo "Starting build..." | tee -a $LOG_FILE
-echo "You can monitor progress with: tail -f $LOG_FILE" | tee -a $LOG_FILE
-echo "" | tee -a $LOG_FILE
+echo ""
+echo "Starting build..."
+echo "Build log: $LOG_FILE"
+echo ""
 
 # Run the modular build script with loop device
-# Save all output to log file but only show errors and progress to console
-./scripts/build-ndi-usb-modular.sh $LOOP_DEVICE >> $LOG_FILE 2>&1 &
-BUILD_PID=$!
-
-# Monitor the build and show only important messages
-echo "Build in progress. Showing only errors and key messages..."
-tail -f $LOG_FILE | grep -E "(ERROR|FAIL|WARNING|SUCCESS|COMPLETE|Starting|Finished|Creating|Building|Installing|^\[|Step [0-9]|===)" &
-TAIL_PID=$!
-
-# Wait for build to complete
-wait $BUILD_PID
+# All output goes to log file only
+./scripts/build-ndi-usb-modular.sh $LOOP_DEVICE 2>&1
 BUILD_STATUS=$?
-
-# Stop the tail process
-kill $TAIL_PID 2>/dev/null
 
 # Check exit status
 if [ $BUILD_STATUS -eq 0 ]; then
-    echo "" | tee -a $LOG_FILE
-    echo "BUILD SUCCESSFUL!" | tee -a $LOG_FILE
-    echo "Image created: $IMAGE_FILE" | tee -a $LOG_FILE
-    echo "You can now write this image to USB using:" | tee -a $LOG_FILE
-    echo "  - Rufus on Windows" | tee -a $LOG_FILE
-    echo "  - dd on Linux: dd if=$IMAGE_FILE of=/dev/sdX bs=4M status=progress" | tee -a $LOG_FILE
-    echo "Log saved to: $LOG_FILE" | tee -a $LOG_FILE
+    echo ""
+    echo "BUILD SUCCESSFUL!"
+    echo "Image created: $IMAGE_FILE"
+    echo "You can now write this image to USB using:"
+    echo "  - Rufus on Windows"
+    echo "  - dd on Linux: dd if=$IMAGE_FILE of=/dev/sdX bs=4M status=progress"
+    echo "Log saved to: $LOG_FILE"
     
     # Show image info
-    echo "" | tee -a $LOG_FILE
-    echo "Image information:" | tee -a $LOG_FILE
-    ls -lh "$IMAGE_FILE" | tee -a $LOG_FILE
+    echo ""
+    echo "Image information:"
+    ls -lh "$IMAGE_FILE"
 else
-    echo "" | tee -a $LOG_FILE
-    echo "BUILD FAILED! Check log for errors: $LOG_FILE" | tee -a $LOG_FILE
+    echo ""
+    echo "BUILD FAILED! Check log for errors: $LOG_FILE"
     rm -f "$IMAGE_FILE"  # Clean up failed image
     exit 1
 fi

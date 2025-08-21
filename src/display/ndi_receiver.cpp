@@ -1,5 +1,7 @@
 #include "ndi_receiver.h"
 #include "../common/logger.h"
+#include <chrono>
+#include <thread>
 
 namespace ndi_bridge {
 namespace display {
@@ -81,7 +83,7 @@ std::vector<NDISource> NDIReceiver::findSources(int timeout_ms) {
     
     // Create finder if not exists
     if (!find_instance_) {
-        NDIlib_find_create_t find_create;
+        NDIlib_find_create_t find_create = {};  // Zero-initialize
         find_create.show_local_sources = true;
         find_create.p_groups = nullptr;
         find_create.p_extra_ips = nullptr;
@@ -93,19 +95,38 @@ std::vector<NDISource> NDIReceiver::findSources(int timeout_ms) {
         }
     }
     
-    // Wait for sources
+    // Wait for sources - do multiple checks to ensure we get a stable list
     Logger::info("Looking for NDI sources...");
+    
+    // Initial wait
     NDIlib_find_wait_for_sources(find_instance_, timeout_ms);
     
-    // Get current sources
+    // Get initial count
     uint32_t num_sources = 0;
     const NDIlib_source_t* p_sources = NDIlib_find_get_current_sources(find_instance_, &num_sources);
     
+    // Do a second check after a brief delay to catch any late arrivals
+    // This helps ensure we get a complete list
+    if (timeout_ms >= 2000) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        NDIlib_find_wait_for_sources(find_instance_, 500);
+        
+        // Get updated list
+        uint32_t new_count = 0;
+        const NDIlib_source_t* new_sources = NDIlib_find_get_current_sources(find_instance_, &new_count);
+        if (new_count > num_sources) {
+            num_sources = new_count;
+            p_sources = new_sources;
+        }
+    }
+    
     Logger::info("Found " + std::to_string(num_sources) + " NDI sources");
     
-    for (uint32_t i = 0; i < num_sources; i++) {
-        sources.emplace_back(p_sources[i]);
-        Logger::info("  - " + sources.back().name);
+    if (p_sources) {
+        for (uint32_t i = 0; i < num_sources; i++) {
+            sources.emplace_back(p_sources[i]);
+            Logger::info("  - " + sources.back().name);
+        }
     }
     
     return sources;
@@ -126,10 +147,10 @@ bool NDIReceiver::connect(const std::string& source_name) {
         disconnect();
     }
     
-    // Find the source
-    auto sources = findSources(2000);
+    // Find sources (this updates the finder)
+    findSources(2000);
     
-    // Get current sources once
+    // Get current sources
     uint32_t num_sources = 0;
     const NDIlib_source_t* p_sources = NDIlib_find_get_current_sources(find_instance_, &num_sources);
     
@@ -148,7 +169,7 @@ bool NDIReceiver::connect(const std::string& source_name) {
     }
     
     // Create receiver - NDI will copy the source internally
-    NDIlib_recv_create_v3_t recv_create;
+    NDIlib_recv_create_v3_t recv_create = {};  // CRITICAL: Zero-initialize
     recv_create.source_to_connect_to = *target_source;
     recv_create.p_ndi_recv_name = "NDI Display Receiver";
     recv_create.bandwidth = NDIlib_recv_bandwidth_highest;
