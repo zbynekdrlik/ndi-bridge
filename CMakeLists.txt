@@ -263,6 +263,55 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
+# NDI Display executable (Linux only)
+if(PLATFORM_LINUX)
+    add_executable(ndi-display
+        src/display/main.cpp
+        src/display/ndi_receiver.cpp
+        src/display/ndi_receiver.h
+        src/display/status_reporter.h
+        src/display/display_output.h
+        src/display/display_output.cpp
+        src/display/drm_display_output.cpp
+        src/common/logger.cpp
+        src/common/logger.h
+        src/common/version.h
+    )
+    
+    # Set executable properties
+    set_target_properties(ndi-display PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+    )
+    
+    # Include directories for ndi-display
+    target_include_directories(ndi-display PRIVATE
+        ${NDI_INCLUDE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    
+    # Include DRM headers
+    target_include_directories(ndi-display PRIVATE 
+        /usr/include/libdrm
+    )
+    
+    # Link libraries for ndi-display
+    # Note: Requires libdrm-dev package on Ubuntu/Debian (apt-get install libdrm-dev)
+    target_link_libraries(ndi-display PRIVATE
+        ${NDI_LIBRARY}
+        pthread
+        drm      # For DRM/KMS display output with hardware scaling
+    )
+    
+    # Set version definitions
+    target_compile_definitions(ndi-display PRIVATE
+        NDI_BRIDGE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        NDI_BRIDGE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        NDI_BRIDGE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        NDI_BRIDGE_VERSION_STRING="${PROJECT_VERSION}"
+    )
+endif()
+
 # Set version definitions
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     NDI_BRIDGE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}

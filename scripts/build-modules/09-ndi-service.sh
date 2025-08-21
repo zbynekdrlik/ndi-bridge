@@ -4,6 +4,17 @@
 configure_ndi_service() {
     log "Configuring NDI Bridge service..."
     
+    # Copy NDI Bridge binary BEFORE chroot (so it's accessible)
+    if [ -f build/bin/ndi-bridge ]; then
+        mkdir -p /mnt/usb/opt/ndi-bridge
+        cp build/bin/ndi-bridge /mnt/usb/opt/ndi-bridge/
+        chmod +x /mnt/usb/opt/ndi-bridge/ndi-bridge
+        log "NDI Bridge binary copied"
+    else
+        log "ERROR: ndi-bridge binary not found at build/bin/ndi-bridge"
+        exit 1
+    fi
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFNDI'
 
 # Create NDI directories

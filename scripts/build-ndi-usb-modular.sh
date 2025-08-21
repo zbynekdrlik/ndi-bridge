@@ -18,6 +18,7 @@ source "$SCRIPT_DIR/build-modules/06-system-config.sh"
 source "$SCRIPT_DIR/build-modules/07-base-setup.sh"
 source "$SCRIPT_DIR/build-modules/08-network.sh"
 source "$SCRIPT_DIR/build-modules/09-ndi-service.sh"
+source "$SCRIPT_DIR/build-modules/09a-ndi-display-service.sh"
 source "$SCRIPT_DIR/build-modules/10-tty-config.sh"
 source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
 source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
@@ -35,6 +36,15 @@ copy_ndi_files() {
     # Copy NDI binary
     cp "$NDI_BINARY_PATH" /mnt/usb/opt/ndi-bridge/
     chmod +x /mnt/usb/opt/ndi-bridge/ndi-bridge
+    
+    # Copy NDI Display binary if it exists
+    if [ -f "$NDI_DISPLAY_BINARY_PATH" ]; then
+        cp "$NDI_DISPLAY_BINARY_PATH" /mnt/usb/opt/ndi-bridge/
+        chmod +x /mnt/usb/opt/ndi-bridge/ndi-display
+        log "NDI Display binary copied"
+    else
+        log "NDI Display binary not found, skipping"
+    fi
     
     # Copy NDI libraries
     mkdir -p /mnt/usb/usr/local/lib
@@ -55,6 +65,7 @@ assemble_configuration() {
     configure_network
     configure_time_sync
     configure_ndi_service
+    configure_ndi_display_service
     configure_ttys
     configure_filesystem
     configure_power_resistance

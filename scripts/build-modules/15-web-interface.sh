@@ -7,9 +7,9 @@ setup_web_interface() {
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFWEB'
 
 # Install wetty dependencies and nginx for web interface
-apt-get update
-apt-get install -y nginx nodejs npm apache2-utils
-npm install -g wetty@2.0.2
+apt-get update -qq 2>&1 | grep -v "^Get:\|^Hit:\|^Reading" || true
+apt-get install -y -qq nginx nodejs npm apache2-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building\|^Unpacking\|^Setting up\|Processing triggers\|database" || true
+npm install -g wetty@2.0.2 2>&1 | grep -v "^npm notice\|^npm WARN" || true
 
 # Disable default nginx site
 rm -f /etc/nginx/sites-enabled/default
@@ -302,7 +302,8 @@ After=local-fs.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'mkdir -p /var/log/nginx /var/lib/nginx/{body,proxy,fastcgi,uwsgi,scgi} && chown -R www-data:www-data /var/log/nginx /var/lib/nginx'
+# Only create/chown directories if they don't exist or are writable
+ExecStart=/bin/bash -c 'mkdir -p /var/log/nginx /var/lib/nginx/{body,proxy,fastcgi,uwsgi,scgi} 2>/dev/null; if [ -w /var/lib/nginx ]; then chown -R www-data:www-data /var/log/nginx /var/lib/nginx 2>/dev/null; fi; exit 0'
 RemainAfterExit=yes
 
 [Install]

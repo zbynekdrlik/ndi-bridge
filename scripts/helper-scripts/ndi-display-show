@@ -1,0 +1,51 @@
+#!/bin/bash
+#
+# Map an NDI stream to a display output
+#
+
+set -e
+
+# Check arguments
+if [ $# -ne 2 ]; then
+    echo "Usage: $0 <stream_name> <display_number>"
+    echo
+    echo "Example:"
+    echo "  $0 \"Camera 1\" 0"
+    echo
+    echo "Available displays:"
+    /usr/local/bin/ndi-display displays
+    exit 1
+fi
+
+STREAM_NAME="$1"
+DISPLAY_NUM="$2"
+
+# Validate display number is an integer
+if ! [[ "$DISPLAY_NUM" =~ ^[0-9]+$ ]]; then
+    echo "Error: Display number must be a positive integer"
+    exit 1
+fi
+
+# Validate display number is in valid range (0-2)
+if [ "$DISPLAY_NUM" -lt 0 ] || [ "$DISPLAY_NUM" -gt 2 ]; then
+    echo "Error: Display number must be between 0 and 2"
+    exit 1
+fi
+
+echo "Mapping stream '$STREAM_NAME' to display $DISPLAY_NUM..."
+
+# Stop the auto service if running
+if systemctl is-active --quiet ndi-display; then
+    echo "Stopping auto-mapping service..."
+    sudo systemctl stop ndi-display
+fi
+
+# Start the stream on the specified display
+/usr/local/bin/ndi-display show "$STREAM_NAME" "$DISPLAY_NUM" &
+DISPLAY_PID=$!
+
+# Save PID for management
+echo $DISPLAY_PID > /var/run/ndi-display-$DISPLAY_NUM.pid
+
+echo "Stream is now displaying on HDMI-$((DISPLAY_NUM + 1))"
+echo "To stop: ndi-display-stop $DISPLAY_NUM"

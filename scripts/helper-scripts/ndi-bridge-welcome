@@ -11,11 +11,20 @@ GRAY='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m'
 
+# Get terminal width
+TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
+
+# Create dynamic width header
+HEADER_LINE=$(printf '═%.0s' $(seq 1 $TERM_WIDTH))
+TITLE="NDI Bridge Status Dashboard"
+TITLE_LEN=${#TITLE}
+PADDING=$(( (TERM_WIDTH - TITLE_LEN) / 2 ))
+
 # Header
 echo -e "${GREEN}${BOLD}"
-echo "═══════════════════════════════════════════════════════════════"
-echo "                    NDI Bridge Status Dashboard                "
-echo "═══════════════════════════════════════════════════════════════"
+echo "$HEADER_LINE"
+printf "%*s%s\n" $PADDING "" "$TITLE"
+echo "$HEADER_LINE"
 echo -e "${NC}"
 
 # Read metrics from collector
@@ -44,7 +53,7 @@ if [ -z "$STREAM_NAME" ] || [ "$STREAM_NAME" = "none" ]; then
 fi
 
 # CAPTURE STATUS (Most important)
-echo -e "${CYAN}▶ CAPTURE STATUS${NC}                           ${BOLD}[LIVE]${NC}"
+printf "${CYAN}▶ CAPTURE STATUS${NC}%*s${BOLD}[LIVE]${NC}\n" $((TERM_WIDTH - 25)) ""
 
 # Capture device
 DEVICE=$(cat /etc/ndi-bridge/config 2>/dev/null | grep DEVICE | cut -d'"' -f2 || echo "/dev/video0")
@@ -74,17 +83,20 @@ elif [ "$CAPTURE_STATE" = "CAPTURING" ]; then
         FPS_COLOR="${RED}"
         FPS_STATUS="✗"
     fi
-    echo -e "  Current FPS: ${FPS_COLOR}${FPS_CURRENT} fps${NC} ${FPS_STATUS}"
+    printf "  Current FPS: ${FPS_COLOR}%-7s fps${NC} %s\n" "$FPS_CURRENT" "$FPS_STATUS"
     
     # 10-minute average with better threshold (59.5+ is good, not "minor issues")
     if (( $(echo "$FPS_AVG >= 59.5" | bc -l) )); then
-        STABILITY="${GREEN}(stable)${NC}"
+        STABILITY="(stable)"
+        STABILITY_COLOR="${GREEN}"
     elif (( $(echo "$FPS_AVG >= 58" | bc -l) )); then
-        STABILITY="${YELLOW}(minor variance)${NC}"
+        STABILITY="(minor variance)"
+        STABILITY_COLOR="${YELLOW}"
     else
-        STABILITY="${RED}(unstable)${NC}"
+        STABILITY="(unstable)"
+        STABILITY_COLOR="${RED}"
     fi
-    echo -e "  10min Avg:   ${FPS_AVG} fps $STABILITY"
+    echo -e "  10min Avg:   $(printf "%-7s" "$FPS_AVG") fps ${STABILITY_COLOR}${STABILITY}${NC}"
     
     # Dropped frames - gray when 0 (not important)
     if [ "$DROPPED" = "0" ]; then
@@ -103,8 +115,14 @@ echo ""
 
 # NDI OUTPUT
 echo -e "${CYAN}▶ NDI OUTPUT${NC}"
-echo "  Stream Name: $STREAM_NAME"
-echo -e "  Network TX:  ${BOLD}${NETWORK_MBPS} Mbps${NC}"
+printf "  Stream Name: %-40s\n" "$STREAM_NAME"
+# Format network TX properly (add leading zero if < 1)
+if (( $(echo "$NETWORK_MBPS < 1" | bc -l 2>/dev/null) )); then
+    NETWORK_FORMATTED=$(printf "0%s" "$NETWORK_MBPS")
+else
+    NETWORK_FORMATTED="$NETWORK_MBPS"
+fi
+printf "  Network TX:  ${BOLD}%-10s Mbps${NC}\n" "$NETWORK_FORMATTED"
 if [ "$LATENCY" != "N/A" ]; then
     if (( $(echo "$LATENCY <= 10" | bc -l) )); then
         echo -e "  Latency:     ${GREEN}${LATENCY}ms${NC} (excellent)"
@@ -232,6 +250,96 @@ if [ "$ETH0_LINK" = "1" ] || [ "$ETH1_LINK" = "1" ]; then
 fi
 echo ""
 
+# DISPLAY OUTPUT (NDI → HDMI)
+echo -e "${CYAN}▶ DISPLAY OUTPUT (NDI → HDMI)${NC}"
+
+# Get terminal width for better formatting
+TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
+
+# Check if ndi-display binary exists
+if [ -x /opt/ndi-bridge/ndi-display ]; then
+    # Check each display port
+    for i in 0 1 2; do
+        HDMI_NUM=$((i + 1))
+        STATUS_FILE="/var/run/ndi-display/display-${i}.status"
+        CONNECTION_FILE="/var/run/ndi-display/hdmi-${i}.connection"
+        
+        # Check for fallback locations
+        if [ ! -f "$STATUS_FILE" ] && [ -f "/tmp/ndi-display/display-${i}.status" ]; then
+            STATUS_FILE="/tmp/ndi-display/display-${i}.status"
+        fi
+        if [ ! -f "$CONNECTION_FILE" ] && [ -f "/tmp/ndi-display/hdmi-${i}.connection" ]; then
+            CONNECTION_FILE="/tmp/ndi-display/hdmi-${i}.connection"
+        fi
+        
+        # Check physical connection status
+        HDMI_CONNECTED=false
+        HDMI_RESOLUTION=""
+        HDMI_REFRESH=""
+        if [ -f "$CONNECTION_FILE" ]; then
+            source "$CONNECTION_FILE" 2>/dev/null
+            if [ "$CONNECTED" = "true" ]; then
+                HDMI_CONNECTED=true
+                HDMI_RESOLUTION="$RESOLUTION"
+                HDMI_REFRESH="$REFRESH_RATE"
+            fi
+        fi
+        
+        if [ -f "$STATUS_FILE" ]; then
+            # Parse active stream info - use grep to avoid sourcing issues
+            STREAM_NAME=$(grep "^STREAM_NAME=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '"')
+            RESOLUTION=$(grep "^RESOLUTION=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
+            FPS=$(grep "^FPS=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
+            BITRATE=$(grep "^BITRATE=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
+            FRAMES_RECEIVED=$(grep "^FRAMES_RECEIVED=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
+            FRAMES_DROPPED=$(grep "^FRAMES_DROPPED=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
+            
+            # Format FPS to 1 decimal place
+            FPS=$(printf "%.1f" "$FPS" 2>/dev/null || echo "$FPS")
+            
+            # Format FPS with color
+            if (( $(echo "$FPS >= 29" | bc -l 2>/dev/null) )); then
+                FPS_COLOR="${GREEN}"
+            elif (( $(echo "$FPS >= 25" | bc -l 2>/dev/null) )); then
+                FPS_COLOR="${YELLOW}"
+            else
+                FPS_COLOR="${RED}"
+            fi
+            
+            # Show both monitor and NDI info on single line
+            if [ "$HDMI_CONNECTED" = "true" ]; then
+                # Single line with monitor info AND NDI stream info with separate FPS
+                printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: ${HDMI_RESOLUTION}@${HDMI_REFRESH}Hz │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
+                    "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                
+                # Show dropped frames if any
+                if [ "$FRAMES_DROPPED" != "0" ] && [ -n "$FRAMES_DROPPED" ]; then
+                    printf "          ${RED}Dropped: ${FRAMES_DROPPED} frames${NC}\n"
+                fi
+            else
+                # No monitor connected but stream active
+                printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: [Not connected] │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
+                    "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                
+                # Show dropped frames if any
+                if [ "$FRAMES_DROPPED" != "0" ] && [ -n "$FRAMES_DROPPED" ]; then
+                    printf "          ${RED}Dropped: ${FRAMES_DROPPED} frames${NC}\n"
+                fi
+            fi
+        elif [ "$HDMI_CONNECTED" = "true" ]; then
+            # Monitor connected but no active stream
+            printf "  HDMI-%-2d ${YELLOW}●${NC} Monitor: ${HDMI_RESOLUTION}@${HDMI_REFRESH}Hz │ ${GRAY}No active NDI stream${NC}\n" \
+                "$HDMI_NUM"
+        else
+            # No monitor connected
+            printf "  HDMI-%-2d ${GRAY}○${NC} Not connected\n" "$HDMI_NUM"
+        fi
+    done
+else
+    echo "  Display support not installed"
+fi
+echo ""
+
 # BUILD INFO
 echo -e "${CYAN}▶ BUILD INFO${NC}"
 echo "  NDI Bridge:  v$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo 'Unknown')"
@@ -268,4 +376,4 @@ echo ""
 
 # QUICK ACTIONS - Moved to last position
 echo -e "${CYAN}▶ QUICK ACTIONS${NC}"
-echo "  [L]ogs  [S]et-name  [N]etwork  [T]ime-sync  [H]elp  [Q]uit"
+echo "  [L]ogs  [S]et-name  [N]etwork  [T]ime-sync  [D]isplay  [H]elp  [Q]uit"

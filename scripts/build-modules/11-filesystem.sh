@@ -30,6 +30,7 @@ tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
 tmpfs /var/log tmpfs defaults,nosuid,nodev,size=100M 0 0
 tmpfs /var/tmp tmpfs defaults,nosuid,nodev 0 0
 tmpfs /var/lib/systemd tmpfs defaults,nosuid,nodev,size=50M 0 0
+tmpfs /var/lib/nginx tmpfs defaults,nosuid,nodev,size=50M 0 0
 EOFFSTAB
 
 # Create systemd directory structure that will be mounted as tmpfs

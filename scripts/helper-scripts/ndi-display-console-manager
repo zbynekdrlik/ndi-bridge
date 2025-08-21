@@ -1,0 +1,240 @@
+#!/bin/bash
+#
+# Manage console allocation across displays
+#
+
+set -e
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then
+    echo "This script must be run as root"
+    exit 1
+fi
+
+# Function to check if console is active on a display
+is_console_active() {
+    local display=$1
+    local vtcon_path="/sys/class/vtconsole/vtcon${display}/bind"
+    
+    if [ -f "$vtcon_path" ]; then
+        if [ "$(cat $vtcon_path)" = "1" ]; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Function to find an available display for console
+find_free_display() {
+    for i in 0 1 2; do
+        # Skip the display we're trying to use
+        if [ "$i" = "$1" ]; then
+            continue
+        fi
+        
+        # Check if NDI is running on this display
+        if ! systemctl is-active --quiet ndi-display@${i}; then
+            echo $i
+            return 0
+        fi
+    done
+    
+    # No free display found
+    echo -1
+    return 1
+}
+
+case "$1" in
+    status)
+        echo "Console Status on Displays:"
+        echo "==========================="
+        for i in 0 1 2; do
+            echo -n "Display $i: "
+            if is_console_active $i; then
+                echo "Console ACTIVE"
+            else
+                if systemctl is-active --quiet ndi-display@${i}; then
+                    echo "NDI Display"
+                else
+                    echo "Inactive"
+                fi
+            fi
+        done
+        
+        # Show framebuffer devices
+        echo ""
+        echo "Framebuffer devices:"
+        ls -la /dev/fb* 2>/dev/null || echo "No framebuffer devices found"
+        
+        # Show DRM devices
+        echo ""
+        echo "DRM devices:"
+        ls -la /dev/dri/card* 2>/dev/null || echo "No DRM devices found"
+        ;;
+        
+    disable)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 disable <display-id>"
+            exit 1
+        fi
+        
+        DISPLAY_ID=$2
+        
+        if ! [[ "$DISPLAY_ID" =~ ^[0-2]$ ]]; then
+            echo "Error: Display ID must be 0, 1, or 2"
+            exit 1
+        fi
+        
+        if is_console_active $DISPLAY_ID; then
+            echo "Disabling console on display $DISPLAY_ID..."
+            
+            # Find alternative display for console
+            ALT_DISPLAY=$(find_free_display $DISPLAY_ID)
+            
+            if [ "$ALT_DISPLAY" -ge 0 ]; then
+                echo "Moving console to display $ALT_DISPLAY..."
+                
+                # Enable console on alternative display first
+                echo 1 > /sys/class/vtconsole/vtcon${ALT_DISPLAY}/bind 2>/dev/null || true
+                
+                # Then disable on requested display
+                echo 0 > /sys/class/vtconsole/vtcon${DISPLAY_ID}/bind
+                
+                # Switch VT to the new display
+                chvt 1
+                
+                echo "Console moved to display $ALT_DISPLAY"
+            else
+                # Check policy to see if we can disable all consoles
+                ALLOW_NO_CONSOLE=false
+                if [ -f /etc/ndi-bridge/display-policy.conf ]; then
+                    source /etc/ndi-bridge/display-policy.conf
+                fi
+                
+                if [ "$ALLOW_NO_CONSOLE" = "true" ]; then
+                    echo "Warning: Disabling last console!"
+                    echo 0 > /sys/class/vtconsole/vtcon${DISPLAY_ID}/bind
+                    echo "Console disabled. SSH access required for recovery!"
+                else
+                    echo "Error: Cannot disable console - no alternative display available"
+                    echo "To force, set ALLOW_NO_CONSOLE=true in /etc/ndi-bridge/display-policy.conf"
+                    exit 1
+                fi
+            fi
+        else
+            echo "Console is not active on display $DISPLAY_ID"
+        fi
+        ;;
+        
+    enable)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 enable <display-id>"
+            exit 1
+        fi
+        
+        DISPLAY_ID=$2
+        
+        if ! [[ "$DISPLAY_ID" =~ ^[0-2]$ ]]; then
+            echo "Error: Display ID must be 0, 1, or 2"
+            exit 1
+        fi
+        
+        # Check if NDI is running on this display
+        if systemctl is-active --quiet ndi-display@${DISPLAY_ID}; then
+            echo "Error: NDI display service is running on display $DISPLAY_ID"
+            echo "Stop it first with: systemctl stop ndi-display@${DISPLAY_ID}"
+            exit 1
+        fi
+        
+        if ! is_console_active $DISPLAY_ID; then
+            echo "Enabling console on display $DISPLAY_ID..."
+            echo 1 > /sys/class/vtconsole/vtcon${DISPLAY_ID}/bind
+            
+            # Switch to TTY1
+            chvt 1
+            
+            echo "Console enabled on display $DISPLAY_ID"
+        else
+            echo "Console is already active on display $DISPLAY_ID"
+        fi
+        ;;
+        
+    move)
+        if [ -z "$2" ] || [ -z "$3" ]; then
+            echo "Usage: $0 move <from-display> <to-display>"
+            exit 1
+        fi
+        
+        FROM_DISPLAY=$2
+        TO_DISPLAY=$3
+        
+        if ! [[ "$FROM_DISPLAY" =~ ^[0-2]$ ]] || ! [[ "$TO_DISPLAY" =~ ^[0-2]$ ]]; then
+            echo "Error: Display IDs must be 0, 1, or 2"
+            exit 1
+        fi
+        
+        if [ "$FROM_DISPLAY" = "$TO_DISPLAY" ]; then
+            echo "Error: Source and destination displays are the same"
+            exit 1
+        fi
+        
+        if ! is_console_active $FROM_DISPLAY; then
+            echo "Error: Console is not active on display $FROM_DISPLAY"
+            exit 1
+        fi
+        
+        if systemctl is-active --quiet ndi-display@${TO_DISPLAY}; then
+            echo "Error: NDI display service is running on display $TO_DISPLAY"
+            exit 1
+        fi
+        
+        echo "Moving console from display $FROM_DISPLAY to display $TO_DISPLAY..."
+        
+        # Enable on new display first
+        echo 1 > /sys/class/vtconsole/vtcon${TO_DISPLAY}/bind
+        
+        # Then disable on old display
+        echo 0 > /sys/class/vtconsole/vtcon${FROM_DISPLAY}/bind
+        
+        # Switch VT
+        chvt 1
+        
+        echo "Console moved successfully"
+        ;;
+        
+    emergency)
+        echo "Emergency console recovery!"
+        echo "=========================="
+        
+        # Stop all NDI displays
+        echo "Stopping all NDI display services..."
+        systemctl stop 'ndi-display@*'
+        
+        # Enable console on display 0
+        echo "Enabling console on display 0..."
+        echo 1 > /sys/class/vtconsole/vtcon0/bind
+        
+        # Disable console on other displays
+        echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true
+        echo 0 > /sys/class/vtconsole/vtcon2/bind 2>/dev/null || true
+        
+        # Switch to TTY1
+        chvt 1
+        
+        echo "Console restored to display 0"
+        echo "All NDI display services stopped"
+        ;;
+        
+    *)
+        echo "NDI Display Console Manager"
+        echo "==========================="
+        echo ""
+        echo "Usage:"
+        echo "  $0 status                    # Show console status"
+        echo "  $0 disable <display-id>      # Disable console on display"
+        echo "  $0 enable <display-id>       # Enable console on display"
+        echo "  $0 move <from-id> <to-id>    # Move console between displays"
+        echo "  $0 emergency                 # Emergency console recovery"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,497 @@
+#!/bin/bash
+#
+# NDI Display Configuration Tool
+# Clean, structured interface for configuring NDI displays
+#
+
+set -e
+
+# Colors and formatting
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BLUE='\033[0;34m'
+GRAY='\033[0;90m'
+BOLD='\033[1m'
+NC='\033[0m'
+CLEAR_LINE='\033[K'
+
+# Get terminal width for formatting
+TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
+
+# Configuration files
+CONFIG_DIR="/etc/ndi-bridge"
+POLICY_FILE="$CONFIG_DIR/display-policy.conf"
+
+# Print centered text
+print_centered() {
+    local text="$1"
+    local width=${2:-$TERM_WIDTH}
+    local padding=$(( (width - ${#text}) / 2 ))
+    printf "%*s%s\n" $padding "" "$text"
+}
+
+# Print a horizontal line
+print_line() {
+    printf '%*s\n' "${TERM_WIDTH}" '' | tr ' ' '─'
+}
+
+# Print header
+print_header() {
+    clear
+    echo -e "${CYAN}${BOLD}"
+    print_line
+    print_centered "NDI DISPLAY CONFIGURATION"
+    print_line
+    echo -e "${NC}"
+}
+
+# Get display physical status
+get_display_info() {
+    local display_id=$1
+    local info=$(/opt/ndi-bridge/ndi-display displays 2>/dev/null | grep "Display $display_id:" || echo "")
+    
+    if echo "$info" | grep -q "Not connected"; then
+        echo "Not connected"
+    elif echo "$info" | grep -q "\["; then
+        echo "$info" | sed -n 's/.*\[\(.*\)\].*/\1/p'
+    else
+        echo "Unknown"
+    fi
+}
+
+# Get NDI stream status for a display
+get_stream_status() {
+    local display_id=$1
+    local status_file="/var/run/ndi-display/display-${display_id}.status"
+    
+    if [ -f "$status_file" ]; then
+        local stream_name=$(grep "^STREAM_NAME=" "$status_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"')
+        local fps=$(grep "^FPS=" "$status_file" 2>/dev/null | cut -d'=' -f2)
+        local resolution=$(grep "^RESOLUTION=" "$status_file" 2>/dev/null | cut -d'=' -f2)
+        
+        if [ -n "$stream_name" ]; then
+            # Format FPS to 1 decimal place for consistency
+            fps=$(printf "%.1f" "$fps" 2>/dev/null || echo "$fps")
+            # Return formatted string for display
+            echo "${stream_name}|${resolution}|${fps}"
+            return 0
+        fi
+    fi
+    
+    # Check if service is configured but not running
+    local config_file="$CONFIG_DIR/display-${display_id}.conf"
+    if [ -f "$config_file" ]; then
+        source "$config_file" 2>/dev/null
+        if [ -n "$STREAM_NAME" ]; then
+            if systemctl is-active --quiet ndi-display@${display_id}; then
+                echo "${STREAM_NAME} (starting...)"
+            else
+                echo "${STREAM_NAME} (stopped)"
+            fi
+            return 0
+        fi
+    fi
+    
+    echo "Not configured"
+    return 1
+}
+
+# Show all displays status
+show_status() {
+    print_header
+    
+    echo -e "${BOLD}Display Status Overview${NC}"
+    echo ""
+    
+    # Load console policy
+    local console_display=0
+    if [ -f "$POLICY_FILE" ]; then
+        source "$POLICY_FILE" 2>/dev/null
+        console_display=${CONSOLE_DISPLAY:-0}
+    fi
+    
+    # Show each display
+    for display_id in 0 1 2; do
+        local hdmi_num=$((display_id + 1))
+        local physical_status=$(get_display_info $display_id)
+        local stream_status=$(get_stream_status $display_id)
+        local is_console=""
+        
+        # Check if console is active
+        if [ "$display_id" = "$console_display" ]; then
+            local vtcon_path="/sys/class/vtconsole/vtcon${display_id}/bind"
+            if [ -f "$vtcon_path" ] && [ "$(cat $vtcon_path 2>/dev/null)" = "1" ]; then
+                is_console=" ${YELLOW}[CONSOLE]${NC}"
+            fi
+        fi
+        
+        # Format display line - just show HDMI number, no confusing display ID
+        printf "  ${BOLD}HDMI-%d${NC}${is_console}\n" $hdmi_num
+        
+        # Physical connection status
+        if [[ "$physical_status" == "Not connected" ]]; then
+            printf "    Monitor:  ${GRAY}Not connected${NC}\n"
+        else
+            printf "    Monitor:  ${GREEN}%s${NC}\n" "$physical_status"
+        fi
+        
+        # NDI stream status
+        if [[ "$stream_status" == "Not configured" ]]; then
+            printf "    NDI:      ${GRAY}%s${NC}\n" "$stream_status"
+        elif [[ "$stream_status" == *"(stopped)"* ]]; then
+            printf "    NDI:      ${RED}%s${NC}\n" "$stream_status"
+        elif [[ "$stream_status" == *"(starting...)"* ]]; then
+            printf "    NDI:      ${YELLOW}%s${NC}\n" "$stream_status"
+        elif [[ "$stream_status" == *"|"* ]]; then
+            # Parse the pipe-separated format
+            IFS='|' read -r name res fps <<< "$stream_status"
+            printf "    NDI:      ${GREEN}%s${NC}\n" "$name"
+            printf "    Stream:   %s @ %s fps\n" "$res" "$fps"
+        else
+            printf "    NDI:      ${GREEN}%s${NC}\n" "$stream_status"
+        fi
+        
+        echo ""
+    done
+    
+    print_line
+}
+
+# Configure a specific display
+configure_display() {
+    local display_id=$1
+    local hdmi_num=$((display_id + 1))
+    local config_file="$CONFIG_DIR/display-${display_id}.conf"
+    
+    print_header
+    
+    echo -e "${BOLD}Configure HDMI-${hdmi_num}${NC}"
+    echo ""
+    
+    # Show current status
+    local physical_status=$(get_display_info $display_id)
+    local stream_status=$(get_stream_status $display_id)
+    
+    echo -e "${CYAN}Current Status:${NC}"
+    printf "  Monitor:  %s\n" "$physical_status"
+    printf "  NDI:      %s\n" "$stream_status"
+    echo ""
+    
+    # Check console status
+    local console_display=0
+    if [ -f "$POLICY_FILE" ]; then
+        source "$POLICY_FILE" 2>/dev/null
+        console_display=${CONSOLE_DISPLAY:-0}
+    fi
+    
+    local vtcon_path="/sys/class/vtconsole/vtcon${display_id}/bind"
+    local console_active=false
+    if [ -f "$vtcon_path" ] && [ "$(cat $vtcon_path 2>/dev/null)" = "1" ]; then
+        console_active=true
+        echo -e "${YELLOW}⚠ Console is currently active on this display${NC}"
+        echo ""
+    fi
+    
+    # Menu options
+    echo -e "${CYAN}Options:${NC}"
+    echo -e "  ${BOLD}1${NC} - Assign NDI stream to this display"
+    echo -e "  ${BOLD}2${NC} - Remove NDI stream (disable display)"
+    echo -e "  ${BOLD}3${NC} - Reserve for Linux console"
+    echo ""
+    echo -e "  ${BOLD}0${NC} - Back to overview"
+    echo ""
+    
+    read -p "Select option: " option
+    
+    case "$option" in
+        1) assign_stream $display_id ;;
+        2) remove_stream $display_id ;;
+        3) set_console $display_id ;;
+        0) return ;;
+        *) echo -e "${RED}Invalid option${NC}"; sleep 1 ;;
+    esac
+}
+
+# Assign NDI stream to display
+assign_stream() {
+    local display_id=$1
+    local config_file="$CONFIG_DIR/display-${display_id}.conf"
+    
+    print_header
+    echo -e "${BOLD}Select NDI Stream${NC}"
+    echo ""
+    
+    # Find available streams with proper wait time for discovery
+    echo "Searching for NDI streams (please wait)..."
+    
+    # Run discovery with 5 second timeout to ensure we get all streams
+    # The ndi-display list command should internally wait for discovery
+    local streams_output=$(timeout 5 /opt/ndi-bridge/ndi-display list 2>&1)
+    
+    # If timeout or no output, try once more with longer wait
+    if [ -z "$streams_output" ] || ! echo "$streams_output" | grep -q "^[0-9]:"; then
+        echo "Waiting for network discovery..."
+        sleep 2
+        streams_output=$(timeout 5 /opt/ndi-bridge/ndi-display list 2>&1)
+    fi
+    
+    # Extract just the numbered stream lines
+    local streams=$(echo "$streams_output" | grep -E "^[0-9]+:" || true)
+    
+    if [ -z "$streams" ]; then
+        echo ""
+        echo -e "${RED}No NDI streams found on network${NC}"
+        echo ""
+        echo "Press Enter to continue..."
+        read
+        return
+    fi
+    
+    echo ""
+    echo -e "${CYAN}Available NDI Streams:${NC}"
+    
+    # Renumber streams starting from 1 to avoid conflict with 0=cancel
+    local stream_count=0
+    declare -a stream_names
+    
+    while IFS= read -r line; do
+        # Extract full stream name including what's in parentheses
+        # Line format is like: "0: RESOLUME-SNV (cg-obs) (10.77.9.59:5961)"
+        # We want: "RESOLUME-SNV (cg-obs)"
+        local orig_name=$(echo "$line" | sed 's/^[0-9]*: //' | sed -E 's/ \([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+:[0-9]+\)$//')
+        stream_count=$((stream_count + 1))
+        stream_names[$stream_count]="$orig_name"
+        
+        # Show with new numbering
+        local details=$(echo "$line" | sed 's/^[0-9]*: //')
+        echo "  ${stream_count}. $details"
+    done <<< "$streams"
+    
+    echo ""
+    echo "Enter stream number (1-${stream_count}) or press Enter to cancel:"
+    read -p "> " selection
+    
+    if [ -z "$selection" ]; then
+        return
+    fi
+    
+    # Extract stream name
+    local stream_name=""
+    if [[ "$selection" =~ ^[0-9]+$ ]]; then
+        # Selected by number
+        if [ "$selection" -ge 1 ] && [ "$selection" -le "$stream_count" ]; then
+            stream_name="${stream_names[$selection]}"
+        else
+            echo -e "${RED}Invalid selection${NC}"
+            sleep 2
+            return
+        fi
+    else
+        # Entered full name
+        stream_name="$selection"
+    fi
+    
+    if [ -z "$stream_name" ]; then
+        echo -e "${RED}Invalid selection${NC}"
+        sleep 2
+        return
+    fi
+    
+    # Apply configuration immediately
+    echo ""
+    echo "Applying configuration..."
+    echo -e "${CYAN}Assigning '${stream_name}' to HDMI-$((display_id + 1))...${NC}"
+    
+    # First, kill ANY running ndi-display process on this display
+    echo "Stopping any existing streams on HDMI-$((display_id + 1))..."
+    
+    # More aggressive killing - find by display ID in command line
+    local pids=$(ps aux | grep -E "/opt/ndi-bridge/ndi-display.*[[:space:]]${display_id}($|[[:space:]])" | grep -v grep | awk '{print $2}')
+    if [ -n "$pids" ]; then
+        echo "Stopping processes: $pids"
+        for pid in $pids; do
+            sudo kill -9 $pid 2>/dev/null || true
+        done
+    fi
+    
+    # Also try pattern matching
+    sudo pkill -9 -f "ndi-display.*[[:space:]]${display_id}$" 2>/dev/null || true
+    
+    # Stop current service if running
+    if systemctl is-active --quiet ndi-display@${display_id}; then
+        sudo systemctl stop ndi-display@${display_id}
+    fi
+    
+    # Wait for process to fully stop
+    sleep 2
+    
+    # Disable console if active
+    local vtcon_path="/sys/class/vtconsole/vtcon${display_id}/bind"
+    if [ -f "$vtcon_path" ] && [ "$(cat $vtcon_path 2>/dev/null)" = "1" ]; then
+        echo "Disabling console on display..."
+        sudo /usr/local/bin/ndi-display-console-manager disable ${display_id} 2>/dev/null || true
+    fi
+    
+    # Create config directory if needed
+    sudo mkdir -p "$CONFIG_DIR"
+    
+    # Write configuration (handle read-only filesystem)
+    # Make filesystem read-write temporarily
+    /usr/local/bin/ndi-bridge-rw
+    
+    sudo tee "$config_file" > /dev/null << EOF
+# NDI Display Configuration for HDMI-$((display_id + 1))
+STREAM_NAME="${stream_name}"
+DISPLAY_ID=${display_id}
+ENABLED=true
+EOF
+    
+    # Enable and start the systemd service (while still RW)
+    echo "Starting stream '${stream_name}' on HDMI-$((display_id + 1))..."
+    
+    # Stop any manually running instance first
+    stop_display_process ${display_id}
+    
+    # Enable service while filesystem is still RW
+    sudo systemctl enable ndi-display@${display_id}
+    sync  # Ensure filesystem writes are completed
+    
+    # Return to read-only
+    /usr/local/bin/ndi-bridge-ro
+    
+    # Start the service (can be done on RO filesystem)
+    sudo systemctl restart ndi-display@${display_id}
+    
+    echo ""
+    echo -e "${GREEN}✓ Configuration applied successfully${NC}"
+    echo ""
+    echo "Press Enter to continue..."
+    read
+}
+
+# Remove stream from display
+remove_stream() {
+    local display_id=$1
+    local config_file="$CONFIG_DIR/display-${display_id}.conf"
+    
+    if [ ! -f "$config_file" ]; then
+        echo -e "${YELLOW}Display is not configured${NC}"
+        sleep 2
+        return
+    fi
+    
+    echo ""
+    echo -e "${YELLOW}Remove NDI stream from HDMI-$((display_id + 1))?${NC}"
+    echo "(y/n): "
+    read -p "> " confirm
+    
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        return
+    fi
+    
+    echo ""
+    echo "Removing configuration..."
+    
+    # Stop service first (can be done on RO)
+    if systemctl is-active --quiet ndi-display@${display_id}; then
+        sudo systemctl stop ndi-display@${display_id}
+    fi
+    
+    # Remove config file and disable service (needs RW)
+    /usr/local/bin/ndi-bridge-rw
+    sudo systemctl disable ndi-display@${display_id} 2>/dev/null || true
+    sudo rm -f "$config_file"
+    /usr/local/bin/ndi-bridge-ro
+    
+    echo ""
+    echo -e "${GREEN}✓ Configuration removed${NC}"
+    echo ""
+    echo "Press Enter to continue..."
+    read
+}
+
+# Set display as console
+set_console() {
+    local display_id=$1
+    
+    echo ""
+    echo -e "${YELLOW}Reserve HDMI-$((display_id + 1)) for Linux console?${NC}"
+    echo "This will remove any NDI stream configuration."
+    echo "(y/n): "
+    read -p "> " confirm
+    
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        return
+    fi
+    
+    echo ""
+    echo "Configuring console..."
+    
+    # Stop NDI service if running
+    if systemctl is-active --quiet ndi-display@${display_id}; then
+        sudo systemctl stop ndi-display@${display_id}
+        sudo systemctl disable ndi-display@${display_id} 2>/dev/null || true
+    fi
+    
+    # Remove NDI config
+    sudo rm -f "$CONFIG_DIR/display-${display_id}.conf"
+    
+    # Update policy
+    sudo mkdir -p "$CONFIG_DIR"
+    echo "CONSOLE_DISPLAY=${display_id}" | sudo tee "$POLICY_FILE" > /dev/null
+    
+    # Enable console
+    sudo /usr/local/bin/ndi-display-console-manager enable ${display_id} 2>/dev/null || true
+    
+    echo ""
+    echo -e "${GREEN}✓ Display reserved for console${NC}"
+    echo ""
+    echo "Press Enter to continue..."
+    read
+}
+
+# Main menu loop
+main_menu() {
+    while true; do
+        show_status
+        
+        echo -e "${CYAN}Actions:${NC}"
+        echo -e "  ${BOLD}1${NC} - Configure HDMI-1"
+        echo -e "  ${BOLD}2${NC} - Configure HDMI-2"
+        echo -e "  ${BOLD}3${NC} - Configure HDMI-3"
+        echo ""
+        echo -e "  ${BOLD}r${NC} - Refresh status"
+        echo -e "  ${BOLD}q${NC} - Quit"
+        echo ""
+        
+        read -n1 -p "Select: " choice
+        echo ""
+        
+        case "$choice" in
+            1) configure_display 0 ;;
+            2) configure_display 1 ;;
+            3) configure_display 2 ;;
+            r|R) continue ;;
+            q|Q) clear; exit 0 ;;
+            *) ;;
+        esac
+    done
+}
+
+# Handle command line arguments
+case "${1:-}" in
+    status)
+        show_status
+        ;;
+    [0-2])
+        # Direct display configuration
+        configure_display $1
+        show_status
+        ;;
+    *)
+        # Interactive menu
+        main_menu
+        ;;
+esac
