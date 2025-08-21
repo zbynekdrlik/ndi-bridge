@@ -302,7 +302,8 @@ After=local-fs.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c 'mkdir -p /var/log/nginx /var/lib/nginx/{body,proxy,fastcgi,uwsgi,scgi} && chown -R www-data:www-data /var/log/nginx /var/lib/nginx'
+# Only create/chown directories if they don't exist or are writable
+ExecStart=/bin/bash -c 'mkdir -p /var/log/nginx /var/lib/nginx/{body,proxy,fastcgi,uwsgi,scgi} 2>/dev/null; if [ -w /var/lib/nginx ]; then chown -R www-data:www-data /var/log/nginx /var/lib/nginx 2>/dev/null; fi; exit 0'
 RemainAfterExit=yes
 
 [Install]
