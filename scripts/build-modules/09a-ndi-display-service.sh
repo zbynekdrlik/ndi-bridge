@@ -16,6 +16,13 @@ configure_ndi_display_service() {
         return 0
     fi
     
+    # Copy display policy configuration
+    if [ -f scripts/config/display-policy.conf ]; then
+        mkdir -p /mnt/usb/etc/ndi-bridge
+        cp scripts/config/display-policy.conf /mnt/usb/etc/ndi-bridge/
+        log "  Copied display-policy.conf"
+    fi
+    
     # Everything else happens inside chroot
     chroot /mnt/usb /bin/bash << 'EOFNDIDISPLAY'
 set -e
