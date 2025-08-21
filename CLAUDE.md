@@ -2,17 +2,26 @@
 
 ## CRITICAL: Modular Architecture Rules
 
-**NEVER CREATE INLINE SCRIPTS IN BUILD MODULES!**
-- ALL scripts must be in `scripts/helper-scripts/` as separate files
-- Build modules (00-15) should ONLY copy/install, NEVER generate scripts inline
+**NEVER CREATE INLINE SCRIPTS OR FILES IN BUILD MODULES!**
+- **Scripts**: ALL must be in `scripts/helper-scripts/` as separate files
+- **Service Files**: Should be in dedicated directory structure (not inline)
+- **Config Files**: Should be in appropriate directories as separate files
+- Build modules (00-15) should ONLY copy/install, NEVER generate content inline
 - Module 12 (`12-helper-scripts.sh`) handles ALL script installation
-- This prevents scripts being overwritten by later modules
-- Violating this causes deployment of old/wrong script versions
+- This prevents files being overwritten by later modules
+- Violating this causes deployment of old/wrong versions
 
 **Why this matters:**
 - Module execution order means later modules overwrite earlier ones
-- Inline script generation in 09a overwrites modular scripts from module 12
-- This has caused repeated deployment failures with wrong script versions
+- Inline generation makes code unmaintainable and hard to debug
+- Prevents proper version control of individual components
+- Creates massive, unreadable build modules (some had 700+ lines!)
+- This has caused repeated deployment failures with wrong versions
+
+**Current Technical Debt (TO BE FIXED):**
+- 15 systemd service files still created inline across 7 modules
+- These should be extracted to proper directory structure
+- Build modules should use `cp` instead of `cat > ... << EOF`
 
 ## Git Workflow Rules
 
