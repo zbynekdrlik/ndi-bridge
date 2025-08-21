@@ -254,7 +254,7 @@ echo -e "${CYAN}▶ DISPLAY OUTPUT (NDI → HDMI)${NC}"
 TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
 
 # Check if ndi-display binary exists
-if [ -x /opt/ndi-bridge/ndi-display ]; then
+if [ -x /opt/ndi-bridge/bin/ndi-display ]; then
     # Check each display port
     for i in 0 1 2; do
         HDMI_NUM=$((i + 1))

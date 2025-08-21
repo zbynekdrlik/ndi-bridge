@@ -60,7 +60,7 @@ while true; do
                 read -n 1 -s -r
                 ;;
             d)
-                if [ -x /opt/ndi-bridge/ndi-display ]; then
+                if [ -x /opt/ndi-bridge/bin/ndi-display ]; then
                     # Launch the new clean display configuration menu directly
                     /usr/local/bin/ndi-display-config
                 else
