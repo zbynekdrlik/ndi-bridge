@@ -345,13 +345,15 @@ DISPLAY_ID=${display_id}
 ENABLED=true
 EOF
     
-    # Start the stream directly (don't rely on systemd service for now)
+    # Start the stream using systemd for persistence
     echo "Starting stream '${stream_name}' on HDMI-$((display_id + 1))..."
-    (
-        source "$config_file"
-        export LD_LIBRARY_PATH=/opt/ndi-lib
-        nohup /opt/ndi-bridge/ndi-display "${STREAM_NAME}" ${DISPLAY_ID} >/dev/null 2>&1 &
-    )
+    
+    # Stop any manually running instance first
+    stop_display_process ${display_id}
+    
+    # Enable and start the systemd service
+    sudo systemctl enable ndi-display@${display_id} 2>/dev/null
+    sudo systemctl restart ndi-display@${display_id}
     
     echo ""
     echo -e "${GREEN}✓ Configuration applied successfully${NC}"
