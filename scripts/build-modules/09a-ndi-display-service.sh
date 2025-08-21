@@ -46,9 +46,9 @@ Environment="LD_LIBRARY_PATH=/usr/local/lib"
 # Read stream configuration from file
 EnvironmentFile=-/etc/ndi-bridge/display-%i.conf
 
-# Start NDI display (stream name comes from EnvironmentFile)
+# Start NDI display using launcher script (handles spaces in stream names)
 ExecStartPre=/usr/local/bin/ndi-display-console-check %i
-ExecStart=/opt/ndi-bridge/ndi-display "${STREAM_NAME}" %i
+ExecStart=/usr/local/bin/ndi-display-launcher %i
 ExecStopPost=/usr/bin/rm -f /var/run/ndi-display/display-%i.status
 
 # Resource limits

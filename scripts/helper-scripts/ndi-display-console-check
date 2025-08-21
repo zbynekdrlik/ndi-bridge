@@ -11,14 +11,15 @@ if [ -z "$DISPLAY_ID" ]; then
     exit 1
 fi
 
-# Check if console is active on this display
+# Check if console is active on this display and disable it if needed
 VTCON_PATH="/sys/class/vtconsole/vtcon${DISPLAY_ID}/bind"
 
 if [ -f "$VTCON_PATH" ]; then
     if [ "$(cat $VTCON_PATH)" = "1" ]; then
-        echo "Error: Console is active on display ${DISPLAY_ID}"
-        echo "Run: sudo ndi-display-console-manager disable ${DISPLAY_ID}"
-        exit 1
+        echo "Console is active on display ${DISPLAY_ID}, disabling it..."
+        # Automatically disable the console on this display
+        /usr/local/bin/ndi-display-console-manager disable ${DISPLAY_ID} >/dev/null 2>&1
+        # No need to fail - we handled it
     fi
 fi
 

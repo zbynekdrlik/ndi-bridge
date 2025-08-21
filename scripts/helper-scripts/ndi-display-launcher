@@ -1,0 +1,29 @@
+#!/bin/bash
+#
+# Launcher script for ndi-display systemd service
+# Properly handles environment variables with spaces in stream names
+#
+
+DISPLAY_ID=$1
+CONFIG_FILE="/etc/ndi-bridge/display-${DISPLAY_ID}.conf"
+
+if [ -z "$DISPLAY_ID" ]; then
+    echo "Error: Display ID not provided"
+    exit 1
+fi
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Error: No configuration found for display $DISPLAY_ID"
+    exit 1
+fi
+
+# Source the configuration file to get STREAM_NAME
+source "$CONFIG_FILE"
+
+if [ -z "$STREAM_NAME" ]; then
+    echo "Error: STREAM_NAME not configured for display $DISPLAY_ID"
+    exit 1
+fi
+
+# Launch ndi-display with proper quoting to handle spaces
+exec /opt/ndi-bridge/ndi-display "$STREAM_NAME" $DISPLAY_ID
