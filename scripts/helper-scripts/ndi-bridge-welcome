@@ -87,13 +87,16 @@ elif [ "$CAPTURE_STATE" = "CAPTURING" ]; then
     
     # 10-minute average with better threshold (59.5+ is good, not "minor issues")
     if (( $(echo "$FPS_AVG >= 59.5" | bc -l) )); then
-        STABILITY="${GREEN}(stable)${NC}"
+        STABILITY="(stable)"
+        STABILITY_COLOR="${GREEN}"
     elif (( $(echo "$FPS_AVG >= 58" | bc -l) )); then
-        STABILITY="${YELLOW}(minor variance)${NC}"
+        STABILITY="(minor variance)"
+        STABILITY_COLOR="${YELLOW}"
     else
-        STABILITY="${RED}(unstable)${NC}"
+        STABILITY="(unstable)"
+        STABILITY_COLOR="${RED}"
     fi
-    printf "  10min Avg:   %-7s fps %s\n" "$FPS_AVG" "$STABILITY"
+    echo -e "  10min Avg:   $(printf "%-7s" "$FPS_AVG") fps ${STABILITY_COLOR}${STABILITY}${NC}"
     
     # Dropped frames - gray when 0 (not important)
     if [ "$DROPPED" = "0" ]; then
