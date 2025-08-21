@@ -4,6 +4,17 @@
 setup_web_interface() {
     log "Setting up web interface with wetty..."
     
+    # Copy systemd service files BEFORE chroot
+    mkdir -p /mnt/usb/etc/systemd/system
+    for service in wetty.service nginx-tmpfs-dirs.service; do
+        if [ -f files/systemd/system/$service ]; then
+            cp files/systemd/system/$service /mnt/usb/etc/systemd/system/
+            log "  Copied $service"
+        else
+            warn "  $service not found in files/systemd/system/"
+        fi
+    done
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFWEB'
 
 # Install wetty dependencies and nginx for web interface
@@ -263,25 +274,7 @@ EOFTMUX
 
 chmod +x /usr/local/bin/ndi-bridge-tmux-session
 
-# Create wetty systemd service
-cat > /etc/systemd/system/wetty.service << 'EOFWETTY'
-[Unit]
-Description=Wetty Web Terminal
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/root
-ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base / --command /usr/local/bin/ndi-bridge-tmux-session
-Restart=always
-RestartSec=10
-Environment="NODE_ENV=production"
-Environment="TERM=xterm-256color"
-
-[Install]
-WantedBy=multi-user.target
-EOFWETTY
+# wetty.service was copied before chroot
 
 # Create nginx writable directories for read-only filesystem
 mkdir -p /var/lib/nginx/body
@@ -293,22 +286,7 @@ mkdir -p /var/log/nginx
 chown -R www-data:www-data /var/lib/nginx
 chown -R www-data:www-data /var/log/nginx
 
-# Create systemd service to ensure nginx directories exist on tmpfs
-cat > /etc/systemd/system/nginx-tmpfs-dirs.service << 'EOFNGINXTMPFS'
-[Unit]
-Description=Create nginx directories on tmpfs
-Before=nginx.service
-After=local-fs.target
-
-[Service]
-Type=oneshot
-# Only create/chown directories if they don't exist or are writable
-ExecStart=/bin/bash -c 'mkdir -p /var/log/nginx /var/lib/nginx/{body,proxy,fastcgi,uwsgi,scgi} 2>/dev/null; if [ -w /var/lib/nginx ]; then chown -R www-data:www-data /var/log/nginx /var/lib/nginx 2>/dev/null; fi; exit 0'
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOFNGINXTMPFS
+# nginx-tmpfs-dirs.service was copied before chroot
 
 # Enable services
 systemctl daemon-reload

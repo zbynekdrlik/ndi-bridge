@@ -4,35 +4,36 @@
 configure_ttys() {
     log "Configuring TTY consoles..."
     
+    # Copy systemd service files and overrides BEFORE chroot
+    mkdir -p /mnt/usb/etc/systemd/system
+    if [ -f files/systemd/system/ndi-logs@.service ]; then
+        cp files/systemd/system/ndi-logs@.service /mnt/usb/etc/systemd/system/
+        log "  Copied ndi-logs@.service"
+    else
+        warn "  ndi-logs@.service not found in files/systemd/system/"
+    fi
+    
+    # Copy getty override for TTY2
+    mkdir -p /mnt/usb/etc/systemd/system/getty@tty2.service.d
+    if [ -f files/systemd/system/getty@tty2.service.d/override.conf ]; then
+        cp files/systemd/system/getty@tty2.service.d/override.conf /mnt/usb/etc/systemd/system/getty@tty2.service.d/
+        log "  Copied getty@tty2 override"
+    else
+        warn "  getty@tty2 override not found"
+    fi
+    
+    # Copy getty override for TTY3-6
+    for tty in 3 4 5 6; do
+        mkdir -p /mnt/usb/etc/systemd/system/getty@tty${tty}.service.d
+        if [ -f files/systemd/system/getty@tty.service.d/override.conf ]; then
+            cp files/systemd/system/getty@tty.service.d/override.conf /mnt/usb/etc/systemd/system/getty@tty${tty}.service.d/
+        fi
+    done
+    log "  Copied getty overrides for TTY3-6"
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFTTY'
 
-# Configure TTY1 to show NDI logs automatically using systemd service
-cat > /etc/systemd/system/ndi-logs@.service << 'EOFLOGSERVICE'
-[Unit]
-Description=NDI Logs on %I
-After=systemd-user-sessions.service plymouth-quit-wait.service
-After=rc-local.service
-Before=getty.target
-IgnoreOnIsolate=yes
-
-[Service]
-Type=idle
-ExecStart=/usr/local/bin/ndi-bridge-show-logs
-Restart=always
-User=root
-StandardInput=tty
-StandardOutput=tty
-TTYPath=/dev/%I
-TTYReset=yes
-TTYVHangup=yes
-TTYVTDisallocate=yes
-UtmpIdentifier=%I
-UtmpMode=login
-
-[Install]
-WantedBy=getty.target
-DefaultInstance=tty1
-EOFLOGSERVICE
+# ndi-logs@.service was copied before chroot
 
 # Disable getty on tty1 and enable our service
 if command -v systemctl >/dev/null 2>&1; then
@@ -43,25 +44,11 @@ else
     update-rc.d ndi-logs@tty1 enable 2>/dev/null || true
 fi
 
-# Configure TTY2 with welcome screen and auto-login
-mkdir -p /etc/systemd/system/getty@tty2.service.d
-cat > /etc/systemd/system/getty@tty2.service.d/override.conf << EOFGETTY2
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin root --noclear %I \$TERM
-Type=idle
-EOFGETTY2
+# getty@tty2 override was copied before chroot
 
-# Enable normal login on other TTYs (3-6)
+# Getty overrides for TTY3-6 were copied before chroot
+# Enable getty services for TTY3-6
 for tty in 3 4 5 6; do
-    mkdir -p /etc/systemd/system/getty@tty${tty}.service.d
-    cat > /etc/systemd/system/getty@tty${tty}.service.d/override.conf << EOFGETTY
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --noclear %I \$TERM
-Type=idle
-EOFGETTY
-    # Enable the getty service for this TTY
     if command -v systemctl >/dev/null 2>&1; then
         systemctl enable getty@tty${tty}
     else

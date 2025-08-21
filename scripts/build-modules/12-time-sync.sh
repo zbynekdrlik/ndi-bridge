@@ -4,6 +4,17 @@
 configure_time_sync() {
     log "Configuring time synchronization (PTP/NTP)..."
     
+    # Copy systemd service files BEFORE chroot
+    mkdir -p /mnt/usb/etc/systemd/system
+    for service in ptp4l.service phc2sys.service time-sync-coordinator.service; do
+        if [ -f files/systemd/system/$service ]; then
+            cp files/systemd/system/$service /mnt/usb/etc/systemd/system/
+            log "  Copied $service"
+        else
+            warn "  $service not found in files/systemd/system/"
+        fi
+    done
+    
     # Create the time sync configuration script that will run in chroot
     cat > /mnt/usb/tmp/configure-time-sync.sh << 'EOFPTP'
 #!/bin/bash
@@ -44,43 +55,8 @@ priority1		10
 [eth1]
 EOFMASTER
 
-# Create ptp4l systemd service
-cat > /etc/systemd/system/ptp4l.service << 'EOFPTP4L'
-[Unit]
-Description=PTPv2 port in slave mode
-After=network.target
-After=ndi-bridge-network-setup.service
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/ptp4l-safe-start
-Restart=on-failure
-RestartSec=30
-StartLimitBurst=3
-
-# To configure as master, replace gPTP.cfg with master.cfg and restart:
-# ExecStart=/usr/sbin/ptp4l -i eth0 -f /etc/linuxptp/master.cfg --step_threshold=1 -m
-
-[Install]
-WantedBy=multi-user.target
-EOFPTP4L
-
-# Create phc2sys systemd service
-cat > /etc/systemd/system/phc2sys.service << 'EOFPHC2SYS'
-[Unit]
-Description=PHC to system clock synchronization
-After=ptp4l.service
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/phc2sys-safe-start
-Restart=on-failure
-RestartSec=30
-StartLimitBurst=3
-
-[Install]
-WantedBy=multi-user.target
-EOFPHC2SYS
+# Systemd service files were copied before chroot
+# ptp4l.service and phc2sys.service are now in /etc/systemd/system/
 
 # Create check_clocks utility for verification
 cat > /usr/local/bin/check_clocks << 'EOFCHECK'
@@ -197,22 +173,7 @@ EOFCHRONY
 # systemctl enable chronyd 2>/dev/null || true
 echo "Chrony installed but not enabled - will be managed by PTP coordination"
 
-# Create PTP/NTP coordination service
-cat > /etc/systemd/system/time-sync-coordinator.service << 'EOFCOORD'
-[Unit]
-Description=PTP/NTP Coordination Service
-After=network-online.target ptp4l.service
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/time-sync-coordinator
-Restart=always
-RestartSec=30
-
-[Install]
-WantedBy=multi-user.target
-EOFCOORD
+# time-sync-coordinator.service was copied before chroot
 
 # Create coordination script
 cat > /usr/local/bin/time-sync-coordinator << 'EOFCOORDSCRIPT'

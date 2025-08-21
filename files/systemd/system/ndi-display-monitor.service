@@ -1,0 +1,15 @@
+[Unit]
+Description=NDI Display Status Monitor
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=10
+ExecStart=/usr/local/bin/ndi-display-monitor
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

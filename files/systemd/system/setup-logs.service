@@ -1,0 +1,12 @@
+[Unit]
+Description=Setup log directories in tmpfs
+Before=ndi-bridge.service
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/mkdir -p /var/log/ndi-bridge
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
