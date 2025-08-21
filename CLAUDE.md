@@ -1,5 +1,19 @@
 # CLAUDE.md - NDI Bridge Development Guide
 
+## CRITICAL: Modular Architecture Rules
+
+**NEVER CREATE INLINE SCRIPTS IN BUILD MODULES!**
+- ALL scripts must be in `scripts/helper-scripts/` as separate files
+- Build modules (00-15) should ONLY copy/install, NEVER generate scripts inline
+- Module 12 (`12-helper-scripts.sh`) handles ALL script installation
+- This prevents scripts being overwritten by later modules
+- Violating this causes deployment of old/wrong script versions
+
+**Why this matters:**
+- Module execution order means later modules overwrite earlier ones
+- Inline script generation in 09a overwrites modular scripts from module 12
+- This has caused repeated deployment failures with wrong script versions
+
 ## Git Workflow Rules
 
 **ALWAYS CREATE PR EARLY:**
