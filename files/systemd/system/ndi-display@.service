@@ -1,0 +1,37 @@
+[Unit]
+Description=NDI Display Output %i
+After=network.target
+Wants=ndi-display-monitor.service
+Before=getty@tty%i.service
+Conflicts=getty@tty%i.service
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+User=root
+
+# Environment for display selection
+Environment="DISPLAY_ID=%i"
+Environment="LD_LIBRARY_PATH=/usr/local/lib"
+
+# Read stream configuration from file
+EnvironmentFile=-/etc/ndi-bridge/display-%i.conf
+
+# Start NDI display using launcher script (handles spaces in stream names)
+# Console management is now handled by the launcher itself
+ExecStart=/usr/local/bin/ndi-display-launcher %i
+ExecStopPost=/usr/bin/rm -f /var/run/ndi-display/display-%i.status
+
+# Resource limits
+LimitNOFILE=65536
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=50
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ndi-display-%i
+
+[Install]
+WantedBy=multi-user.target

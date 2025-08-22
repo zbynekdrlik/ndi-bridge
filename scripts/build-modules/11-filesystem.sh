@@ -4,6 +4,15 @@
 configure_filesystem() {
     log "Configuring filesystem and bootloader..."
     
+    # Copy systemd service files BEFORE chroot
+    mkdir -p /mnt/usb/etc/systemd/system
+    if [ -f files/systemd/system/remount-rw.service ]; then
+        cp files/systemd/system/remount-rw.service /mnt/usb/etc/systemd/system/
+        log "  Copied remount-rw.service"
+    else
+        warn "  remount-rw.service not found in files/systemd/system/"
+    fi
+    
     # Determine partition device names (same logic as partition script)
     if [[ $USB_DEVICE == /dev/loop* ]]; then
         # For loop devices, use kpartx mappings
@@ -74,21 +83,8 @@ update-grub 2>&1 | head -20
 echo "Updating initramfs..."
 update-initramfs -u -k all 2>&1 | head -20
 
-# Configure systemd for read-only root (prepare for future)
-cat > /etc/systemd/system/remount-rw.service << EOFREMOUNT
-[Unit]
-Description=Remount root filesystem read-write
-Before=local-fs-pre.target
-DefaultDependencies=no
-
-[Service]
-Type=oneshot
-ExecStart=/bin/mount -o remount,rw /
-RemainAfterExit=yes
-
-[Install]
-WantedBy=local-fs-pre.target
-EOFREMOUNT
+# remount-rw.service was copied before chroot
+# (Service is for read-only root filesystem preparation)
 
 # For now, keep it read-write but ready for read-only conversion
 # systemctl enable remount-rw

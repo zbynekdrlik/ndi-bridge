@@ -4,6 +4,15 @@
 configure_network() {
     log "Configuring network bridge..."
     
+    # Copy avahi service file BEFORE chroot (so it's accessible)
+    if [ -f files/avahi/services/ndi-bridge-http.service ]; then
+        mkdir -p /mnt/usb/etc/avahi/services
+        cp files/avahi/services/ndi-bridge-http.service /mnt/usb/etc/avahi/services/
+        log "  Copied ndi-bridge-http.service"
+    else
+        warn "  ndi-bridge-http.service not found in files/avahi/services/"
+    fi
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFNET'
 
 # Configure network bridge for both ethernet interfaces
@@ -118,26 +127,9 @@ rpc:            db files
 netgroup:       nis
 EOFNSS
 
-# Create Avahi services directory
-mkdir -p /etc/avahi/services
-
+# Avahi services directory is created and service file is copied before chroot
 # NOTE: NDI service advertisement is handled by the NDI Bridge application itself
-# We only create the HTTP service advertisement for the web interface
-
-# Create HTTP service advertisement for future web interface
-cat > /etc/avahi/services/ndi-bridge-http.service << 'EOFHTTPSERVICE'
-<?xml version="1.0" standalone='no'?>
-<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
-<service-group>
-  <name>NDI Bridge Configuration</name>
-  <service>
-    <type>_http._tcp</type>
-    <port>80</port>
-    <txt-record>path=/</txt-record>
-    <txt-record>product=NDI Bridge</txt-record>
-  </service>
-</service-group>
-EOFHTTPSERVICE
+# HTTP service advertisement for web interface was copied to /etc/avahi/services/
 
 EOFNET
 }
