@@ -48,14 +48,33 @@
 ## Quick Commands
 
 ### Application Build (AUTO-APPROVED)
+
+**RECOMMENDED: Use the build helper script for foolproof building:**
+
 ```bash
-# ALWAYS build from existing build directory
-cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/build
-# For specific target (e.g., after display changes):
-make ndi-display -j$(nproc)
-# For full rebuild:
-make -j$(nproc)
+# From repository root - handles directory changes automatically
+./build.sh                     # Build everything
+./build.sh ndi-display         # Build display component only
+./build.sh ndi-bridge          # Build capture component only
+./build.sh --clean             # Clean and rebuild
+./build.sh --help              # Show all options
 ```
+
+**Manual build (if needed):**
+```bash
+# CRITICAL: Must be in build/ directory!
+cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/build
+make ndi-display -j$(nproc)    # Display component
+make ndi-bridge -j$(nproc)     # Capture component
+make -j$(nproc)                # Everything
+```
+
+**Common build errors:**
+- `"No rule to make target"` → Wrong directory! Use `./build.sh` or cd to `build/`
+- `"Command not found: cmake"` → Run: `sudo apt install cmake build-essential`
+- `"Cannot find NDI"` → Run: `./setup-build-environment.sh` from repo root
+
+**Build Output**: `build/bin/` (e.g., `build/bin/ndi-display`)
 
 ### Testing
 ```bash
