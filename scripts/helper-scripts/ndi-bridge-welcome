@@ -328,13 +328,13 @@ if [ -x /opt/ndi-bridge/ndi-display ]; then
             
             # Show both monitor and NDI info on single line
             if [ "$HDMI_CONNECTED" = "true" ]; then
-                # Single line with monitor info AND NDI stream info with separate FPS
-                printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: ${HDMI_RESOLUTION}@${HDMI_REFRESH}Hz │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
-                    "$HDMI_NUM" "$STREAM_NAME" "$FPS"
-                
-                # Show audio info if available
+                # Single line with monitor info AND NDI stream info with audio at end
                 if [ -n "$AUDIO_INFO" ]; then
-                    printf "          Audio: ${GREEN}${AUDIO_INFO}${NC}\n"
+                    printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: ${HDMI_RESOLUTION}@${HDMI_REFRESH}Hz │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps │ ${GREEN}${AUDIO_INFO}${NC}\n" \
+                        "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                else
+                    printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: ${HDMI_RESOLUTION}@${HDMI_REFRESH}Hz │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
+                        "$HDMI_NUM" "$STREAM_NAME" "$FPS"
                 fi
                 
                 # Show dropped frames if any
@@ -343,12 +343,12 @@ if [ -x /opt/ndi-bridge/ndi-display ]; then
                 fi
             else
                 # No monitor connected but stream active
-                printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: [Not connected] │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
-                    "$HDMI_NUM" "$STREAM_NAME" "$FPS"
-                
-                # Show audio info if available
                 if [ -n "$AUDIO_INFO" ]; then
-                    printf "          Audio: ${GREEN}${AUDIO_INFO}${NC}\n"
+                    printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: [Not connected] │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps │ ${GREEN}${AUDIO_INFO}${NC}\n" \
+                        "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                else
+                    printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: [Not connected] │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
+                        "$HDMI_NUM" "$STREAM_NAME" "$FPS"
                 fi
                 
                 # Show dropped frames if any
