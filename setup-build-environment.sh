@@ -122,7 +122,7 @@ install_build_deps() {
     
     # NDI Bridge specific dependencies
     NDI_DEPS=(
-        "libasound2-dev"
+        "libasound2-dev"  # ALSA development headers for audio output to HDMI (v1.8.4+)
         "libavcodec-dev"
         "libavformat-dev"
         "libavutil-dev"

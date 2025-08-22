@@ -9,6 +9,8 @@
 
 #include "ndi_receiver.h"
 #include "display_output.h"
+#include "audio_output.h"
+#include "audio_processor.h"
 #include "status_reporter.h"
 #include "../common/logger.h"
 #include "../common/version.h"
@@ -261,6 +263,24 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                 " (" + std::to_string(disp_info.width) + "x" + 
                 std::to_string(disp_info.height) + ")");
     
+    // Initialize audio output
+    auto audio = createAudioOutput();
+    AudioProcessor audio_processor;
+    bool audio_initialized = false;
+    
+    if (audio && audio->initialize()) {
+        if (audio->openDevice(display_id)) {
+            audio_initialized = true;
+            Logger::info("Audio output initialized for display " + 
+                        std::to_string(display_id));
+        } else {
+            Logger::warning("Failed to open audio device for display " + 
+                          std::to_string(display_id) + ", continuing without audio");
+        }
+    } else {
+        Logger::warning("Failed to initialize audio system, continuing without audio");
+    }
+    
     // Status reporter
     StatusReporter status(display_id);
     
@@ -268,6 +288,9 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
     uint64_t frame_count = 0;
     uint64_t frames_dropped = 0;
     uint64_t last_frame_count = 0;
+    uint64_t audio_frame_count = 0;
+    int audio_channels = 0;
+    int audio_sample_rate = 0;
     int status_counter = 0;
     auto start_time = std::chrono::steady_clock::now();
     auto last_status_update = start_time;
@@ -360,7 +383,8 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                     status.update(stream_name, 
                                 video_frame.xres, video_frame.yres,
                                 fps, bitrate_mbps,
-                                frame_count, frames_dropped);
+                                frame_count, frames_dropped,
+                                audio_channels, audio_sample_rate, audio_frame_count);
                     
                     last_status_update = now;
                     last_frame_count = frame_count;
@@ -375,10 +399,26 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
                 break;
             }
             
-            case NDIlib_frame_type_audio:
-                // We ignore audio
+            case NDIlib_frame_type_audio: {
+                // Process audio if initialized
+                if (audio_initialized && audio->isOpen()) {
+                    int channels, num_samples, sample_rate;
+                    const int16_t* converted = audio_processor.convertNDIAudio(
+                        audio_frame, channels, num_samples, sample_rate);
+                    
+                    if (converted) {
+                        if (audio->writeAudio(converted, channels, num_samples, sample_rate)) {
+                            // Update audio statistics
+                            audio_frame_count++;
+                            audio_channels = channels;
+                            audio_sample_rate = sample_rate;
+                        }
+                    }
+                }
+                
                 NDIlib_recv_free_audio_v2(recv_instance, &audio_frame);
                 break;
+            }
                 
             case NDIlib_frame_type_metadata:
                 // We ignore metadata
@@ -409,8 +449,14 @@ int receiveAndDisplay(const std::string& stream_name, int display_id) {
     // Clear display before closing
     display->clearDisplay();
     
+    // Close audio if initialized
+    if (audio_initialized && audio) {
+        audio->closeDevice();
+    }
+    
     // Destructors will handle cleanup
     // display destructor calls shutdown()
+    // audio destructor calls shutdown()
     // receiver destructor calls disconnect() and shutdown()
     // status destructor removes status file
     
