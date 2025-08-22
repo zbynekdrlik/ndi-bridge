@@ -73,8 +73,11 @@ apt-get install -y -qq --no-install-recommends \
     htop \
     tmux \
     bc \
-    alsa-utils \
-    libasound2 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+    alsa-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+
+# Install ALSA library (package name changed in Ubuntu 24.04)
+apt-get install -y -qq --no-install-recommends libasound2t64 2>/dev/null || \
+apt-get install -y -qq --no-install-recommends libasound2 2>/dev/null || true
 
 # Try to install v4l2 tools with different package names
 apt-get install -y -qq --no-install-recommends v4l-utils 2>/dev/null || \
