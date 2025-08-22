@@ -203,7 +203,7 @@ configure_display() {
     echo -e "  ${BOLD}0${NC} - Back to overview"
     echo ""
     
-    read -p "Select option: " option
+    read < /dev/tty -p "Select option: " option < /dev/tty
     
     case "$option" in
         1) assign_stream $display_id ;;
@@ -245,7 +245,7 @@ assign_stream() {
         echo -e "${RED}No NDI streams found on network${NC}"
         echo ""
         echo "Press Enter to continue..."
-        read
+        read < /dev/tty
         return
     fi
     
@@ -271,7 +271,7 @@ assign_stream() {
     
     echo ""
     echo "Enter stream number (1-${stream_count}) or press Enter to cancel:"
-    read -p "> " selection
+    read < /dev/tty -p "> " selection < /dev/tty
     
     if [ -z "$selection" ]; then
         return
@@ -380,7 +380,7 @@ EOF
     fi
     echo ""
     echo "Press Enter to continue..."
-    read
+    read < /dev/tty
 }
 
 # Remove stream from display
@@ -397,7 +397,7 @@ remove_stream() {
     echo ""
     echo -e "${YELLOW}Remove NDI stream from HDMI-$((display_id + 1))?${NC}"
     echo "(y/n): "
-    read -p "> " confirm
+    read < /dev/tty -p "> " confirm < /dev/tty
     
     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
         return
@@ -421,7 +421,7 @@ remove_stream() {
     echo -e "${GREEN}✓ Configuration removed${NC}"
     echo ""
     echo "Press Enter to continue..."
-    read
+    read < /dev/tty
 }
 
 # Set display as console
@@ -432,7 +432,7 @@ set_console() {
     echo -e "${YELLOW}Reserve HDMI-$((display_id + 1)) for Linux console?${NC}"
     echo "This will remove any NDI stream configuration."
     echo "(y/n): "
-    read -p "> " confirm
+    read < /dev/tty -p "> " confirm < /dev/tty
     
     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
         return
@@ -461,7 +461,7 @@ set_console() {
     echo -e "${GREEN}✓ Display reserved for console${NC}"
     echo ""
     echo "Press Enter to continue..."
-    read
+    read < /dev/tty
 }
 
 # Main menu loop
@@ -478,7 +478,7 @@ main_menu() {
         echo -e "  ${BOLD}q${NC} - Quit"
         echo ""
         
-        read -n1 -p "Select: " choice
+        read < /dev/tty -n1 -p "Select: " choice < /dev/tty
         echo ""
         
         case "$choice" in
