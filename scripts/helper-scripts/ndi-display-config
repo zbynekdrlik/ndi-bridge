@@ -362,10 +362,22 @@ EOF
     /usr/local/bin/ndi-bridge-ro
     
     # Start the service (can be done on RO filesystem)
-    sudo systemctl restart ndi-display@${display_id}
+    if ! sudo systemctl restart ndi-display@${display_id}; then
+        echo -e "${RED}Failed to start ndi-display service${NC}"
+        echo "Trying to start manually..."
+        sudo systemctl start ndi-display@${display_id}
+    fi
     
-    echo ""
-    echo -e "${GREEN}✓ Configuration applied successfully${NC}"
+    # Verify service is actually running
+    sleep 1
+    if systemctl is-active --quiet ndi-display@${display_id}; then
+        echo ""
+        echo -e "${GREEN}✓ Configuration applied successfully${NC}"
+    else
+        echo ""
+        echo -e "${YELLOW}⚠ Service configured but may not be running${NC}"
+        echo "Try selecting 'R' to restart the display"
+    fi
     echo ""
     echo "Press Enter to continue..."
     read
