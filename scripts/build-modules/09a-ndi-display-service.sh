@@ -68,6 +68,12 @@ ln -sf /opt/ndi-bridge/ndi-display /usr/local/bin/ndi-display 2>/dev/null || tru
 # systemctl isn't available in chroot, create enable symlink manually
 ln -sf /etc/systemd/system/ndi-display-monitor.service /etc/systemd/system/multi-user.target.wants/ndi-display-monitor.service
 
+# Enable all display services by default (they check config to decide if they run)
+# This eliminates the need for systemctl enable when configuring displays
+for i in 0 1 2; do
+    ln -sf /etc/systemd/system/ndi-display@.service /etc/systemd/system/multi-user.target.wants/ndi-display@${i}.service
+done
+
 EOFNDIDISPLAY
 
     log "NDI Display service configuration complete"

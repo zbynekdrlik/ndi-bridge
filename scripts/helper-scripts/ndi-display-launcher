@@ -2,6 +2,7 @@
 #
 # Launcher script for ndi-display systemd service
 # Properly handles environment variables with spaces in stream names
+# Checks ENABLED parameter to determine if display should run
 #
 
 DISPLAY_ID=$1
@@ -12,18 +13,27 @@ if [ -z "$DISPLAY_ID" ]; then
     exit 1
 fi
 
+# No config = no NDI display (exit cleanly)
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Error: No configuration found for display $DISPLAY_ID"
-    exit 1
+    echo "No configuration for display $DISPLAY_ID, skipping"
+    exit 0
 fi
 
-# Source the configuration file to get STREAM_NAME
+# Source the configuration file to get STREAM_NAME and ENABLED
 source "$CONFIG_FILE"
 
+# Check if explicitly disabled
+if [ "${ENABLED}" = "false" ]; then
+    echo "Display $DISPLAY_ID is disabled in configuration"
+    exit 0
+fi
+
+# No stream configured = no NDI display (exit cleanly)
 if [ -z "$STREAM_NAME" ]; then
-    echo "Error: STREAM_NAME not configured for display $DISPLAY_ID"
-    exit 1
+    echo "No stream name configured for display $DISPLAY_ID, skipping"
+    exit 0
 fi
 
 # Launch ndi-display with proper quoting to handle spaces
+echo "Starting NDI display $DISPLAY_ID with stream: $STREAM_NAME"
 exec /opt/ndi-bridge/ndi-display "$STREAM_NAME" $DISPLAY_ID

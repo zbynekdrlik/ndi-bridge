@@ -24,6 +24,15 @@ TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
 CONFIG_DIR="/etc/ndi-bridge"
 POLICY_FILE="$CONFIG_DIR/display-policy.conf"
 
+# Stop any manually running ndi-display process on a specific display
+stop_display_process() {
+    local display_id=$1
+    # Kill any manually running ndi-display on this display
+    pkill -f "ndi-display.*[[:space:]]${display_id}$" 2>/dev/null || true
+    # Also try sudo version
+    sudo pkill -f "ndi-display.*[[:space:]]${display_id}$" 2>/dev/null || true
+}
+
 # Print centered text
 print_centered() {
     local text="$1"
@@ -354,14 +363,10 @@ EOF
     # Stop any manually running instance first
     stop_display_process ${display_id}
     
-    # Enable service while filesystem is still RW
-    sudo systemctl enable ndi-display@${display_id}
-    sync  # Ensure filesystem writes are completed
-    
     # Return to read-only
     /usr/local/bin/ndi-bridge-ro
     
-    # Start the service (can be done on RO filesystem)
+    # Restart the service (services are always enabled)
     if ! sudo systemctl restart ndi-display@${display_id}; then
         echo -e "${RED}Failed to start ndi-display service${NC}"
         echo "Trying to start manually..."
@@ -411,9 +416,8 @@ remove_stream() {
         sudo systemctl stop ndi-display@${display_id}
     fi
     
-    # Remove config file and disable service (needs RW)
+    # Remove config file (needs RW)
     /usr/local/bin/ndi-bridge-rw
-    sudo systemctl disable ndi-display@${display_id} 2>/dev/null || true
     sudo rm -f "$config_file"
     /usr/local/bin/ndi-bridge-ro
     
@@ -441,10 +445,9 @@ set_console() {
     echo ""
     echo "Configuring console..."
     
-    # Stop NDI service if running
+    # Stop NDI service if running (but don't disable - services always enabled)
     if systemctl is-active --quiet ndi-display@${display_id}; then
         sudo systemctl stop ndi-display@${display_id}
-        sudo systemctl disable ndi-display@${display_id} 2>/dev/null || true
     fi
     
     # Remove NDI config
