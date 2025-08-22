@@ -181,3 +181,22 @@ The display system automatically handles resolution mismatches:
 4. **Build image**: Increment version, build from root, monitor logs
 5. **Deploy**: Flash with Rufus, test on device
 6. **Verify**: Check TTY2 for version, SSH for detailed testing
+
+## Fast Testing on Running Box (Without USB Reflashing)
+
+For quick iteration during development, you can deploy directly to a running box:
+
+```bash
+# Option 1: Deploy specific binaries only (fastest)
+sshpass -p newlevel ssh root@10.77.9.140 "systemctl stop ndi-display@1"
+sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.140:/opt/ndi-bridge/
+sshpass -p newlevel ssh root@10.77.9.140 "systemctl start ndi-display@1"
+
+# Option 2: Use quick-deploy.sh script (if created)
+./quick-deploy.sh 10.77.9.140
+
+# Check logs after deployment
+sshpass -p newlevel ssh root@10.77.9.140 "journalctl -u ndi-display@1 -n 50"
+```
+
+**Note**: The box's SSH may show welcome screen. Add `-o LogLevel=ERROR` to suppress it.
