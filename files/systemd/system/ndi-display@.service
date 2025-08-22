@@ -19,7 +19,7 @@ Environment="LD_LIBRARY_PATH=/usr/local/lib"
 EnvironmentFile=-/etc/ndi-bridge/display-%i.conf
 
 # Start NDI display using launcher script (handles spaces in stream names)
-ExecStartPre=/usr/local/bin/ndi-display-console-check %i
+# Console management is now handled by the launcher itself
 ExecStart=/usr/local/bin/ndi-display-launcher %i
 ExecStopPost=/usr/bin/rm -f /var/run/ndi-display/display-%i.status
 
