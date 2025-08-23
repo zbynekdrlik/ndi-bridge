@@ -64,11 +64,13 @@ configure_readonly_root() {
 ROOT_UUID=\$(blkid -s UUID -o value $ROOT_PARTITION)
 sed -i "s|UUID=.* / ext4 .*|UUID=\$ROOT_UUID / ext4 ro,noatime,errors=remount-ro 0 1|" /etc/fstab
 
-# Enable the remount service we created earlier (it was commented out)
+# DO NOT enable remount-rw service - it breaks power failure protection!
+# The service exists for emergency use only and must remain disabled
+# Filesystem should boot read-only as specified in fstab
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl enable remount-rw.service 2>/dev/null || true
+    systemctl disable remount-rw.service 2>/dev/null || true
 else
-    update-rc.d remount-rw enable 2>/dev/null || true
+    update-rc.d remount-rw disable 2>/dev/null || true
 fi
 
 EOFREADONLY

@@ -25,17 +25,50 @@ void ALSAAudioOutput::shutdown() {
 
 std::string ALSAAudioOutput::getDeviceForDisplay(int display_id) const {
     // Map display ID to ALSA HDMI PCM device
-    // Based on Intel N100 hardware configuration:
-    // card 2 is HDA Intel PCH
-    // TODO: This mapping may need to be configurable per system
-    // Currently configured for test box where HDMI-A-2 (display 1) uses device 3
+    // Try to auto-detect the correct card (1 or 2) for HDMI audio
+    // Different systems have HDMI audio on different cards
+    
+    std::string device;
+    snd_pcm_t* test_handle = nullptr;
+    
+    // First try card 1 (common on consumer boards with Intel HDA)
+    // HDMI port numbering can vary by chipset
     switch (display_id) {
-        case 0: return "hw:2,7";  // HDMI 0 - typically PCM device 7
-        case 1: return "hw:2,3";  // HDMI 1 - uses device 3 for HDMI-A-2 on test box
-        case 2: return "hw:2,8";  // HDMI 2 - typically PCM device 8
-        default:
-            Logger::error("Invalid display ID for audio: " + std::to_string(display_id));
-            return "";
+        case 0: device = "hw:1,3"; break;  // HDMI-1 often uses device 3
+        case 1: device = "hw:1,7"; break;  // HDMI-2 often uses device 7  
+        case 2: device = "hw:1,8"; break;  // HDMI-3 often uses device 8
+        default: device = "hw:1,3"; break;
+    }
+    
+    // Test if the device exists and can be opened
+    if (snd_pcm_open(&test_handle, device.c_str(), SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK) == 0) {
+        snd_pcm_close(test_handle);
+        Logger::info("Using audio device " + device + " for display " + std::to_string(display_id));
+        return device;
+    }
+    
+    // If card 1 didn't work, try card 2 (industrial/server boards)
+    switch (display_id) {
+        case 0: device = "hw:2,7"; break;  // HDMI-1
+        case 1: device = "hw:2,3"; break;  // HDMI-2 (confirmed on test box)
+        case 2: device = "hw:2,8"; break;  // HDMI-3
+        default: device = "hw:2,7"; break;
+    }
+    
+    // Test card 2
+    if (snd_pcm_open(&test_handle, device.c_str(), SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK) == 0) {
+        snd_pcm_close(test_handle);
+        Logger::info("Using audio device " + device + " for display " + std::to_string(display_id));
+        return device;
+    }
+    
+    // If neither worked, log error and return card 1 as fallback
+    Logger::error("Could not detect HDMI audio device for display " + std::to_string(display_id) + ", using fallback");
+    switch (display_id) {
+        case 0: return "hw:1,3";
+        case 1: return "hw:1,7";
+        case 2: return "hw:1,8";
+        default: return "hw:1,3";
     }
 }
 

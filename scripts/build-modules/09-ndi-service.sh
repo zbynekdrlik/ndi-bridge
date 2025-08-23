@@ -27,7 +27,7 @@ echo "BUILD_SCRIPT_VERSION_PLACEHOLDER" > /etc/ndi-bridge/build-script-version
 # NDI configuration - use hostname as default NDI name
 cat > /etc/ndi-bridge/config << EOFCONFIG
 DEVICE="/dev/video0"
-NDI_NAME="NDI Bridge \$(cat /etc/hostname 2>/dev/null || echo 'Device')"
+NDI_NAME="USB Capture"
 EOFCONFIG
 
 # NDI runner script

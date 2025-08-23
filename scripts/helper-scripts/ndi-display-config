@@ -304,9 +304,6 @@ assign_stream() {
     echo "Applying configuration..."
     echo -e "${CYAN}Assigning '${stream_name}' to HDMI-$((display_id + 1))...${NC}"
     
-    # First, kill ANY running ndi-display process on this display
-    echo "Stopping any existing streams on HDMI-$((display_id + 1))..."
-    
     # More aggressive killing - find by display ID in command line
     local pids=$(ps aux | grep -E "/opt/ndi-bridge/ndi-display.*[[:space:]]${display_id}($|[[:space:]])" | grep -v grep | awk '{print $2}')
     if [ -n "$pids" ]; then
@@ -350,9 +347,6 @@ EOF
     
     # Enable and start the systemd service (while still RW)
     echo "Starting stream '${stream_name}' on HDMI-$((display_id + 1))..."
-    
-    # Stop any manually running instance first
-    stop_display_process ${display_id}
     
     # Enable service while filesystem is still RW
     sudo systemctl enable ndi-display@${display_id}
