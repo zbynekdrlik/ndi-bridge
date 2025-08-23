@@ -93,26 +93,39 @@ fi
 # Test 4: ndi-bridge-set-name command
 log_test "Test 4: ndi-bridge-set-name"
 
-# Get current name
-current_name=$(box_ssh "grep '^NAME=' /etc/ndi-bridge/ndi-bridge.conf 2>/dev/null | cut -d= -f2 | tr -d '\"'")
-log_info "Current NDI name: $current_name"
+# Save original NDI name from config
+original_ndi_name=$(box_ssh "grep NDI_NAME /etc/ndi-bridge/config | cut -d'=' -f2 | tr -d '\"'")
+log_info "Original NDI name: $original_ndi_name"
 
-# Try to set a test name (non-interactive test)
-test_name="TEST-$(date +%s)"
-set_name_cmd=$(box_ssh "echo '$test_name' | ndi-bridge-set-name 2>&1 || echo 'interactive-required'")
+# The set-name command requires a parameter, not stdin
+# Test with a parameter
+test_name="test$(date +%s | tail -c 5)"
+set_name_result=$(box_ssh "ndi-bridge-set-name $test_name 2>&1")
 
-if echo "$set_name_cmd" | grep -q "interactive-required"; then
-    record_test "ndi-bridge-set-name" "INFO" "Command requires interactive input"
-else
-    # Check if name was changed
-    new_name=$(box_ssh "grep '^NAME=' /etc/ndi-bridge/ndi-bridge.conf 2>/dev/null | cut -d= -f2 | tr -d '\"'")
-    if [ "$new_name" = "$test_name" ]; then
-        record_test "ndi-bridge-set-name" "PASS" "Name changed successfully"
-        # Restore original name
-        box_ssh "ndi-bridge-rw && sed -i 's/^NAME=.*/NAME=\"$current_name\"/' /etc/ndi-bridge/ndi-bridge.conf && ndi-bridge-ro"
+if echo "$set_name_result" | grep -q "successfully changed"; then
+    record_test "ndi-bridge-set-name" "PASS" "Command works with parameter"
+    
+    # Check if hostname was actually changed
+    new_hostname=$(box_ssh "hostname")
+    if echo "$new_hostname" | grep -q "$test_name"; then
+        record_test "Hostname Change" "PASS" "Hostname updated to include $test_name"
     else
-        record_test "ndi-bridge-set-name" "INFO" "Name change requires restart"
+        record_test "Hostname Change" "WARN" "Hostname not immediately updated"
     fi
+    
+    # IMPORTANT: Restore original name
+    log_info "Restoring original NDI name: $original_ndi_name"
+    if [ "$original_ndi_name" = "USB Capture" ]; then
+        # USB Capture has spaces, need a different approach
+        box_ssh "ndi-bridge-rw && sed -i 's/NDI_NAME=.*/NDI_NAME=\"USB Capture\"/' /etc/ndi-bridge/config && systemctl restart ndi-bridge && ndi-bridge-ro" 2>/dev/null
+    else
+        # For simple names without spaces
+        box_ssh "ndi-bridge-set-name ${original_ndi_name:-ndi-bridge} 2>/dev/null || true"
+    fi
+elif echo "$set_name_result" | grep -q "Usage:"; then
+    record_test "ndi-bridge-set-name" "FAIL" "Command returned usage - parameter not accepted"
+else
+    record_test "ndi-bridge-set-name" "FAIL" "Unexpected output from set-name command"
 fi
 
 # Test 5: ndi-bridge-welcome command
