@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/lib/common.sh"
 # Check for required IP parameter
 if [ -z "$1" ]; then
     echo "Usage: $0 <box-ip>"
-    echo "Example: $0 10.77.9.140"
+    echo "Example: $0 10.77.9.143"
     exit 1
 fi
 

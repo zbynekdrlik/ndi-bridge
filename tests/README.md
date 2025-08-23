@@ -6,17 +6,17 @@ Comprehensive automated testing suite for NDI Bridge USB appliance. Tests deploy
 ## Quick Start
 
 ```bash
-# Run all standard tests on box at 10.77.9.140
-./run_tests.sh -i 10.77.9.140
+# Run all standard tests on box at 10.77.9.143
+./run_tests.sh -i 10.77.9.143
 
 # Quick capture-only test
-./run_tests.sh -i 10.77.9.140 --quick
+./run_tests.sh -i 10.77.9.143 --quick
 
 # Full deployment test (requires ndi-bridge.img)
-./run_tests.sh -i 10.77.9.140 --all
+./run_tests.sh -i 10.77.9.143 --all
 
 # Run with long-duration stability tests
-./run_tests.sh -i 10.77.9.140 --long
+./run_tests.sh -i 10.77.9.143 --long
 ```
 
 ## Test Suites
@@ -49,7 +49,7 @@ Comprehensive automated testing suite for NDI Bridge USB appliance. Tests deploy
 
 Edit `fixtures/test_config.env`:
 ```bash
-TEST_BOX_IP="10.77.9.140"
+TEST_BOX_IP="10.77.9.143"
 TEST_NDI_STREAM="RESOLUME-SNV (cg-obs)"
 TEST_NDI_STREAM_NO_AUDIO="RESOLUME-SNV (Arena - VJ)"
 ```

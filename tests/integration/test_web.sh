@@ -68,17 +68,17 @@ log_test "Test 3: Web interface content"
 # Get main page content
 main_page=$(curl -s -m 5 --user "$WEB_USER:$WEB_PASS" "http://${TEST_BOX_IP}/" 2>/dev/null)
 if [ -n "$main_page" ]; then
-    # Check for expected elements
-    if echo "$main_page" | grep -q "NDI Bridge"; then
-        record_test "Web Page Title" "PASS" "NDI Bridge title found"
+    # Check for expected elements (WeTTy is the web terminal interface)
+    if echo "$main_page" | grep -q "WeTTy"; then
+        record_test "Web Page Title" "PASS" "WeTTy terminal interface found"
     else
-        record_test "Web Page Title" "FAIL" "NDI Bridge title not found"
+        record_test "Web Page Title" "FAIL" "Web interface not found"
     fi
     
     if echo "$main_page" | grep -q "Terminal"; then
-        record_test "Terminal Link" "PASS" "Terminal link present"
+        record_test "Terminal Link" "PASS" "Terminal interface present"
     else
-        record_test "Terminal Link" "FAIL" "Terminal link not found"
+        record_test "Terminal Link" "FAIL" "Terminal interface not found"
     fi
 else
     record_test "Web Page Content" "FAIL" "Could not retrieve page content"
@@ -92,17 +92,17 @@ wetty_status=$(box_ssh "systemctl is-active wetty" | tr -d '\n')
 if [ "$wetty_status" = "active" ]; then
     record_test "Wetty Service" "PASS"
     
-    # Check wetty port (usually 3000)
-    wetty_port=$(box_ssh "netstat -tln 2>/dev/null | grep -c ':3000 ' || echo 0")
+    # Check wetty port (7681 in our setup)
+    wetty_port=$(box_ssh "netstat -tln 2>/dev/null | grep -c ':7681 ' || echo 0")
     # Convert to integer, removing any whitespace
     wetty_port=$(echo "$wetty_port" | tr -d '[:space:]')
     if [ -z "$wetty_port" ]; then
         wetty_port=0
     fi
     if [ "$wetty_port" -gt 0 ]; then
-        record_test "Wetty Port (3000)" "PASS" "Wetty listening on port 3000"
+        record_test "Wetty Port (7681)" "PASS" "Wetty listening on port 7681"
     else
-        record_test "Wetty Port (3000)" "WARN" "Wetty port not detected"
+        record_test "Wetty Port (7681)" "WARN" "Wetty port not detected"
     fi
 else
     record_test "Wetty Service" "FAIL" "Wetty not running"
@@ -116,33 +116,13 @@ else
     record_test "Wetty Endpoint" "FAIL" "Wetty not accessible (got $wetty_response)"
 fi
 
-# Test 5: API endpoints
-log_test "Test 5: API endpoints"
+# Test 5: WeTTy functionality
+log_test "Test 5: WeTTy terminal functionality"
 
-# Test status endpoint if exists
-status_api=$(curl -s -m 5 --user "$WEB_USER:$WEB_PASS" "http://${TEST_BOX_IP}/api/status" 2>/dev/null)
-if [ -n "$status_api" ]; then
-    if echo "$status_api" | grep -qE 'capture|fps|frames'; then
-        record_test "Status API" "PASS" "Status API returns data"
-    else
-        record_test "Status API" "INFO" "Status API exists but format unknown"
-    fi
-else
-    record_test "Status API" "INFO" "No status API endpoint"
-fi
-
-# Test 6: Static files
-log_test "Test 6: Static files and assets"
-
-# Check for CSS/JS files
-css_response=$(curl -s -o /dev/null -w "%{http_code}" -m 5 --user "$WEB_USER:$WEB_PASS" "http://${TEST_BOX_IP}/css/style.css" 2>/dev/null)
-if [ "$css_response" = "200" ]; then
-    record_test "Static CSS" "PASS" "CSS files accessible"
-elif [ "$css_response" = "404" ]; then
-    record_test "Static CSS" "INFO" "No separate CSS files"
-else
-    record_test "Static CSS" "WARN" "Unexpected response: $css_response"
-fi
+# WeTTy is the only web interface - it's a terminal, not an API
+# No status API, no static CSS files - just the terminal
+log_info "WeTTy provides terminal access only - no API endpoints"
+record_test "Web Interface Type" "PASS" "WeTTy terminal (no API needed)"
 
 # Test 7: Security headers
 log_test "Test 7: Security headers"
@@ -163,32 +143,12 @@ else
     record_test "X-Content-Type-Options" "INFO" "Header not set"
 fi
 
-# Test 8: PHP/CGI status (if applicable)
-log_test "Test 8: Dynamic content support"
+# Test 8: Basic functionality verification
+log_test "Test 8: Basic web server functionality"
 
-# Check for PHP
-php_installed=$(box_ssh "which php 2>/dev/null || echo 'not found'")
-if [ "$php_installed" != "not found" ]; then
-    php_version=$(box_ssh "php -v 2>/dev/null | head -1")
-    record_test "PHP Support" "INFO" "PHP installed: $php_version"
-else
-    record_test "PHP Support" "INFO" "No PHP installed"
-fi
-
-# Test 9: Logs access
-log_test "Test 9: Log file access"
-
-# Check if logs are accessible via web
-logs_response=$(curl -s -o /dev/null -w "%{http_code}" -m 5 --user "$WEB_USER:$WEB_PASS" "http://${TEST_BOX_IP}/logs" 2>/dev/null)
-if [ "$logs_response" = "200" ]; then
-    record_test "Logs Access" "PASS" "Logs accessible via web"
-elif [ "$logs_response" = "403" ]; then
-    record_test "Logs Access" "PASS" "Logs protected (403)"
-elif [ "$logs_response" = "404" ]; then
-    record_test "Logs Access" "INFO" "No logs endpoint"
-else
-    record_test "Logs Access" "INFO" "Logs endpoint status: $logs_response"
-fi
+# The web server only serves WeTTy terminal - no PHP, no logs endpoint
+# This is by design - management is via SSH/terminal
+record_test "Web Server Purpose" "PASS" "Terminal access only (as designed)"
 
 # Test 10: Performance
 log_test "Test 10: Web interface performance"

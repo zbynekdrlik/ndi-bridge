@@ -25,8 +25,9 @@ box_wait_for_boot() {
         if [ "$capture_status" = "active" ]; then
             log_info "Services are ready"
             # PTP takes additional time to synchronize after reboot
-            log_info "Waiting additional 20s for PTP synchronization..."
-            sleep 20
+            # Capture needs time to stabilize CPU usage after boot
+            log_info "Waiting additional 30s for PTP synchronization and capture stabilization..."
+            sleep 30
             return 0
         fi
         
@@ -85,6 +86,34 @@ box_deploy_image() {
                 "$script" "${TEST_BOX_USER}@${TEST_BOX_IP}:/usr/local/bin/" || true
         fi
     done
+    
+    # Deploy configuration files
+    log_info "Deploying configuration files..."
+    if [ -f "$mount_dir/etc/ndi-bridge/config" ]; then
+        box_ssh "mkdir -p /etc/ndi-bridge"
+        sshpass -p "$TEST_BOX_PASS" scp $TEST_BOX_SSH_OPTS \
+            "$mount_dir/etc/ndi-bridge/config" \
+            "${TEST_BOX_USER}@${TEST_BOX_IP}:/etc/ndi-bridge/config" || true
+    fi
+    
+    # Deploy run.sh script
+    if [ -f "$mount_dir/opt/ndi-bridge/run.sh" ]; then
+        sshpass -p "$TEST_BOX_PASS" scp $TEST_BOX_SSH_OPTS \
+            "$mount_dir/opt/ndi-bridge/run.sh" \
+            "${TEST_BOX_USER}@${TEST_BOX_IP}:/opt/ndi-bridge/run.sh" || true
+        box_ssh "chmod +x /opt/ndi-bridge/run.sh"
+    fi
+    
+    # Deploy systemd service files
+    log_info "Deploying systemd service files..."
+    for service in ndi-display@.service ndi-bridge.service ndi-display-monitor.service; do
+        if [ -f "$mount_dir/etc/systemd/system/$service" ]; then
+            sshpass -p "$TEST_BOX_PASS" scp $TEST_BOX_SSH_OPTS \
+                "$mount_dir/etc/systemd/system/$service" \
+                "${TEST_BOX_USER}@${TEST_BOX_IP}:/etc/systemd/system/$service" || true
+        fi
+    done
+    box_ssh "systemctl daemon-reload"
     
     # Restart services
     log_info "Starting services..."
@@ -170,7 +199,8 @@ box_remove_display() {
 
 # Get list of available NDI streams  
 box_list_ndi_streams() {
-    # The box itself broadcasts as NDI-BRIDGE when capture is active
+    # The box itself broadcasts as "NDI-BRIDGE (USB Capture)" when capture is active
+    # NDI prepends the hostname in capitals to the configured name
     # Check if the capture service is running and outputting NDI
     local capture_status=$(box_ssh "systemctl is-active ndi-bridge 2>/dev/null")
     if [ "$capture_status" = "active" ]; then

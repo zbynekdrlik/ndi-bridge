@@ -52,16 +52,16 @@ Options:
 
 Examples:
     # Run all standard tests
-    $0 -i 10.77.9.140
+    $0 -i 10.77.9.143
     
     # Run deployment and all tests
-    $0 -i 10.77.9.140 --all
+    $0 -i 10.77.9.143 --all
     
     # Quick capture-only test
-    $0 -i 10.77.9.140 --quick
+    $0 -i 10.77.9.143 --quick
     
     # Run with long-duration tests
-    $0 -i 10.77.9.140 --long
+    $0 -i 10.77.9.143 --long
 
 EOF
     exit 0
