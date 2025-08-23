@@ -293,6 +293,10 @@ if [ -x /opt/ndi-bridge/ndi-display ]; then
             BITRATE=$(grep "^BITRATE=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
             FRAMES_RECEIVED=$(grep "^FRAMES_RECEIVED=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
             FRAMES_DROPPED=$(grep "^FRAMES_DROPPED=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
+            # Audio info (v1.8.4+)
+            AUDIO_CHANNELS=$(grep "^AUDIO_CHANNELS=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
+            AUDIO_SAMPLE_RATE=$(grep "^AUDIO_SAMPLE_RATE=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
+            AUDIO_FRAMES=$(grep "^AUDIO_FRAMES=" "$STATUS_FILE" 2>/dev/null | cut -d'=' -f2)
             
             # Format FPS to 1 decimal place
             FPS=$(printf "%.1f" "$FPS" 2>/dev/null || echo "$FPS")
@@ -306,11 +310,32 @@ if [ -x /opt/ndi-bridge/ndi-display ]; then
                 FPS_COLOR="${RED}"
             fi
             
+            # Format audio info
+            AUDIO_INFO=""
+            if [ -n "$AUDIO_CHANNELS" ] && [ "$AUDIO_CHANNELS" != "0" ]; then
+                # Convert sample rate to kHz for compact display
+                if [ -n "$AUDIO_SAMPLE_RATE" ] && [ "$AUDIO_SAMPLE_RATE" != "0" ]; then
+                    AUDIO_KHZ=$(echo "scale=1; $AUDIO_SAMPLE_RATE / 1000" | bc 2>/dev/null || echo "0")
+                    if [ "$AUDIO_CHANNELS" = "2" ]; then
+                        AUDIO_INFO="${AUDIO_KHZ}kHz Stereo"
+                    elif [ "$AUDIO_CHANNELS" = "1" ]; then
+                        AUDIO_INFO="${AUDIO_KHZ}kHz Mono"
+                    else
+                        AUDIO_INFO="${AUDIO_KHZ}kHz ${AUDIO_CHANNELS}ch"
+                    fi
+                fi
+            fi
+            
             # Show both monitor and NDI info on single line
             if [ "$HDMI_CONNECTED" = "true" ]; then
-                # Single line with monitor info AND NDI stream info with separate FPS
-                printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: ${HDMI_RESOLUTION}@${HDMI_REFRESH}Hz │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
-                    "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                # Single line with monitor info AND NDI stream info with audio at end
+                if [ -n "$AUDIO_INFO" ]; then
+                    printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: ${HDMI_RESOLUTION}@${HDMI_REFRESH}Hz │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps │ ${GREEN}${AUDIO_INFO}${NC}\n" \
+                        "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                else
+                    printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: ${HDMI_RESOLUTION}@${HDMI_REFRESH}Hz │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
+                        "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                fi
                 
                 # Show dropped frames if any
                 if [ "$FRAMES_DROPPED" != "0" ] && [ -n "$FRAMES_DROPPED" ]; then
@@ -318,8 +343,13 @@ if [ -x /opt/ndi-bridge/ndi-display ]; then
                 fi
             else
                 # No monitor connected but stream active
-                printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: [Not connected] │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
-                    "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                if [ -n "$AUDIO_INFO" ]; then
+                    printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: [Not connected] │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps │ ${GREEN}${AUDIO_INFO}${NC}\n" \
+                        "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                else
+                    printf "  HDMI-%-2d ${GREEN}●${NC} %-22s │ Mon: [Not connected] │ NDI: ${RESOLUTION} ${FPS_COLOR}%-5sfps${NC} ${BITRATE}Mbps\n" \
+                        "$HDMI_NUM" "$STREAM_NAME" "$FPS"
+                fi
                 
                 # Show dropped frames if any
                 if [ "$FRAMES_DROPPED" != "0" ] && [ -n "$FRAMES_DROPPED" ]; then

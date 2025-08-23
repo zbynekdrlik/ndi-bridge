@@ -73,7 +73,16 @@ apt-get install -y -qq --no-install-recommends \
     libnss-mdns \
     htop \
     tmux \
-    bc 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+    bc \
+    alsa-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+
+# Install kbd package non-interactively (needed for chvt command for console restoration)
+echo "Installing kbd package for console management..."
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq kbd 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+
+# Install ALSA library (package name changed in Ubuntu 24.04)
+apt-get install -y -qq --no-install-recommends libasound2t64 2>/dev/null || \
+apt-get install -y -qq --no-install-recommends libasound2 2>/dev/null || true
 
 # Try to install v4l2 tools with different package names
 apt-get install -y -qq --no-install-recommends v4l-utils 2>/dev/null || \

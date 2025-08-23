@@ -22,6 +22,9 @@ EnvironmentFile=-/etc/ndi-bridge/display-%i.conf
 # Console management is now handled by the launcher itself
 ExecStart=/usr/local/bin/ndi-display-launcher %i
 ExecStopPost=/usr/bin/rm -f /var/run/ndi-display/display-%i.status
+ExecStopPost=/bin/sh -c 'echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true'
+ExecStopPost=/bin/sh -c 'chvt 1; sleep 0.1; chvt 2'
+ExecStopPost=/bin/sh -c 'setterm -blank poke > /dev/tty2 2>/dev/null || true'
 
 # Resource limits
 LimitNOFILE=65536

@@ -273,6 +273,11 @@ if(PLATFORM_LINUX)
         src/display/display_output.h
         src/display/display_output.cpp
         src/display/drm_display_output.cpp
+        src/display/audio_output.h
+        src/display/alsa_audio_output.h
+        src/display/alsa_audio_output.cpp
+        src/display/audio_processor.h
+        src/display/audio_processor.cpp
         src/common/logger.cpp
         src/common/logger.h
         src/common/version.h
@@ -301,6 +306,7 @@ if(PLATFORM_LINUX)
         ${NDI_LIBRARY}
         pthread
         drm      # For DRM/KMS display output with hardware scaling
+        asound   # For ALSA audio output to HDMI
     )
     
     # Set version definitions

@@ -47,7 +47,10 @@ public:
                 int width, int height,
                 float fps, float bitrate_mbps,
                 uint64_t frames_received,
-                uint64_t frames_dropped) {
+                uint64_t frames_dropped,
+                int audio_channels = 0,
+                int audio_sample_rate = 0,
+                uint64_t audio_frames = 0) {
         
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -64,6 +67,13 @@ public:
         f << std::fixed << std::setprecision(1) << "BITRATE=" << bitrate_mbps << "\n";
         f << "FRAMES_RECEIVED=" << frames_received << "\n";
         f << "FRAMES_DROPPED=" << frames_dropped << "\n";
+        
+        // Audio metrics
+        if (audio_channels > 0) {
+            f << "AUDIO_CHANNELS=" << audio_channels << "\n";
+            f << "AUDIO_SAMPLE_RATE=" << audio_sample_rate << "\n";
+            f << "AUDIO_FRAMES=" << audio_frames << "\n";
+        }
         
         char time_buf[100];
         std::strftime(time_buf, sizeof(time_buf), "%Y-%m-%dT%H:%M:%S", 

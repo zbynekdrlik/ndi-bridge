@@ -73,14 +73,33 @@
 ## Quick Commands
 
 ### Application Build (AUTO-APPROVED)
+
+**RECOMMENDED: Use the build helper script for foolproof building:**
+
 ```bash
-# ALWAYS build from existing build directory
-cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/build
-# For specific target (e.g., after display changes):
-make ndi-display -j$(nproc)
-# For full rebuild:
-make -j$(nproc)
+# From repository root - handles directory changes automatically
+./build.sh                     # Build everything
+./build.sh ndi-display         # Build display component only
+./build.sh ndi-bridge          # Build capture component only
+./build.sh --clean             # Clean and rebuild
+./build.sh --help              # Show all options
 ```
+
+**Manual build (if needed):**
+```bash
+# CRITICAL: Must be in build/ directory!
+cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/build
+make ndi-display -j$(nproc)    # Display component
+make ndi-bridge -j$(nproc)     # Capture component
+make -j$(nproc)                # Everything
+```
+
+**Common build errors:**
+- `"No rule to make target"` → Wrong directory! Use `./build.sh` or cd to `build/`
+- `"Command not found: cmake"` → Run: `sudo apt install cmake build-essential`
+- `"Cannot find NDI"` → Run: `./setup-build-environment.sh` from repo root
+
+**Build Output**: `build/bin/` (e.g., `build/bin/ndi-display`)
 
 ### Testing
 ```bash
@@ -187,3 +206,23 @@ The display system automatically handles resolution mismatches:
 4. **Build image**: Increment version, build from root, monitor logs
 5. **Deploy**: Flash with Rufus, test on device
 6. **Verify**: Check TTY2 for version, SSH for detailed testing
+
+## Fast Testing on Running Box (Without USB Reflashing)
+
+For quick iteration during development, you can deploy directly to a running box:
+
+```bash
+# Option 1: Deploy specific binaries only (fastest)
+sshpass -p newlevel ssh root@10.77.9.143 "systemctl stop ndi-display@1"
+sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.143:/opt/ndi-bridge/
+sshpass -p newlevel ssh root@10.77.9.143 "systemctl start ndi-display@1"
+
+# Option 2: Use quick-deploy.sh script (if created)
+./quick-deploy.sh 10.77.9.143
+
+# Check logs after deployment
+sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
+```
+
+**Note**: The box's SSH may show welcome screen. Add `-o LogLevel=ERROR` to suppress it.
+- Use TDD test driven development. Working and full tests sucess are most important part.
