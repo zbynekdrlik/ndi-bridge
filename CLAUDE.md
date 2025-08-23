@@ -188,15 +188,16 @@ For quick iteration during development, you can deploy directly to a running box
 
 ```bash
 # Option 1: Deploy specific binaries only (fastest)
-sshpass -p newlevel ssh root@10.77.9.140 "systemctl stop ndi-display@1"
-sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.140:/opt/ndi-bridge/
-sshpass -p newlevel ssh root@10.77.9.140 "systemctl start ndi-display@1"
+sshpass -p newlevel ssh root@10.77.9.143 "systemctl stop ndi-display@1"
+sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.143:/opt/ndi-bridge/
+sshpass -p newlevel ssh root@10.77.9.143 "systemctl start ndi-display@1"
 
 # Option 2: Use quick-deploy.sh script (if created)
-./quick-deploy.sh 10.77.9.140
+./quick-deploy.sh 10.77.9.143
 
 # Check logs after deployment
-sshpass -p newlevel ssh root@10.77.9.140 "journalctl -u ndi-display@1 -n 50"
+sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
 ```
 
 **Note**: The box's SSH may show welcome screen. Add `-o LogLevel=ERROR` to suppress it.
+- Use TDD test driven development. Working and full tests sucess are most important part.

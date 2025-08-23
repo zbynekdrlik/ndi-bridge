@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-BOX_IP="${1:-10.77.9.140}"
+BOX_IP="${1:-10.77.9.143}"
 BOX_USER="root"
 BOX_PASS="newlevel"
 IMAGE_FILE="ndi-bridge.img"
