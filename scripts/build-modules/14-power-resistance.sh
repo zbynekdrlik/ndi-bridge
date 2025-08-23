@@ -5,6 +5,15 @@
 configure_power_resistance() {
     log "Configuring power failure resistance and optimizations..."
     
+    # Copy systemd config files BEFORE chroot
+    mkdir -p /mnt/usb/etc/systemd/system.conf.d
+    if [ -f files/systemd/system.conf.d/10-timeout.conf ]; then
+        cp files/systemd/system.conf.d/10-timeout.conf /mnt/usb/etc/systemd/system.conf.d/
+        log "  Copied systemd timeout configuration"
+    else
+        warn "  10-timeout.conf not found in files/systemd/system.conf.d/"
+    fi
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFPOWER'
 
 # Configure system for power failure resistance
@@ -12,13 +21,7 @@ configure_power_resistance() {
 # Reduce swappiness for better performance
 echo "vm.swappiness=10" >> /etc/sysctl.conf
 
-# Configure systemd for faster boot
-mkdir -p /etc/systemd/system.conf.d
-cat > /etc/systemd/system.conf.d/10-timeout.conf << EOFTIMEOUT
-[Manager]
-DefaultTimeoutStartSec=10s
-DefaultTimeoutStopSec=10s
-EOFTIMEOUT
+# Systemd timeout config was copied before chroot
 
 # Create helper scripts for filesystem remounting
 cat > /usr/local/bin/ndi-bridge-rw << 'EOFRW'

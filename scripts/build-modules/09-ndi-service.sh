@@ -15,6 +15,17 @@ configure_ndi_service() {
         exit 1
     fi
     
+    # Copy systemd service files BEFORE chroot
+    mkdir -p /mnt/usb/etc/systemd/system
+    for service in ndi-bridge.service setup-logs.service ndi-bridge-collector.service; do
+        if [ -f files/systemd/system/$service ]; then
+            cp files/systemd/system/$service /mnt/usb/etc/systemd/system/
+            log "  Copied $service"
+        else
+            warn "  $service not found in files/systemd/system/"
+        fi
+    done
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFNDI'
 
 # Create NDI directories
@@ -24,7 +35,7 @@ mkdir -p /opt/ndi-bridge /etc/ndi-bridge
 echo "BUILD_TIMESTAMP_PLACEHOLDER" > /etc/ndi-bridge/build-timestamp
 echo "BUILD_SCRIPT_VERSION_PLACEHOLDER" > /etc/ndi-bridge/build-script-version
 
-# NDI configuration - use hostname as default NDI name
+# NDI configuration - default to "USB Capture"
 cat > /etc/ndi-bridge/config << EOFCONFIG
 DEVICE="/dev/video0"
 NDI_NAME="USB Capture"
@@ -93,24 +104,8 @@ done
 EOFRUN
 chmod +x /opt/ndi-bridge/run.sh
 
-# Systemd service (output to journal only, not console)
-cat > /etc/systemd/system/ndi-bridge.service << EOFSERVICE
-[Unit]
-Description=NDI Bridge
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-Restart=always
-RestartSec=5
-ExecStart=/opt/ndi-bridge/run.sh
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOFSERVICE
+# Systemd service files were copied before chroot
+# ndi-bridge.service is now in /etc/systemd/system/
 
 if command -v systemctl >/dev/null 2>&1; then
     systemctl enable ndi-bridge
@@ -118,21 +113,7 @@ else
     update-rc.d ndi-bridge enable 2>/dev/null || true
 fi
 
-# Create systemd service to setup log directories on boot
-cat > /etc/systemd/system/setup-logs.service << EOFLOGSVC
-[Unit]
-Description=Setup log directories in tmpfs
-Before=ndi-bridge.service
-After=local-fs.target
-
-[Service]
-Type=oneshot
-ExecStart=/bin/mkdir -p /var/log/ndi-bridge
-RemainAfterExit=yes
-
-[Install]
-WantedBy=multi-user.target
-EOFLOGSVC
+# setup-logs.service was copied before chroot
 
 if command -v systemctl >/dev/null 2>&1; then
     systemctl enable setup-logs
@@ -140,24 +121,7 @@ else
     update-rc.d setup-logs enable 2>/dev/null || true
 fi
 
-# Create systemd service for metrics collector
-cat > /etc/systemd/system/ndi-bridge-collector.service << EOFCOLLECTOR
-[Unit]
-Description=NDI Bridge Metrics Collector
-After=ndi-bridge.service
-Wants=ndi-bridge.service
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/ndi-bridge-collector
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOFCOLLECTOR
+# ndi-bridge-collector.service was copied before chroot
 
 if command -v systemctl >/dev/null 2>&1; then
     systemctl enable ndi-bridge-collector
