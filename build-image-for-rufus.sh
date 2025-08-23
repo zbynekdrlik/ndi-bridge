@@ -10,10 +10,14 @@ mkdir -p build-logs
 # Auto-redirect all output to log file if running in terminal
 # This prevents terminal crashes from verbose output
 if [ -t 1 ]; then
-    echo "Auto-redirecting output to: $LOG_FILE"
-    echo "Monitor progress with: tail -f $LOG_FILE"
-    exec >> "$LOG_FILE" 2>&1
+    # Only show essential info before redirect
+    echo "Build starting - log: $LOG_FILE"
+    echo "Monitor with: tail -f $LOG_FILE"
+    # Redirect everything to log file immediately
+    exec > "$LOG_FILE" 2>&1
 fi
+
+# Now safe to output verbose info (goes to log or console)
 echo "Starting image build at $(date)"
 echo "Log file: $LOG_FILE"
 echo "----------------------------------------"
@@ -101,7 +105,6 @@ trap cleanup EXIT
 
 echo ""
 echo "Starting build..."
-echo "Build log: $LOG_FILE"
 echo ""
 
 # Run the modular build script with loop device

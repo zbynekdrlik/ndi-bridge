@@ -1,0 +1,16 @@
+[Unit]
+Description=Wetty Web Terminal
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root
+ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base / --command /usr/local/bin/ndi-bridge-tmux-session
+Restart=always
+RestartSec=10
+Environment="NODE_ENV=production"
+Environment="TERM=xterm-256color"
+
+[Install]
+WantedBy=multi-user.target

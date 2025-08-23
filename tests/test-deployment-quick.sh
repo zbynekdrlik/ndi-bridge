@@ -7,7 +7,7 @@ source "${SCRIPT_DIR}/lib/assertions.sh"
 source "${SCRIPT_DIR}/lib/box_control.sh"
 
 # Configuration
-TEST_BOX_IP="${1:-10.77.9.140}"
+TEST_BOX_IP="${1:-10.77.9.143}"
 IMAGE_FILE="${2:-ndi-bridge.img}"
 
 echo "================================"

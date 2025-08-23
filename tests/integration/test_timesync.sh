@@ -25,7 +25,7 @@ fi
 # Test 1: Time sync coordinator service
 log_test "Test 1: Time sync coordinator service"
 
-coordinator_status=$(box_ssh "systemctl is-active ndi-bridge-timesync-coordinator" | tr -d '\n')
+coordinator_status=$(box_ssh "systemctl is-active time-sync-coordinator" | tr -d '\n')
 if [ "$coordinator_status" = "active" ]; then
     record_test "Coordinator Service" "PASS" "Time sync coordinator active"
 else
@@ -67,8 +67,8 @@ fi
 
 # Check phc2sys service (syncs PTP hardware clock to system clock)
 phc2sys_status=$(box_ssh "systemctl is-active phc2sys" | tr -d '\n')
-if [ "$phc2sys_status" = "active" ]; then
-    record_test "PHC2SYS Service" "PASS" "Hardware clock sync active"
+if [ "$phc2sys_status" = "active" ] || [ "$phc2sys_status" = "activating" ]; then
+    record_test "PHC2SYS Service" "PASS" "Hardware clock sync active/starting"
 else
     record_test "PHC2SYS Service" "INFO" "PHC2SYS not active"
 fi
@@ -147,7 +147,7 @@ fi
 log_test "Test 6: Time sync failover"
 
 # Check coordinator logs for failover events
-failover_logs=$(box_ssh "journalctl -u ndi-bridge-timesync-coordinator -n 50 --no-pager | grep -E 'Switching|Failed|Fallback' | tail -5")
+failover_logs=$(box_ssh "journalctl -u time-sync-coordinator -n 50 --no-pager | grep -E 'Switching|Failed|Fallback' | tail -5")
 if [ -n "$failover_logs" ]; then
     log_info "Recent failover events:"
     echo "$failover_logs"

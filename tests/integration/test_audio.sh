@@ -58,15 +58,35 @@ else
     record_test "ALSA Output hw:2,3" "WARN" "Device may not be connected or active"
 fi
 
-# Test 3: Assign stream with audio
-log_test "Test 3: Stream with audio"
+# Test 3: Test with real CG NDI stream with audio
+log_test "Test 3: CG NDI stream with audio"
 
 # Stop any existing display
 box_stop_service "ndi-display@${TEST_DISPLAY_ID}" 2>/dev/null || true
 sleep 2
 
+# Try to find a real CG NDI stream with audio (not USB Capture which has no audio)
+log_info "Looking for CG NDI streams with audio..."
+available_streams=$(box_ssh "/opt/ndi-bridge/ndi-display list 2>/dev/null | grep -E 'RESOLUME|CG|cg-obs|Arena' || echo ''")
+
+# Check if we have CG streams available (RESOLUME streams have audio)
+if echo "$available_streams" | grep -q "RESOLUME"; then
+    # Use RESOLUME CG stream which has audio
+    CG_STREAM="RESOLUME-SNV (cg-obs)"
+    log_info "Using CG stream with audio: $CG_STREAM"
+    TEST_AUDIO_STREAM="$CG_STREAM"
+elif echo "$available_streams" | grep -q "Arena"; then
+    # Alternative CG stream
+    CG_STREAM="RESOLUME-SNV (Arena - VJ)"
+    log_info "Using CG stream with audio: $CG_STREAM"
+    TEST_AUDIO_STREAM="$CG_STREAM"
+else
+    log_warn "No CG streams found, using default test stream (no audio)"
+    TEST_AUDIO_STREAM="$TEST_NDI_STREAM"
+fi
+
 # Assign stream with audio
-if box_assign_display "$TEST_NDI_STREAM" "$TEST_DISPLAY_ID"; then
+if box_assign_display "$TEST_AUDIO_STREAM" "$TEST_DISPLAY_ID"; then
     record_test "Audio Stream Assignment" "PASS"
     
     sleep 5  # Give time for audio to start

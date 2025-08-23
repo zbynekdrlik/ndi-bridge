@@ -24,6 +24,15 @@ TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
 CONFIG_DIR="/etc/ndi-bridge"
 POLICY_FILE="$CONFIG_DIR/display-policy.conf"
 
+# Stop any manually running ndi-display process on a specific display
+stop_display_process() {
+    local display_id=$1
+    # Kill any manually running ndi-display on this display
+    pkill -f "ndi-display.*[[:space:]]${display_id}$" 2>/dev/null || true
+    # Also try sudo version
+    sudo pkill -f "ndi-display.*[[:space:]]${display_id}$" 2>/dev/null || true
+}
+
 # Print centered text
 print_centered() {
     local text="$1"
@@ -203,7 +212,7 @@ configure_display() {
     echo -e "  ${BOLD}0${NC} - Back to overview"
     echo ""
     
-    read -p "Select option: " option
+    read < /dev/tty -p "Select option: " option < /dev/tty
     
     case "$option" in
         1) assign_stream $display_id ;;
@@ -245,7 +254,7 @@ assign_stream() {
         echo -e "${RED}No NDI streams found on network${NC}"
         echo ""
         echo "Press Enter to continue..."
-        read
+        read < /dev/tty
         return
     fi
     
@@ -271,7 +280,7 @@ assign_stream() {
     
     echo ""
     echo "Enter stream number (1-${stream_count}) or press Enter to cancel:"
-    read -p "> " selection
+    read < /dev/tty -p "> " selection < /dev/tty
     
     if [ -z "$selection" ]; then
         return
@@ -303,9 +312,6 @@ assign_stream() {
     echo ""
     echo "Applying configuration..."
     echo -e "${CYAN}Assigning '${stream_name}' to HDMI-$((display_id + 1))...${NC}"
-    
-    # First, kill ANY running ndi-display process on this display
-    echo "Stopping any existing streams on HDMI-$((display_id + 1))..."
     
     # More aggressive killing - find by display ID in command line
     local pids=$(ps aux | grep -E "/opt/ndi-bridge/ndi-display.*[[:space:]]${display_id}($|[[:space:]])" | grep -v grep | awk '{print $2}')
@@ -361,14 +367,26 @@ EOF
     # Return to read-only
     /usr/local/bin/ndi-bridge-ro
     
-    # Start the service (can be done on RO filesystem)
-    sudo systemctl restart ndi-display@${display_id}
+    # Restart the service (services are always enabled)
+    if ! sudo systemctl restart ndi-display@${display_id}; then
+        echo -e "${RED}Failed to start ndi-display service${NC}"
+        echo "Trying to start manually..."
+        sudo systemctl start ndi-display@${display_id}
+    fi
     
-    echo ""
-    echo -e "${GREEN}✓ Configuration applied successfully${NC}"
+    # Verify service is actually running
+    sleep 1
+    if systemctl is-active --quiet ndi-display@${display_id}; then
+        echo ""
+        echo -e "${GREEN}✓ Configuration applied successfully${NC}"
+    else
+        echo ""
+        echo -e "${YELLOW}⚠ Service configured but may not be running${NC}"
+        echo "Try selecting 'R' to restart the display"
+    fi
     echo ""
     echo "Press Enter to continue..."
-    read
+    read < /dev/tty
 }
 
 # Remove stream from display
@@ -385,7 +403,7 @@ remove_stream() {
     echo ""
     echo -e "${YELLOW}Remove NDI stream from HDMI-$((display_id + 1))?${NC}"
     echo "(y/n): "
-    read -p "> " confirm
+    read < /dev/tty -p "> " confirm < /dev/tty
     
     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
         return
@@ -399,9 +417,8 @@ remove_stream() {
         sudo systemctl stop ndi-display@${display_id}
     fi
     
-    # Remove config file and disable service (needs RW)
+    # Remove config file (needs RW)
     /usr/local/bin/ndi-bridge-rw
-    sudo systemctl disable ndi-display@${display_id} 2>/dev/null || true
     sudo rm -f "$config_file"
     /usr/local/bin/ndi-bridge-ro
     
@@ -409,7 +426,7 @@ remove_stream() {
     echo -e "${GREEN}✓ Configuration removed${NC}"
     echo ""
     echo "Press Enter to continue..."
-    read
+    read < /dev/tty
 }
 
 # Set display as console
@@ -420,7 +437,7 @@ set_console() {
     echo -e "${YELLOW}Reserve HDMI-$((display_id + 1)) for Linux console?${NC}"
     echo "This will remove any NDI stream configuration."
     echo "(y/n): "
-    read -p "> " confirm
+    read < /dev/tty -p "> " confirm < /dev/tty
     
     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
         return
@@ -429,10 +446,9 @@ set_console() {
     echo ""
     echo "Configuring console..."
     
-    # Stop NDI service if running
+    # Stop NDI service if running (but don't disable - services always enabled)
     if systemctl is-active --quiet ndi-display@${display_id}; then
         sudo systemctl stop ndi-display@${display_id}
-        sudo systemctl disable ndi-display@${display_id} 2>/dev/null || true
     fi
     
     # Remove NDI config
@@ -449,7 +465,7 @@ set_console() {
     echo -e "${GREEN}✓ Display reserved for console${NC}"
     echo ""
     echo "Press Enter to continue..."
-    read
+    read < /dev/tty
 }
 
 # Main menu loop
@@ -466,7 +482,7 @@ main_menu() {
         echo -e "  ${BOLD}q${NC} - Quit"
         echo ""
         
-        read -n1 -p "Select: " choice
+        read < /dev/tty -n1 -p "Select: " choice < /dev/tty
         echo ""
         
         case "$choice" in

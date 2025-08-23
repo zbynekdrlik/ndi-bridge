@@ -5,6 +5,15 @@
 configure_power_resistance() {
     log "Configuring power failure resistance and optimizations..."
     
+    # Copy systemd config files BEFORE chroot
+    mkdir -p /mnt/usb/etc/systemd/system.conf.d
+    if [ -f files/systemd/system.conf.d/10-timeout.conf ]; then
+        cp files/systemd/system.conf.d/10-timeout.conf /mnt/usb/etc/systemd/system.conf.d/
+        log "  Copied systemd timeout configuration"
+    else
+        warn "  10-timeout.conf not found in files/systemd/system.conf.d/"
+    fi
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFPOWER'
 
 # Configure system for power failure resistance
@@ -12,13 +21,7 @@ configure_power_resistance() {
 # Reduce swappiness for better performance
 echo "vm.swappiness=10" >> /etc/sysctl.conf
 
-# Configure systemd for faster boot
-mkdir -p /etc/systemd/system.conf.d
-cat > /etc/systemd/system.conf.d/10-timeout.conf << EOFTIMEOUT
-[Manager]
-DefaultTimeoutStartSec=10s
-DefaultTimeoutStopSec=10s
-EOFTIMEOUT
+# Systemd timeout config was copied before chroot
 
 # Create helper scripts for filesystem remounting
 cat > /usr/local/bin/ndi-bridge-rw << 'EOFRW'
@@ -64,11 +67,13 @@ configure_readonly_root() {
 ROOT_UUID=\$(blkid -s UUID -o value $ROOT_PARTITION)
 sed -i "s|UUID=.* / ext4 .*|UUID=\$ROOT_UUID / ext4 ro,noatime,errors=remount-ro 0 1|" /etc/fstab
 
-# Enable the remount service we created earlier (it was commented out)
+# DO NOT enable remount-rw service - it breaks power failure protection!
+# The service exists for emergency use only and must remain disabled
+# Filesystem should boot read-only as specified in fstab
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl enable remount-rw.service 2>/dev/null || true
+    systemctl disable remount-rw.service 2>/dev/null || true
 else
-    update-rc.d remount-rw enable 2>/dev/null || true
+    update-rc.d remount-rw disable 2>/dev/null || true
 fi
 
 EOFREADONLY

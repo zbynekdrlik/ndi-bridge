@@ -105,17 +105,17 @@ if [ "$avahi_status" = "active" ]; then
     mdns_name="${hostname}.local"
     log_info "mDNS name should be: $mdns_name"
     
-    # Check if avahi is advertising
-    avahi_browse=$(box_ssh "avahi-browse -a -t -r 2>/dev/null | grep -c '_http._tcp' || echo 0")
+    # Check if avahi is advertising (look for NDI services which the box advertises)
+    avahi_browse=$(box_ssh "avahi-browse -a -t 2>/dev/null | grep -c '_ndi._tcp' || echo 0")
     # Convert to integer, removing any whitespace
     avahi_browse=$(echo "$avahi_browse" | tr -d '[:space:]')
     if [ -z "$avahi_browse" ]; then
         avahi_browse=0
     fi
     if [ "$avahi_browse" -gt 0 ]; then
-        record_test "mDNS Advertisement" "PASS" "Services advertised via mDNS"
+        record_test "mDNS Advertisement" "PASS" "NDI services advertised via mDNS"
     else
-        record_test "mDNS Advertisement" "WARN" "No services advertised"
+        record_test "mDNS Advertisement" "WARN" "No NDI services advertised"
     fi
 else
     record_test "Avahi Service" "FAIL" "Avahi not running"

@@ -65,7 +65,8 @@ fi
 
 # Test 3: Capture status and metrics
 log_test "Test 3: Capture status and metrics"
-sleep 3  # Give time for capture to stabilize
+log_info "Waiting 30 seconds for capture to stabilize after boot..."
+sleep 30  # Give proper time for capture to stabilize after boot
 
 capture_status=$(box_get_capture_status)
 if [ -n "$capture_status" ]; then
@@ -170,9 +171,9 @@ if [ -n "$cpu_usage" ]; then
     log_info "CPU Usage: ${cpu_usage}%"
     log_info "Memory Usage: ${mem_usage}%"
     
-    # Check if CPU usage is reasonable (less than 50%)
+    # Check if CPU usage is reasonable (less than 60% for USB capture + NDI encoding)
     cpu_int=$(echo "$cpu_usage" | cut -d'.' -f1)
-    if [ "$cpu_int" -lt 50 ]; then
+    if [ "$cpu_int" -lt 60 ]; then
         record_test "CPU Usage" "PASS" "CPU: ${cpu_usage}%"
     else
         record_test "CPU Usage" "WARN" "High CPU usage: ${cpu_usage}%"

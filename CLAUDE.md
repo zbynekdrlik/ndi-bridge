@@ -1,5 +1,30 @@
 # CLAUDE.md - NDI Bridge Development Guide
 
+## CRITICAL: Debugging & Testing Requirements
+
+**NEVER assume a fix works without testing on actual hardware!**
+
+### Common Mistakes to Avoid:
+1. **Testing on box but not fixing in repository** - Always update code after confirming fix
+2. **Assuming services work without checking `systemctl is-enabled`** - Many issues from disabled services
+3. **Not testing menu systems interactively** - Read commands fail in non-interactive contexts
+4. **Making complex menus that can't be tested** - Keep it simple and testable
+5. **Not verifying after reboot** - Always test persistence
+
+### Proper Debugging Workflow:
+1. Test on actual deployed box (not just build)
+2. Make ONE atomic change at a time
+3. Test → Reboot → Test again
+4. If works: Document exact fix
+5. Apply fix to repository IMMEDIATELY
+6. Never leave fixes only on test box
+
+### Known Issues That Took 10+ Builds to Find:
+- Menu `read` commands need `< /dev/tty` when called from other scripts
+- Services must be enabled AND started
+- kbd package required for chvt but was missing
+- Stream names must match exactly (e.g., "NDI-BRIDGE (USB Capture)")
+
 ## CRITICAL: Modular Architecture Rules
 
 **NEVER CREATE INLINE SCRIPTS OR FILES IN BUILD MODULES!**
@@ -188,15 +213,16 @@ For quick iteration during development, you can deploy directly to a running box
 
 ```bash
 # Option 1: Deploy specific binaries only (fastest)
-sshpass -p newlevel ssh root@10.77.9.140 "systemctl stop ndi-display@1"
-sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.140:/opt/ndi-bridge/
-sshpass -p newlevel ssh root@10.77.9.140 "systemctl start ndi-display@1"
+sshpass -p newlevel ssh root@10.77.9.143 "systemctl stop ndi-display@1"
+sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.143:/opt/ndi-bridge/
+sshpass -p newlevel ssh root@10.77.9.143 "systemctl start ndi-display@1"
 
 # Option 2: Use quick-deploy.sh script (if created)
-./quick-deploy.sh 10.77.9.140
+./quick-deploy.sh 10.77.9.143
 
 # Check logs after deployment
-sshpass -p newlevel ssh root@10.77.9.140 "journalctl -u ndi-display@1 -n 50"
+sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
 ```
 
 **Note**: The box's SSH may show welcome screen. Add `-o LogLevel=ERROR` to suppress it.
+- Use TDD test driven development. Working and full tests sucess are most important part.

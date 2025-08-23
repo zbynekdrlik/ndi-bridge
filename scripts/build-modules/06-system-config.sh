@@ -55,7 +55,8 @@ apt-get install -y -qq --no-install-recommends \
     curl \
     ca-certificates \
     iputils-ping \
-    zstd 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+    zstd \
+    kbd 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Try to install DHCP client (different package names in different Ubuntu versions)
 apt-get install -y -qq --no-install-recommends isc-dhcp-client 2>/dev/null || \
@@ -74,6 +75,10 @@ apt-get install -y -qq --no-install-recommends \
     tmux \
     bc \
     alsa-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+
+# Install kbd package non-interactively (needed for chvt command for console restoration)
+echo "Installing kbd package for console management..."
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq kbd 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Install ALSA library (package name changed in Ubuntu 24.04)
 apt-get install -y -qq --no-install-recommends libasound2t64 2>/dev/null || \

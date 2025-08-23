@@ -1,0 +1,17 @@
+[Unit]
+Description=PTPv2 port in slave mode
+After=network.target
+After=ndi-bridge-network-setup.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ptp4l-safe-start
+Restart=on-failure
+RestartSec=30
+StartLimitBurst=3
+
+# To configure as master, replace gPTP.cfg with master.cfg and restart:
+# ExecStart=/usr/sbin/ptp4l -i eth0 -f /etc/linuxptp/master.cfg --step_threshold=1 -m
+
+[Install]
+WantedBy=multi-user.target

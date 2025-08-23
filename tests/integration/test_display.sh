@@ -188,16 +188,32 @@ else
     record_test "Stream Switching" "SKIP" "Only one stream available"
 fi
 
-# Test 7: Remove stream from display
-log_test "Test 7: Remove stream from display"
+# Test 7: Remove stream from display and verify console restoration
+log_test "Test 7: Remove stream from display (console restoration test)"
+
+# First check which TTY is active before removal (should be display TTY)
+initial_tty=$(box_ssh "fgconsole 2>/dev/null || echo '1'")
+log_info "Initial TTY before removal: $initial_tty"
 
 box_remove_display "$TEST_DISPLAY_ID"
 sleep 2
 
 if assert_service_inactive "ndi-display@${TEST_DISPLAY_ID}"; then
     record_test "Stream Removal" "PASS"
+    
+    # Check if console was restored to TTY2 (the welcome screen)
+    sleep 2  # Give time for console switch
+    final_tty=$(box_ssh "fgconsole 2>/dev/null || echo '1'")
+    log_info "Final TTY after removal: $final_tty"
+    
+    if [ "$final_tty" = "2" ]; then
+        record_test "Console Restoration" "PASS" "Console restored to TTY2"
+    else
+        record_test "Console Restoration" "FAIL" "Console not restored (on TTY$final_tty, expected TTY2)"
+    fi
 else
     record_test "Stream Removal" "FAIL" "Display service still active"
+    record_test "Console Restoration" "SKIP" "Could not test - service still active"
 fi
 
 # Test 8: Test with stream without audio
@@ -259,8 +275,52 @@ else
     record_test "Display Service Restart" "FAIL" "Service did not restart"
 fi
 
-# Test 10: Multiple displays (if supported)
-log_test "Test 10: Multiple displays"
+# Test 10: Test with real CG NDI stream
+log_test "Test 10: Display CG NDI stream with video and audio"
+
+# Look for CG streams
+cg_streams=$(box_ssh "/opt/ndi-bridge/ndi-display list 2>/dev/null | grep -E 'RESOLUME|CG|cg-obs' || echo ''")
+
+if echo "$cg_streams" | grep -q "RESOLUME"; then
+    CG_STREAM="RESOLUME-SNV (cg-obs)"
+    log_info "Testing with CG stream: $CG_STREAM"
+    
+    if box_assign_display "$CG_STREAM" "$TEST_DISPLAY_ID"; then
+        record_test "CG Stream Assignment" "PASS"
+        
+        sleep 5
+        status=$(box_get_display_status "$TEST_DISPLAY_ID")
+        
+        # Check video
+        if assert_display_has_video "$TEST_DISPLAY_ID"; then
+            record_test "CG Stream Video" "PASS"
+        else
+            record_test "CG Stream Video" "FAIL" "No video from CG stream"
+        fi
+        
+        # Check audio
+        if assert_display_has_audio "$TEST_DISPLAY_ID"; then
+            record_test "CG Stream Audio" "PASS" "CG stream has audio as expected"
+            
+            audio_channels=$(parse_status_value "$status" "AUDIO_CHANNELS")
+            audio_rate=$(parse_status_value "$status" "AUDIO_SAMPLE_RATE")
+            log_info "CG audio: ${audio_rate}Hz, ${audio_channels} channels"
+        else
+            record_test "CG Stream Audio" "FAIL" "CG stream should have audio"
+        fi
+        
+        # Clean up
+        box_remove_display "$TEST_DISPLAY_ID"
+    else
+        record_test "CG Stream Assignment" "FAIL" "Could not assign CG stream"
+    fi
+else
+    log_info "No CG streams available for testing"
+    record_test "CG Stream Test" "SKIP" "No CG streams available"
+fi
+
+# Test 11: Multiple displays (if supported)
+log_test "Test 11: Multiple displays"
 
 # Try to start display 2
 if box_assign_display "$TEST_NDI_STREAM" "2"; then
