@@ -1,0 +1,32 @@
+#!/bin/bash
+
+# Restart intercom service
+echo "Restarting NDI Bridge Intercom Service..."
+
+# Check if service exists
+if ! systemctl list-unit-files 2>/dev/null | grep -q ndi-bridge-intercom; then
+    echo "Error: Intercom service not installed"
+    exit 1
+fi
+
+# Restart the service
+systemctl restart ndi-bridge-intercom
+
+# Wait a moment for service to start
+sleep 2
+
+# Check status
+if systemctl is-active --quiet ndi-bridge-intercom; then
+    echo "✓ Intercom service restarted successfully"
+    
+    # Show current status
+    echo ""
+    /opt/ndi-bridge/ndi-bridge-intercom-status 2>/dev/null || \
+        systemctl status ndi-bridge-intercom --no-pager
+else
+    echo "✗ Failed to restart intercom service"
+    echo ""
+    echo "Recent logs:"
+    journalctl -u ndi-bridge-intercom -n 10 --no-pager
+    exit 1
+fi

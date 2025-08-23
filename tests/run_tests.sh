@@ -21,6 +21,7 @@ RUN_NETWORK=false
 RUN_WEB=false
 RUN_TIMESYNC=false
 RUN_HELPERS=false
+RUN_INTERCOM=false
 RUN_LONG_TESTS=false
 RUN_COMPLETE=false
 TEST_BOX_IP=""
@@ -44,6 +45,7 @@ Options:
     -w, --web           Run web interface tests (default: no)
     -t, --timesync      Run time sync tests (default: no)
     -e, --helpers       Run helper scripts tests (default: no)
+    -m, --intercom      Run intercom tests (default: no)
     -l, --long          Run long-duration tests
     --skip-capture      Skip capture tests
     --skip-display      Skip display tests
@@ -115,6 +117,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--helpers)
             RUN_HELPERS=true
+            shift
+            ;;
+        -m|--intercom)
+            RUN_INTERCOM=true
             shift
             ;;
         --complete)
@@ -285,6 +291,11 @@ fi
 # Run helper scripts tests if requested
 if [ "$RUN_HELPERS" = "true" ]; then
     run_test_suite "Helper Scripts Test" "${SCRIPT_DIR}/integration/test_helpers.sh"
+fi
+
+# Run intercom tests
+if [ "$RUN_INTERCOM" = "true" ]; then
+    run_test_suite "Intercom Test" "${SCRIPT_DIR}/integration/test_intercom.sh"
 fi
 
 # Calculate totals

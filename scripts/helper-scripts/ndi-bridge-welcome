@@ -250,6 +250,49 @@ if [ "$ETH0_LINK" = "1" ] || [ "$ETH1_LINK" = "1" ]; then
 fi
 echo ""
 
+# INTERCOM STATUS
+echo -e "${CYAN}▶ INTERCOM STATUS${NC}"
+if systemctl is-active --quiet ndi-bridge-intercom 2>/dev/null; then
+    echo -e "  Status:      ${GREEN}● Connected${NC}"
+    
+    # Load config to show room
+    if [ -f /etc/ndi-bridge/intercom.conf ]; then
+        source /etc/ndi-bridge/intercom.conf
+        echo -e "  Room:        ${VDO_ROOM:-nl_interkom}"
+    fi
+    
+    echo -e "  Device ID:   $(hostname)"
+    
+    # Check if chromium process exists and get memory usage
+    INTERCOM_PID=$(pgrep -f "vdo.ninja.*interkom" 2>/dev/null | head -1)
+    if [ -z "$INTERCOM_PID" ]; then
+        # Fallback to checking for chromium with intercom
+        INTERCOM_PID=$(pgrep -f "chromium.*intercom" 2>/dev/null | head -1)
+    fi
+    
+    if [ -n "$INTERCOM_PID" ]; then
+        INTERCOM_MEM_KB=$(ps -o rss= -p $INTERCOM_PID 2>/dev/null | tr -d ' ')
+        if [ -n "$INTERCOM_MEM_KB" ]; then
+            INTERCOM_MEM=$((INTERCOM_MEM_KB / 1024))
+            echo -e "  Memory:      ${INTERCOM_MEM}MB"
+        fi
+    fi
+else
+    # Check if service exists
+    if systemctl list-unit-files 2>/dev/null | grep -q ndi-bridge-intercom; then
+        # Service exists but not running
+        if systemctl is-failed --quiet ndi-bridge-intercom 2>/dev/null; then
+            echo -e "  Status:      ${RED}● Failed${NC}"
+            echo -e "  Info:        Run 'ndi-bridge-intercom-logs' for details"
+        else
+            echo -e "  Status:      ${YELLOW}● Stopped${NC}"
+        fi
+    else
+        echo -e "  Status:      ${DIM}Not installed${NC}"
+    fi
+fi
+echo ""
+
 # DISPLAY OUTPUT (NDI → HDMI)
 echo -e "${CYAN}▶ DISPLAY OUTPUT (NDI → HDMI)${NC}"
 

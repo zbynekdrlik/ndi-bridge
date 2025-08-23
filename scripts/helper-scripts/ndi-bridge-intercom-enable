@@ -1,0 +1,29 @@
+#!/bin/bash
+
+# Enable intercom service
+echo "Enabling NDI Bridge Intercom Service..."
+
+# Check if service exists
+if ! systemctl list-unit-files 2>/dev/null | grep -q ndi-bridge-intercom; then
+    echo "Error: Intercom service not installed"
+    exit 1
+fi
+
+# Enable the service
+systemctl enable ndi-bridge-intercom
+
+# Start the service if not running
+if ! systemctl is-active --quiet ndi-bridge-intercom; then
+    echo "Starting intercom service..."
+    systemctl start ndi-bridge-intercom
+    sleep 2
+fi
+
+# Check status
+if systemctl is-active --quiet ndi-bridge-intercom; then
+    echo "✓ Intercom service enabled and running"
+else
+    echo "✗ Intercom service enabled but failed to start"
+    echo "Check logs with: ndi-bridge-intercom-logs"
+    exit 1
+fi

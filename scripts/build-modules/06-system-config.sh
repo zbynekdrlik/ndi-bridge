@@ -79,6 +79,12 @@ apt-get install -y -qq --no-install-recommends \
 apt-get install -y -qq --no-install-recommends libasound2t64 2>/dev/null || \
 apt-get install -y -qq --no-install-recommends libasound2 2>/dev/null || true
 
+# Install Chromium for intercom support
+echo "Installing Chromium for VDO.Ninja intercom..."
+apt-get install -y -qq --no-install-recommends chromium-browser 2>/dev/null || \
+apt-get install -y -qq --no-install-recommends chromium 2>/dev/null || \
+echo "Warning: Chromium not available - intercom feature will not work"
+
 # Try to install v4l2 tools with different package names
 apt-get install -y -qq --no-install-recommends v4l-utils 2>/dev/null || \
 apt-get install -y -qq --no-install-recommends v4l2-tools 2>/dev/null || \
