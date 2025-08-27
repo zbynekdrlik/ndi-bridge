@@ -2,7 +2,8 @@
 # VDO.Ninja Intercom for NDI Bridge with PipeWire
 # Connects to VDO.Ninja room with real USB audio using PipeWire
 
-set -e
+# Don't exit on error - some commands may fail but we continue
+set +e
 
 # Function to cleanup everything
 cleanup() {
@@ -225,9 +226,9 @@ PREFS
 fi
 
 # VDO.Ninja URL with parameters for automatic connection
-# webcam flag needed for microphone permissions to work properly
-# videodevice=9 uses non-existent device to avoid Elgato
-URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&videodevice=9&autostart&webcam&videomuted&sl&st&mobile&fb"
+# miconly forces microphone-only mode, avoiding camera prompt completely
+# autostart automatically joins without user interaction
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&autostart&sl&st&mobile&fb"
 
 echo "Starting Chrome (single instance)..."
 echo "URL: $URL"
