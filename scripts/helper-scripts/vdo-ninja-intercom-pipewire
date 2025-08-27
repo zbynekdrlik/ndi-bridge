@@ -1,0 +1,256 @@
+#!/bin/bash
+# VDO.Ninja Intercom for NDI Bridge with PipeWire
+# Connects to VDO.Ninja room with real USB audio using PipeWire
+
+set -e
+
+# Function to cleanup everything
+cleanup() {
+    echo "Cleaning up Chrome, PipeWire, VNC and Xvfb..."
+    
+    # Kill ALL Chrome processes forcefully
+    pkill -9 -f "chrome" 2>/dev/null || true
+    pkill -9 -f "google-chrome" 2>/dev/null || true
+    
+    # Kill PipeWire and WirePlumber
+    pkill -9 pipewire 2>/dev/null || true
+    pkill -9 wireplumber 2>/dev/null || true
+    
+    # Kill VNC server
+    pkill -9 -f "x11vnc" 2>/dev/null || true
+    
+    # Kill Xvfb
+    pkill -9 -f "Xvfb" 2>/dev/null || true
+    
+    # Clean up lock files and temp directories
+    rm -f /tmp/.X99-lock 2>/dev/null || true
+    rm -rf /tmp/.com.google.Chrome.* 2>/dev/null || true
+    rm -rf /tmp/chrome-* 2>/dev/null || true
+    rm -f /opt/chrome-vdo-profile/SingletonLock 2>/dev/null || true
+    rm -f /opt/chrome-vdo-profile/SingletonCookie 2>/dev/null || true
+    rm -f /opt/chrome-vdo-profile/SingletonSocket 2>/dev/null || true
+    
+    # Wait for processes to die
+    sleep 3
+    
+    # Verify everything is dead
+    if pgrep -f "chrome" > /dev/null; then
+        echo "Warning: Chrome still running, forcing kill..."
+        killall -9 chrome google-chrome 2>/dev/null || true
+        sleep 2
+    fi
+}
+
+# Trap exit signals to cleanup
+trap cleanup EXIT INT TERM
+
+# Configuration
+FULL_HOSTNAME=$(hostname)
+HOSTNAME=${FULL_HOSTNAME#ndi-bridge-}  # Remove prefix if exists
+ROOM="${VDO_ROOM:-nl_interkom}"
+PROFILE_DIR="/opt/chrome-vdo-profile"
+DISPLAY_NUM=99
+
+echo "=== VDO.Ninja Intercom Starting (PipeWire) ==="
+echo "Device: $HOSTNAME"
+echo "Room: $ROOM"
+
+# ALWAYS cleanup first
+cleanup
+
+# Start Xvfb
+echo "Starting virtual display..."
+Xvfb :$DISPLAY_NUM -screen 0 1280x720x24 -ac > /dev/null 2>&1 &
+XVFB_PID=$!
+sleep 2
+
+export DISPLAY=:$DISPLAY_NUM
+
+# Start VNC server for remote monitoring
+echo "Starting VNC server on port 5999..."
+# Use setsid to completely detach VNC from this process group
+setsid x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+sleep 2
+echo "VNC server detached and running"
+
+# Setup runtime directory
+export XDG_RUNTIME_DIR=/run/user/0
+mkdir -p $XDG_RUNTIME_DIR
+
+# Start PipeWire and WirePlumber
+echo "Starting PipeWire audio system..."
+
+# Kill any existing PipeWire/WirePlumber
+pkill -9 pipewire 2>/dev/null || true
+pkill -9 wireplumber 2>/dev/null || true
+sleep 1
+
+# Remove any custom configs that might cause issues
+rm -f /etc/pipewire/pipewire.conf.d/10-usb-audio.conf 2>/dev/null
+rm -f /etc/wireplumber/main.lua.d/50-usb-audio.lua 2>/dev/null
+
+# Create simple WirePlumber config directory
+mkdir -p /etc/wireplumber/main.lua.d
+
+# Create WirePlumber configuration to not ignore USB Audio HID
+cat > /etc/wireplumber/main.lua.d/50-usb-audio.lua << 'EOFWP'
+-- Enable USB Audio devices
+alsa_monitor.enabled = true
+
+alsa_monitor.rules = {
+  {
+    matches = {
+      {
+        { "device.name", "matches", "alsa_card.*" },
+      },
+    },
+    apply_properties = {
+      ["api.alsa.use-acp"] = true,
+      ["device.disabled"] = false,
+    },
+  },
+  -- Specific rule for USB Audio HID
+  {
+    matches = {
+      {
+        { "alsa.card_name", "matches", "*USB Audio*" },
+      },
+    },
+    apply_properties = {
+      ["device.nick"] = "USB Audio 3.5mm",
+      ["device.description"] = "USB Audio (3.5mm Jack)",
+      ["priority.driver"] = 3000,
+      ["priority.session"] = 3000,
+      ["api.alsa.use-acp"] = true,
+      ["device.disabled"] = false,
+    },
+  },
+}
+EOFWP
+
+# Start PipeWire as user daemon with proper environment
+echo "Starting PipeWire..."
+pipewire &
+PIPEWIRE_PID=$!
+sleep 2
+
+# Start pipewire-pulse for PulseAudio compatibility
+echo "Starting PipeWire PulseAudio bridge..."
+pipewire-pulse &
+PULSE_PID=$!
+sleep 1
+
+# Start WirePlumber session manager
+echo "Starting WirePlumber..."
+wireplumber &
+WIREPLUMBER_PID=$!
+sleep 3
+
+# Wait for PipeWire to be ready
+for i in {1..10}; do
+    if pactl info >/dev/null 2>&1; then
+        echo "PipeWire PulseAudio bridge ready"
+        break
+    fi
+    sleep 1
+done
+
+echo "PipeWire started"
+
+# List available devices using pactl (PulseAudio compatibility)
+echo "Available audio devices:"
+pactl list cards short || true
+echo "Available outputs:"
+pactl list sinks short || true
+echo "Available inputs:"
+pactl list sources short | grep -v monitor || true
+
+# Find and set USB Audio as default using pactl
+echo "Looking for USB Audio device..."
+USB_SINK=$(pactl list sinks short | grep -E "USB.*Audio|usb" | awk '{print $2}' | head -1)
+USB_SOURCE=$(pactl list sources short | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+
+if [ -n "$USB_SINK" ]; then
+    pactl set-default-sink "$USB_SINK"
+    echo "Default output set to: $USB_SINK"
+else
+    echo "WARNING: USB Audio output not found"
+fi
+
+if [ -n "$USB_SOURCE" ]; then
+    pactl set-default-source "$USB_SOURCE"
+    echo "Default input set to: $USB_SOURCE"
+else
+    echo "WARNING: USB Audio input not found"
+fi
+
+# Setup Chrome profile with saved permissions - always recreate to ensure they exist
+echo "Setting up Chrome profile with permissions..."
+mkdir -p $PROFILE_DIR/Default
+
+# Check if permissions exist in current Preferences
+if [ -f "$PROFILE_DIR/Default/Preferences" ]; then
+    if ! grep -q "media_stream_mic.*vdo.ninja.*setting.:1" "$PROFILE_DIR/Default/Preferences" 2>/dev/null; then
+        echo "Permissions missing, recreating profile..."
+        rm -f $PROFILE_DIR/Default/Preferences
+    fi
+fi
+
+if [ ! -f "$PROFILE_DIR/Default/Preferences" ]; then
+    cat > $PROFILE_DIR/Default/Preferences << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766142668061",
+            "setting": 1
+          }
+        },
+        "media_stream_camera": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766150219890",
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+fi
+
+# VDO.Ninja URL with parameters for automatic connection
+# webcam flag needed for microphone permissions to work properly
+# videodevice=9 uses non-existent device to avoid Elgato
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&videodevice=9&autostart&webcam&videomuted&sl&st&mobile&fb"
+
+echo "Starting Chrome (single instance)..."
+echo "URL: $URL"
+echo ""
+echo "=== VNC Remote Access ==="
+echo "Connect to VNC: $(hostname -I | awk '{print $1}'):5999"
+echo "No password required"
+echo ""
+
+# Start Chrome - exec replaces this script with Chrome process
+# This ensures only ONE Chrome runs and systemd can manage it properly
+# Chrome will use PipeWire through pipewire-pulse compatibility layer
+exec env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+    PIPEWIRE_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+    PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse \
+    /usr/bin/google-chrome \
+    --no-first-run \
+    --no-default-browser-check \
+    --no-sandbox \
+    --disable-gpu \
+    --disable-dev-shm-usage \
+    --autoplay-policy=no-user-gesture-required \
+    --audio-buffer-size=2048 \
+    --user-data-dir=$PROFILE_DIR \
+    --new-window \
+    "$URL"
