@@ -20,7 +20,6 @@ echo "Stopping service..."
 sshpass -p $PASSWORD ssh -o LogLevel=ERROR root@$IP "systemctl stop vdo-ninja-intercom || true"
 
 echo "Deploying intercom scripts..."
-sshpass -p $PASSWORD scp -o LogLevel=ERROR scripts/helper-scripts/vdo-ninja-intercom root@$IP:/usr/local/bin/
 sshpass -p $PASSWORD scp -o LogLevel=ERROR scripts/helper-scripts/vdo-ninja-intercom-pipewire root@$IP:/usr/local/bin/
 sshpass -p $PASSWORD scp -o LogLevel=ERROR scripts/helper-scripts/vdo-ninja-intercom-launcher root@$IP:/usr/local/bin/
 sshpass -p $PASSWORD ssh -o LogLevel=ERROR root@$IP "chmod +x /usr/local/bin/vdo-ninja-intercom*"

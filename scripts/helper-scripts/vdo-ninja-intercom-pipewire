@@ -41,8 +41,8 @@ cleanup() {
     fi
 }
 
-# Trap exit signals to cleanup
-trap cleanup EXIT INT TERM
+# Trap exit signals to cleanup (only on abnormal exit)
+trap cleanup INT TERM
 
 # Configuration
 FULL_HOSTNAME=$(hostname)
