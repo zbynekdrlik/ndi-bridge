@@ -68,7 +68,7 @@
 - Run build from `build/` directory (causes "file not found" errors)
 - Forget to increment version (can't identify deployed devices)
 
-**Build takes 10-15 minutes. Image output: `ndi-bridge.img` (4GB)**
+**Build takes 10-15 minutes. Image output: `ndi-bridge.img` (8GB)**
 
 ## Quick Commands
 
