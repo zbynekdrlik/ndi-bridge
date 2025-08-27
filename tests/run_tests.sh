@@ -293,9 +293,9 @@ if [ "$RUN_HELPERS" = "true" ]; then
     run_test_suite "Helper Scripts Test" "${SCRIPT_DIR}/integration/test_helpers.sh"
 fi
 
-# Run intercom tests
+# Run VDO.Ninja intercom tests
 if [ "$RUN_INTERCOM" = "true" ]; then
-    run_test_suite "Intercom Test" "${SCRIPT_DIR}/integration/test_intercom.sh"
+    run_test_suite "VDO.Ninja Intercom Test" "${SCRIPT_DIR}/integration/test_vdo_intercom.sh"
 fi
 
 # Calculate totals

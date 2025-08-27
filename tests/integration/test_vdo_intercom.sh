@@ -149,6 +149,20 @@ echo "6. Checking Xvfb display..."
 check_process "Xvfb" || exit 1
 
 echo ""
+echo "7. Checking welcome screen integration..."
+# Test that welcome screen would show intercom status correctly
+if command -v ndi-bridge-welcome >/dev/null 2>&1; then
+    # The welcome script should detect vdo-ninja-intercom service
+    if ndi-bridge-welcome 2>/dev/null | grep -q "INTERCOM STATUS"; then
+        echo -e "${GREEN}✓${NC} Welcome screen has intercom section"
+    else
+        echo -e "${YELLOW}⚠${NC} Welcome screen may not show intercom status"
+    fi
+else
+    echo -e "${YELLOW}⚠${NC} ndi-bridge-welcome not found (OK in test environment)"
+fi
+
+echo ""
 echo "=== All tests passed! ==="
 echo "VDO.Ninja intercom is functioning correctly"
 echo "- Audio-only mode (no camera prompt)"
