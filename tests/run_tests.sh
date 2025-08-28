@@ -4,6 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
+source "${SCRIPT_DIR}/lib/ro_check.sh"
 
 # Test runner configuration
 TEST_SUITES=()
@@ -203,6 +204,18 @@ if ! ping -c 1 -W 2 "$TEST_BOX_IP" &>/dev/null; then
     exit 1
 fi
 log_info "Test box is reachable"
+
+# CRITICAL: Verify filesystem is read-only
+log_info "Verifying filesystem status..."
+if ! verify_readonly_filesystem "$TEST_BOX_IP"; then
+    log_error "Filesystem verification failed - tests cannot proceed"
+    echo ""
+    echo "This is a critical requirement for test validity."
+    echo "Tests must run against a read-only filesystem to ensure"
+    echo "they reflect real production conditions."
+    exit 1
+fi
+log_info "Filesystem verified as read-only ✓"
 
 # Get system information
 log_info "Getting system information..."
