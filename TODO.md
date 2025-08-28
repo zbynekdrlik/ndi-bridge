@@ -29,15 +29,22 @@ Each task follows this structure:
 
 ### Medium Priority
 
-- [ ] Simple web intercom control interface
+- [ ] Fix dynamic MAC address on bridge interface
   - **ID**: NDI-003
+  - **Branch**: feature/static-mac-bridge
+  - **Priority**: Medium
+  - **Status**: Planning
+  - **Details**: Solve issue where bridge interface gets different MAC addresses after each image build, causing DHCP to assign different IPs on the same PC. Need to implement static/persistent MAC address for br0 interface.
+
+- [ ] Simple web intercom control interface
+  - **ID**: NDI-004
   - **Branch**: feature/web-intercom
   - **Priority**: Medium
   - **Status**: Planning
   - **Details**: Add web-based intercom control with mute button and volume slider for easy audio management
 
 - [ ] Dante audio bridge integration
-  - **ID**: NDI-004
+  - **ID**: NDI-005
   - **Branch**: feature/dante-bridge
   - **Priority**: Medium
   - **Status**: Planning
@@ -46,7 +53,7 @@ Each task follows this structure:
 ### Low Priority
 
 - [ ] Add comprehensive monitoring dashboard
-  - **ID**: NDI-005
+  - **ID**: NDI-006
   - **Branch**: feature/monitoring-dashboard
   - **Priority**: Low
   - **Status**: Planning
