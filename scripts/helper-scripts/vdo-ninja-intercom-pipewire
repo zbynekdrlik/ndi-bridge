@@ -27,9 +27,9 @@ cleanup() {
     rm -f /tmp/.X99-lock 2>/dev/null || true
     rm -rf /tmp/.com.google.Chrome.* 2>/dev/null || true
     rm -rf /tmp/chrome-* 2>/dev/null || true
-    rm -f /opt/chrome-vdo-profile/SingletonLock 2>/dev/null || true
-    rm -f /opt/chrome-vdo-profile/SingletonCookie 2>/dev/null || true
-    rm -f /opt/chrome-vdo-profile/SingletonSocket 2>/dev/null || true
+    rm -f /tmp/chrome-vdo-profile/SingletonLock 2>/dev/null || true
+    rm -f /tmp/chrome-vdo-profile/SingletonCookie 2>/dev/null || true
+    rm -f /tmp/chrome-vdo-profile/SingletonSocket 2>/dev/null || true
     
     # Wait for processes to die
     sleep 3
@@ -49,7 +49,7 @@ trap cleanup INT TERM
 FULL_HOSTNAME=$(hostname)
 HOSTNAME=${FULL_HOSTNAME#ndi-bridge-}  # Remove prefix if exists
 ROOM="${VDO_ROOM:-nl_interkom}"
-PROFILE_DIR="/opt/chrome-vdo-profile"
+PROFILE_DIR="/tmp/chrome-vdo-profile"
 DISPLAY_NUM=99
 
 echo "=== VDO.Ninja Intercom Starting (PipeWire) ==="
@@ -78,6 +78,15 @@ echo "VNC server detached and running"
 export XDG_RUNTIME_DIR=/run/user/0
 mkdir -p $XDG_RUNTIME_DIR
 mkdir -p $XDG_RUNTIME_DIR/pulse
+
+# Create required directories in tmpfs for Chrome and WirePlumber
+mkdir -p /tmp/.local/state/wireplumber
+mkdir -p /tmp/.local/share/applications
+export HOME=/tmp
+export XDG_STATE_HOME=/tmp/.local/state
+export XDG_DATA_HOME=/tmp/.local/share
+export XDG_CONFIG_HOME=/tmp/.config
+mkdir -p $XDG_CONFIG_HOME
 
 # Start PipeWire and WirePlumber
 echo "Starting PipeWire audio system..."
@@ -286,6 +295,10 @@ echo "URL: $URL"
 env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
     PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse \
     PULSE_SERVER=unix:$XDG_RUNTIME_DIR/pulse/native \
+    HOME=/tmp \
+    XDG_STATE_HOME=/tmp/.local/state \
+    XDG_DATA_HOME=/tmp/.local/share \
+    XDG_CONFIG_HOME=/tmp/.config \
     /usr/bin/google-chrome \
     --no-first-run \
     --no-default-browser-check \
