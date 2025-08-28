@@ -7,3 +7,4 @@
 - [ ] Dante audio bridge integration using Inferno
 - [ ] Add comprehensive monitoring dashboard
 - [ ] Rename ndi-bridge app to ndi-capture - better describes functionality
+- [ ] Rename project and repository from ndi-bridge to media-bridge - project now includes multiple features beyond NDI
