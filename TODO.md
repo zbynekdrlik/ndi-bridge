@@ -8,6 +8,7 @@
 - [ ] Simple web intercom control with mute/volume buttons
 - [ ] Dante audio bridge integration using Inferno
 - [ ] Add comprehensive monitoring dashboard
+- [ ] Rename ndi-bridge app to ndi-capture - better describes functionality
 
 ## In Progress
 
