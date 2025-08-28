@@ -16,7 +16,7 @@ TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
 
 # Create dynamic width header
 HEADER_LINE=$(printf '═%.0s' $(seq 1 $TERM_WIDTH))
-TITLE="NDI Bridge Status Dashboard"
+TITLE="Media Bridge Status Dashboard"
 TITLE_LEN=${#TITLE}
 PADDING=$(( (TERM_WIDTH - TITLE_LEN) / 2 ))
 
@@ -48,7 +48,7 @@ if [ -z "$STREAM_NAME" ] || [ "$STREAM_NAME" = "none" ]; then
     fi
     # Fallback to hostname-based name
     if [ -z "$STREAM_NAME" ] || [ "$STREAM_NAME" = "none" ]; then
-        STREAM_NAME="NDI Bridge $(hostname)"
+        STREAM_NAME="NDI Capture $(hostname)"
     fi
 fi
 
@@ -372,7 +372,7 @@ echo ""
 
 # BUILD INFO
 echo -e "${CYAN}▶ BUILD INFO${NC}"
-echo "  NDI Bridge:  v$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo 'Unknown')"
+echo "  NDI Capture: v$(/opt/ndi-bridge/ndi-capture --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo 'Unknown')"
 echo "  Image Built: $(cat /etc/ndi-bridge/build-timestamp 2>/dev/null || echo 'Unknown')"
 echo "  Build Ver:   $(cat /etc/ndi-bridge/build-script-version 2>/dev/null || echo 'Unknown')"
 echo ""

@@ -83,12 +83,12 @@ EOF
 
 # Deploy core binaries
 log_info "Deploying NDI-Bridge binaries..."
-if [ -f "$MOUNT_DIR/opt/ndi-bridge/ndi-bridge" ]; then
+if [ -f "$MOUNT_DIR/opt/ndi-bridge/ndi-capture" ]; then
     sshpass -p "$BOX_PASS" scp -o StrictHostKeyChecking=no \
-        "$MOUNT_DIR/opt/ndi-bridge/ndi-bridge" \
-        $BOX_USER@$BOX_IP:/opt/ndi-bridge/ndi-bridge
+        "$MOUNT_DIR/opt/ndi-bridge/ndi-capture" \
+        $BOX_USER@$BOX_IP:/opt/ndi-bridge/ndi-capture
     sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP \
-        "chmod +x /opt/ndi-bridge/ndi-bridge"
+        "chmod +x /opt/ndi-bridge/ndi-capture"
 fi
 
 if [ -f "$MOUNT_DIR/opt/ndi-bridge/ndi-display" ]; then
