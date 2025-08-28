@@ -77,7 +77,7 @@ while true; do
     if [ ! -e "$DEVICE" ]; then
         # Device doesn't exist
         echo "NO_DEVICE" > /var/run/ndi-bridge/capture_state
-    elif systemctl is-active --quiet ndi-bridge; then
+    elif systemctl is-active --quiet ndi-capture; then
         # Service is running, check if actually capturing (has recent metrics)
         LAST_METRIC_TIME=$(journalctl -u ndi-capture -n 10 --no-pager 2>/dev/null | grep "METRICS|" | tail -1 | cut -d' ' -f1-3)
         if [ -n "$LAST_METRIC_TIME" ]; then

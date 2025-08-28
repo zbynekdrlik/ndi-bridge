@@ -221,10 +221,10 @@ sudo ./build-usb-with-log.sh /dev/sdc
 Connect via SSH or console:
 ```bash
 # Check service status
-systemctl status ndi-bridge
+systemctl status ndi-capture
 
 # View logs
-journalctl -u ndi-bridge -f
+journalctl -u ndi-capture -f
 
 # Check network
 ip addr show

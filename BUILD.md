@@ -86,7 +86,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --config Release
 ```
 
-The executable will be in `build/Release/ndi-bridge.exe`
+The executable will be in `build/Release/ndi-capture.exe`
 
 ### Linux
 
@@ -139,7 +139,7 @@ make -j$(nproc)
 sudo make install
 ```
 
-The executable will be in `build/ndi-bridge`
+The executable will be in `build/ndi-capture`
 
 ### macOS (Not Supported)
 NDI Bridge currently does not support macOS. Windows and Linux are the supported platforms.
@@ -247,14 +247,14 @@ cmake -DCMAKE_BUILD_TYPE=Release \
 After building, test with:
 ```bash
 # List available devices
-./ndi-bridge --list
+./ndi-capture --list
 
 # Test with first device
-./ndi-bridge
+./ndi-capture
 
 # Test with specific device
-./ndi-bridge /dev/video0          # Linux
-ndi-bridge.exe "USB Video Device" # Windows
+./ndi-capture /dev/video0          # Linux
+ndi-capture.exe "USB Video Device" # Windows
 ```
 
 ## Creating a Release Build
