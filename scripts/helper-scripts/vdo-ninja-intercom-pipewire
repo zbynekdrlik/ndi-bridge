@@ -74,9 +74,10 @@ setsid x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var
 sleep 2
 echo "VNC server detached and running"
 
-# Setup runtime directory
+# Setup runtime directory and PulseAudio directory
 export XDG_RUNTIME_DIR=/run/user/0
 mkdir -p $XDG_RUNTIME_DIR
+mkdir -p $XDG_RUNTIME_DIR/pulse
 
 # Start PipeWire and WirePlumber
 echo "Starting PipeWire audio system..."
@@ -133,57 +134,88 @@ EOFWP
 echo "Starting PipeWire..."
 pipewire &
 PIPEWIRE_PID=$!
-sleep 2
+sleep 3
 
-# Start pipewire-pulse for PulseAudio compatibility
+# Start pipewire-pulse for PulseAudio compatibility FIRST
 echo "Starting PipeWire PulseAudio bridge..."
 pipewire-pulse &
 PULSE_PID=$!
-sleep 1
+sleep 2
 
-# Start WirePlumber session manager
+# Start WirePlumber session manager AFTER pipewire-pulse (matching working config)
 echo "Starting WirePlumber..."
 wireplumber &
 WIREPLUMBER_PID=$!
 sleep 3
 
-# Wait for PipeWire to be ready
+# Wait for PipeWire to be ready and socket to exist  
 for i in {1..10}; do
-    if pactl info >/dev/null 2>&1; then
+    if [ -S "$XDG_RUNTIME_DIR/pulse/native" ] && pactl info >/dev/null 2>&1; then
         echo "PipeWire PulseAudio bridge ready"
+        echo "Socket exists at: $XDG_RUNTIME_DIR/pulse/native"
         break
     fi
+    echo "Waiting for PulseAudio socket... (attempt $i)"
     sleep 1
 done
 
+# Verify socket really exists
+if [ ! -S "$XDG_RUNTIME_DIR/pulse/native" ]; then
+    echo "ERROR: PulseAudio socket not created at $XDG_RUNTIME_DIR/pulse/native"
+    echo "Creating pulse directory..."
+    mkdir -p $XDG_RUNTIME_DIR/pulse
+    echo "Restarting pipewire-pulse..."
+    pkill pipewire-pulse
+    sleep 1
+    PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse pipewire-pulse &
+    PULSE_PID=$!
+    sleep 3
+fi
+
 echo "PipeWire started"
 
-# List available devices using pactl (PulseAudio compatibility)
-echo "Available audio devices:"
-pactl list cards short || true
-echo "Available outputs:"
-pactl list sinks short || true
-echo "Available inputs:"
-pactl list sources short | grep -v monitor || true
+# Set USB audio as default devices (simple approach like working box)
+echo "Configuring USB audio devices..."
 
-# Find and set USB Audio as default using pactl
-echo "Looking for USB Audio device..."
-USB_SINK=$(pactl list sinks short | grep -E "USB.*Audio|usb" | awk '{print $2}' | head -1)
+# Find USB devices
+USB_SINK=$(pactl list sinks short | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
 USB_SOURCE=$(pactl list sources short | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
 
 if [ -n "$USB_SINK" ]; then
+    echo "Setting default output to: $USB_SINK"
     pactl set-default-sink "$USB_SINK"
-    echo "Default output set to: $USB_SINK"
 else
     echo "WARNING: USB Audio output not found"
 fi
 
 if [ -n "$USB_SOURCE" ]; then
+    echo "Setting default input to: $USB_SOURCE"
     pactl set-default-source "$USB_SOURCE"
-    echo "Default input set to: $USB_SOURCE"
 else
     echo "WARNING: USB Audio input not found"
 fi
+
+# Verify defaults are set
+sleep 1
+echo "Default devices configured:"
+pactl info | grep -E "Default (Sink|Source):"
+
+# List available devices using pactl (PulseAudio compatibility)
+echo ""
+echo "=== Audio Devices ==="
+# Show cards in a cleaner format
+for card in $(pactl list cards short 2>/dev/null | awk '{print $2}'); do
+    desc=$(pactl list cards 2>/dev/null | grep -A 2 "Name: $card" | grep "Description:" | cut -d: -f2- | sed 's/^ //')
+    if echo "$card" | grep -q "usb.*HID\|USB.*Audio"; then
+        echo "  ✓ USB Audio (3.5mm): $desc"
+    elif echo "$card" | grep -q "Elgato"; then
+        echo "  ⚠ Elgato (capture device - not used for audio)"
+    else
+        echo "  - $desc"
+    fi
+done || echo "  No audio cards detected"
+
+# USB devices already found and set as defaults above
 
 # Setup Chrome profile with saved permissions - always recreate to ensure they exist
 echo "Setting up Chrome profile with permissions..."
@@ -230,20 +262,30 @@ fi
 # autostart automatically joins without user interaction
 URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&autostart&sl&st&mobile&fb"
 
-echo "Starting Chrome (single instance)..."
-echo "URL: $URL"
 echo ""
 echo "=== VNC Remote Access ==="
 echo "Connect to VNC: $(hostname -I | awk '{print $1}'):5999"
 echo "No password required"
 echo ""
 
-# Start Chrome - exec replaces this script with Chrome process
-# This ensures only ONE Chrome runs and systemd can manage it properly
-# Chrome will use PipeWire through pipewire-pulse compatibility layer
-exec env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
-    PIPEWIRE_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+# Wait for audio system to be fully ready
+echo "Waiting for audio system to stabilize..."
+sleep 5
+
+# Test that PulseAudio is actually working
+if pactl info >/dev/null 2>&1; then
+    echo "PulseAudio interface is ready"
+else
+    echo "WARNING: PulseAudio interface not responding!"
+fi
+
+echo "Starting Chrome..."
+echo "URL: $URL"
+
+# Start Chrome in background (not exec) so we can monitor PipeWire
+env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
     PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse \
+    PULSE_SERVER=unix:$XDG_RUNTIME_DIR/pulse/native \
     /usr/bin/google-chrome \
     --no-first-run \
     --no-default-browser-check \
@@ -254,4 +296,43 @@ exec env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
     --audio-buffer-size=2048 \
     --user-data-dir=$PROFILE_DIR \
     --new-window \
-    "$URL"
+    "$URL" &
+
+CHROME_PID=$!
+
+# Monitor Chrome and audio system
+echo "Chrome started with PID $CHROME_PID"
+
+# Give Chrome time to create audio streams
+sleep 10
+
+# Force any Chrome audio streams to use USB devices
+echo "Ensuring Chrome uses USB audio..."
+if [ -n "$USB_SINK" ]; then
+    for stream in $(pactl list sink-inputs short | awk '{print $1}'); do
+        current_sink=$(pactl list sink-inputs short | grep "^$stream" | awk '{print $2}')
+        if [ "$current_sink" != "$(pactl list sinks short | grep "$USB_SINK" | awk '{print $1}')" ]; then
+            echo "Moving output stream $stream to USB audio"
+            pactl move-sink-input "$stream" "$USB_SINK" 2>/dev/null || true
+        fi
+    done
+fi
+
+if [ -n "$USB_SOURCE" ]; then
+    for stream in $(pactl list source-outputs short | awk '{print $1}'); do
+        current_source=$(pactl list source-outputs short | grep "^$stream" | awk '{print $2}')
+        if [ "$current_source" != "$(pactl list sources short | grep "$USB_SOURCE" | awk '{print $1}')" ]; then
+            echo "Moving input stream $stream to USB audio"
+            pactl move-source-output "$stream" "$USB_SOURCE" 2>/dev/null || true
+        fi
+    done
+fi
+
+echo "Audio routing verified"
+
+# Keep the script running to maintain PipeWire
+while kill -0 $CHROME_PID 2>/dev/null; do
+    sleep 30
+done
+
+echo "Chrome has exited"

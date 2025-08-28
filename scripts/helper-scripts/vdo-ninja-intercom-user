@@ -1,0 +1,137 @@
+#!/bin/bash
+# VDO.Ninja Intercom with proper user-based PipeWire setup
+
+set +e
+
+# Configuration
+FULL_HOSTNAME=$(hostname)
+HOSTNAME=${FULL_HOSTNAME#ndi-bridge-}
+ROOM="${VDO_ROOM:-nl_interkom}"
+PROFILE_DIR="/home/intercom/.config/google-chrome"
+DISPLAY_NUM=99
+INTERCOM_USER="intercom"
+
+echo "=== VDO.Ninja Intercom Starting (User Mode) ==="
+echo "Device: $HOSTNAME"
+echo "Room: $ROOM"
+
+# Cleanup function
+cleanup() {
+    echo "Cleaning up Chrome and Xvfb..."
+    pkill -9 -f "chrome" 2>/dev/null || true
+    pkill -9 -f "x11vnc" 2>/dev/null || true
+    pkill -9 -f "Xvfb" 2>/dev/null || true
+    rm -f /tmp/.X99-lock 2>/dev/null || true
+}
+
+trap cleanup INT TERM
+
+# Cleanup first
+cleanup
+
+# Create intercom user if it doesn't exist
+if ! id "$INTERCOM_USER" &>/dev/null; then
+    echo "Creating intercom user..."
+    useradd -m -s /bin/bash -G audio,video $INTERCOM_USER
+fi
+
+# Ensure user is in audio group
+usermod -a -G audio $INTERCOM_USER
+
+# Start Xvfb virtual display
+echo "Starting virtual display..."
+Xvfb :$DISPLAY_NUM -screen 0 1280x720x24 -ac > /dev/null 2>&1 &
+sleep 2
+
+# Start VNC server  
+echo "Starting VNC server on port 5999..."
+x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+sleep 2
+
+# Create Chrome profile directory
+sudo -u $INTERCOM_USER mkdir -p $PROFILE_DIR
+
+# VDO.Ninja URL
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&autostart&sl&st&mobile&fb"
+
+echo ""
+echo "=== VNC Remote Access ==="
+echo "Connect to VNC: $(hostname -I | awk '{print $1}'):5999"
+echo ""
+
+# Create a script that the user will run
+cat > /tmp/run-chrome.sh << 'CHROMESCRIPT'
+#!/bin/bash
+export DISPLAY=:99
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+
+# Ensure runtime directory exists
+mkdir -p $XDG_RUNTIME_DIR
+
+# Start PipeWire and WirePlumber as user
+echo "Starting PipeWire as user..."
+pipewire &
+PIPEWIRE_PID=$!
+sleep 2
+
+wireplumber &
+WIREPLUMBER_PID=$!
+sleep 2
+
+pipewire-pulse &
+PULSE_PID=$!
+sleep 3
+
+# Wait for PulseAudio interface
+for i in {1..10}; do
+    if pactl info >/dev/null 2>&1; then
+        echo "PipeWire audio system ready"
+        break
+    fi
+    sleep 1
+done
+
+# Create virtual devices and route to USB
+echo "Setting up audio routing..."
+
+# Find USB devices
+USB_SINK=$(pactl list sinks short | grep -i usb | grep -v monitor | awk '{print $2}' | head -1)
+USB_SOURCE=$(pactl list sources short | grep -i usb | grep -v monitor | awk '{print $2}' | head -1)
+
+if [ -n "$USB_SINK" ] && [ -n "$USB_SOURCE" ]; then
+    echo "USB Audio found: $USB_SINK / $USB_SOURCE"
+    
+    # Create virtual devices
+    pactl load-module module-null-sink sink_name=chrome_speaker sink_properties="device.description='Chrome_Speaker'"
+    pactl load-module module-loopback source=chrome_speaker.monitor sink="$USB_SINK"
+    
+    pactl load-module module-remap-source source_name=chrome_microphone source_properties="device.description='Chrome_Microphone'" master="$USB_SOURCE"
+    
+    # Set as defaults
+    pactl set-default-sink chrome_speaker
+    pactl set-default-source chrome_microphone
+    
+    echo "Virtual audio devices configured"
+else
+    echo "WARNING: USB Audio not found, using defaults"
+fi
+
+# Start Chrome
+exec google-chrome \
+    --no-first-run \
+    --no-default-browser-check \
+    --disable-gpu \
+    --disable-dev-shm-usage \
+    --autoplay-policy=no-user-gesture-required \
+    --user-data-dir=$HOME/.config/google-chrome \
+    --new-window \
+    "$1"
+CHROMESCRIPT
+
+chmod +x /tmp/run-chrome.sh
+
+# Run Chrome as intercom user
+echo "Starting Chrome..."
+echo "URL: $URL"
+
+sudo -u $INTERCOM_USER DISPLAY=:$DISPLAY_NUM /tmp/run-chrome.sh "$URL"

@@ -1,0 +1,13 @@
+[Unit]
+Description=WireP wireplumber System-Wide Service
+After=pipewire-system.service
+Requires=pipewire-system.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/wireplumber
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

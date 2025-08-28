@@ -89,21 +89,31 @@ check_audio() {
         return 1
     fi
     
-    # Check if USB Audio is detected
-    if pactl list sinks short 2>/dev/null | grep -q "USB.*Audio\|usb"; then
-        echo -e "${GREEN}✓${NC} USB Audio detected by PipeWire"
+    # Check if USB Audio was detected by checking service logs
+    # Since PipeWire runs inside the service, we check the logs
+    if journalctl -u vdo-ninja-intercom --no-pager | grep -q "Default output set to:.*usb\|Default output set to:.*USB"; then
+        echo -e "${GREEN}✓${NC} USB Audio detected and set as default output"
         
-        # Check if it's set as default
-        local default_sink=$(pactl info 2>/dev/null | grep "Default Sink" | cut -d: -f2 | tr -d ' ')
-        if echo "$default_sink" | grep -q -i "usb"; then
-            echo -e "${GREEN}✓${NC} USB Audio is default output"
-        else
-            echo -e "${RED}✗${NC} USB Audio is NOT default output"
-            return 1
+        # Also check if there were any warnings
+        if journalctl -u vdo-ninja-intercom --no-pager | grep -q "WARNING: USB Audio output not found"; then
+            # Check if it was found later (after pactl was installed)
+            if journalctl -u vdo-ninja-intercom --no-pager | tail -100 | grep -q "Default output set to:.*usb"; then
+                echo -e "${GREEN}✓${NC} USB Audio configured after restart"
+            else
+                echo -e "${RED}✗${NC} USB Audio initially not found and not recovered"
+                return 1
+            fi
         fi
     else
-        echo -e "${RED}✗${NC} USB Audio NOT detected"
-        return 1
+        # Fallback: check ALSA directly
+        if aplay -l | grep -q "USB Audio"; then
+            echo -e "${YELLOW}⚠${NC} USB Audio present in ALSA but not configured in PipeWire"
+            echo "  This may require 'pulseaudio-utils' package installation"
+            return 1
+        else
+            echo -e "${RED}✗${NC} USB Audio NOT detected"
+            return 1
+        fi
     fi
     
     return 0
@@ -112,11 +122,20 @@ check_audio() {
 # Main test sequence
 echo ""
 echo "1. Checking service status..."
-if systemctl is-active --quiet $SERVICE; then
-    echo -e "${GREEN}✓${NC} Service is active"
+if [ -n "$SSH_HOST" ]; then
+    if ssh_exec "systemctl is-active --quiet $SERVICE"; then
+        echo -e "${GREEN}✓${NC} Service is active"
+    else
+        echo -e "${RED}✗${NC} Service is not active"
+        exit 1
+    fi
 else
-    echo -e "${RED}✗${NC} Service is not active"
-    exit 1
+    if systemctl is-active --quiet $SERVICE; then
+        echo -e "${GREEN}✓${NC} Service is active"
+    else
+        echo -e "${RED}✗${NC} Service is not active"
+        exit 1
+    fi
 fi
 
 echo ""

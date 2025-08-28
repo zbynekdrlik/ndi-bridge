@@ -65,8 +65,8 @@ install_helper_scripts() {
 }
 PREFS
         
-        # Note: Chrome intercom will use chrome-based implementation
-        log "Chrome intercom scripts installed (requires post-install setup)"
+        # Chrome intercom is now fully installed during build
+        log "Chrome intercom scripts installed"
     else
         warn "Helper scripts directory not found, creating inline..."
         # If helper scripts directory doesn't exist, create them inline

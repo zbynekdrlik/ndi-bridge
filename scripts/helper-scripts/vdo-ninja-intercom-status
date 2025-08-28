@@ -1,0 +1,4 @@
+#!/bin/bash
+# Check VDO.Ninja intercom service status
+
+systemctl status vdo-ninja-intercom.service --no-pager

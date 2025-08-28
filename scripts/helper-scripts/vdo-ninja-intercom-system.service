@@ -1,0 +1,22 @@
+[Unit]
+Description=VDO.Ninja Intercom Service (System-Wide PipeWire)
+After=network.target pipewire-system.service wireplumber-system.service pipewire-pulse-system.service
+Wants=pipewire-system.service wireplumber-system.service pipewire-pulse-system.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/bash -c 'pkill -9 -f chrome 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'pkill -9 -f x11vnc 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'pkill -9 -f Xvfb 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock /opt/chrome-vdo-profile/Singleton* 2>/dev/null || true'
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/local/bin/vdo-ninja-intercom-system
+Restart=always
+RestartSec=10
+StartLimitInterval=0
+StartLimitBurst=0
+MemoryMax=512M
+Nice=-10
+
+[Install]
+WantedBy=multi-user.target

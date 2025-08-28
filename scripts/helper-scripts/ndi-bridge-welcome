@@ -370,6 +370,23 @@ else
 fi
 echo ""
 
+# VDO.NINJA INTERCOM
+echo -e "${CYAN}▶ VDO.NINJA INTERCOM${NC}"
+if systemctl is-active vdo-ninja-intercom --quiet 2>/dev/null; then
+    echo -e "  Status:      ${GREEN}● Running${NC}"
+    echo "  Room:        nl_interkom"
+    echo "  Device ID:   $(hostname)"
+    echo "  VNC Access:  $(hostname).local:5999"
+else
+    echo -e "  Status:      ${YELLOW}○ Not running${NC}"
+    if [ -f /usr/local/bin/vdo-ninja-intercom-launcher ]; then
+        echo "  Ready to start (run: vdo-ninja-intercom-enable)"
+    else
+        echo "  Not installed (run: install-chrome-intercom-deps.sh)"
+    fi
+fi
+echo ""
+
 # BUILD INFO
 echo -e "${CYAN}▶ BUILD INFO${NC}"
 echo "  NDI Bridge:  v$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo 'Unknown')"

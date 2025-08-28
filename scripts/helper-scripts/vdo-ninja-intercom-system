@@ -1,0 +1,114 @@
+#!/bin/bash
+# VDO.Ninja Intercom using system-wide PipeWire service
+
+set +e
+
+# Configuration
+FULL_HOSTNAME=$(hostname)
+HOSTNAME=${FULL_HOSTNAME#ndi-bridge-}
+ROOM="${VDO_ROOM:-nl_interkom}"
+PROFILE_DIR="/opt/chrome-vdo-profile"
+DISPLAY_NUM=99
+
+echo "=== VDO.Ninja Intercom Starting ==="
+echo "Device: $HOSTNAME"
+echo "Room: $ROOM"
+
+# Cleanup function
+cleanup() {
+    echo "Cleaning up Chrome and Xvfb..."
+    pkill -9 -f "chrome" 2>/dev/null || true
+    pkill -9 -f "x11vnc" 2>/dev/null || true
+    pkill -9 -f "Xvfb" 2>/dev/null || true
+    rm -f /tmp/.X99-lock 2>/dev/null || true
+}
+
+trap cleanup INT TERM
+
+# Cleanup first
+cleanup
+
+# Start Xvfb virtual display
+echo "Starting virtual display..."
+Xvfb :$DISPLAY_NUM -screen 0 1280x720x24 -ac > /dev/null 2>&1 &
+sleep 2
+
+export DISPLAY=:$DISPLAY_NUM
+
+# Start VNC server  
+echo "Starting VNC server on port 5999..."
+setsid x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+sleep 2
+
+# Check if PipeWire system service is running
+if ! systemctl is-active pipewire-system --quiet 2>/dev/null; then
+    echo "ERROR: PipeWire system service is not running!"
+    echo "Please ensure pipewire-system.service is enabled and started"
+    exit 1
+fi
+
+if ! systemctl is-active wireplumber-system --quiet 2>/dev/null; then
+    echo "ERROR: WirePlumber system service is not running!"
+    echo "Please ensure wireplumber-system.service is enabled and started"
+    exit 1
+fi
+
+if ! systemctl is-active pipewire-pulse-system --quiet 2>/dev/null; then
+    echo "ERROR: PipeWire PulseAudio system service is not running!"
+    echo "Please ensure pipewire-pulse-system.service is enabled and started"
+    exit 1
+fi
+
+echo "System-wide PipeWire services detected"
+
+# Create Chrome profile with permissions
+mkdir -p $PROFILE_DIR/Default
+
+if [ ! -f "$PROFILE_DIR/Default/Preferences" ]; then
+    cat > $PROFILE_DIR/Default/Preferences << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766142668061",
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+fi
+
+# VDO.Ninja URL
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&autostart&sl&st&mobile"
+
+echo ""
+echo "=== VNC Remote Access ==="
+echo "Connect to VNC: $(hostname).local:5999"
+echo ""
+
+# Start Chrome using system PipeWire/PulseAudio
+echo "Starting Chrome..."
+echo "URL: $URL"
+
+# Chrome will use the system-wide PulseAudio server at /run/pulse
+exec env PULSE_RUNTIME_PATH=/run/pulse \
+    ALSA_CARD=HID \
+    /usr/bin/google-chrome \
+    --no-first-run \
+    --no-default-browser-check \
+    --no-sandbox \
+    --disable-gpu \
+    --disable-dev-shm-usage \
+    --autoplay-policy=no-user-gesture-required \
+    --audio-buffer-size=2048 \
+    --user-data-dir=$PROFILE_DIR \
+    --new-window \
+    "$URL"

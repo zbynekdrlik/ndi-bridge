@@ -1,0 +1,9 @@
+#!/bin/bash
+# Enable and start VDO.Ninja intercom service
+
+echo "Enabling VDO.Ninja intercom service..."
+systemctl enable vdo-ninja-intercom.service
+systemctl start vdo-ninja-intercom.service
+echo "VDO.Ninja intercom is now running"
+echo "VNC access: $(hostname).local:5999"
+echo "Room: nl_interkom"
