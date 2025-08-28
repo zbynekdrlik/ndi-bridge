@@ -111,8 +111,8 @@ Fixes #25"
 **ALWAYS DO:**
 1. Run from repository ROOT: `cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge`
 2. Increment version: Edit `scripts/build-modules/00-variables.sh` → `BUILD_SCRIPT_VERSION`
-3. Run build: `sudo ./build-image-for-rufus.sh` (auto-redirects to log)
-4. Monitor logs: `tail -f build-logs/image-build-*.log`
+3. Run build: `sudo ./build-image-for-rufus.sh > build.log 2>&1 &` (MUST redirect ALL output to prevent Claude crashes)
+4. Monitor logs: `tail -f build.log` or check build-logs directory
 
 **NEVER DO:**
 - Run build from `build/` directory (causes "file not found" errors)
