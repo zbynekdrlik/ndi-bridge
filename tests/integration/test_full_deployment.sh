@@ -184,7 +184,7 @@ if box_wait_for_boot; then
     
     # The capture service itself broadcasts as an NDI stream
     # Check if capture is active which means NDI stream should be available
-    capture_active=$(box_ssh "systemctl is-active ndi-bridge" | tr -d '\n')
+    capture_active=$(box_ssh "systemctl is-active ndi-capture" | tr -d '\n')
     if [ "$capture_active" = "active" ]; then
         log_info "Capture service is active, NDI stream should be available"
         record_test "NDI Stream Available" "PASS" "Capture service broadcasting NDI"
@@ -202,7 +202,7 @@ if box_wait_for_boot; then
     # Test 8: System files and directories
     log_test "Test 8: Verify system files and directories"
     
-    if assert_file_exists "/opt/ndi-bridge/ndi-bridge"; then
+    if assert_file_exists "/opt/ndi-bridge/ndi-capture"; then
         record_test "NDI Bridge Binary" "PASS"
     else
         record_test "NDI Bridge Binary" "FAIL" "Binary not found"

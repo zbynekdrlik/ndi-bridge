@@ -35,7 +35,7 @@ copy_ndi_files() {
     
     # Copy NDI binary
     cp "$NDI_BINARY_PATH" /mnt/usb/opt/ndi-bridge/
-    chmod +x /mnt/usb/opt/ndi-bridge/ndi-bridge
+    chmod +x /mnt/usb/opt/ndi-bridge/ndi-capture
     
     # Copy NDI Display binary if it exists
     if [ -f "$NDI_DISPLAY_BINARY_PATH" ]; then

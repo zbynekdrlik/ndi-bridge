@@ -64,7 +64,7 @@ box_deploy_image() {
     
     # Stop services
     log_info "Stopping services on box..."
-    box_ssh "systemctl stop ndi-bridge ndi-display@* ndi-bridge-collector 2>/dev/null || true"
+    box_ssh "systemctl stop ndi-capture ndi-display@* ndi-bridge-collector 2>/dev/null || true"
     sleep 2
     
     # Deploy binaries
@@ -106,7 +106,7 @@ box_deploy_image() {
     
     # Deploy systemd service files
     log_info "Deploying systemd service files..."
-    for service in ndi-display@.service ndi-bridge.service ndi-display-monitor.service; do
+    for service in ndi-display@.service ndi-capture.service ndi-display-monitor.service; do
         if [ -f "$mount_dir/etc/systemd/system/$service" ]; then
             sshpass -p "$TEST_BOX_PASS" scp $TEST_BOX_SSH_OPTS \
                 "$mount_dir/etc/systemd/system/$service" \
@@ -117,7 +117,7 @@ box_deploy_image() {
     
     # Restart services
     log_info "Starting services..."
-    box_ssh "systemctl start ndi-bridge 2>/dev/null || true"
+    box_ssh "systemctl start ndi-capture 2>/dev/null || true"
     box_ssh "systemctl start ndi-display@1 2>/dev/null || true"
     
     # Remount filesystem as read-only
@@ -202,7 +202,7 @@ box_list_ndi_streams() {
     # The box itself broadcasts as "NDI-BRIDGE (USB Capture)" when capture is active
     # NDI prepends the hostname in capitals to the configured name
     # Check if the capture service is running and outputting NDI
-    local capture_status=$(box_ssh "systemctl is-active ndi-bridge 2>/dev/null")
+    local capture_status=$(box_ssh "systemctl is-active ndi-capture 2>/dev/null")
     if [ "$capture_status" = "active" ]; then
         echo "NDI-BRIDGE (USB Capture)"
     fi
@@ -223,7 +223,7 @@ box_get_system_info() {
     echo "Hostname: $(box_ssh 'hostname')"
     echo "IP: $(box_ssh "ip -4 addr show br0 2>/dev/null | grep inet | awk '{print \$2}' | cut -d/ -f1")"
     echo "Uptime: $(box_ssh 'uptime -p')"
-    echo "Version: $(box_ssh '/opt/ndi-bridge/ndi-bridge --version 2>/dev/null || echo unknown')"
+    echo "Version: $(box_ssh '/opt/ndi-bridge/ndi-capture --version 2>/dev/null || echo unknown')"
     echo "Build: $(box_ssh 'cat /etc/ndi-bridge/build-script-version 2>/dev/null || echo unknown')"
 }
 
@@ -321,7 +321,7 @@ box_cleanup_all() {
     
     # Ensure capture service is running
     if ! box_service_status "ndi-bridge" | grep -q "active"; then
-        box_ssh "systemctl restart ndi-bridge"
+        box_ssh "systemctl restart ndi-capture"
     fi
     
     log_info "Cleanup complete"

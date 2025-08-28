@@ -52,7 +52,7 @@ else
     record_test "NDI Bridge Service" "FAIL" "Service not active"
     
     # Try to start it
-    log_info "Attempting to start ndi-bridge service..."
+    log_info "Attempting to start ndi-capture service..."
     box_start_service "ndi-bridge"
     sleep 3
     
@@ -125,7 +125,7 @@ fi
 
 # Test 5: Service restart
 log_test "Test 5: Service restart and recovery"
-log_info "Restarting ndi-bridge service..."
+log_info "Restarting ndi-capture service..."
 
 box_restart_service "ndi-bridge"
 sleep 5
@@ -164,8 +164,8 @@ fi
 # Test 7: Memory and CPU usage
 log_test "Test 7: Resource usage"
 # Use ps for more reliable output
-cpu_usage=$(box_ssh "ps aux | grep '/opt/ndi-bridge/ndi-bridge' | grep -v grep | awk '{print \$3}' | head -1")
-mem_usage=$(box_ssh "ps aux | grep '/opt/ndi-bridge/ndi-bridge' | grep -v grep | awk '{print \$4}' | head -1")
+cpu_usage=$(box_ssh "ps aux | grep '/opt/ndi-bridge/ndi-capture' | grep -v grep | awk '{print \$3}' | head -1")
+mem_usage=$(box_ssh "ps aux | grep '/opt/ndi-bridge/ndi-capture' | grep -v grep | awk '{print \$4}' | head -1")
 
 if [ -n "$cpu_usage" ]; then
     log_info "CPU Usage: ${cpu_usage}%"

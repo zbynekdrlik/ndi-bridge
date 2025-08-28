@@ -33,7 +33,7 @@ fi
 
 # Test 2: Capture stream availability
 log_test "Test 2: Verify capture stream for display"
-capture_status=$(box_ssh "systemctl is-active ndi-bridge" | tr -d '\n')
+capture_status=$(box_ssh "systemctl is-active ndi-capture" | tr -d '\n')
 if [ "$capture_status" = "active" ]; then
     record_test "Capture Stream Available" "PASS"
     TEST_NDI_STREAM="NDI-BRIDGE (USB Capture)"
