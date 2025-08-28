@@ -48,6 +48,39 @@
 - These should be extracted to proper directory structure
 - Build modules should use `cp` instead of `cat > ... << EOF`
 
+## TODO Tracking with GitHub Issues
+
+**ALWAYS use GitHub Issues for TODO tracking, not TODO.md files:**
+- Create issues with `gh issue create`
+- List issues with `gh issue list`
+- View specific issue with `gh issue view <number>`
+- Close completed issues with `gh issue close <number>`
+
+**Why GitHub Issues instead of TODO.md:**
+- No merge conflicts between branches
+- Single source of truth across all branches
+- Better collaboration and tracking
+- Can link issues to PRs
+- Works perfectly with multi-branch workflow
+
+**Example workflow:**
+```bash
+# Create a new task
+gh issue create --title "Fix blinking dashboard" --body "Details..." --label "bug"
+
+# List all open issues
+gh issue list
+
+# Start working on issue #25
+gh issue view 25
+git checkout -b fix-issue-25
+
+# After completing, reference in commit
+git commit -m "Fix blinking dashboard issue
+
+Fixes #25"
+```
+
 ## Git Workflow Rules
 
 **ALWAYS CREATE PR EARLY:**
