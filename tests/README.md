@@ -75,7 +75,7 @@ source "${SCRIPT_DIR}/../lib/box_control.sh"
 
 3. Use assertion functions:
 ```bash
-assert_service_active "ndi-bridge"
+assert_service_active "ndi-capture"
 assert_display_has_audio "1"
 assert_fps_in_range "30"
 ```

@@ -21,7 +21,7 @@ box_wait_for_boot() {
     log_info "Waiting for services to start..."
     local count=0
     while true; do
-        local capture_status=$(box_service_status "ndi-bridge")
+        local capture_status=$(box_service_status "ndi-capture")
         if [ "$capture_status" = "active" ]; then
             log_info "Services are ready"
             # PTP takes additional time to synchronize after reboot
@@ -69,7 +69,7 @@ box_deploy_image() {
     
     # Deploy binaries
     log_info "Deploying binaries..."
-    for binary in ndi-bridge ndi-display; do
+    for binary in ndi-capture ndi-display; do
         if [ -f "$mount_dir/opt/ndi-bridge/$binary" ]; then
             sshpass -p "$TEST_BOX_PASS" scp $TEST_BOX_SSH_OPTS \
                 "$mount_dir/opt/ndi-bridge/$binary" \
@@ -320,7 +320,7 @@ box_cleanup_all() {
     box_ssh "ndi-bridge-ro"
     
     # Ensure capture service is running
-    if ! box_service_status "ndi-bridge" | grep -q "active"; then
+    if ! box_service_status "ndi-capture" | grep -q "active"; then
         box_ssh "systemctl restart ndi-capture"
     fi
     

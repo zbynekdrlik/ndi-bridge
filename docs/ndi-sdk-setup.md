@@ -77,4 +77,4 @@ If CMake can't find NDI SDK:
 Once NDI SDK is configured:
 1. Rebuild the project in Visual Studio
 2. The build process will automatically copy the DLL to the output directory
-3. Test with `ndi-bridge.exe --version`
+3. Test with `ndi-capture.exe --version`

@@ -739,7 +739,7 @@ void V4L2Capture::applyRealtimeScheduling() {
     
     if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0) {
         Logger::warning("Could not set real-time priority (need CAP_SYS_NICE)");
-        Logger::warning("Run with: sudo setcap cap_sys_nice+ep ndi-bridge");
+        Logger::warning("Run with: sudo setcap cap_sys_nice+ep ndi-capture");
     } else {
         Logger::info("Real-time SCHED_FIFO priority " + std::to_string(kRealtimePriority) + " active");
     }
@@ -771,7 +771,7 @@ void V4L2Capture::applyExtremeRealtimeSettings() {
     if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &param) != 0) {
         Logger::warning("Could not set real-time priority " + std::to_string(kRealtimePriority) + 
                        " (need CAP_SYS_NICE)");
-        Logger::warning("Run with: sudo setcap 'cap_sys_nice,cap_ipc_lock+ep' ndi-bridge");
+        Logger::warning("Run with: sudo setcap 'cap_sys_nice,cap_ipc_lock+ep' ndi-capture");
     } else {
         Logger::info("EXTREME real-time SCHED_FIFO priority " + std::to_string(kRealtimePriority) + " active");
     }
@@ -779,7 +779,7 @@ void V4L2Capture::applyExtremeRealtimeSettings() {
     // Lock memory with MCL_ONFAULT for better performance
     if (mlockall(MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT) != 0) {
         Logger::warning("Could not lock memory (need CAP_IPC_LOCK)");
-        Logger::warning("Run with: sudo setcap 'cap_sys_nice,cap_ipc_lock+ep' ndi-bridge");
+        Logger::warning("Run with: sudo setcap 'cap_sys_nice,cap_ipc_lock+ep' ndi-capture");
     } else {
         Logger::info("Memory locked with MCL_ONFAULT (EXTREME mode)");
     }

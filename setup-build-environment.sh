@@ -382,7 +382,7 @@ main() {
     log_info "Environment is ready for NDI Bridge development!"
     echo
     echo "Next steps:"
-    echo "  1. Build NDI Bridge: mkdir build && cd build && cmake .. && make"
+    echo "  1. Build NDI Capture: mkdir build && cd build && cmake .. && make"
     echo "  2. Create USB appliance: sudo ./build-image-for-rufus.sh"
     echo "  3. See CLAUDE.md for more details"
     echo

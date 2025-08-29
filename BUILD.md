@@ -266,12 +266,12 @@ cmake -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_CXX_FLAGS="-O3 -march=x86-64 -mtune=generic" \
       ..
 make -j$(nproc)
-strip ndi-bridge  # Remove debug symbols
+strip ndi-capture  # Remove debug symbols
 
 # Windows
 cmake -DCMAKE_BUILD_TYPE=Release ..
 cmake --build . --config Release
-# Use Release/ndi-bridge.exe
+# Use Release/ndi-capture.exe
 ```
 
 ## USB Appliance Build

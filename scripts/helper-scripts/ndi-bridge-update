@@ -1,5 +1,5 @@
 #!/bin/bash
-# Update NDI Bridge binary from USB or network
+# Update NDI Capture binary from USB or network
 
 set -e
 
@@ -91,7 +91,7 @@ fi
 mount -o remount,rw / 2>/dev/null || true
 
 # Stop service
-log "Stopping NDI Bridge service..."
+log "Stopping NDI Capture service..."
 systemctl stop ndi-capture
 
 # Backup current binary
@@ -104,13 +104,13 @@ cp "$BINARY_PATH" /opt/ndi-bridge/ndi-capture
 chmod +x /opt/ndi-bridge/ndi-capture
 
 # Start service
-log "Starting NDI Bridge service..."
+log "Starting NDI Capture service..."
 systemctl start ndi-capture
 
 # Check if service started successfully
 sleep 2
 if systemctl is-active --quiet ndi-capture; then
-    log "Update successful! NDI Bridge is running with version $NEW_VERSION"
+    log "Update successful! NDI Capture is running with version $NEW_VERSION"
 else
     warn "Service failed to start, rolling back..."
     cp /opt/ndi-bridge/ndi-capture.backup /opt/ndi-bridge/ndi-capture

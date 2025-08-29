@@ -1,5 +1,5 @@
 #!/bin/bash
-# NDI service configuration module
+# NDI Capture service configuration module
 
 configure_ndi_service() {
     log "Configuring NDI Bridge service..."
@@ -62,7 +62,7 @@ while [ ! -e "$DEVICE" ]; do
     sleep 2
 done
 
-# Check time synchronization before starting NDI Bridge
+# Check time synchronization before starting NDI Capture
 # This ensures optimal frame synchronization quality
 check_time_sync() {
     # First try PTP sync check

@@ -8,7 +8,7 @@ This document describes the implementation of high-precision time synchronizatio
 
 ### 1. New Build Module
 
-A new build module `scripts/build-modules/12-time-sync.sh` was created to handle time synchronization setup during USB creation:
+A new build module `scripts/build-modules/13-time-sync.sh` was created to handle time synchronization setup during USB creation:
 
 - Installs LinuxPTP for PTP support
 - Installs chrony for NTP support
@@ -22,7 +22,7 @@ The main build script `scripts/build-ndi-usb-modular.sh` was updated to include 
 
 ### 3. NDI Service Integration
 
-The NDI service script `scripts/build-modules/09-ndi-service.sh` was modified to check time synchronization status before starting the NDI Bridge application.
+The NDI capture service script `scripts/build-modules/09-ndi-capture-service.sh` was modified to check time synchronization status before starting the NDI Capture application.
 
 ### 4. Test Script
 

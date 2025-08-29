@@ -37,29 +37,29 @@ else
     exit 1
 fi
 
-# Test 2: NDI Bridge service status
-log_test "Test 2: NDI Bridge service status"
-if assert_service_active "ndi-bridge"; then
-    record_test "NDI Bridge Service" "PASS"
+# Test 2: NDI Capture service status
+log_test "Test 2: NDI Capture service status"
+if assert_service_active "ndi-capture"; then
+    record_test "NDI Capture Service" "PASS"
     
     # Check if process is actually running
-    if assert_process_running "ndi-bridge"; then
-        record_test "NDI Bridge Process" "PASS"
+    if assert_process_running "ndi-capture"; then
+        record_test "NDI Capture Process" "PASS"
     else
-        record_test "NDI Bridge Process" "FAIL" "Service active but process not found"
+        record_test "NDI Capture Process" "FAIL" "Service active but process not found"
     fi
 else
-    record_test "NDI Bridge Service" "FAIL" "Service not active"
+    record_test "NDI Capture Service" "FAIL" "Service not active"
     
     # Try to start it
     log_info "Attempting to start ndi-capture service..."
-    box_start_service "ndi-bridge"
+    box_start_service "ndi-capture"
     sleep 3
     
-    if assert_service_active "ndi-bridge"; then
-        record_test "NDI Bridge Service Recovery" "PASS"
+    if assert_service_active "ndi-capture"; then
+        record_test "NDI Capture Service Recovery" "PASS"
     else
-        record_test "NDI Bridge Service Recovery" "FAIL" "Could not start service"
+        record_test "NDI Capture Service Recovery" "FAIL" "Could not start service"
     fi
 fi
 
@@ -127,10 +127,10 @@ fi
 log_test "Test 5: Service restart and recovery"
 log_info "Restarting ndi-capture service..."
 
-box_restart_service "ndi-bridge"
+box_restart_service "ndi-capture"
 sleep 5
 
-if assert_service_active "ndi-bridge"; then
+if assert_service_active "ndi-capture"; then
     record_test "Service Restart" "PASS"
     
     # Check if capture resumed
@@ -217,8 +217,8 @@ fi
 
 # Collect diagnostic logs
 log_info "Collecting diagnostic information..."
-bridge_logs=$(box_get_logs "ndi-bridge" 30)
-log_output "NDI Bridge Recent Logs" "$bridge_logs"
+bridge_logs=$(box_get_logs "ndi-capture" 30)
+log_output "NDI Capture Recent Logs" "$bridge_logs"
 
 # Get dmesg for V4L2 errors
 dmesg_v4l2=$(box_ssh "dmesg | grep -i v4l2 | tail -20")
