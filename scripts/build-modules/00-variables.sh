@@ -3,7 +3,7 @@
 # This module defines all global variables used throughout the build process
 
 # Build Script Version - Auto-incremented with each build
-BUILD_SCRIPT_VERSION="1.9.2"
+BUILD_SCRIPT_VERSION="1.9.3"
 BUILD_SCRIPT_DATE="2025-08-29"
 
 # Build timestamp - Generated at build time (local timezone)
