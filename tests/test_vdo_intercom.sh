@@ -5,6 +5,15 @@
 # Don't exit on error - we want to run all tests
 set +e
 
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source the RO check module
+source "${SCRIPT_DIR}/lib/ro_check.sh" || {
+    echo "ERROR: Could not load ro_check.sh module"
+    exit 1
+}
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -13,6 +22,7 @@ NC='\033[0m' # No Color
 
 # Test configuration
 DEVICE_IP="${1:-10.77.9.169}"
+TEST_BOX_IP="${DEVICE_IP}"  # For compatibility with ro_check module
 SSH_USER="root"
 SSH_PASS="newlevel"
 
@@ -44,15 +54,9 @@ echo "VDO.Ninja Intercom Test Suite"
 echo "Testing device: $DEVICE_IP"
 echo "========================================="
 
-# CRITICAL: First verify filesystem is read-only
+# CRITICAL: Use the standard RO check module
 echo -e "\n${YELLOW}CRITICAL CHECK: Filesystem Status${NC}"
-
-if ssh_cmd "mount | grep ' / ' | grep -q 'ro,'"; then
-    print_test_result "Filesystem is READ-ONLY (required for test validity)" "PASS"
-else
-    echo -e "${RED}FATAL ERROR: Filesystem is NOT read-only!${NC}"
-    echo "Tests cannot proceed - filesystem must be read-only to ensure real-world conditions"
-    echo "Run 'ndi-bridge-ro' on the device and try again"
+if ! verify_readonly_filesystem "$DEVICE_IP"; then
     exit 1
 fi
 
