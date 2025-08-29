@@ -10,6 +10,17 @@ SERVICE_START_FILE="/var/run/ndi-bridge/capture_start_time"
 
 # Main collection loop
 while true; do
+    # Check if we're in stabilization period
+    IS_STABILIZING=false
+    if [ -f "$SERVICE_START_FILE" ] && systemctl is-active --quiet ndi-capture; then
+        START_TIME=$(cat "$SERVICE_START_FILE")
+        CURRENT_TIME=$(date +%s)
+        ELAPSED=$((CURRENT_TIME - START_TIME))
+        if [ "$ELAPSED" -lt 60 ]; then
+            IS_STABILIZING=true
+        fi
+    fi
+    
     # 1. Get current FPS from last metrics entry (only if recent)
     METRICS_LINE=$(journalctl -u ndi-capture -n 200 --no-pager 2>/dev/null | grep "METRICS|" | tail -1)
     if [ -n "$METRICS_LINE" ]; then
@@ -29,7 +40,14 @@ while true; do
                 
                 echo "$FPS" > /var/run/ndi-bridge/fps_current
                 echo "$FRAMES" > /var/run/ndi-bridge/frames_total
-                echo "$DROPPED" > /var/run/ndi-bridge/frames_dropped
+                
+                # During stabilization, don't count dropped frames
+                if [ "$IS_STABILIZING" = true ]; then
+                    echo "0" > /var/run/ndi-bridge/frames_dropped
+                else
+                    echo "$DROPPED" > /var/run/ndi-bridge/frames_dropped
+                fi
+                
                 [ -n "$LATENCY" ] && echo "$LATENCY" > /var/run/ndi-bridge/latency_ms
             else
                 # Metrics are stale - clear them
@@ -42,6 +60,7 @@ while true; do
     fi
     
     # 2. Get 10-minute FPS history and calculate average
+    # During stabilization, only collect FPS stats but don't count issues
     FPS_HISTORY=$(journalctl -u ndi-capture --since "10 minutes ago" --no-pager 2>/dev/null | grep "METRICS|" | sed -n 's/.*FPS:\([0-9.]*\).*/\1/p')
     if [ -n "$FPS_HISTORY" ]; then
         # Calculate average
@@ -54,9 +73,13 @@ while true; do
         echo "$MIN_FPS" > /var/run/ndi-bridge/fps_10min_min
         echo "$MAX_FPS" > /var/run/ndi-bridge/fps_10min_max
         
-        # Count issues (FPS < 55)
-        ISSUES=$(echo "$FPS_HISTORY" | awk '$1 < 55' | wc -l)
-        echo "$ISSUES" > /var/run/ndi-bridge/fps_issues
+        # Count issues (FPS < 55) - but not during stabilization
+        if [ "$IS_STABILIZING" = true ]; then
+            echo "0" > /var/run/ndi-bridge/fps_issues
+        else
+            ISSUES=$(echo "$FPS_HISTORY" | awk '$1 < 55' | wc -l)
+            echo "$ISSUES" > /var/run/ndi-bridge/fps_issues
+        fi
     fi
     
     # 3. Monitor network TX rate on br0
