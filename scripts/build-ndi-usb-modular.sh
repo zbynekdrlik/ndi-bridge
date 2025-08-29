@@ -27,6 +27,11 @@ source "$SCRIPT_DIR/build-modules/15-time-sync.sh"
 source "$SCRIPT_DIR/build-modules/16-power-resistance.sh"
 source "$SCRIPT_DIR/build-modules/17-web-interface.sh"
 
+# Source Dante audio module if it exists
+if [ -f "$SCRIPT_DIR/build-modules/18-dante-audio.sh" ]; then
+    source "$SCRIPT_DIR/build-modules/18-dante-audio.sh"
+fi
+
 # Copy NDI files
 copy_ndi_files() {
     log "Copying NDI files..."
@@ -73,6 +78,11 @@ assemble_configuration() {
     configure_power_resistance
     configure_readonly_root
     setup_web_interface
+    
+    # Add Dante audio if module is available
+    if command -v configure_dante_audio >/dev/null 2>&1; then
+        configure_dante_audio
+    fi
     
     # Replace the version and timestamp placeholders
     sed -i "s/BUILD_SCRIPT_VERSION_PLACEHOLDER/$BUILD_SCRIPT_VERSION/" /mnt/usb/tmp/configure-system.sh
