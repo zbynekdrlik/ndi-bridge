@@ -129,7 +129,7 @@ assert_capture_active() {
     local status_file=$(box_get_capture_status)
     local state=$(parse_status_value "$status_file" "CAPTURE_STATE")
     
-    if [ "$state" = "ACTIVE" ] || [ "$state" = "STARTING" ] || [ "$state" = "CAPTURING" ]; then
+    if [ "$state" = "ACTIVE" ] || [ "$state" = "STARTING" ] || [ "$state" = "CAPTURING" ] || [ "$state" = "STABILIZING" ]; then
         return 0
     else
         log_error "Capture is not active (state: $state)"
