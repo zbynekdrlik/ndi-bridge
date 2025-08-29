@@ -63,10 +63,62 @@ else
     fi
 fi
 
-# Test 3: Capture status and metrics
-log_test "Test 3: Capture status and metrics"
-log_info "Waiting 30 seconds for capture to stabilize after boot..."
-sleep 30  # Stabilization period (30 seconds)
+# Test 3: Stabilization period behavior (NEW - Issue #38)
+log_test "Test 3: Stabilization period behavior"
+log_info "Testing 30-second stabilization period..."
+
+# Restart capture to trigger fresh stabilization
+box_ssh "systemctl stop ndi-capture; rm -f /var/run/ndi-bridge/capture_start_time /var/run/ndi-bridge/stabilization_complete /var/run/ndi-bridge/dropped_baseline; systemctl start ndi-capture"
+sleep 3
+
+# Check initial state is STABILIZING
+initial_state=$(box_ssh "cat /var/run/ndi-bridge/capture_state 2>/dev/null")
+if [ "$initial_state" = "STABILIZING" ]; then
+    record_test "Stabilization State Detection" "PASS" "State: STABILIZING"
+else
+    record_test "Stabilization State Detection" "FAIL" "Expected STABILIZING, got: $initial_state"
+fi
+
+# Check that dropped frames are shown during stabilization
+stab_dropped=$(box_ssh "cat /var/run/ndi-bridge/frames_dropped 2>/dev/null")
+log_info "Dropped frames during stabilization: $stab_dropped"
+if [ -n "$stab_dropped" ]; then
+    record_test "Dropped Frames During Stabilization" "PASS" "Shows: $stab_dropped frames"
+else
+    record_test "Dropped Frames During Stabilization" "FAIL" "No dropped frame count"
+fi
+
+# Wait for stabilization to complete (30 seconds total)
+log_info "Waiting for stabilization to complete (27 more seconds)..."
+sleep 27
+
+# Check state transitions to CAPTURING
+post_state=$(box_ssh "cat /var/run/ndi-bridge/capture_state 2>/dev/null")
+if [ "$post_state" = "CAPTURING" ]; then
+    record_test "Post-Stabilization State" "PASS" "State: CAPTURING"
+else
+    record_test "Post-Stabilization State" "FAIL" "Expected CAPTURING, got: $post_state"
+fi
+
+# Check that dropped frames reset to 0 or low number
+sleep 2  # Give collector time to update
+post_dropped=$(box_ssh "cat /var/run/ndi-bridge/frames_dropped 2>/dev/null")
+if [ "$post_dropped" -le 5 ]; then
+    record_test "Dropped Frame Reset" "PASS" "Reset to: $post_dropped frames"
+else
+    record_test "Dropped Frame Reset" "FAIL" "Not reset, showing: $post_dropped frames"
+fi
+
+# Check baseline was saved
+baseline=$(box_ssh "cat /var/run/ndi-bridge/dropped_baseline 2>/dev/null")
+if [ -n "$baseline" ] && [ "$baseline" -gt 0 ]; then
+    record_test "Baseline Saved" "PASS" "Baseline: $baseline frames"
+else
+    record_test "Baseline Saved" "FAIL" "No baseline saved"
+fi
+
+# Test 4: Capture status and metrics (original test, renamed)
+log_test "Test 4: Capture status and metrics after stabilization"
 
 capture_status=$(box_get_capture_status)
 if [ -n "$capture_status" ]; then
@@ -112,8 +164,8 @@ else
     record_test "Capture Status File" "FAIL" "Status file not found"
 fi
 
-# Test 4: FPS stability over time
-log_test "Test 4: FPS stability test (5 seconds)"
+# Test 5: FPS stability over time
+log_test "Test 5: FPS stability test (5 seconds)"
 log_info "Monitoring capture FPS for 5 seconds..."
 
 avg_fps=$(box_monitor_capture 5)
@@ -123,8 +175,8 @@ else
     record_test "FPS Stability" "FAIL" "Average FPS: $avg_fps (unstable)"
 fi
 
-# Test 5: Service restart
-log_test "Test 5: Service restart and recovery"
+# Test 6: Service restart
+log_test "Test 6: Service restart and recovery"
 log_info "Restarting ndi-capture service..."
 
 box_restart_service "ndi-capture"
@@ -144,8 +196,8 @@ else
     record_test "Service Restart" "FAIL" "Service failed to restart"
 fi
 
-# Test 6: NDI stream verification
-log_test "Test 6: NDI stream verification"
+# Test 7: NDI stream verification
+log_test "Test 7: NDI stream verification"
 streams=$(box_list_ndi_streams)
 
 if [ -n "$streams" ]; then
@@ -161,8 +213,8 @@ else
     record_test "NDI Stream Broadcasting" "FAIL" "No NDI streams detected"
 fi
 
-# Test 7: Memory and CPU usage
-log_test "Test 7: Resource usage"
+# Test 8: Memory and CPU usage
+log_test "Test 8: Resource usage"
 # Use ps for more reliable output
 cpu_usage=$(box_ssh "ps aux | grep '/opt/ndi-bridge/ndi-capture' | grep -v grep | awk '{print \$3}' | head -1")
 mem_usage=$(box_ssh "ps aux | grep '/opt/ndi-bridge/ndi-capture' | grep -v grep | awk '{print \$4}' | head -1")
@@ -182,13 +234,13 @@ else
     record_test "Resource Usage" "FAIL" "Could not get resource metrics"
 fi
 
-# Test 8: Error handling - disconnect/reconnect device
-log_test "Test 8: Error handling (optional - requires physical access)"
+# Test 9: Error handling - disconnect/reconnect device
+log_test "Test 9: Error handling (optional - requires physical access)"
 log_warn "Skipping physical disconnect test (requires manual intervention)"
 
-# Test 9: Long-term stability (optional)
+# Test 10: Long-term stability (optional)
 if [ "${RUN_LONG_TESTS:-false}" = "true" ]; then
-    log_test "Test 9: Long-term stability (5 minutes)"
+    log_test "Test 10: Long-term stability (5 minutes)"
     log_info "Running 5-minute stability test..."
     
     start_frames=$(parse_status_value "$(box_get_capture_status)" "TOTAL_FRAMES")
