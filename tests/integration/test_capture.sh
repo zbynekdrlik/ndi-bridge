@@ -117,6 +117,53 @@ else
     record_test "Baseline Saved" "FAIL" "No baseline saved"
 fi
 
+# Test that new dropped frames are calculated correctly (total - baseline)
+log_info "Waiting for potential new dropped frames..."
+sleep 10
+actual_dropped=$(box_ssh "journalctl -u ndi-capture -n 1 --no-pager | grep METRICS | sed -n 's/.*DROPPED:\([0-9]*\).*/\1/p'")
+displayed_dropped=$(box_ssh "cat /var/run/ndi-bridge/frames_dropped 2>/dev/null")
+if [ -n "$actual_dropped" ] && [ -n "$baseline" ]; then
+    expected_displayed=$((actual_dropped - baseline))
+    if [ "$expected_displayed" -lt 0 ]; then
+        expected_displayed=0
+    fi
+    if [ "$displayed_dropped" -eq "$expected_displayed" ]; then
+        record_test "New Dropped Frame Calculation" "PASS" "Shows: $displayed_dropped (actual: $actual_dropped - baseline: $baseline)"
+    else
+        record_test "New Dropped Frame Calculation" "FAIL" "Expected: $expected_displayed, got: $displayed_dropped"
+    fi
+else
+    record_test "New Dropped Frame Calculation" "SKIP" "Could not get metrics"
+fi
+
+# Test cleanup on service stop
+log_info "Testing cleanup on service stop..."
+box_ssh "systemctl stop ndi-capture"
+sleep 2
+cleanup_check=$(box_ssh "ls /var/run/ndi-bridge/stabilization_complete /var/run/ndi-bridge/dropped_baseline 2>&1 | grep -c 'No such file'")
+if [ "$cleanup_check" -eq 2 ]; then
+    record_test "Service Stop Cleanup" "PASS" "Files cleaned up"
+else
+    record_test "Service Stop Cleanup" "FAIL" "Files not cleaned up"
+fi
+
+# Restart service for remaining tests
+box_ssh "systemctl start ndi-capture"
+sleep 3
+
+# Test second restart works correctly (idempotency check)
+log_info "Testing second stabilization cycle..."
+box_ssh "systemctl restart ndi-capture"
+sleep 3
+second_state=$(box_ssh "cat /var/run/ndi-bridge/capture_state 2>/dev/null")
+if [ "$second_state" = "STABILIZING" ]; then
+    record_test "Second Stabilization Cycle" "PASS" "Stabilization restarts correctly"
+    # Wait for it to complete
+    sleep 30
+else
+    record_test "Second Stabilization Cycle" "FAIL" "Expected STABILIZING, got: $second_state"
+fi
+
 # Test 4: Capture status and metrics (original test, renamed)
 log_test "Test 4: Capture status and metrics after stabilization"
 

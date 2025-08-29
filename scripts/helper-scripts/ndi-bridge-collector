@@ -10,17 +10,6 @@ SERVICE_START_FILE="/var/run/ndi-bridge/capture_start_time"
 
 # Main collection loop
 while true; do
-    # Check if we're in stabilization period (30 seconds)
-    IS_STABILIZING=false
-    if [ -f "$SERVICE_START_FILE" ] && systemctl is-active --quiet ndi-capture; then
-        START_TIME=$(cat "$SERVICE_START_FILE")
-        CURRENT_TIME=$(date +%s)
-        ELAPSED=$((CURRENT_TIME - START_TIME))
-        if [ "$ELAPSED" -lt 30 ]; then
-            IS_STABILIZING=true
-        fi
-    fi
-    
     # 1. Get current FPS from last metrics entry (only if recent)
     METRICS_LINE=$(journalctl -u ndi-capture -n 200 --no-pager 2>/dev/null | grep "METRICS|" | tail -1)
     if [ -n "$METRICS_LINE" ]; then
@@ -66,7 +55,6 @@ while true; do
     fi
     
     # 2. Get 10-minute FPS history and calculate average
-    # During stabilization, only collect FPS stats but don't count issues
     FPS_HISTORY=$(journalctl -u ndi-capture --since "10 minutes ago" --no-pager 2>/dev/null | grep "METRICS|" | sed -n 's/.*FPS:\([0-9.]*\).*/\1/p')
     if [ -n "$FPS_HISTORY" ]; then
         # Calculate average
@@ -112,14 +100,14 @@ while true; do
             date +%s > "$SERVICE_START_FILE"
         fi
         
-        # Check if we're in stabilization period (first 60 seconds)
+        # Check if we're in stabilization period (first 30 seconds)
         if [ -f "$SERVICE_START_FILE" ]; then
             START_TIME=$(cat "$SERVICE_START_FILE")
             CURRENT_TIME=$(date +%s)
             ELAPSED=$((CURRENT_TIME - START_TIME))
             
             if [ "$ELAPSED" -lt 30 ]; then
-                # Still stabilizing (reduced to 30 seconds)
+                # Still stabilizing (30 seconds)
                 echo "STABILIZING" > /var/run/ndi-bridge/capture_state
                 echo "$ELAPSED" > /var/run/ndi-bridge/stabilizing_seconds
                 # Skip the rest of the checks during stabilization
