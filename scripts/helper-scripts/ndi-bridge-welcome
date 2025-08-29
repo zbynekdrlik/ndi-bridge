@@ -380,9 +380,9 @@ if systemctl is-active vdo-ninja-intercom --quiet 2>/dev/null; then
 else
     echo -e "  Status:      ${YELLOW}○ Not running${NC}"
     if [ -f /usr/local/bin/vdo-ninja-intercom-launcher ]; then
-        echo "  Ready to start (run: vdo-ninja-intercom-enable)"
+        echo "  Ready to start (run: systemctl start vdo-ninja-intercom)"
     else
-        echo "  Not installed (run: install-chrome-intercom-deps.sh)"
+        echo "  Chrome intercom not installed"
     fi
 fi
 echo ""

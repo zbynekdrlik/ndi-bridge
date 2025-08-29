@@ -15,12 +15,6 @@ install_helper_scripts() {
         chmod +x /mnt/usb/usr/local/bin/ndi-bridge-*
         chmod +x /mnt/usb/usr/local/bin/ndi-display-*
         
-        # Install Chrome intercom dependencies installer
-        if [ -f "$HELPER_DIR/install-chrome-intercom-deps.sh" ]; then
-            cp "$HELPER_DIR/install-chrome-intercom-deps.sh" /mnt/usb/opt/ndi-bridge/
-            chmod +x /mnt/usb/opt/ndi-bridge/install-chrome-intercom-deps.sh
-        fi
-        
         # Copy VDO.Ninja intercom scripts and service (PipeWire only)
         if [ -f "$HELPER_DIR/vdo-ninja-intercom-pipewire" ]; then
             cp "$HELPER_DIR/vdo-ninja-intercom-pipewire" /mnt/usb/usr/local/bin/

@@ -12,7 +12,7 @@ ExecStartPre=-/bin/bash -c 'pkill -9 -f chrome 2>/dev/null || true'
 ExecStartPre=-/bin/bash -c 'pkill -9 pulseaudio 2>/dev/null || true'
 ExecStartPre=-/bin/bash -c 'pkill -9 -f x11vnc 2>/dev/null || true'
 ExecStartPre=-/bin/bash -c 'pkill -9 -f Xvfb 2>/dev/null || true'
-ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock /opt/chrome-vdo-profile/Singleton* 2>/dev/null || true'
+ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock /tmp/chrome-vdo-profile/Singleton* 2>/dev/null || true'
 ExecStartPre=/bin/sleep 3
 
 # Start the service (auto-selects PipeWire or PulseAudio)

@@ -1,7 +1,0 @@
-#!/bin/bash
-# Disable and stop VDO.Ninja intercom service
-
-echo "Stopping VDO.Ninja intercom service..."
-systemctl stop vdo-ninja-intercom.service
-systemctl disable vdo-ninja-intercom.service
-echo "VDO.Ninja intercom has been disabled"
