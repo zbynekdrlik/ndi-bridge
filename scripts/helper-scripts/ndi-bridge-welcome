@@ -80,8 +80,12 @@ elif [ "$CAPTURE_STATE" = "STABILIZING" ]; then
     if (( $(echo "$FPS_CURRENT > 0" | bc -l) )); then
         echo -e "  Current FPS: ${YELLOW}${FPS_CURRENT}${NC} (stabilizing)"
     fi
-    # Force show 0 dropped frames during stabilization (ignore file value)
-    echo -e "  Dropped:     ${GRAY}0 frames${NC} (ignored during init)"
+    # Show actual dropped frames but indicate they'll be reset
+    if [ "$DROPPED" = "0" ]; then
+        echo -e "  Dropped:     ${GRAY}0 frames${NC} (will reset after init)"
+    else
+        echo -e "  Dropped:     ${YELLOW}${DROPPED} frames${NC} (will reset after init)"
+    fi
 elif [ "$CAPTURE_STATE" = "CAPTURING" ]; then
     echo -e "  Capture:     ${GREEN}●${NC} ACTIVE - $DEVICE"
     
