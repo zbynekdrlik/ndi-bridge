@@ -75,7 +75,7 @@ deploy_files() {
 # Stop services before deployment
 log_info "Stopping services..."
 sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no -t $BOX_USER@$BOX_IP << 'EOF'
-systemctl stop ndi-bridge 2>/dev/null || true
+systemctl stop ndi-capture 2>/dev/null || true
 systemctl stop ndi-display@0 ndi-display@1 ndi-display@2 2>/dev/null || true
 systemctl stop ndi-bridge-collector 2>/dev/null || true
 sleep 1
@@ -83,12 +83,12 @@ EOF
 
 # Deploy core binaries
 log_info "Deploying NDI-Bridge binaries..."
-if [ -f "$MOUNT_DIR/opt/ndi-bridge/ndi-bridge" ]; then
+if [ -f "$MOUNT_DIR/opt/ndi-bridge/ndi-capture" ]; then
     sshpass -p "$BOX_PASS" scp -o StrictHostKeyChecking=no \
-        "$MOUNT_DIR/opt/ndi-bridge/ndi-bridge" \
-        $BOX_USER@$BOX_IP:/opt/ndi-bridge/ndi-bridge
+        "$MOUNT_DIR/opt/ndi-bridge/ndi-capture" \
+        $BOX_USER@$BOX_IP:/opt/ndi-bridge/ndi-capture
     sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP \
-        "chmod +x /opt/ndi-bridge/ndi-bridge"
+        "chmod +x /opt/ndi-bridge/ndi-capture"
 fi
 
 if [ -f "$MOUNT_DIR/opt/ndi-bridge/ndi-display" ]; then
@@ -157,7 +157,7 @@ sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP << 'EOF
 systemctl daemon-reload
 
 # Restart NDI services
-systemctl restart ndi-bridge 2>/dev/null || true
+systemctl restart ndi-capture 2>/dev/null || true
 systemctl restart ndi-bridge-collector 2>/dev/null || true
 
 # Restart display services if they exist
@@ -180,11 +180,11 @@ sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP \
 log_info "Checking deployment status..."
 sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP << 'EOF'
 echo "=== Version Info ==="
-/opt/ndi-bridge/ndi-bridge --version 2>/dev/null || echo "ndi-bridge not found"
+/opt/ndi-bridge/ndi-capture --version 2>/dev/null || echo "ndi-capture not found"
 /opt/ndi-bridge/ndi-display --version 2>&1 | head -3 || echo "ndi-display not found"
 
 echo -e "\n=== Service Status ==="
-systemctl is-active ndi-bridge || echo "ndi-bridge: inactive"
+systemctl is-active ndi-capture || echo "ndi-capture: inactive"
 systemctl is-active ndi-display@1 2>/dev/null || echo "ndi-display@1: not configured"
 
 echo -e "\n=== Audio Support ==="

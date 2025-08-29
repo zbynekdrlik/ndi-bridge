@@ -117,7 +117,7 @@ if echo "$set_name_result" | grep -q "successfully changed"; then
     log_info "Restoring original NDI name: $original_ndi_name"
     if [ "$original_ndi_name" = "USB Capture" ]; then
         # USB Capture has spaces, need a different approach
-        box_ssh "ndi-bridge-rw && sed -i 's/NDI_NAME=.*/NDI_NAME=\"USB Capture\"/' /etc/ndi-bridge/config && systemctl restart ndi-bridge && ndi-bridge-ro" 2>/dev/null
+        box_ssh "ndi-bridge-rw && sed -i 's/NDI_NAME=.*/NDI_NAME=\"USB Capture\"/' /etc/ndi-bridge/config && systemctl restart ndi-capture && ndi-bridge-ro" 2>/dev/null
     else
         # For simple names without spaces
         box_ssh "ndi-bridge-set-name ${original_ndi_name:-ndi-bridge} 2>/dev/null || true"

@@ -130,7 +130,7 @@ Fixes #25"
 # From repository root - handles directory changes automatically
 ./build.sh                     # Build everything
 ./build.sh ndi-display         # Build display component only
-./build.sh ndi-bridge          # Build capture component only
+./build.sh ndi-capture         # Build capture component only
 ./build.sh --clean             # Clean and rebuild
 ./build.sh --help              # Show all options
 ```
@@ -140,7 +140,7 @@ Fixes #25"
 # CRITICAL: Must be in build/ directory!
 cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/build
 make ndi-display -j$(nproc)    # Display component
-make ndi-bridge -j$(nproc)     # Capture component
+make ndi-capture -j$(nproc)    # Capture component
 make -j$(nproc)                # Everything
 ```
 
@@ -156,7 +156,7 @@ make -j$(nproc)                # Everything
 # After changes, ALWAYS run:
 npm run lint       # If exists
 npm run typecheck  # If exists
-./ndi-bridge --version  # Should return version immediately
+./ndi-capture --version  # Should return version immediately
 ```
 
 ### USB Appliance Commands

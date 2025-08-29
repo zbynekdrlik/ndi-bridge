@@ -56,7 +56,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [target] [options]"
             echo ""
             echo "Targets:"
-            echo "  ndi-bridge    - Build capture component only"
+            echo "  ndi-capture   - Build capture component only"
             echo "  ndi-display   - Build display component only"
             echo "  all           - Build everything (default)"
             echo ""

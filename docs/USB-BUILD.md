@@ -40,7 +40,7 @@ sudo apt-get install -y \
 
 ## Quick Start
 
-1. **Build NDI Bridge Binary**
+1. **Build NDI Capture Binary**
 ```bash
 cd ndi-bridge
 mkdir -p build && cd build
@@ -64,7 +64,7 @@ The process takes 10-15 minutes and will:
 - Partition and format the USB
 - Install Ubuntu 24.04 base system
 - Configure all services
-- Install NDI Bridge
+- Install NDI Capture and Display binaries
 
 ## Build System Architecture
 
@@ -80,12 +80,15 @@ The build system is organized into modules in `scripts/build-modules/`:
 - `06-system-config.sh` - Package installation
 - `07-base-setup.sh` - Basic system configuration
 - `08-network.sh` - Network bridge setup
-- `09-ndi-service.sh` - NDI Bridge service
-- `10-tty-config.sh` - Console configuration
-- `11-filesystem.sh` - Filesystem and bootloader
-- `12-helper-scripts.sh` - Helper script installation
-- `13-helper-scripts-inline.sh` - Inline helper creation
-- `14-power-resistance.sh` - Power failure resistance features
+- `09-ndi-capture-service.sh` - NDI Capture service
+- `10-ndi-display-service.sh` - NDI Display service
+- `11-intercom-chrome.sh` - Chrome intercom setup
+- `12-tty-config.sh` - Console configuration
+- `13-filesystem.sh` - Filesystem and bootloader
+- `14-helper-scripts.sh` - Helper script installation
+- `15-time-sync.sh` - Time synchronization setup
+- `16-power-resistance.sh` - Power failure resistance features
+- `17-web-interface.sh` - Web interface setup
 
 ### Helper Scripts
 Management scripts in `scripts/helper-scripts/`:
@@ -221,10 +224,10 @@ sudo ./build-usb-with-log.sh /dev/sdc
 Connect via SSH or console:
 ```bash
 # Check service status
-systemctl status ndi-bridge
+systemctl status ndi-capture
 
 # View logs
-journalctl -u ndi-bridge -f
+journalctl -u ndi-capture -f
 
 # Check network
 ip addr show

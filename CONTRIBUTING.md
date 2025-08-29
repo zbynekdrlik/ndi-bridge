@@ -91,7 +91,7 @@ cmake --build . --config Debug  # Windows
 ### Running Tests
 ```bash
 # Run the binary with test devices
-./ndi-bridge --verbose
+./ndi-capture --verbose
 
 # Test USB hot-plug recovery
 # 1. Start NDI Bridge

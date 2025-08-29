@@ -5,4 +5,4 @@ echo "=== NDI Bridge Live Logs ==="
 echo "Switch to TTY2 (Alt+F2) for system menu"
 echo "Press Ctrl+C to stop following logs"
 echo ""
-journalctl -u ndi-bridge -f --no-pager
+journalctl -u ndi-capture -f --no-pager

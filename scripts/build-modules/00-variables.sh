@@ -11,7 +11,7 @@ BUILD_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 
 # Configuration
 USB_DEVICE="${1:-/dev/sdb}"
-NDI_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-bridge"
+NDI_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-capture"
 NDI_DISPLAY_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-display"
 NDI_SDK_PATH="$(dirname "$0")/../NDI SDK for Linux"
 

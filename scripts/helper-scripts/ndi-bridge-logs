@@ -3,4 +3,4 @@
 
 echo "NDI Bridge Logs (press 'q' to quit):"
 echo "===================================="
-journalctl -u ndi-bridge --no-pager | less
+journalctl -u ndi-capture --no-pager | less

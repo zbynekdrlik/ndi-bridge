@@ -147,8 +147,8 @@ echo "Final verification..."
 # Check critical services are still running
 final_checks_passed=true
 
-echo -n "  Checking ndi-bridge service... "
-if box_service_status "ndi-bridge" | grep -q "active"; then
+echo -n "  Checking ndi-capture service... "
+if box_service_status "ndi-capture" | grep -q "active"; then
     echo "✅ Active"
 else
     echo "❌ Not active"

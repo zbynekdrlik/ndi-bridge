@@ -55,10 +55,10 @@ sleep 5
 
 # Test 2: Verify services after deployment
 log_test "Test 2: Verify services after deployment"
-if assert_service_active "ndi-bridge"; then
-    record_test "NDI Bridge Service (Post-Deploy)" "PASS"
+if assert_service_active "ndi-capture"; then
+    record_test "NDI Capture Service (Post-Deploy)" "PASS"
 else
-    record_test "NDI Bridge Service (Post-Deploy)" "FAIL" "Service not active after deployment"
+    record_test "NDI Capture Service (Post-Deploy)" "FAIL" "Service not active after deployment"
 fi
 
 display_status=$(box_ssh "systemctl is-active ndi-display@1" | tr -d '\n')
@@ -104,10 +104,10 @@ if box_wait_for_boot; then
     # Verify services started automatically
     log_test "Test 5: Verify services after reboot"
     
-    if assert_service_active "ndi-bridge"; then
-        record_test "NDI Bridge Auto-Start" "PASS"
+    if assert_service_active "ndi-capture"; then
+        record_test "NDI Capture Auto-Start" "PASS"
     else
-        record_test "NDI Bridge Auto-Start" "FAIL" "Service did not start after reboot"
+        record_test "NDI Capture Auto-Start" "FAIL" "Service did not start after reboot"
     fi
     
     display_status=$(box_ssh "systemctl is-active ndi-display@1" | tr -d '\n')
@@ -184,7 +184,7 @@ if box_wait_for_boot; then
     
     # The capture service itself broadcasts as an NDI stream
     # Check if capture is active which means NDI stream should be available
-    capture_active=$(box_ssh "systemctl is-active ndi-bridge" | tr -d '\n')
+    capture_active=$(box_ssh "systemctl is-active ndi-capture" | tr -d '\n')
     if [ "$capture_active" = "active" ]; then
         log_info "Capture service is active, NDI stream should be available"
         record_test "NDI Stream Available" "PASS" "Capture service broadcasting NDI"
@@ -202,10 +202,10 @@ if box_wait_for_boot; then
     # Test 8: System files and directories
     log_test "Test 8: Verify system files and directories"
     
-    if assert_file_exists "/opt/ndi-bridge/ndi-bridge"; then
-        record_test "NDI Bridge Binary" "PASS"
+    if assert_file_exists "/opt/ndi-bridge/ndi-capture"; then
+        record_test "NDI Capture Binary" "PASS"
     else
-        record_test "NDI Bridge Binary" "FAIL" "Binary not found"
+        record_test "NDI Capture Binary" "FAIL" "Binary not found"
     fi
     
     if assert_file_exists "/opt/ndi-bridge/ndi-display"; then
@@ -227,10 +227,10 @@ if box_wait_for_boot; then
     
     # Get service logs for debugging
     log_info "Collecting service logs..."
-    bridge_logs=$(box_get_logs "ndi-bridge" 20)
+    bridge_logs=$(box_get_logs "ndi-capture" 20)
     display_logs=$(box_get_logs "ndi-display@1" 20)
     
-    log_output "NDI Bridge Logs" "$bridge_logs"
+    log_output "NDI Capture Logs" "$bridge_logs"
     log_output "NDI Display Logs" "$display_logs"
     
 else

@@ -17,15 +17,15 @@ source "$SCRIPT_DIR/build-modules/05-debootstrap.sh"
 source "$SCRIPT_DIR/build-modules/06-system-config.sh"
 source "$SCRIPT_DIR/build-modules/07-base-setup.sh"
 source "$SCRIPT_DIR/build-modules/08-network.sh"
-source "$SCRIPT_DIR/build-modules/09-ndi-service.sh"
-source "$SCRIPT_DIR/build-modules/09a-ndi-display-service.sh"
-source "$SCRIPT_DIR/build-modules/09a-intercom-chrome.sh"
-source "$SCRIPT_DIR/build-modules/10-tty-config.sh"
-source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
-source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
-source "$SCRIPT_DIR/build-modules/12-time-sync.sh"
-source "$SCRIPT_DIR/build-modules/14-power-resistance.sh"
-source "$SCRIPT_DIR/build-modules/15-web-interface.sh"
+source "$SCRIPT_DIR/build-modules/09-ndi-capture-service.sh"
+source "$SCRIPT_DIR/build-modules/10-ndi-display-service.sh"
+source "$SCRIPT_DIR/build-modules/11-intercom-chrome.sh"
+source "$SCRIPT_DIR/build-modules/12-tty-config.sh"
+source "$SCRIPT_DIR/build-modules/13-filesystem.sh"
+source "$SCRIPT_DIR/build-modules/14-helper-scripts.sh"
+source "$SCRIPT_DIR/build-modules/15-time-sync.sh"
+source "$SCRIPT_DIR/build-modules/16-power-resistance.sh"
+source "$SCRIPT_DIR/build-modules/17-web-interface.sh"
 
 # Copy NDI files
 copy_ndi_files() {
@@ -36,7 +36,7 @@ copy_ndi_files() {
     
     # Copy NDI binary
     cp "$NDI_BINARY_PATH" /mnt/usb/opt/ndi-bridge/
-    chmod +x /mnt/usb/opt/ndi-bridge/ndi-bridge
+    chmod +x /mnt/usb/opt/ndi-bridge/ndi-capture
     
     # Copy NDI Display binary if it exists
     if [ -f "$NDI_DISPLAY_BINARY_PATH" ]; then

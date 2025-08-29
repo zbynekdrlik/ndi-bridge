@@ -115,8 +115,8 @@ EOFHTTPSERVICE
 hostname "$FULL_HOSTNAME"
 
 # Restart NDI Bridge service to apply new name
-log "Restarting NDI Bridge service..."
-systemctl restart ndi-bridge
+log "Restarting NDI Capture service..."
+systemctl restart ndi-capture
 
 # Restart Avahi to advertise new name and services
 if systemctl is-active --quiet avahi-daemon; then

@@ -251,15 +251,15 @@ if(USE_DECKLINK AND WIN32)
     endif()
 endif()
 
-# Main executable
-add_executable(${PROJECT_NAME}
+# Main executable (capture application)
+add_executable(ndi-capture
     src/main.cpp
     ${COMMON_SOURCES}
     ${PLATFORM_SOURCES}
 )
 
 # Set executable properties
-set_target_properties(${PROJECT_NAME} PROPERTIES
+set_target_properties(ndi-capture PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
@@ -319,7 +319,7 @@ if(PLATFORM_LINUX)
 endif()
 
 # Set version definitions
-target_compile_definitions(${PROJECT_NAME} PRIVATE
+target_compile_definitions(ndi-capture PRIVATE
     NDI_BRIDGE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
     NDI_BRIDGE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
     NDI_BRIDGE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
@@ -328,18 +328,18 @@ target_compile_definitions(${PROJECT_NAME} PRIVATE
 
 # Set synchronous mode flag if enabled
 if(MF_SYNCHRONOUS_MODE)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE MF_SYNCHRONOUS_CAPTURE)
+    target_compile_definitions(ndi-capture PRIVATE MF_SYNCHRONOUS_CAPTURE)
     message(STATUS "Media Foundation synchronous mode: ENABLED (experimental)")
 else()
     message(STATUS "Media Foundation synchronous mode: DISABLED")
 endif()
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} PRIVATE ${NDI_LIBRARY})
+target_link_libraries(ndi-capture PRIVATE ${NDI_LIBRARY})
 
 if(PLATFORM_WINDOWS)
     # Windows Media Foundation and system libraries
-    target_link_libraries(${PROJECT_NAME} PRIVATE
+    target_link_libraries(ndi-capture PRIVATE
         mfplat
         mfreadwrite
         mfuuid
@@ -352,15 +352,15 @@ if(PLATFORM_WINDOWS)
     
     # Copy NDI runtime DLL to output directory
     if(NDI_DLL)
-        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        add_custom_command(TARGET ndi-capture POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${NDI_DLL}"
-            $<TARGET_FILE_DIR:${PROJECT_NAME}>
+            $<TARGET_FILE_DIR:ndi-capture>
         )
     endif()
 elseif(PLATFORM_LINUX)
     # Linux system libraries
-    target_link_libraries(${PROJECT_NAME} PRIVATE
+    target_link_libraries(ndi-capture PRIVATE
         Threads::Threads
         dl
         m
@@ -370,7 +370,7 @@ elseif(PLATFORM_LINUX)
     # RPATH for finding NDI library
     if(NDI_LIBRARY)
         get_filename_component(NDI_LIB_DIR ${NDI_LIBRARY} DIRECTORY)
-        set_target_properties(${PROJECT_NAME} PROPERTIES
+        set_target_properties(ndi-capture PROPERTIES
             INSTALL_RPATH "${NDI_LIB_DIR}"
             BUILD_WITH_INSTALL_RPATH TRUE
         )
@@ -391,7 +391,7 @@ elseif(PLATFORM_LINUX)
 endif()
 
 # Installation rules
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS ndi-capture
     RUNTIME DESTINATION bin
 )
 

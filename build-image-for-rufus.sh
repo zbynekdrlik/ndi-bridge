@@ -30,7 +30,7 @@ fi
 
 # Check for required binaries - build them if missing
 echo "Checking for required binaries..."
-if [ ! -f "build/bin/ndi-bridge" ] || [ ! -f "build/bin/ndi-display" ]; then
+if [ ! -f "build/bin/ndi-capture" ] || [ ! -f "build/bin/ndi-display" ]; then
     echo "ERROR: Required binaries missing. Building them now..."
     if [ ! -d "build" ]; then
         mkdir build
@@ -43,13 +43,13 @@ if [ ! -f "build/bin/ndi-bridge" ] || [ ! -f "build/bin/ndi-display" ]; then
     cd ..
     
     # Verify binaries exist after build
-    if [ ! -f "build/bin/ndi-bridge" ] || [ ! -f "build/bin/ndi-display" ]; then
+    if [ ! -f "build/bin/ndi-capture" ] || [ ! -f "build/bin/ndi-display" ]; then
         echo "ERROR: Failed to build required binaries"
         echo "Please run: cd build && make -j\$(nproc)"
         exit 1
     fi
 fi
-echo "✓ ndi-bridge binary found"
+echo "✓ ndi-capture binary found"
 echo "✓ ndi-display binary found"
 
 # Create image file (8GB for Chrome and dependencies)
