@@ -1,6 +1,7 @@
 #!/bin/bash
-# Generate unique, persistent MAC address for bridge interface
-# Based on the hardware's physical ethernet MAC addresses
+# Generate unique MAC address for bridge interface
+# Based on the CURRENT hardware's physical ethernet MAC addresses
+# Runs every boot to ensure MAC matches current hardware
 
 set -e
 

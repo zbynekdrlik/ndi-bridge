@@ -143,14 +143,13 @@ EOFNET
         log "  Installed generate-bridge-mac script"
     fi
     
-    # Create service to generate unique MAC on first boot
+    # Create service to generate unique MAC on EVERY boot (based on current hardware)
     cat > /mnt/usb/etc/systemd/system/generate-bridge-mac.service << 'EOFMACSERVICE'
 [Unit]
-Description=Generate unique MAC address for bridge interface
+Description=Generate unique MAC address for bridge interface based on current hardware
 Before=systemd-networkd.service
 Before=remount-rw.service
 After=systemd-modules-load.service
-ConditionPathExists=!/etc/ndi-bridge-mac
 DefaultDependencies=no
 
 [Service]
