@@ -4,6 +4,15 @@
 
 set -e
 
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source the RO check module
+source "${SCRIPT_DIR}/lib/ro_check.sh" || {
+    echo "ERROR: Could not load ro_check.sh module"
+    exit 1
+}
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,6 +25,9 @@ TESTS_FAILED=0
 
 # Device IP from argument
 DEVICE_IP="${1:-}"
+TEST_BOX_IP="${DEVICE_IP}"  # For compatibility with ro_check module
+SSH_USER="root"
+SSH_PASS="newlevel"
 
 if [ -z "$DEVICE_IP" ]; then
     echo "Usage: $0 <device-ip>"
@@ -25,7 +37,7 @@ fi
 
 # Function to run SSH commands
 ssh_cmd() {
-    sshpass -p newlevel ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR -o ConnectTimeout=5 root@${DEVICE_IP} "$1"
+    sshpass -p "$SSH_PASS" ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR -o ConnectTimeout=5 ${SSH_USER}@${DEVICE_IP} "$1"
 }
 
 # Function to print test results
@@ -44,16 +56,9 @@ echo "MAC Address Persistence Test"
 echo "Testing device: $DEVICE_IP"
 echo "========================================="
 
-# CRITICAL: First verify filesystem is read-only
+# CRITICAL: Use the standard RO check module
 echo -e "\n${YELLOW}CRITICAL CHECK: Filesystem Status${NC}"
-
-RO_CHECK=$(ssh_cmd "mount | grep ' / ' | grep 'ro,' | wc -l" || echo "0")
-if [ "$RO_CHECK" -gt 0 ]; then
-    print_test_result "Filesystem is READ-ONLY (required for test validity)" "PASS"
-else
-    echo -e "${RED}FATAL ERROR: Filesystem is NOT read-only!${NC}"
-    echo "Tests cannot proceed - filesystem must be read-only to ensure real-world conditions"
-    echo "Run 'ndi-bridge-ro' on the device and try again"
+if ! verify_readonly_filesystem "$DEVICE_IP"; then
     exit 1
 fi
 

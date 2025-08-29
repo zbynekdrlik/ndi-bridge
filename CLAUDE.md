@@ -32,16 +32,26 @@
 ### MANDATORY: Read-Only Filesystem Check
 **EVERY test script MUST start with read-only filesystem verification!**
 
+**Use the existing module `tests/lib/ro_check.sh`:**
 ```bash
-# CRITICAL: First verify filesystem is read-only
-echo -e "\n${YELLOW}CRITICAL CHECK: Filesystem Status${NC}"
+#!/bin/bash
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if ssh_cmd "mount | grep ' / ' | grep -q 'ro,'"; then
-    print_test_result "Filesystem is READ-ONLY (required for test validity)" "PASS"
-else
-    echo -e "${RED}FATAL ERROR: Filesystem is NOT read-only!${NC}"
-    echo "Tests cannot proceed - filesystem must be read-only to ensure real-world conditions"
-    echo "Run 'ndi-bridge-ro' on the device and try again"
+# Source the RO check module
+source "${SCRIPT_DIR}/lib/ro_check.sh" || {
+    echo "ERROR: Could not load ro_check.sh module"
+    exit 1
+}
+
+# Set up variables for the module
+TEST_BOX_IP="${1:-}"  # Device IP from first argument
+SSH_USER="root"
+SSH_PASS="newlevel"
+
+# CRITICAL: Verify filesystem is read-only
+echo -e "\n${YELLOW}CRITICAL CHECK: Filesystem Status${NC}"
+if ! verify_readonly_filesystem "$TEST_BOX_IP"; then
     exit 1
 fi
 ```
