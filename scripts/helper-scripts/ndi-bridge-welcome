@@ -59,7 +59,8 @@ printf "${CYAN}▶ CAPTURE STATUS${NC}%*s${BOLD}[LIVE]${NC}\n" $((TERM_WIDTH - 2
 DEVICE=$(cat /etc/ndi-bridge/config 2>/dev/null | grep DEVICE | cut -d'"' -f2 || echo "/dev/video0")
 
 # Better capture state detection - if we have recent FPS data, we're capturing
-if (( $(echo "$FPS_CURRENT > 0" | bc -l) )) && [ "$CAPTURE_STATE" != "NO_DEVICE" ] && [ "$CAPTURE_STATE" != "ERROR" ]; then
+# But don't override STABILIZING state
+if (( $(echo "$FPS_CURRENT > 0" | bc -l) )) && [ "$CAPTURE_STATE" != "NO_DEVICE" ] && [ "$CAPTURE_STATE" != "ERROR" ] && [ "$CAPTURE_STATE" != "STABILIZING" ]; then
     CAPTURE_STATE="CAPTURING"
 fi
 
@@ -69,6 +70,22 @@ if [ "$CAPTURE_STATE" = "NO_DEVICE" ]; then
 elif [ "$CAPTURE_STATE" = "ERROR" ]; then
     echo -e "  Capture:     ${RED}●${NC} ERROR - Failed to open $DEVICE"
     echo -e "  Status:      Check device connection"
+elif [ "$CAPTURE_STATE" = "STABILIZING" ]; then
+    # Get stabilization progress (30 seconds total)
+    STAB_SECONDS=$(cat /var/run/ndi-bridge/stabilizing_seconds 2>/dev/null || echo "0")
+    STAB_REMAINING=$((30 - STAB_SECONDS))
+    echo -e "  Capture:     ${YELLOW}●${NC} STABILIZING - $DEVICE"
+    echo -e "  Status:      Initializing capture (${STAB_REMAINING}s remaining)..."
+    # Show current FPS even during stabilization
+    if (( $(echo "$FPS_CURRENT > 0" | bc -l) )); then
+        echo -e "  Current FPS: ${YELLOW}${FPS_CURRENT}${NC} (stabilizing)"
+    fi
+    # Show actual dropped frames but indicate they'll be reset
+    if [ "$DROPPED" = "0" ]; then
+        echo -e "  Dropped:     ${GRAY}0 frames${NC} (will reset after init)"
+    else
+        echo -e "  Dropped:     ${YELLOW}${DROPPED} frames${NC} (will reset after init)"
+    fi
 elif [ "$CAPTURE_STATE" = "CAPTURING" ]; then
     echo -e "  Capture:     ${GREEN}●${NC} ACTIVE - $DEVICE"
     

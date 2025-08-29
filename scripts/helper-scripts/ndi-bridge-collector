@@ -5,6 +5,9 @@
 # Create runtime directory
 mkdir -p /var/run/ndi-bridge
 
+# Track service start time for stabilization period
+SERVICE_START_FILE="/var/run/ndi-bridge/capture_start_time"
+
 # Main collection loop
 while true; do
     # 1. Get current FPS from last metrics entry (only if recent)
@@ -26,7 +29,20 @@ while true; do
                 
                 echo "$FPS" > /var/run/ndi-bridge/fps_current
                 echo "$FRAMES" > /var/run/ndi-bridge/frames_total
-                echo "$DROPPED" > /var/run/ndi-bridge/frames_dropped
+                
+                # If we have a baseline (post-stabilization), subtract it from dropped frames
+                if [ -f /var/run/ndi-bridge/dropped_baseline ]; then
+                    BASELINE=$(cat /var/run/ndi-bridge/dropped_baseline)
+                    ADJUSTED_DROPPED=$((DROPPED - BASELINE))
+                    # Don't show negative values
+                    if [ "$ADJUSTED_DROPPED" -lt 0 ]; then
+                        ADJUSTED_DROPPED=0
+                    fi
+                    echo "$ADJUSTED_DROPPED" > /var/run/ndi-bridge/frames_dropped
+                else
+                    echo "$DROPPED" > /var/run/ndi-bridge/frames_dropped
+                fi
+                
                 [ -n "$LATENCY" ] && echo "$LATENCY" > /var/run/ndi-bridge/latency_ms
             else
                 # Metrics are stale - clear them
@@ -78,6 +94,45 @@ while true; do
         # Device doesn't exist
         echo "NO_DEVICE" > /var/run/ndi-bridge/capture_state
     elif systemctl is-active --quiet ndi-capture; then
+        # Check if this is a fresh start (service just became active)
+        if [ ! -f "$SERVICE_START_FILE" ]; then
+            # Record the start time
+            date +%s > "$SERVICE_START_FILE"
+        fi
+        
+        # Check if we're in stabilization period (first 30 seconds)
+        if [ -f "$SERVICE_START_FILE" ]; then
+            START_TIME=$(cat "$SERVICE_START_FILE")
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            
+            if [ "$ELAPSED" -lt 30 ]; then
+                # Still stabilizing (30 seconds)
+                echo "STABILIZING" > /var/run/ndi-bridge/capture_state
+                echo "$ELAPSED" > /var/run/ndi-bridge/stabilizing_seconds
+                # Skip the rest of the checks during stabilization
+                sleep 1
+                continue
+            elif [ "$ELAPSED" -ge 30 ] && [ ! -f /var/run/ndi-bridge/stabilization_complete ]; then
+                # Stabilization just completed - save current dropped count as baseline
+                echo "CAPTURING" > /var/run/ndi-bridge/capture_state
+                rm -f /var/run/ndi-bridge/stabilizing_seconds
+                
+                # Get current dropped frames to use as baseline
+                CURRENT_DROPPED=$(journalctl -u ndi-capture -n 200 --no-pager 2>/dev/null | grep "METRICS|" | tail -1 | sed -n 's/.*DROPPED:\([0-9]*\).*/\1/p')
+                if [ -n "$CURRENT_DROPPED" ]; then
+                    echo "$CURRENT_DROPPED" > /var/run/ndi-bridge/dropped_baseline
+                else
+                    echo "0" > /var/run/ndi-bridge/dropped_baseline
+                fi
+                
+                # Reset the displayed counter to 0
+                echo "0" > /var/run/ndi-bridge/frames_dropped
+                
+                # Mark that we've reset so we don't do it again
+                touch /var/run/ndi-bridge/stabilization_complete
+            fi
+        fi
         # Service is running, check if actually capturing (has recent metrics)
         LAST_METRIC_TIME=$(journalctl -u ndi-capture -n 10 --no-pager 2>/dev/null | grep "METRICS|" | tail -1 | cut -d' ' -f1-3)
         if [ -n "$LAST_METRIC_TIME" ]; then
@@ -102,6 +157,11 @@ while true; do
         fi
     else
         echo "STOPPED" > /var/run/ndi-bridge/capture_state
+        # Clear the start time and stabilization markers when service stops
+        rm -f "$SERVICE_START_FILE"
+        rm -f /var/run/ndi-bridge/stabilizing_seconds
+        rm -f /var/run/ndi-bridge/stabilization_complete
+        rm -f /var/run/ndi-bridge/dropped_baseline
     fi
     
     # 5. Get NDI stream name from config
