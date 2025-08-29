@@ -18,18 +18,27 @@ configure_network() {
 # Configure network bridge for both ethernet interfaces
 mkdir -p /etc/systemd/network
 
-# Create bridge device
+# Create bridge device with no MAC address (inherit from first interface)
 cat > /etc/systemd/network/10-br0.netdev << EOFBRIDGE
 [NetDev]
 Name=br0
 Kind=bridge
+# Let kernel assign MAC from first enslaved interface
+MACAddress=none
 
 [Bridge]
 STP=false
 EOFBRIDGE
 
-# Create directory for drop-in configs
-mkdir -p /etc/systemd/network/10-br0.netdev.d/
+# Create link file to prevent systemd from generating MAC
+cat > /etc/systemd/network/10-br0.link << EOFBRLINK
+[Match]
+OriginalName=br0
+
+[Link]
+# Don't generate MAC, use kernel's default behavior
+MACAddressPolicy=none
+EOFBRLINK
 
 # Configure physical interfaces to join bridge
 cat > /etc/systemd/network/20-eth.network << EOFETH
@@ -136,40 +145,8 @@ EOFNSS
 
 EOFNET
 
-    # Copy the MAC generation script (from helper-scripts after chroot)
-    if [ -f "scripts/helper-scripts/generate-bridge-mac" ]; then
-        cp scripts/helper-scripts/generate-bridge-mac /mnt/usb/usr/local/bin/
-        chmod +x /mnt/usb/usr/local/bin/generate-bridge-mac
-        log "  Installed generate-bridge-mac script"
-    fi
-    
-    # Create service to generate unique MAC on EVERY boot (based on current hardware)
-    cat > /mnt/usb/etc/systemd/system/generate-bridge-mac.service << 'EOFMACSERVICE'
-[Unit]
-Description=Generate unique MAC address for bridge interface based on current hardware
-Before=systemd-networkd.service
-Before=remount-rw.service
-After=systemd-modules-load.service
-DefaultDependencies=no
-
-[Service]
-Type=oneshot
-ExecStartPre=/bin/mount -o remount,rw /
-ExecStart=/usr/local/bin/generate-bridge-mac
-ExecStartPost=/bin/mount -o remount,ro /
-RemainAfterExit=yes
-
-[Install]
-WantedBy=sysinit.target
-EOFMACSERVICE
-
-    # Enable the MAC generation service in chroot
-    cat >> /mnt/usb/tmp/configure-system.sh << 'EOFMACENABLE'
-
-# Enable MAC generation service
-systemctl enable generate-bridge-mac.service 2>/dev/null || true
-
-EOFMACENABLE
+    # No need for complex MAC generation - kernel handles it automatically!
+    # Bridge will inherit MAC from first (or lowest) enslaved interface
 }
 
 export -f configure_network
