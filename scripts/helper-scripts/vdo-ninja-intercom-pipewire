@@ -276,8 +276,9 @@ fi
 
 # VDO.Ninja URL with parameters for automatic connection
 # miconly forces microphone-only mode, avoiding camera prompt completely
+# novideo explicitly disables video capture
 # autostart automatically joins without user interaction
-URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&autostart&sl&st&mobile&fb"
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&novideo&autostart&sl&st&mobile&fb"
 
 echo ""
 echo "=== VNC Remote Access ==="

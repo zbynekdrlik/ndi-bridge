@@ -72,10 +72,22 @@ else
     print_test_result "VDO.Ninja service is active" "FAIL"
 fi
 
-# Test 3: Chrome is running
+# Test 3: Chrome is running (with retry for startup time)
 echo -e "\n${YELLOW}Testing Chrome Process${NC}"
 
-CHROME_COUNT=$(ssh_cmd "ps aux | grep -E 'google-chrome.*vdo\.ninja' | grep -v grep | wc -l")
+# Retry up to 3 times with 5 second delays for Chrome to start
+CHROME_COUNT=0
+for attempt in 1 2 3; do
+    CHROME_COUNT=$(ssh_cmd "ps aux | grep -E 'google-chrome.*vdo\.ninja' | grep -v grep | wc -l")
+    if [ "$CHROME_COUNT" -gt 0 ]; then
+        break
+    fi
+    if [ $attempt -lt 3 ]; then
+        echo "  Waiting for Chrome to start (attempt $attempt/3)..."
+        sleep 5
+    fi
+done
+
 if [ "$CHROME_COUNT" -gt 0 ]; then
     print_test_result "Chrome browser is running ($CHROME_COUNT processes)" "PASS"
 else
@@ -139,7 +151,8 @@ fi
 echo -e "\n${YELLOW}Testing Service Resilience${NC}"
 
 ssh_cmd "systemctl restart vdo-ninja-intercom.service" 2>/dev/null
-sleep 10
+echo "  Waiting for service to fully start..."
+sleep 20  # Increased from 10 to give Chrome more time to start
 
 if ssh_cmd "systemctl is-active vdo-ninja-intercom.service" | grep -q "active"; then
     print_test_result "Service restarts successfully" "PASS"
