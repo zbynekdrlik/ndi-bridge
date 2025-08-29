@@ -8,6 +8,8 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 
 ## 🚀 Latest Updates (v2.1.6)
 
+- **VDO.Ninja Intercom**: Bidirectional audio communication for remote production
+- **8GB Image Size**: Expanded from 4GB to support Chrome and additional features
 - **Fixed Boot Issues**: USB systems now boot properly with correct partition layout
 - **Fixed TTY2 Display**: Welcome screen shows with proper colors and auto-refresh
 - **USB Hot-plug Recovery**: Automatic recovery when USB capture devices are disconnected/reconnected
@@ -46,6 +48,8 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 - ✅ **mDNS/Avahi hostname resolution** - Access via `<name>.local` addresses
 - ✅ **NDI service advertisement** - Automatic NDI discovery via mDNS
 - ✅ **Build timestamp tracking** - Shows when each USB image was created
+- ✅ **VDO.Ninja Intercom** - Bidirectional WebRTC audio for remote production
+- ✅ **VNC Remote Access** - Monitor intercom via VNC on port 5999
 
 ## Quick Start
 
@@ -144,6 +148,9 @@ ndi-bridge.exe "USB Video Device" "Camera 1" # Windows
 - `ndi-bridge-logs` - View service logs
 - `ndi-bridge-netstat` - Network bridge status
 - `ndi-bridge-help` - Show all commands
+- `vdo-ninja-intercom-logs` - View intercom logs
+- `vdo-ninja-intercom-restart` - Restart intercom service
+- `systemctl status vdo-ninja-intercom` - Check intercom service status
 
 #### mDNS Network Access
 Devices are accessible via mDNS/Avahi with automatic hostname resolution:
@@ -161,6 +168,72 @@ http://cam1.local           # Port 80
 ```
 
 NDI services are also advertised via mDNS for automatic discovery by NDI applications.
+
+## VDO.Ninja Intercom
+
+The NDI Bridge appliance includes built-in bidirectional audio intercom functionality using VDO.Ninja WebRTC technology. This enables remote production teams to communicate with operators at the device location.
+
+### Intercom Features
+- **Automatic Connection**: Connects to VDO.Ninja room at boot without user interaction
+- **Audio Only**: Microphone-only mode with explicit video disabled (novideo parameter)
+- **USB Audio Support**: Uses USB audio device (3.5mm jack) for local audio I/O
+- **Auto Volume**: Automatically sets volume to 100% on startup
+- **PipeWire Audio**: Modern Linux audio system for low-latency communication
+- **VNC Monitoring**: Remote desktop access on port 5999 (no password)
+- **Auto-recovery**: Automatically restarts if connection drops
+- **Persistent Configuration**: Settings preserved across reboots
+- **Read-Only Safe**: All data stored in tmpfs, works with read-only root filesystem
+
+### Intercom Configuration
+
+The intercom connects to a VDO.Ninja room using the device hostname:
+- **Room Name**: `nl_interkom` (default)
+- **Device ID**: Uses hostname (e.g., `ndi-bridge-cam1`)
+- **Audio Device**: USB Audio (3.5mm jack on device)
+
+### Remote Access
+
+#### VNC Access (Port 5999)
+```bash
+# Connect to intercom display (using mDNS hostname)
+vncviewer cam1.local:5999    # No password required
+vncviewer ndi-bridge-cam1.local:5999    # Alternative full hostname
+```
+
+#### Web Interface
+Access the VDO.Ninja control page from any browser:
+```
+https://vdo.ninja/?room=nl_interkom&view
+```
+
+This shows all connected NDI Bridge devices in the room.
+
+### Troubleshooting Intercom
+
+#### Check Service Status
+```bash
+ssh root@cam1.local
+systemctl status vdo-ninja-intercom
+```
+
+#### View Logs
+```bash
+vdo-ninja-intercom-logs
+# or
+journalctl -u vdo-ninja-intercom -f
+```
+
+#### Restart Service
+```bash
+vdo-ninja-intercom-restart
+# or
+systemctl restart vdo-ninja-intercom
+```
+
+#### Audio Issues
+- Ensure USB audio device is connected to 3.5mm jack
+- Check PipeWire status: `systemctl status pipewire`
+- Verify audio device: `pactl list sinks`
 
 ## Command-Line Options
 
@@ -191,8 +264,9 @@ sudo ./scripts/build-ndi-usb-modular.sh /dev/sdb
 ### Build System Features
 - Modular build scripts in `scripts/build-modules/`
 - Helper scripts in `scripts/helper-scripts/`
-- Version tracking (currently v1.2.3)
+- Version tracking (currently v1.9.0)
 - Comprehensive logging to `build-logs/`
+- 8GB image size (expanded from 4GB for Chrome and intercom features)
 - ~10-15 minute build time
 
 ### Customization

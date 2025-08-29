@@ -4,6 +4,7 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
+source "${SCRIPT_DIR}/lib/ro_check.sh"
 
 # Test runner configuration
 TEST_SUITES=()
@@ -21,6 +22,7 @@ RUN_NETWORK=false
 RUN_WEB=false
 RUN_TIMESYNC=false
 RUN_HELPERS=false
+RUN_INTERCOM=false
 RUN_LONG_TESTS=false
 RUN_COMPLETE=false
 TEST_BOX_IP=""
@@ -44,6 +46,7 @@ Options:
     -w, --web           Run web interface tests (default: no)
     -t, --timesync      Run time sync tests (default: no)
     -e, --helpers       Run helper scripts tests (default: no)
+    -m, --intercom      Run intercom tests (default: no)
     -l, --long          Run long-duration tests
     --skip-capture      Skip capture tests
     --skip-display      Skip display tests
@@ -115,6 +118,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -e|--helpers)
             RUN_HELPERS=true
+            shift
+            ;;
+        -m|--intercom)
+            RUN_INTERCOM=true
             shift
             ;;
         --complete)
@@ -197,6 +204,18 @@ if ! ping -c 1 -W 2 "$TEST_BOX_IP" &>/dev/null; then
     exit 1
 fi
 log_info "Test box is reachable"
+
+# CRITICAL: Verify filesystem is read-only
+log_info "Verifying filesystem status..."
+if ! verify_readonly_filesystem "$TEST_BOX_IP"; then
+    log_error "Filesystem verification failed - tests cannot proceed"
+    echo ""
+    echo "This is a critical requirement for test validity."
+    echo "Tests must run against a read-only filesystem to ensure"
+    echo "they reflect real production conditions."
+    exit 1
+fi
+log_info "Filesystem verified as read-only ✓"
 
 # Get system information
 log_info "Getting system information..."
@@ -285,6 +304,11 @@ fi
 # Run helper scripts tests if requested
 if [ "$RUN_HELPERS" = "true" ]; then
     run_test_suite "Helper Scripts Test" "${SCRIPT_DIR}/integration/test_helpers.sh"
+fi
+
+# Run VDO.Ninja intercom tests
+if [ "$RUN_INTERCOM" = "true" ]; then
+    run_test_suite "VDO.Ninja Intercom Test" "${SCRIPT_DIR}/integration/test_vdo_intercom.sh"
 fi
 
 # Calculate totals

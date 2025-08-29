@@ -312,9 +312,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Helper functions
-log() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
+# Use log function from 01-functions.sh, don't redefine it
 
 error() {
     echo -e "${RED}[ERROR]${NC} $1" >&2

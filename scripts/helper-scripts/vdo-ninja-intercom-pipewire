@@ -1,0 +1,360 @@
+#!/bin/bash
+# VDO.Ninja Intercom for NDI Bridge with PipeWire
+# Connects to VDO.Ninja room with real USB audio using PipeWire
+
+# Don't exit on error - some commands may fail but we continue
+set +e
+
+# Function to cleanup everything
+cleanup() {
+    echo "Cleaning up Chrome, PipeWire, VNC and Xvfb..."
+    
+    # Kill ALL Chrome processes forcefully
+    pkill -9 -f "chrome" 2>/dev/null || true
+    pkill -9 -f "google-chrome" 2>/dev/null || true
+    
+    # Kill PipeWire and WirePlumber
+    pkill -9 pipewire 2>/dev/null || true
+    pkill -9 wireplumber 2>/dev/null || true
+    
+    # Kill VNC server
+    pkill -9 -f "x11vnc" 2>/dev/null || true
+    
+    # Kill Xvfb
+    pkill -9 -f "Xvfb" 2>/dev/null || true
+    
+    # Clean up lock files and temp directories
+    rm -f /tmp/.X99-lock 2>/dev/null || true
+    rm -rf /tmp/.com.google.Chrome.* 2>/dev/null || true
+    rm -rf /tmp/chrome-* 2>/dev/null || true
+    rm -f /tmp/chrome-vdo-profile/SingletonLock 2>/dev/null || true
+    rm -f /tmp/chrome-vdo-profile/SingletonCookie 2>/dev/null || true
+    rm -f /tmp/chrome-vdo-profile/SingletonSocket 2>/dev/null || true
+    
+    # Wait for processes to die
+    sleep 3
+    
+    # Verify everything is dead
+    if pgrep -f "chrome" > /dev/null; then
+        echo "Warning: Chrome still running, forcing kill..."
+        killall -9 chrome google-chrome 2>/dev/null || true
+        sleep 2
+    fi
+}
+
+# Trap exit signals to cleanup (only on abnormal exit)
+trap cleanup INT TERM
+
+# Configuration
+FULL_HOSTNAME=$(hostname)
+HOSTNAME=${FULL_HOSTNAME#ndi-bridge-}  # Remove prefix if exists
+ROOM="${VDO_ROOM:-nl_interkom}"
+PROFILE_DIR="/tmp/chrome-vdo-profile"
+DISPLAY_NUM=99
+
+echo "=== VDO.Ninja Intercom Starting (PipeWire) ==="
+echo "Device: $HOSTNAME"
+echo "Room: $ROOM"
+
+# ALWAYS cleanup first
+cleanup
+
+# Start Xvfb
+echo "Starting virtual display..."
+Xvfb :$DISPLAY_NUM -screen 0 1280x720x24 -ac > /dev/null 2>&1 &
+XVFB_PID=$!
+sleep 2
+
+export DISPLAY=:$DISPLAY_NUM
+
+# Start VNC server for remote monitoring
+echo "Starting VNC server on port 5999..."
+# Use setsid to completely detach VNC from this process group
+setsid x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+sleep 2
+echo "VNC server detached and running"
+
+# Setup runtime directory and PulseAudio directory
+export XDG_RUNTIME_DIR=/run/user/0
+mkdir -p $XDG_RUNTIME_DIR
+mkdir -p $XDG_RUNTIME_DIR/pulse
+
+# Create required directories in tmpfs for Chrome and WirePlumber
+mkdir -p /tmp/.local/state/wireplumber
+mkdir -p /tmp/.local/share/applications
+export HOME=/tmp
+export XDG_STATE_HOME=/tmp/.local/state
+export XDG_DATA_HOME=/tmp/.local/share
+export XDG_CONFIG_HOME=/tmp/.config
+mkdir -p $XDG_CONFIG_HOME
+
+# Start PipeWire and WirePlumber
+echo "Starting PipeWire audio system..."
+
+# Kill any existing PipeWire/WirePlumber
+pkill -9 pipewire 2>/dev/null || true
+pkill -9 wireplumber 2>/dev/null || true
+sleep 1
+
+# Remove any custom configs that might cause issues
+rm -f /etc/pipewire/pipewire.conf.d/10-usb-audio.conf 2>/dev/null
+rm -f /etc/wireplumber/main.lua.d/50-usb-audio.lua 2>/dev/null
+
+# Create simple WirePlumber config directory
+mkdir -p /etc/wireplumber/main.lua.d
+
+# Create WirePlumber configuration to not ignore USB Audio HID
+cat > /etc/wireplumber/main.lua.d/50-usb-audio.lua << 'EOFWP'
+-- Enable USB Audio devices
+alsa_monitor.enabled = true
+
+alsa_monitor.rules = {
+  {
+    matches = {
+      {
+        { "device.name", "matches", "alsa_card.*" },
+      },
+    },
+    apply_properties = {
+      ["api.alsa.use-acp"] = true,
+      ["device.disabled"] = false,
+    },
+  },
+  -- Specific rule for USB Audio HID
+  {
+    matches = {
+      {
+        { "alsa.card_name", "matches", "*USB Audio*" },
+      },
+    },
+    apply_properties = {
+      ["device.nick"] = "USB Audio 3.5mm",
+      ["device.description"] = "USB Audio (3.5mm Jack)",
+      ["priority.driver"] = 3000,
+      ["priority.session"] = 3000,
+      ["api.alsa.use-acp"] = true,
+      ["device.disabled"] = false,
+    },
+  },
+}
+EOFWP
+
+# Start PipeWire as user daemon with proper environment
+echo "Starting PipeWire..."
+pipewire &
+PIPEWIRE_PID=$!
+sleep 3
+
+# Start pipewire-pulse for PulseAudio compatibility FIRST
+echo "Starting PipeWire PulseAudio bridge..."
+pipewire-pulse &
+PULSE_PID=$!
+sleep 2
+
+# Start WirePlumber session manager AFTER pipewire-pulse (matching working config)
+echo "Starting WirePlumber..."
+wireplumber &
+WIREPLUMBER_PID=$!
+sleep 3
+
+# Wait for PipeWire to be ready and socket to exist  
+for i in {1..10}; do
+    if [ -S "$XDG_RUNTIME_DIR/pulse/native" ] && pactl info >/dev/null 2>&1; then
+        echo "PipeWire PulseAudio bridge ready"
+        echo "Socket exists at: $XDG_RUNTIME_DIR/pulse/native"
+        break
+    fi
+    echo "Waiting for PulseAudio socket... (attempt $i)"
+    sleep 1
+done
+
+# Verify socket really exists
+if [ ! -S "$XDG_RUNTIME_DIR/pulse/native" ]; then
+    echo "ERROR: PulseAudio socket not created at $XDG_RUNTIME_DIR/pulse/native"
+    echo "Creating pulse directory..."
+    mkdir -p $XDG_RUNTIME_DIR/pulse
+    echo "Restarting pipewire-pulse..."
+    pkill pipewire-pulse
+    sleep 1
+    PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse pipewire-pulse &
+    PULSE_PID=$!
+    sleep 3
+fi
+
+echo "PipeWire started"
+
+# Set USB audio as default devices (simple approach like working box)
+echo "Configuring USB audio devices..."
+
+# Find USB devices
+USB_SINK=$(pactl list sinks short | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+USB_SOURCE=$(pactl list sources short | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+
+if [ -n "$USB_SINK" ]; then
+    echo "Setting default output to: $USB_SINK"
+    pactl set-default-sink "$USB_SINK"
+    # Set volume to 100% and ensure unmuted
+    echo "Setting output volume to 100%"
+    pactl set-sink-volume "$USB_SINK" 100%
+    pactl set-sink-mute "$USB_SINK" 0
+else
+    echo "WARNING: USB Audio output not found"
+fi
+
+if [ -n "$USB_SOURCE" ]; then
+    echo "Setting default input to: $USB_SOURCE"
+    pactl set-default-source "$USB_SOURCE"
+    # Set microphone volume to 100% and ensure unmuted
+    echo "Setting microphone volume to 100%"
+    pactl set-source-volume "$USB_SOURCE" 100%
+    pactl set-source-mute "$USB_SOURCE" 0
+else
+    echo "WARNING: USB Audio input not found"
+fi
+
+# Verify defaults are set
+sleep 1
+echo "Default devices configured:"
+pactl info | grep -E "Default (Sink|Source):"
+
+# List available devices using pactl (PulseAudio compatibility)
+echo ""
+echo "=== Audio Devices ==="
+# Show cards in a cleaner format
+for card in $(pactl list cards short 2>/dev/null | awk '{print $2}'); do
+    desc=$(pactl list cards 2>/dev/null | grep -A 2 "Name: $card" | grep "Description:" | cut -d: -f2- | sed 's/^ //')
+    if echo "$card" | grep -q "usb.*HID\|USB.*Audio"; then
+        echo "  ✓ USB Audio (3.5mm): $desc"
+    elif echo "$card" | grep -q "Elgato"; then
+        echo "  ⚠ Elgato (capture device - not used for audio)"
+    else
+        echo "  - $desc"
+    fi
+done || echo "  No audio cards detected"
+
+# USB devices already found and set as defaults above
+
+# Setup Chrome profile with saved permissions - always recreate to ensure they exist
+echo "Setting up Chrome profile with permissions..."
+mkdir -p $PROFILE_DIR/Default
+
+# Check if permissions exist in current Preferences
+if [ -f "$PROFILE_DIR/Default/Preferences" ]; then
+    if ! grep -q "media_stream_mic.*vdo.ninja.*setting.:1" "$PROFILE_DIR/Default/Preferences" 2>/dev/null; then
+        echo "Permissions missing, recreating profile..."
+        rm -f $PROFILE_DIR/Default/Preferences
+    fi
+fi
+
+if [ ! -f "$PROFILE_DIR/Default/Preferences" ]; then
+    cat > $PROFILE_DIR/Default/Preferences << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766142668061",
+            "setting": 1
+          }
+        },
+        "media_stream_camera": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766150219890",
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+fi
+
+# VDO.Ninja URL with parameters for automatic connection
+# miconly forces microphone-only mode, avoiding camera prompt completely
+# novideo explicitly disables video capture
+# autostart automatically joins without user interaction
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&novideo&autostart&sl&st&mobile&fb"
+
+echo ""
+echo "=== VNC Remote Access ==="
+echo "Connect to VNC: $(hostname -I | awk '{print $1}'):5999"
+echo "No password required"
+echo ""
+
+# Wait for audio system to be fully ready
+echo "Waiting for audio system to stabilize..."
+sleep 5
+
+# Test that PulseAudio is actually working
+if pactl info >/dev/null 2>&1; then
+    echo "PulseAudio interface is ready"
+else
+    echo "WARNING: PulseAudio interface not responding!"
+fi
+
+echo "Starting Chrome..."
+echo "URL: $URL"
+
+# Start Chrome in background (not exec) so we can monitor PipeWire
+env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+    PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse \
+    PULSE_SERVER=unix:$XDG_RUNTIME_DIR/pulse/native \
+    HOME=/tmp \
+    XDG_STATE_HOME=/tmp/.local/state \
+    XDG_DATA_HOME=/tmp/.local/share \
+    XDG_CONFIG_HOME=/tmp/.config \
+    /usr/bin/google-chrome \
+    --no-first-run \
+    --no-default-browser-check \
+    --no-sandbox \
+    --disable-gpu \
+    --disable-dev-shm-usage \
+    --autoplay-policy=no-user-gesture-required \
+    --audio-buffer-size=2048 \
+    --user-data-dir=$PROFILE_DIR \
+    --new-window \
+    "$URL" &
+
+CHROME_PID=$!
+
+# Monitor Chrome and audio system
+echo "Chrome started with PID $CHROME_PID"
+
+# Give Chrome time to create audio streams
+sleep 10
+
+# Force any Chrome audio streams to use USB devices
+echo "Ensuring Chrome uses USB audio..."
+if [ -n "$USB_SINK" ]; then
+    for stream in $(pactl list sink-inputs short | awk '{print $1}'); do
+        current_sink=$(pactl list sink-inputs short | grep "^$stream" | awk '{print $2}')
+        if [ "$current_sink" != "$(pactl list sinks short | grep "$USB_SINK" | awk '{print $1}')" ]; then
+            echo "Moving output stream $stream to USB audio"
+            pactl move-sink-input "$stream" "$USB_SINK" 2>/dev/null || true
+        fi
+    done
+fi
+
+if [ -n "$USB_SOURCE" ]; then
+    for stream in $(pactl list source-outputs short | awk '{print $1}'); do
+        current_source=$(pactl list source-outputs short | grep "^$stream" | awk '{print $2}')
+        if [ "$current_source" != "$(pactl list sources short | grep "$USB_SOURCE" | awk '{print $1}')" ]; then
+            echo "Moving input stream $stream to USB audio"
+            pactl move-source-output "$stream" "$USB_SOURCE" 2>/dev/null || true
+        fi
+    done
+fi
+
+echo "Audio routing verified"
+
+# Keep the script running to maintain PipeWire
+while kill -0 $CHROME_PID 2>/dev/null; do
+    sleep 30
+done
+
+echo "Chrome has exited"

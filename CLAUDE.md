@@ -19,6 +19,14 @@
 5. Apply fix to repository IMMEDIATELY
 6. Never leave fixes only on test box
 
+### Testing Success Criteria:
+**ONLY 100% test success can be considered "working"!**
+- If ANY test component fails, the feature is NOT working
+- Do NOT claim success when critical components fail
+- USB Audio detection failure = Intercom NOT working
+- Partial success = Complete failure
+- All tests must pass before declaring feature operational
+
 ### Known Issues That Took 10+ Builds to Find:
 - Menu `read` commands need `< /dev/tty` when called from other scripts
 - Services must be enabled AND started
@@ -36,12 +44,21 @@
 - This prevents files being overwritten by later modules
 - Violating this causes deployment of old/wrong versions
 
+**FEATURE IMPLEMENTATION RULES:**
+- **Every feature must be installed during image build** - NO post-install scripts
+- **All dependencies installed in build modules** - Users should never run install scripts  
+- **Services enabled by default** if they're core features (like intercom)
+- **Consistent approach** - All features follow same pattern (not different for each)
+- **Modular files** - Split features across multiple small files, not one big file
+- **No conditional installation** - Everything needed is in the image
+
 **Why this matters:**
 - Module execution order means later modules overwrite earlier ones
 - Inline generation makes code unmaintainable and hard to debug
 - Prevents proper version control of individual components
 - Creates massive, unreadable build modules (some had 700+ lines!)
 - This has caused repeated deployment failures with wrong versions
+- Inconsistent approaches confuse users and break expectations
 
 **Current Technical Debt (TO BE FIXED):**
 - 15 systemd service files still created inline across 7 modules
@@ -94,14 +111,14 @@ Fixes #25"
 **ALWAYS DO:**
 1. Run from repository ROOT: `cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge`
 2. Increment version: Edit `scripts/build-modules/00-variables.sh` → `BUILD_SCRIPT_VERSION`
-3. Run build: `sudo ./build-image-for-rufus.sh` (auto-redirects to log)
-4. Monitor logs: `tail -f build-logs/image-build-*.log`
+3. Run build: `sudo ./build-image-for-rufus.sh > build.log 2>&1 &` (MUST redirect ALL output to prevent Claude crashes)
+4. Monitor logs: `tail -f build.log` or check build-logs directory
 
 **NEVER DO:**
 - Run build from `build/` directory (causes "file not found" errors)
 - Forget to increment version (can't identify deployed devices)
 
-**Build takes 10-15 minutes. Image output: `ndi-bridge.img` (4GB)**
+**Build takes 10-15 minutes. Image output: `ndi-bridge.img` (8GB)**
 
 ## Quick Commands
 
@@ -180,6 +197,8 @@ ndi-bridge-ro           # Return to read-only
 | mDNS fails in WSL | Use IP address or test from Windows |
 | --version hangs | Fixed in main.cpp - exits before init |
 | Scripts not updating | Removed inline scripts from 10-tty-config.sh |
+| Chrome shows no audio devices | Reboot device, make filesystem writable (`ndi-bridge-rw`), select USB device in Chrome |
+| Audio device locked after testing | Stale PipeWire modules can lock devices - reboot clears state |
 
 ## NDI Display System (v1.6.8+)
 
