@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDI Bridge Intercom Control</title>
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --primary-dark: #5a67d8;
+            --success-color: #48bb78;
+            --danger-color: #f56565;
+            --warning-color: #ed8936;
+            --bg-gradient-start: #667eea;
+            --bg-gradient-end: #764ba2;
+            --card-bg: #ffffff;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --border-color: #e2e8f0;
+            --shadow: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .header h1 {
+            color: var(--text-primary);
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .header .subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.active {
+            background: var(--success-color);
+        }
+
+        .status-indicator.inactive {
+            background: var(--danger-color);
+        }
+
+        .status-indicator.warning {
+            background: var(--warning-color);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .mute-button {
+            width: 100%;
+            padding: 32px;
+            border: none;
+            border-radius: 8px;
+            font-size: 24px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            color: white;
+        }
+
+        .mute-button.unmuted {
+            background: var(--success-color);
+        }
+
+        .mute-button.unmuted:hover {
+            background: #38a169;
+        }
+
+        .mute-button.muted {
+            background: var(--danger-color);
+        }
+
+        .mute-button.muted:hover {
+            background: #e53e3e;
+        }
+
+        .mute-button .icon {
+            font-size: 48px;
+        }
+
+        .volume-container {
+            margin: 20px 0;
+        }
+
+        .volume-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .volume-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: var(--border-color);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .volume-slider::-webkit-slider-thumb:hover {
+            background: var(--primary-dark);
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            cursor: pointer;
+            border: none;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .button.primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .button.primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .button.secondary {
+            background: #f7fafc;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .button.secondary:hover {
+            background: #edf2f7;
+        }
+
+        .button.danger {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        .button.danger:hover {
+            background: #e53e3e;
+        }
+
+        .button.success {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .button.success:hover {
+            background: #38a169;
+        }
+
+        .status-list {
+            list-style: none;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .status-value {
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .alert {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert.success {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .alert.error {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+
+        .alert.warning {
+            background: #feebc8;
+            color: #7c2d12;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
+
+        .modal-body {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ NDI Bridge Intercom Control</h1>
+            <div class="subtitle">Real-time audio control and monitoring</div>
+        </div>
+
+        <div id="alert-container"></div>
+
+        <div class="grid">
+            <!-- Main Control Card -->
+            <div class="card">
+                <h2 class="card-title">
+                    <span class="status-indicator" id="service-status"></span>
+                    Audio Control
+                </h2>
+                
+                <button class="mute-button" id="mute-toggle" onclick="toggleMute()">
+                    <span class="icon" id="mute-icon">🔊</span>
+                    <span id="mute-text">Loading...</span>
+                </button>
+
+                <div class="volume-container">
+                    <div class="volume-label">
+                        <span>Output Volume</span>
+                        <span id="output-volume-value">75%</span>
+                    </div>
+                    <input type="range" class="volume-slider" id="output-volume" 
+                           min="0" max="100" value="75" onchange="setVolume('output', this.value)">
+                </div>
+
+                <div class="volume-container">
+                    <div class="volume-label">
+                        <span>Input Volume</span>
+                        <span id="input-volume-value">75%</span>
+                    </div>
+                    <input type="range" class="volume-slider" id="input-volume" 
+                           min="0" max="100" value="75" onchange="setVolume('input', this.value)">
+                </div>
+
+                <div class="button-group">
+                    <button class="button success" onclick="saveDefaults()">
+                        💾 Save as Default
+                    </button>
+                    <button class="button secondary" onclick="loadDefaults()">
+                        📂 Load Defaults
+                    </button>
+                </div>
+            </div>
+
+            <!-- Status Card -->
+            <div class="card">
+                <h2 class="card-title">System Status</h2>
+                
+                <ul class="status-list">
+                    <li class="status-item">
+                        <span class="status-label">Service</span>
+                        <span class="status-value" id="service-state">Checking...</span>
+                    </li>
+                    <li class="status-item">
+                        <span class="status-label">Audio Output</span>
+                        <span class="status-value" id="output-device">-</span>
+                    </li>
+                    <li class="status-item">
+                        <span class="status-label">Audio Input</span>
+                        <span class="status-value" id="input-device">-</span>
+                    </li>
+                    <li class="status-item">
+                        <span class="status-label">VDO.Ninja Room</span>
+                        <span class="status-value">nl_interkom</span>
+                    </li>
+                    <li class="status-item">
+                        <span class="status-label">VNC Access</span>
+                        <span class="status-value" id="vnc-port">Port 5999</span>
+                    </li>
+                    <li class="status-item">
+                        <span class="status-label">Last Update</span>
+                        <span class="status-value" id="last-update">-</span>
+                    </li>
+                </ul>
+
+                <div class="button-group" style="margin-top: 24px;">
+                    <button class="button primary" onclick="restartService()">
+                        🔄 Restart Service
+                    </button>
+                    <button class="button secondary" onclick="refreshStatus()">
+                        🔃 Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Card -->
+        <div class="card">
+            <h2 class="card-title">Quick Actions</h2>
+            
+            <div class="button-group">
+                <button class="button secondary" onclick="muteInput()">
+                    🎤 Mute Mic Only
+                </button>
+                <button class="button secondary" onclick="muteOutput()">
+                    🔇 Mute Speakers Only
+                </button>
+                <button class="button secondary" onclick="setVolume('both', 50)">
+                    🔉 Set All to 50%
+                </button>
+                <button class="button secondary" onclick="setVolume('both', 100)">
+                    🔊 Set All to 100%
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal" id="confirm-modal">
+        <div class="modal-content">
+            <h3 class="modal-title" id="modal-title">Confirm Action</h3>
+            <div class="modal-body" id="modal-body">
+                Are you sure you want to proceed?
+            </div>
+            <div class="modal-footer">
+                <button class="button secondary" onclick="closeModal()">Cancel</button>
+                <button class="button primary" id="modal-confirm" onclick="confirmAction()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API endpoint base URL
+        const API_BASE = '/api/intercom';
+        
+        // State management
+        let currentState = {
+            service: 'stopped',
+            output: { volume: 75, muted: false, device: '' },
+            input: { volume: 75, muted: false, device: '' }
+        };
+        
+        let pendingAction = null;
+        let autoRefreshInterval = null;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshStatus();
+            // Auto-refresh every 5 seconds
+            autoRefreshInterval = setInterval(refreshStatus, 5000);
+        });
+
+        // Show alert message
+        function showAlert(message, type = 'success') {
+            const container = document.getElementById('alert-container');
+            const alert = document.createElement('div');
+            alert.className = `alert ${type}`;
+            alert.innerHTML = `
+                ${type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'}
+                ${message}
+            `;
+            container.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Refresh status from backend
+        async function refreshStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/status`);
+                if (!response.ok) throw new Error('Failed to fetch status');
+                
+                const data = await response.json();
+                updateUI(data);
+                
+                // Update last refresh time
+                document.getElementById('last-update').textContent = 
+                    new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error('Status refresh failed:', error);
+                // Fallback to command execution
+                executeCommand('status').then(updateUI);
+            }
+        }
+
+        // Update UI with status data
+        function updateUI(data) {
+            currentState = data;
+            
+            // Update service status
+            const serviceIndicator = document.getElementById('service-status');
+            const serviceState = document.getElementById('service-state');
+            
+            if (data.service === 'running') {
+                serviceIndicator.className = 'status-indicator active';
+                serviceState.textContent = 'Running';
+                serviceState.style.color = 'var(--success-color)';
+            } else {
+                serviceIndicator.className = 'status-indicator inactive';
+                serviceState.textContent = 'Stopped';
+                serviceState.style.color = 'var(--danger-color)';
+            }
+            
+            // Update mute button
+            const muteButton = document.getElementById('mute-toggle');
+            const muteIcon = document.getElementById('mute-icon');
+            const muteText = document.getElementById('mute-text');
+            
+            const isMuted = data.output.muted || data.input.muted;
+            
+            if (isMuted) {
+                muteButton.className = 'mute-button muted';
+                muteIcon.textContent = '🔇';
+                muteText.textContent = 'MUTED';
+            } else {
+                muteButton.className = 'mute-button unmuted';
+                muteIcon.textContent = '🔊';
+                muteText.textContent = 'ACTIVE';
+            }
+            
+            // Update volume sliders
+            document.getElementById('output-volume').value = data.output.volume;
+            document.getElementById('output-volume-value').textContent = `${data.output.volume}%`;
+            
+            document.getElementById('input-volume').value = data.input.volume;
+            document.getElementById('input-volume-value').textContent = `${data.input.volume}%`;
+            
+            // Update device info
+            document.getElementById('output-device').textContent = 
+                data.output.device || 'Not detected';
+            document.getElementById('input-device').textContent = 
+                data.input.device || 'Not detected';
+        }
+
+        // Execute command via API or direct
+        async function executeCommand(command, params = {}) {
+            try {
+                // Try API first
+                const response = await fetch(`${API_BASE}/${command}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(params)
+                });
+                
+                if (!response.ok) throw new Error('API call failed');
+                return await response.json();
+            } catch (error) {
+                // Fallback to direct command execution
+                return executeDirectCommand(command, params);
+            }
+        }
+
+        // Direct command execution (fallback)
+        async function executeDirectCommand(command, params) {
+            // This would call the shell script directly via a simple CGI endpoint
+            const queryParams = new URLSearchParams(params).toString();
+            const response = await fetch(`/cgi-bin/intercom-control.sh?cmd=${command}&${queryParams}`);
+            return await response.json();
+        }
+
+        // Toggle mute state
+        async function toggleMute() {
+            try {
+                await executeCommand('toggle', { target: 'both' });
+                showAlert('Audio mute toggled', 'success');
+                refreshStatus();
+            } catch (error) {
+                showAlert('Failed to toggle mute', 'error');
+            }
+        }
+
+        // Set volume
+        async function setVolume(target, value) {
+            try {
+                await executeCommand('volume', { target, value });
+                
+                // Update UI immediately
+                if (target === 'output' || target === 'both') {
+                    document.getElementById('output-volume-value').textContent = `${value}%`;
+                }
+                if (target === 'input' || target === 'both') {
+                    document.getElementById('input-volume-value').textContent = `${value}%`;
+                }
+                
+                showAlert(`Volume set to ${value}%`, 'success');
+            } catch (error) {
+                showAlert('Failed to set volume', 'error');
+            }
+        }
+
+        // Mute input only
+        async function muteInput() {
+            try {
+                await executeCommand('mute', { target: 'input' });
+                showAlert('Microphone muted', 'success');
+                refreshStatus();
+            } catch (error) {
+                showAlert('Failed to mute microphone', 'error');
+            }
+        }
+
+        // Mute output only
+        async function muteOutput() {
+            try {
+                await executeCommand('mute', { target: 'output' });
+                showAlert('Speakers muted', 'success');
+                refreshStatus();
+            } catch (error) {
+                showAlert('Failed to mute speakers', 'error');
+            }
+        }
+
+        // Save current settings as defaults
+        function saveDefaults() {
+            pendingAction = async () => {
+                try {
+                    await executeCommand('save-defaults');
+                    showAlert('Default settings saved! They will be restored after reboot.', 'success');
+                    closeModal();
+                } catch (error) {
+                    showAlert('Failed to save defaults', 'error');
+                    closeModal();
+                }
+            };
+            
+            showModal(
+                'Save Default Settings',
+                `Save current audio settings as defaults?<br><br>
+                Output Volume: ${currentState.output.volume}%<br>
+                Input Volume: ${currentState.input.volume}%<br>
+                Output Muted: ${currentState.output.muted}<br>
+                Input Muted: ${currentState.input.muted}<br><br>
+                These settings will be automatically applied after every boot.`
+            );
+        }
+
+        // Load default settings
+        async function loadDefaults() {
+            try {
+                await executeCommand('load-defaults');
+                showAlert('Default settings loaded', 'success');
+                refreshStatus();
+            } catch (error) {
+                showAlert('Failed to load defaults', 'error');
+            }
+        }
+
+        // Restart intercom service
+        function restartService() {
+            pendingAction = async () => {
+                try {
+                    showAlert('Restarting service...', 'warning');
+                    await executeCommand('restart');
+                    setTimeout(() => {
+                        showAlert('Service restarted successfully', 'success');
+                        refreshStatus();
+                    }, 5000);
+                    closeModal();
+                } catch (error) {
+                    showAlert('Failed to restart service', 'error');
+                    closeModal();
+                }
+            };
+            
+            showModal(
+                'Restart Intercom Service',
+                'This will restart the intercom service. Audio will be temporarily interrupted. Continue?'
+            );
+        }
+
+        // Modal management
+        function showModal(title, body) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-body').innerHTML = body;
+            document.getElementById('confirm-modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('confirm-modal').classList.remove('active');
+            pendingAction = null;
+        }
+
+        function confirmAction() {
+            if (pendingAction) {
+                pendingAction();
+            }
+        }
+
+        // WebSocket for real-time updates (optional enhancement)
+        function connectWebSocket() {
+            const ws = new WebSocket(`ws://${window.location.host}/ws/intercom`);
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                updateUI(data);
+            };
+            
+            ws.onerror = () => {
+                console.log('WebSocket not available, using polling');
+            };
+        }
+
+        // Try to establish WebSocket connection
+        connectWebSocket();
+    </script>
+</body>
+</html>

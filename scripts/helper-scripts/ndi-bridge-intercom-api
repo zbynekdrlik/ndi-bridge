@@ -1,0 +1,301 @@
+#!/usr/bin/python3
+# NDI Bridge Intercom Web API
+# Simple HTTP API server for intercom control
+
+import json
+import subprocess
+import sys
+import os
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+import threading
+import time
+
+# Configuration
+API_PORT = 8089
+CONTROL_SCRIPT = "/usr/local/bin/ndi-bridge-intercom-control"
+CONFIG_SCRIPT = "/usr/local/bin/ndi-bridge-intercom-config"
+
+class IntercomAPIHandler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        """Handle CORS preflight requests"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+    
+    def do_GET(self):
+        """Handle GET requests"""
+        parsed_path = urlparse(self.path)
+        
+        if parsed_path.path == '/api/intercom/status':
+            self.handle_status()
+        elif parsed_path.path == '/api/intercom/health':
+            self.handle_health()
+        else:
+            self.send_error(404, "Endpoint not found")
+    
+    def do_POST(self):
+        """Handle POST requests"""
+        parsed_path = urlparse(self.path)
+        
+        # Read request body
+        content_length = int(self.headers.get('Content-Length', 0))
+        body = self.rfile.read(content_length) if content_length > 0 else b'{}'
+        
+        try:
+            data = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            self.send_error(400, "Invalid JSON")
+            return
+        
+        # Route to appropriate handler
+        if parsed_path.path == '/api/intercom/mute':
+            self.handle_mute(data)
+        elif parsed_path.path == '/api/intercom/unmute':
+            self.handle_unmute(data)
+        elif parsed_path.path == '/api/intercom/toggle':
+            self.handle_toggle(data)
+        elif parsed_path.path == '/api/intercom/volume':
+            self.handle_volume(data)
+        elif parsed_path.path == '/api/intercom/restart':
+            self.handle_restart()
+        elif parsed_path.path == '/api/intercom/save-defaults':
+            self.handle_save_defaults()
+        elif parsed_path.path == '/api/intercom/load-defaults':
+            self.handle_load_defaults()
+        else:
+            self.send_error(404, "Endpoint not found")
+    
+    def handle_status(self):
+        """Get current intercom status"""
+        try:
+            result = subprocess.run(
+                [CONTROL_SCRIPT, "status"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                # Parse JSON output from control script
+                status_data = json.loads(result.stdout)
+                self.send_json_response(status_data)
+            else:
+                self.send_error(500, "Failed to get status")
+        except subprocess.TimeoutExpired:
+            self.send_error(504, "Command timeout")
+        except Exception as e:
+            self.send_error(500, str(e))
+    
+    def handle_health(self):
+        """Simple health check endpoint"""
+        self.send_json_response({"status": "healthy", "api_version": "1.0"})
+    
+    def handle_mute(self, data):
+        """Mute audio"""
+        target = data.get('target', 'both')
+        try:
+            result = subprocess.run(
+                [CONTROL_SCRIPT, "mute", target],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                self.send_json_response({
+                    "success": True,
+                    "message": result.stdout.strip()
+                })
+            else:
+                self.send_error(500, "Failed to mute")
+        except Exception as e:
+            self.send_error(500, str(e))
+    
+    def handle_unmute(self, data):
+        """Unmute audio"""
+        target = data.get('target', 'both')
+        try:
+            result = subprocess.run(
+                [CONTROL_SCRIPT, "unmute", target],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                self.send_json_response({
+                    "success": True,
+                    "message": result.stdout.strip()
+                })
+            else:
+                self.send_error(500, "Failed to unmute")
+        except Exception as e:
+            self.send_error(500, str(e))
+    
+    def handle_toggle(self, data):
+        """Toggle mute state"""
+        target = data.get('target', 'both')
+        try:
+            result = subprocess.run(
+                [CONTROL_SCRIPT, "toggle", target],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                self.send_json_response({
+                    "success": True,
+                    "message": result.stdout.strip()
+                })
+            else:
+                self.send_error(500, "Failed to toggle")
+        except Exception as e:
+            self.send_error(500, str(e))
+    
+    def handle_volume(self, data):
+        """Set volume level"""
+        target = data.get('target', 'both')
+        value = data.get('value', 75)
+        
+        # Validate volume range
+        try:
+            value = int(value)
+            if value < 0 or value > 100:
+                self.send_error(400, "Volume must be between 0 and 100")
+                return
+        except (ValueError, TypeError):
+            self.send_error(400, "Invalid volume value")
+            return
+        
+        try:
+            result = subprocess.run(
+                [CONTROL_SCRIPT, "volume", target, str(value)],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                self.send_json_response({
+                    "success": True,
+                    "message": result.stdout.strip()
+                })
+            else:
+                self.send_error(500, "Failed to set volume")
+        except Exception as e:
+            self.send_error(500, str(e))
+    
+    def handle_restart(self):
+        """Restart intercom service"""
+        try:
+            result = subprocess.run(
+                [CONTROL_SCRIPT, "restart"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                self.send_json_response({
+                    "success": True,
+                    "message": "Service restarted"
+                })
+            else:
+                self.send_error(500, "Failed to restart service")
+        except Exception as e:
+            self.send_error(500, str(e))
+    
+    def handle_save_defaults(self):
+        """Save current settings as defaults"""
+        try:
+            # Use echo to simulate 'y' response for confirmation
+            process = subprocess.Popen(
+                [CONFIG_SCRIPT, "save"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            stdout, stderr = process.communicate(input="y\n", timeout=10)
+            
+            if process.returncode == 0:
+                self.send_json_response({
+                    "success": True,
+                    "message": "Default settings saved"
+                })
+            else:
+                self.send_error(500, "Failed to save defaults")
+        except Exception as e:
+            self.send_error(500, str(e))
+    
+    def handle_load_defaults(self):
+        """Load default settings"""
+        try:
+            result = subprocess.run(
+                [CONFIG_SCRIPT, "apply"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                self.send_json_response({
+                    "success": True,
+                    "message": "Default settings loaded"
+                })
+            else:
+                self.send_error(500, "Failed to load defaults")
+        except Exception as e:
+            self.send_error(500, str(e))
+    
+    def send_json_response(self, data, status=200):
+        """Send JSON response with CORS headers"""
+        self.send_response(status)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        self.wfile.write(json.dumps(data).encode())
+    
+    def send_error(self, code, message=None):
+        """Send error response"""
+        self.send_json_response({
+            "success": False,
+            "error": message or "Unknown error"
+        }, code)
+    
+    def log_message(self, format, *args):
+        """Override to reduce console spam"""
+        if '/api/intercom/status' not in args[0]:
+            sys.stderr.write("%s - - [%s] %s\n" %
+                           (self.client_address[0],
+                            self.log_date_time_string(),
+                            format%args))
+
+def run_server():
+    """Run the API server"""
+    server = HTTPServer(('0.0.0.0', API_PORT), IntercomAPIHandler)
+    print(f"NDI Bridge Intercom API running on port {API_PORT}")
+    print(f"Access at: http://localhost:{API_PORT}/api/intercom/status")
+    
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down API server...")
+        server.shutdown()
+
+if __name__ == '__main__':
+    # Check if running as root (required for audio control)
+    if os.geteuid() != 0:
+        print("Warning: API server should run as root for full functionality")
+    
+    # Check if control scripts exist
+    if not os.path.exists(CONTROL_SCRIPT):
+        print(f"Error: Control script not found at {CONTROL_SCRIPT}")
+        sys.exit(1)
+    
+    run_server()

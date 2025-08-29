@@ -1,7 +1,0 @@
-#!/bin/bash
-# Restart VDO.Ninja intercom service
-
-echo "Restarting VDO.Ninja intercom service..."
-systemctl restart vdo-ninja-intercom.service
-echo "VDO.Ninja intercom has been restarted"
-systemctl status vdo-ninja-intercom.service --no-pager | head -5

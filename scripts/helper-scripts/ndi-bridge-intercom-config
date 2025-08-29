@@ -1,0 +1,211 @@
+#!/bin/bash
+# NDI Bridge Intercom Configuration Manager
+# Manages persistent intercom settings (volume, mute state)
+
+CONFIG_FILE="/etc/ndi-bridge/intercom.conf"
+CONFIG_DIR="/etc/ndi-bridge"
+
+# Function to make filesystem writable
+make_writable() {
+    mount -o remount,rw / 2>/dev/null || {
+        echo "ERROR: Failed to remount filesystem as read-write"
+        echo "This operation requires root privileges"
+        exit 1
+    }
+}
+
+# Function to make filesystem read-only
+make_readonly() {
+    sync
+    mount -o remount,ro / 2>/dev/null || {
+        echo "WARNING: Failed to remount filesystem as read-only"
+        echo "System remains in read-write mode"
+    }
+}
+
+# Function to load config
+load_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+        echo "Loaded configuration from $CONFIG_FILE"
+    else
+        echo "No configuration file found, using defaults"
+        # Default values
+        INTERCOM_OUTPUT_VOLUME=75
+        INTERCOM_INPUT_VOLUME=75
+        INTERCOM_OUTPUT_MUTED=false
+        INTERCOM_INPUT_MUTED=false
+    fi
+}
+
+# Function to save current state as default
+save_defaults() {
+    # Get current state from the control script
+    local status=$(/usr/local/bin/ndi-bridge-intercom-control status 2>/dev/null)
+    
+    if [ -z "$status" ]; then
+        echo "ERROR: Could not get current intercom status"
+        exit 1
+    fi
+    
+    # Parse JSON status (basic parsing, works with our simple JSON)
+    local output_volume=$(echo "$status" | grep -A2 '"output"' | grep '"volume"' | grep -oP '\d+')
+    local input_volume=$(echo "$status" | grep -A2 '"input"' | grep '"volume"' | grep -oP '\d+')
+    local output_muted=$(echo "$status" | grep -A2 '"output"' | grep '"muted"' | awk -F: '{print $2}' | tr -d ' ,')
+    local input_muted=$(echo "$status" | grep -A2 '"input"' | grep '"muted"' | awk -F: '{print $2}' | tr -d ' ,')
+    
+    # Confirmation prompt
+    echo "Current settings:"
+    echo "  Output Volume: ${output_volume}%"
+    echo "  Output Muted: ${output_muted}"
+    echo "  Input Volume: ${input_volume}%"
+    echo "  Input Muted: ${input_muted}"
+    echo ""
+    echo "These settings will be restored after every boot."
+    read -p "Save these as default settings? (y/N): " confirm
+    
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        echo "Operation cancelled"
+        exit 0
+    fi
+    
+    # Make filesystem writable
+    echo "Making filesystem writable..."
+    make_writable
+    
+    # Ensure config directory exists
+    mkdir -p "$CONFIG_DIR"
+    
+    # Write configuration
+    cat > "$CONFIG_FILE" <<EOF
+# NDI Bridge Intercom Default Configuration
+# Generated: $(date)
+
+# Volume settings (0-100)
+INTERCOM_OUTPUT_VOLUME=${output_volume}
+INTERCOM_INPUT_VOLUME=${input_volume}
+
+# Mute settings (true/false)
+INTERCOM_OUTPUT_MUTED=${output_muted}
+INTERCOM_INPUT_MUTED=${input_muted}
+EOF
+    
+    echo "Configuration saved to $CONFIG_FILE"
+    
+    # Make filesystem read-only again
+    echo "Returning filesystem to read-only..."
+    make_readonly
+    
+    echo "Default settings saved successfully!"
+}
+
+# Function to apply saved defaults
+apply_defaults() {
+    load_config
+    
+    echo "Applying default settings..."
+    
+    # Apply volume settings
+    /usr/local/bin/ndi-bridge-intercom-control volume output "$INTERCOM_OUTPUT_VOLUME"
+    /usr/local/bin/ndi-bridge-intercom-control volume input "$INTERCOM_INPUT_VOLUME"
+    
+    # Apply mute settings
+    if [ "$INTERCOM_OUTPUT_MUTED" = "true" ]; then
+        /usr/local/bin/ndi-bridge-intercom-control mute output
+    else
+        /usr/local/bin/ndi-bridge-intercom-control unmute output
+    fi
+    
+    if [ "$INTERCOM_INPUT_MUTED" = "true" ]; then
+        /usr/local/bin/ndi-bridge-intercom-control mute input
+    else
+        /usr/local/bin/ndi-bridge-intercom-control unmute input
+    fi
+    
+    echo "Default settings applied"
+}
+
+# Function to show current config
+show_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        echo "Current default configuration:"
+        echo "=============================="
+        cat "$CONFIG_FILE"
+    else
+        echo "No default configuration saved"
+        echo "Use '$0 save' to save current settings as defaults"
+    fi
+}
+
+# Function to reset to factory defaults
+reset_defaults() {
+    echo "This will reset to factory default settings:"
+    echo "  Output Volume: 75%"
+    echo "  Input Volume: 75%"
+    echo "  Both unmuted"
+    echo ""
+    read -p "Continue? (y/N): " confirm
+    
+    if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
+        echo "Operation cancelled"
+        exit 0
+    fi
+    
+    # Make filesystem writable
+    echo "Making filesystem writable..."
+    make_writable
+    
+    # Remove config file
+    rm -f "$CONFIG_FILE"
+    echo "Configuration reset"
+    
+    # Make filesystem read-only again
+    echo "Returning filesystem to read-only..."
+    make_readonly
+    
+    # Apply factory defaults
+    /usr/local/bin/ndi-bridge-intercom-control volume both 75
+    /usr/local/bin/ndi-bridge-intercom-control unmute both
+    
+    echo "Factory defaults applied"
+}
+
+# Main command processing
+case "$1" in
+    save)
+        save_defaults
+        ;;
+    apply|load)
+        apply_defaults
+        ;;
+    show)
+        show_config
+        ;;
+    reset)
+        reset_defaults
+        ;;
+    help|--help|-h|"")
+        cat <<EOF
+NDI Bridge Intercom Configuration Manager
+
+Usage: $0 <command>
+
+Commands:
+  save    Save current audio settings as boot defaults
+  apply   Apply saved default settings
+  show    Show current default configuration
+  reset   Reset to factory defaults
+  help    Show this help message
+
+This tool manages persistent intercom audio settings that survive reboots.
+The configuration is stored in $CONFIG_FILE
+
+Note: Saving settings requires temporarily making the filesystem writable.
+EOF
+        ;;
+    *)
+        echo "Invalid command: $1"
+        echo "Use '$0 help' for usage information"
+        exit 1
+        ;;
+esac

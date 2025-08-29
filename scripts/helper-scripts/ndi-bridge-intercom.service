@@ -1,5 +1,5 @@
 [Unit]
-Description=VDO.Ninja Intercom Service
+Description=NDI Bridge Intercom Service
 After=network-online.target
 Wants=network-online.target
 
@@ -15,8 +15,11 @@ ExecStartPre=-/bin/bash -c 'pkill -9 -f Xvfb 2>/dev/null || true'
 ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock /tmp/chrome-vdo-profile/Singleton* 2>/dev/null || true'
 ExecStartPre=/bin/sleep 3
 
+# Apply saved audio configuration after service starts
+ExecStartPost=/bin/bash -c 'sleep 5; /usr/local/bin/ndi-bridge-intercom-config apply 2>/dev/null || true'
+
 # Start the service (auto-selects PipeWire or PulseAudio)
-ExecStart=/usr/local/bin/vdo-ninja-intercom-launcher
+ExecStart=/usr/local/bin/ndi-bridge-intercom-launcher
 
 # Stop cleanup
 ExecStopPost=-/bin/bash -c 'pkill -9 -f chrome 2>/dev/null || true'

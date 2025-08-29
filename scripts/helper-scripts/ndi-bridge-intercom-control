@@ -1,0 +1,248 @@
+#!/bin/bash
+# NDI Bridge Intercom Control
+# Controls audio mute and volume for VDO.Ninja intercom
+
+# State file for persistence
+STATE_DIR="/var/run/ndi-bridge"
+STATE_FILE="$STATE_DIR/intercom-state"
+LOCK_FILE="$STATE_DIR/intercom-control.lock"
+
+# Ensure state directory exists
+mkdir -p "$STATE_DIR"
+
+# Use flock for atomic operations
+exec 200>"$LOCK_FILE"
+flock -n 200 || { echo "Another control operation in progress"; exit 1; }
+
+# Function to get USB audio devices
+get_usb_audio_devices() {
+    local usb_sink=$(pactl list sinks short 2>/dev/null | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+    local usb_source=$(pactl list sources short 2>/dev/null | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+    
+    if [ -z "$usb_sink" ] || [ -z "$usb_source" ]; then
+        echo "ERROR: USB audio devices not found"
+        exit 1
+    fi
+    
+    echo "$usb_sink|$usb_source"
+}
+
+# Function to get current status
+get_status() {
+    local devices=$(get_usb_audio_devices)
+    local usb_sink=$(echo "$devices" | cut -d'|' -f1)
+    local usb_source=$(echo "$devices" | cut -d'|' -f2)
+    
+    # Get sink (output) status
+    local sink_info=$(pactl list sinks 2>/dev/null | grep -A 10 "Name: $usb_sink")
+    local sink_volume=$(echo "$sink_info" | grep "Volume:" | head -1 | grep -oP '\d+%' | head -1 | tr -d '%')
+    local sink_muted=$(echo "$sink_info" | grep "Mute:" | awk '{print $2}')
+    
+    # Get source (input) status
+    local source_info=$(pactl list sources 2>/dev/null | grep -A 10 "Name: $usb_source")
+    local source_volume=$(echo "$source_info" | grep "Volume:" | head -1 | grep -oP '\d+%' | head -1 | tr -d '%')
+    local source_muted=$(echo "$source_info" | grep "Mute:" | awk '{print $2}')
+    
+    # Check if intercom service is running
+    local service_status="stopped"
+    if systemctl is-active --quiet vdo-ninja-intercom.service; then
+        service_status="running"
+    fi
+    
+    # Output JSON format
+    cat <<EOF
+{
+    "service": "$service_status",
+    "output": {
+        "device": "$usb_sink",
+        "volume": ${sink_volume:-0},
+        "muted": $([ "$sink_muted" = "yes" ] && echo "true" || echo "false")
+    },
+    "input": {
+        "device": "$usb_source",
+        "volume": ${source_volume:-0},
+        "muted": $([ "$source_muted" = "yes" ] && echo "true" || echo "false")
+    }
+}
+EOF
+    
+    # Save state
+    echo "$sink_volume|$sink_muted|$source_volume|$source_muted" > "$STATE_FILE"
+}
+
+# Function to set mute state
+set_mute() {
+    local target="$1"  # input, output, or both
+    local state="$2"   # 1 for mute, 0 for unmute
+    
+    local devices=$(get_usb_audio_devices)
+    local usb_sink=$(echo "$devices" | cut -d'|' -f1)
+    local usb_source=$(echo "$devices" | cut -d'|' -f2)
+    
+    case "$target" in
+        output|speaker)
+            pactl set-sink-mute "$usb_sink" "$state"
+            echo "Output $([ "$state" = "1" ] && echo "muted" || echo "unmuted")"
+            ;;
+        input|mic|microphone)
+            pactl set-source-mute "$usb_source" "$state"
+            echo "Input $([ "$state" = "1" ] && echo "muted" || echo "unmuted")"
+            ;;
+        both|all)
+            pactl set-sink-mute "$usb_sink" "$state"
+            pactl set-source-mute "$usb_source" "$state"
+            echo "All audio $([ "$state" = "1" ] && echo "muted" || echo "unmuted")"
+            ;;
+        *)
+            echo "Invalid target: $target (use input, output, or both)"
+            exit 1
+            ;;
+    esac
+}
+
+# Function to toggle mute
+toggle_mute() {
+    local target="$1"
+    
+    local devices=$(get_usb_audio_devices)
+    local usb_sink=$(echo "$devices" | cut -d'|' -f1)
+    local usb_source=$(echo "$devices" | cut -d'|' -f2)
+    
+    case "$target" in
+        output|speaker)
+            pactl set-sink-mute "$usb_sink" toggle
+            local new_state=$(pactl list sinks 2>/dev/null | grep -A 10 "Name: $usb_sink" | grep "Mute:" | awk '{print $2}')
+            echo "Output $([ "$new_state" = "yes" ] && echo "muted" || echo "unmuted")"
+            ;;
+        input|mic|microphone)
+            pactl set-source-mute "$usb_source" toggle
+            local new_state=$(pactl list sources 2>/dev/null | grep -A 10 "Name: $usb_source" | grep "Mute:" | awk '{print $2}')
+            echo "Input $([ "$new_state" = "yes" ] && echo "muted" || echo "unmuted")"
+            ;;
+        both|all)
+            # For both, we toggle each independently
+            pactl set-sink-mute "$usb_sink" toggle
+            pactl set-source-mute "$usb_source" toggle
+            echo "Toggled mute for both input and output"
+            ;;
+        *)
+            echo "Invalid target: $target (use input, output, or both)"
+            exit 1
+            ;;
+    esac
+}
+
+# Function to set volume
+set_volume() {
+    local target="$1"
+    local volume="$2"
+    
+    # Validate volume (0-100)
+    if ! [[ "$volume" =~ ^[0-9]+$ ]] || [ "$volume" -lt 0 ] || [ "$volume" -gt 100 ]; then
+        echo "Invalid volume: $volume (must be 0-100)"
+        exit 1
+    fi
+    
+    local devices=$(get_usb_audio_devices)
+    local usb_sink=$(echo "$devices" | cut -d'|' -f1)
+    local usb_source=$(echo "$devices" | cut -d'|' -f2)
+    
+    case "$target" in
+        output|speaker)
+            pactl set-sink-volume "$usb_sink" "${volume}%"
+            echo "Output volume set to ${volume}%"
+            ;;
+        input|mic|microphone)
+            pactl set-source-volume "$usb_source" "${volume}%"
+            echo "Input volume set to ${volume}%"
+            ;;
+        both|all)
+            pactl set-sink-volume "$usb_sink" "${volume}%"
+            pactl set-source-volume "$usb_source" "${volume}%"
+            echo "All volumes set to ${volume}%"
+            ;;
+        *)
+            echo "Invalid target: $target (use input, output, or both)"
+            exit 1
+            ;;
+    esac
+}
+
+# Function to restart intercom service
+restart_service() {
+    echo "Restarting intercom service..."
+    systemctl restart vdo-ninja-intercom.service
+    
+    # Wait for service to start
+    sleep 3
+    
+    if systemctl is-active --quiet vdo-ninja-intercom.service; then
+        echo "Intercom service restarted successfully"
+    else
+        echo "Failed to restart intercom service"
+        exit 1
+    fi
+}
+
+# Main command processing
+case "$1" in
+    status)
+        get_status
+        ;;
+    mute)
+        set_mute "${2:-both}" 1
+        ;;
+    unmute)
+        set_mute "${2:-both}" 0
+        ;;
+    toggle)
+        toggle_mute "${2:-both}"
+        ;;
+    volume)
+        if [ -z "$3" ]; then
+            echo "Usage: $0 volume <input|output|both> <0-100>"
+            exit 1
+        fi
+        set_volume "$2" "$3"
+        ;;
+    restart)
+        restart_service
+        ;;
+    help|--help|-h)
+        cat <<EOF
+NDI Bridge Intercom Control
+
+Usage: $0 <command> [options]
+
+Commands:
+  status              Get current intercom status (JSON format)
+  mute [target]       Mute audio (target: input, output, both)
+  unmute [target]     Unmute audio (target: input, output, both)
+  toggle [target]     Toggle mute (target: input, output, both)
+  volume <target> <0-100>  Set volume (target: input, output, both)
+  restart             Restart intercom service
+  help                Show this help message
+
+Examples:
+  $0 status           # Get current status
+  $0 mute input       # Mute microphone
+  $0 unmute output    # Unmute speakers
+  $0 toggle           # Toggle both input and output
+  $0 volume input 75  # Set microphone to 75%
+  $0 volume both 50   # Set all volumes to 50%
+
+Target options:
+  input, mic, microphone  - Control microphone
+  output, speaker         - Control speakers
+  both, all              - Control both (default)
+EOF
+        ;;
+    *)
+        echo "Invalid command: $1"
+        echo "Use '$0 help' for usage information"
+        exit 1
+        ;;
+esac
+
+# Release lock
+flock -u 200
