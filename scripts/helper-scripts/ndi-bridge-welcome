@@ -80,6 +80,8 @@ elif [ "$CAPTURE_STATE" = "STABILIZING" ]; then
     if (( $(echo "$FPS_CURRENT > 0" | bc -l) )); then
         echo -e "  Current FPS: ${YELLOW}${FPS_CURRENT}${NC} (stabilizing)"
     fi
+    # Always show 0 dropped frames during stabilization
+    echo -e "  Dropped:     ${GRAY}0 frames${NC} (not counted during stabilization)"
 elif [ "$CAPTURE_STATE" = "CAPTURING" ]; then
     echo -e "  Capture:     ${GREEN}●${NC} ACTIVE - $DEVICE"
     
