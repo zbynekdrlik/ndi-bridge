@@ -193,6 +193,10 @@ USB_SOURCE=$(pactl list sources short | grep -E "USB.*Audio|usb" | grep -v monit
 if [ -n "$USB_SINK" ]; then
     echo "Setting default output to: $USB_SINK"
     pactl set-default-sink "$USB_SINK"
+    # Set volume to 100% and ensure unmuted
+    echo "Setting output volume to 100%"
+    pactl set-sink-volume "$USB_SINK" 100%
+    pactl set-sink-mute "$USB_SINK" 0
 else
     echo "WARNING: USB Audio output not found"
 fi
@@ -200,6 +204,10 @@ fi
 if [ -n "$USB_SOURCE" ]; then
     echo "Setting default input to: $USB_SOURCE"
     pactl set-default-source "$USB_SOURCE"
+    # Set microphone volume to 100% and ensure unmuted
+    echo "Setting microphone volume to 100%"
+    pactl set-source-volume "$USB_SOURCE" 100%
+    pactl set-source-mute "$USB_SOURCE" 0
 else
     echo "WARNING: USB Audio input not found"
 fi
