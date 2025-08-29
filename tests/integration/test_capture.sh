@@ -267,6 +267,25 @@ else
     log_info "Skipping long-term test (set RUN_LONG_TESTS=true to enable)"
 fi
 
+# Test 11: Read-only filesystem (if modified during tests)
+log_test "Test 11: Filesystem read-only status"
+# Check if filesystem was made writable during testing
+fs_status=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'")
+if [ "$fs_status" = "rw" ]; then
+    log_info "Filesystem is read-write, returning to read-only..."
+    box_ssh "ndi-bridge-ro"
+    sleep 2
+    # Verify it's read-only now
+    fs_status_after=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'")
+    if [ "$fs_status_after" = "ro" ]; then
+        record_test "Filesystem Read-Only" "PASS" "Returned to read-only"
+    else
+        record_test "Filesystem Read-Only" "FAIL" "Failed to return to read-only"
+    fi
+else
+    record_test "Filesystem Read-Only" "PASS" "Already read-only"
+fi
+
 # Collect diagnostic logs
 log_info "Collecting diagnostic information..."
 bridge_logs=$(box_get_logs "ndi-capture" 30)
