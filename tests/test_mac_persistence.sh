@@ -2,7 +2,8 @@
 # Test for MAC address persistence and uniqueness
 # This verifies that issue #27 is fixed - each device gets a unique, persistent MAC
 
-set -e
+# Don't exit on error - we want to run all tests
+set +e
 
 # Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,7 +67,7 @@ fi
 echo -e "\n${YELLOW}Testing Bridge MAC Configuration${NC}"
 
 # Check if MACAddress=none is set in netdev
-RESULT=$(ssh_cmd "grep -q 'MACAddress=none' /etc/systemd/network/10-br0.netdev && echo 'configured'" || echo "")
+RESULT=$(ssh_cmd "grep -q 'MACAddress=none' /etc/systemd/network/10-br0.netdev && echo 'configured' || echo 'not-configured'")
 if [ "$RESULT" = "configured" ]; then
     print_test_result "Bridge configured to inherit MAC" "PASS"
 else
@@ -74,7 +75,7 @@ else
 fi
 
 # Test 2: Check if link file prevents systemd MAC generation
-RESULT=$(ssh_cmd "test -f /etc/systemd/network/10-br0.link && grep -q 'MACAddressPolicy=none' /etc/systemd/network/10-br0.link && echo 'exists'" || echo "")
+RESULT=$(ssh_cmd "test -f /etc/systemd/network/10-br0.link && grep -q 'MACAddressPolicy=none' /etc/systemd/network/10-br0.link && echo 'exists' || echo 'missing'")
 if [ "$RESULT" = "exists" ]; then
     print_test_result "Link file prevents systemd MAC generation" "PASS"
 else
