@@ -8,9 +8,59 @@ install_helper_scripts() {
     local HELPER_DIR="$(dirname "$0")/helper-scripts"
     
     if [ -d "$HELPER_DIR" ]; then
+        # Copy all helper scripts
         cp -r "$HELPER_DIR"/* /mnt/usb/usr/local/bin/
+        
+        # Make executable
         chmod +x /mnt/usb/usr/local/bin/ndi-bridge-*
         chmod +x /mnt/usb/usr/local/bin/ndi-display-*
+        
+        # Copy VDO.Ninja intercom scripts and service (PipeWire only)
+        if [ -f "$HELPER_DIR/vdo-ninja-intercom-pipewire" ]; then
+            cp "$HELPER_DIR/vdo-ninja-intercom-pipewire" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/vdo-ninja-intercom-pipewire
+        fi
+        
+        # Copy launcher (PipeWire only, no fallback)
+        if [ -f "$HELPER_DIR/vdo-ninja-intercom-launcher" ]; then
+            cp "$HELPER_DIR/vdo-ninja-intercom-launcher" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/vdo-ninja-intercom-launcher
+        fi
+        
+        if [ -f "$HELPER_DIR/vdo-ninja-intercom.service" ]; then
+            cp "$HELPER_DIR/vdo-ninja-intercom.service" /mnt/usb/etc/systemd/system/
+        fi
+        
+        # Setup Chrome profile with VDO.Ninja permissions (pre-granted)
+        mkdir -p /mnt/usb/opt/chrome-vdo-profile/Default
+        cat > /mnt/usb/opt/chrome-vdo-profile/Default/Preferences << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766142668061",
+            "setting": 1
+          }
+        },
+        "media_stream_camera": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766150219890",
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+        
+        # Chrome intercom is now fully installed during build
+        log "Chrome intercom scripts installed"
     else
         warn "Helper scripts directory not found, creating inline..."
         # If helper scripts directory doesn't exist, create them inline

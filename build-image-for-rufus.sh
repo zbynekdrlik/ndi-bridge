@@ -52,9 +52,9 @@ fi
 echo "✓ ndi-capture binary found"
 echo "✓ ndi-display binary found"
 
-# Create image file (4GB should be enough)
+# Create image file (8GB for Chrome and dependencies)
 IMAGE_FILE="${1:-ndi-bridge.img}"
-IMAGE_SIZE="4G"
+IMAGE_SIZE="8G"
 
 echo "Creating disk image: $IMAGE_FILE ($IMAGE_SIZE)"
 

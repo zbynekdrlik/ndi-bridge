@@ -19,6 +19,7 @@ source "$SCRIPT_DIR/build-modules/07-base-setup.sh"
 source "$SCRIPT_DIR/build-modules/08-network.sh"
 source "$SCRIPT_DIR/build-modules/09-ndi-capture-service.sh"
 source "$SCRIPT_DIR/build-modules/09a-ndi-display-service.sh"
+source "$SCRIPT_DIR/build-modules/09a-intercom-chrome.sh"
 source "$SCRIPT_DIR/build-modules/10-tty-config.sh"
 source "$SCRIPT_DIR/build-modules/11-filesystem.sh"
 source "$SCRIPT_DIR/build-modules/12-helper-scripts.sh"
@@ -66,6 +67,7 @@ assemble_configuration() {
     configure_time_sync
     configure_ndi_service
     configure_ndi_display_service
+    configure_chrome_intercom
     configure_ttys
     configure_filesystem
     configure_power_resistance
