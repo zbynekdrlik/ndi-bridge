@@ -92,6 +92,9 @@ fi
 log_info "Waiting for stabilization to complete (27 more seconds)..."
 sleep 27
 
+# Wait a bit more for collector to update state after 30s mark
+sleep 3
+
 # Check state transitions to CAPTURING
 post_state=$(box_ssh "cat /var/run/ndi-bridge/capture_state 2>/dev/null")
 if [ "$post_state" = "CAPTURING" ]; then
