@@ -81,11 +81,14 @@ The build system is organized into modules in `scripts/build-modules/`:
 - `07-base-setup.sh` - Basic system configuration
 - `08-network.sh` - Network bridge setup
 - `09-ndi-capture-service.sh` - NDI Capture service
-- `10-tty-config.sh` - Console configuration
-- `11-filesystem.sh` - Filesystem and bootloader
-- `12-helper-scripts.sh` - Helper script installation
-- `13-helper-scripts-inline.sh` - Inline helper creation
-- `14-power-resistance.sh` - Power failure resistance features
+- `10-ndi-display-service.sh` - NDI Display service
+- `11-intercom-chrome.sh` - Chrome intercom setup
+- `12-tty-config.sh` - Console configuration
+- `13-filesystem.sh` - Filesystem and bootloader
+- `14-helper-scripts.sh` - Helper script installation
+- `15-time-sync.sh` - Time synchronization setup
+- `16-power-resistance.sh` - Power failure resistance features
+- `17-web-interface.sh` - Web interface setup
 
 ### Helper Scripts
 Management scripts in `scripts/helper-scripts/`:

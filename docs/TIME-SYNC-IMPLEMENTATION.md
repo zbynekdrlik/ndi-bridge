@@ -8,7 +8,7 @@ This document describes the implementation of high-precision time synchronizatio
 
 ### 1. New Build Module
 
-A new build module `scripts/build-modules/13-time-sync.sh` was created to handle time synchronization setup during USB creation:
+A new build module `scripts/build-modules/15-time-sync.sh` was created to handle time synchronization setup during USB creation:
 
 - Installs LinuxPTP for PTP support
 - Installs chrony for NTP support
