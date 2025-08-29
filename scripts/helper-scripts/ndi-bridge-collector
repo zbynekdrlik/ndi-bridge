@@ -10,13 +10,13 @@ SERVICE_START_FILE="/var/run/ndi-bridge/capture_start_time"
 
 # Main collection loop
 while true; do
-    # Check if we're in stabilization period
+    # Check if we're in stabilization period (30 seconds)
     IS_STABILIZING=false
     if [ -f "$SERVICE_START_FILE" ] && systemctl is-active --quiet ndi-capture; then
         START_TIME=$(cat "$SERVICE_START_FILE")
         CURRENT_TIME=$(date +%s)
         ELAPSED=$((CURRENT_TIME - START_TIME))
-        if [ "$ELAPSED" -lt 60 ]; then
+        if [ "$ELAPSED" -lt 30 ]; then
             IS_STABILIZING=true
         fi
     fi
@@ -116,10 +116,12 @@ while true; do
             CURRENT_TIME=$(date +%s)
             ELAPSED=$((CURRENT_TIME - START_TIME))
             
-            if [ "$ELAPSED" -lt 60 ]; then
-                # Still stabilizing
+            if [ "$ELAPSED" -lt 30 ]; then
+                # Still stabilizing (reduced to 30 seconds)
                 echo "STABILIZING" > /var/run/ndi-bridge/capture_state
                 echo "$ELAPSED" > /var/run/ndi-bridge/stabilizing_seconds
+                # Force dropped frames to 0 during stabilization
+                echo "0" > /var/run/ndi-bridge/frames_dropped
                 # Skip the rest of the checks during stabilization
                 sleep 1
                 continue

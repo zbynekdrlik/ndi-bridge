@@ -71,17 +71,17 @@ elif [ "$CAPTURE_STATE" = "ERROR" ]; then
     echo -e "  Capture:     ${RED}●${NC} ERROR - Failed to open $DEVICE"
     echo -e "  Status:      Check device connection"
 elif [ "$CAPTURE_STATE" = "STABILIZING" ]; then
-    # Get stabilization progress
+    # Get stabilization progress (30 seconds total)
     STAB_SECONDS=$(cat /var/run/ndi-bridge/stabilizing_seconds 2>/dev/null || echo "0")
-    STAB_REMAINING=$((60 - STAB_SECONDS))
+    STAB_REMAINING=$((30 - STAB_SECONDS))
     echo -e "  Capture:     ${YELLOW}●${NC} STABILIZING - $DEVICE"
     echo -e "  Status:      Initializing capture (${STAB_REMAINING}s remaining)..."
     # Show current FPS even during stabilization
     if (( $(echo "$FPS_CURRENT > 0" | bc -l) )); then
         echo -e "  Current FPS: ${YELLOW}${FPS_CURRENT}${NC} (stabilizing)"
     fi
-    # Always show 0 dropped frames during stabilization
-    echo -e "  Dropped:     ${GRAY}0 frames${NC} (not counted during stabilization)"
+    # Force show 0 dropped frames during stabilization (ignore file value)
+    echo -e "  Dropped:     ${GRAY}0 frames${NC} (ignored during init)"
 elif [ "$CAPTURE_STATE" = "CAPTURING" ]; then
     echo -e "  Capture:     ${GREEN}●${NC} ACTIVE - $DEVICE"
     
