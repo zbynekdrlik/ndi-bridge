@@ -10,6 +10,37 @@ source "${SCRIPT_DIR}/../lib/box_control.sh"
 # Test configuration
 TEST_NAME="Capture Test Suite"
 
+# Ensure filesystem is read-only (critical for valid testing)
+ensure_filesystem_readonly() {
+    local fs_status=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'" 2>/dev/null)
+    
+    if [ "$fs_status" = "rw" ]; then
+        log_error "CRITICAL: Filesystem is read-write!"
+        log_error "Tests cannot proceed on read-write filesystem"
+        log_info "Attempting to remount as read-only..."
+        
+        box_ssh "ndi-bridge-ro" 2>/dev/null || box_ssh "mount -o remount,ro /"
+        sleep 2
+        
+        # Verify it's now read-only
+        fs_status=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'" 2>/dev/null)
+        if [ "$fs_status" = "ro" ]; then
+            log_info "Filesystem successfully remounted as read-only"
+            return 0
+        else
+            log_error "Failed to remount filesystem as read-only"
+            log_error "Tests MUST NOT proceed with read-write filesystem"
+            return 1
+        fi
+    elif [ "$fs_status" = "ro" ]; then
+        log_info "✓ Filesystem is read-only (correct for testing)"
+        return 0
+    else
+        log_error "Could not determine filesystem status"
+        return 1
+    fi
+}
+
 # Initialize test logs
 setup_test_logs
 
@@ -21,6 +52,17 @@ if ! box_ping; then
     log_error "Box at $TEST_BOX_IP is not reachable"
     exit 1
 fi
+
+# CRITICAL: Ensure filesystem is read-only before testing
+log_test "Pre-test: Filesystem read-only check"
+if ! ensure_filesystem_readonly; then
+    log_error "FATAL: Cannot proceed with tests on read-write filesystem"
+    log_error "This would produce invalid test results"
+    record_test "Filesystem Read-Only Check" "FAIL" "Tests aborted - filesystem not read-only"
+    print_test_summary
+    exit 1
+fi
+record_test "Filesystem Read-Only Check" "PASS" "Filesystem is read-only"
 
 # Test 1: Check capture device
 log_test "Test 1: Capture device detection"
@@ -315,25 +357,6 @@ if [ "${RUN_LONG_TESTS:-false}" = "true" ]; then
     fi
 else
     log_info "Skipping long-term test (set RUN_LONG_TESTS=true to enable)"
-fi
-
-# Test 11: Read-only filesystem (if modified during tests)
-log_test "Test 11: Filesystem read-only status"
-# Check if filesystem was made writable during testing
-fs_status=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'")
-if [ "$fs_status" = "rw" ]; then
-    log_info "Filesystem is read-write, returning to read-only..."
-    box_ssh "ndi-bridge-ro"
-    sleep 2
-    # Verify it's read-only now
-    fs_status_after=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'")
-    if [ "$fs_status_after" = "ro" ]; then
-        record_test "Filesystem Read-Only" "PASS" "Returned to read-only"
-    else
-        record_test "Filesystem Read-Only" "FAIL" "Failed to return to read-only"
-    fi
-else
-    record_test "Filesystem Read-Only" "PASS" "Already read-only"
 fi
 
 # Collect diagnostic logs
