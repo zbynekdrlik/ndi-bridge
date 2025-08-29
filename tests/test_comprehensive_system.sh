@@ -337,6 +337,54 @@ fi
 
 echo -e "\n${CYAN}═══ Section 8: Dante Audio Bridge ═══${NC}"
 
+# Test Statime PTP daemon
+if ssh_cmd "systemctl is-enabled statime.service 2>/dev/null | grep -q enabled"; then
+    print_test_result "Statime PTP daemon" "PASS"
+    if ssh_cmd "systemctl is-active statime.service >/dev/null 2>&1"; then
+        echo "  ✓ PTP synchronization active"
+    else
+        echo "  ⚠ Service enabled but not running"
+    fi
+else
+    print_test_result "Statime PTP daemon" "WARN" "Not installed"
+fi
+
+# Test Inferno ALSA service
+if ssh_cmd "systemctl is-enabled inferno-alsa.service 2>/dev/null | grep -q enabled"; then
+    print_test_result "Inferno ALSA service" "PASS"
+    if ssh_cmd "systemctl is-active inferno-alsa.service >/dev/null 2>&1"; then
+        echo "  ✓ Dante device active"
+        # Check if listening on Dante ports
+        DANTE_PORTS=$(ssh_cmd "netstat -ulnp 2>/dev/null | grep -E '8700|8800' | wc -l")
+        if [ "$DANTE_PORTS" -gt 0 ]; then
+            echo "  ✓ Listening on Dante control ports"
+        fi
+    else
+        echo "  ⚠ Service enabled but not running"
+    fi
+else
+    print_test_result "Inferno ALSA service" "WARN" "Not installed"
+fi
+
+# Test USB-Dante bridge
+if ssh_cmd "systemctl list-units --all | grep -q usb-dante-bridge"; then
+    print_test_result "USB-Dante bridge" "PASS"
+    if ssh_cmd "systemctl is-active usb-dante-bridge.service >/dev/null 2>&1"; then
+        echo "  ✓ USB audio bridged to Dante"
+    else
+        echo "  ⚠ Service available but not active (may need USB device)"
+    fi
+else
+    print_test_result "USB-Dante bridge" "WARN" "Not installed"
+fi
+
+# Test Inferno ALSA plugin
+if ssh_cmd "test -f /usr/lib/x86_64-linux-gnu/alsa-lib/libasound_module_pcm_inferno.so"; then
+    print_test_result "Inferno ALSA plugin" "PASS"
+else
+    print_test_result "Inferno ALSA plugin" "WARN" "Not installed"
+fi
+
 # Test Dante configuration
 if ssh_cmd "test -f /etc/ndi-bridge/dante.conf" && echo "exists"; then
     print_test_result "Dante configuration" "PASS"

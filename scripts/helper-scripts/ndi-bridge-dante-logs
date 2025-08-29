@@ -6,29 +6,35 @@ echo "    Dante Audio Bridge Logs     "
 echo "================================"
 echo
 
-# Check if service exists
-if ! systemctl list-units --all | grep -q dante-bridge.service; then
-    echo "Dante bridge service not found"
-    exit 1
-fi
+# Function to show service logs
+show_service_logs() {
+    local service=$1
+    local description=$2
+    
+    if systemctl list-units --all | grep -q "$service"; then
+        echo "$description:"
+        echo "--------------------------------"
+        systemctl status $service --no-pager | head -10
+        echo
+        echo "Recent log entries:"
+        journalctl -u $service -n 20 --no-pager
+        echo
+        echo "================================"
+        echo
+    fi
+}
 
-# Show service status first
-echo "Service Status:"
-systemctl status dante-bridge.service --no-pager | head -10
-echo
-echo "--------------------------------"
-echo "Recent Log Entries:"
-echo "--------------------------------"
-echo
-
-# Show logs with follow option if requested
+# Check if follow mode is requested
 if [ "$1" = "-f" ] || [ "$1" = "--follow" ]; then
-    echo "Following logs (Ctrl+C to exit)..."
-    journalctl -u dante-bridge.service -f
-else
-    # Show last 50 lines by default
-    journalctl -u dante-bridge.service -n ${1:-50} --no-pager
+    echo "Following all Dante-related logs (Ctrl+C to exit)..."
     echo
+    journalctl -u statime.service -u inferno-alsa.service -u usb-dante-bridge.service -f
+else
+    # Show status and logs for each service
+    show_service_logs "statime.service" "Statime PTP Daemon"
+    show_service_logs "inferno-alsa.service" "Inferno ALSA Service"
+    show_service_logs "usb-dante-bridge.service" "USB to Dante Bridge"
+    
     echo "Tip: Use 'ndi-bridge-dante-logs -f' to follow logs in real-time"
-    echo "     Use 'ndi-bridge-dante-logs 100' to see last 100 lines"
+    echo "     Use 'ndi-bridge-dante-status' to see current status"
 fi

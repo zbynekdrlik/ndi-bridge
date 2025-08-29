@@ -19,11 +19,11 @@ show_menu() {
     echo "1) Set Device Name"
     echo "2) Configure Channels (2-64)"
     echo "3) Set Sample Rate"
-    echo "4) Configure Audio Mode"
-    echo "5) Enable/Disable Service"
-    echo "6) Test Audio Routing"
+    echo "4) Enable/Disable Services"
+    echo "5) Enable/Disable USB Bridge"
+    echo "6) Test Audio"
     echo "7) Show Current Config"
-    echo "8) Restart Service"
+    echo "8) Restart Services"
     echo "9) Exit"
     echo
     echo -n "Select option: "
@@ -44,7 +44,6 @@ DANTE_SAMPLE_RATE=48000
 DANTE_DEVICE_NAME=ndi-bridge
 DANTE_ENABLED=true
 DANTE_MODE=bidirectional
-DANTE_PTP_DEVICE=/dev/ptp0
 EOF
     fi
 }
@@ -58,7 +57,6 @@ DANTE_SAMPLE_RATE=${DANTE_SAMPLE_RATE:-48000}
 DANTE_DEVICE_NAME=${DANTE_DEVICE_NAME:-ndi-bridge}
 DANTE_ENABLED=${DANTE_ENABLED:-true}
 DANTE_MODE=${DANTE_MODE:-bidirectional}
-DANTE_PTP_DEVICE=${DANTE_PTP_DEVICE:-/dev/ptp0}
 EOF
     echo -e "${GREEN}Configuration saved${NC}"
     NEED_RESTART=true
@@ -70,6 +68,9 @@ set_device_name() {
     if [ -n "$new_name" ]; then
         DANTE_DEVICE_NAME="$new_name"
         save_config
+        # Update environment for services
+        sed -i "s/INFERNO_NAME=.*/INFERNO_NAME=$new_name/" /etc/systemd/system/inferno-alsa.service 2>/dev/null
+        systemctl daemon-reload
     fi
 }
 
@@ -99,43 +100,67 @@ set_sample_rate() {
     esac
 }
 
-set_audio_mode() {
-    echo "Select audio routing mode:"
-    echo "1) USB to Dante only"
-    echo "2) Dante to USB only"
-    echo "3) Bidirectional"
-    echo -n "Choice (current: ${DANTE_MODE:-bidirectional}): "
+toggle_services() {
+    echo "Dante Services:"
+    echo "1) Enable all Dante services"
+    echo "2) Disable all Dante services"
+    echo "3) Back to menu"
+    echo -n "Choice: "
     read choice
+    
     case $choice in
-        1) DANTE_MODE="usb2dante"; save_config ;;
-        2) DANTE_MODE="dante2usb"; save_config ;;
-        3) DANTE_MODE="bidirectional"; save_config ;;
-        *) echo -e "${RED}Invalid choice${NC}"; sleep 2 ;;
+        1)
+            systemctl enable statime.service inferno-alsa.service 2>/dev/null
+            systemctl start statime.service inferno-alsa.service 2>/dev/null
+            echo -e "${GREEN}Dante services enabled${NC}"
+            sleep 2
+            ;;
+        2)
+            systemctl stop statime.service inferno-alsa.service usb-dante-bridge.service 2>/dev/null
+            systemctl disable statime.service inferno-alsa.service 2>/dev/null
+            echo -e "${YELLOW}Dante services disabled${NC}"
+            sleep 2
+            ;;
     esac
 }
 
-toggle_service() {
-    if [ "${DANTE_ENABLED}" = "true" ]; then
-        DANTE_ENABLED="false"
-        systemctl disable dante-bridge.service 2>/dev/null
-        systemctl stop dante-bridge.service 2>/dev/null
-        echo -e "${YELLOW}Dante service disabled${NC}"
+toggle_usb_bridge() {
+    USB_STATUS=$(systemctl is-active usb-dante-bridge.service)
+    
+    if [ "$USB_STATUS" = "active" ]; then
+        echo "USB to Dante bridge is currently ACTIVE"
+        echo -n "Disable it? (y/n): "
+        read choice
+        if [ "$choice" = "y" ]; then
+            systemctl stop usb-dante-bridge.service
+            systemctl disable usb-dante-bridge.service
+            echo -e "${YELLOW}USB bridge disabled${NC}"
+        fi
     else
-        DANTE_ENABLED="true"
-        systemctl enable dante-bridge.service 2>/dev/null
-        systemctl start dante-bridge.service 2>/dev/null
-        echo -e "${GREEN}Dante service enabled${NC}"
+        echo "USB to Dante bridge is currently INACTIVE"
+        # Check for USB audio devices
+        USB_COUNT=$(aplay -l | grep -E "USB Audio|Arturia" | wc -l)
+        if [ "$USB_COUNT" -gt 0 ]; then
+            echo "Found $USB_COUNT USB audio device(s)"
+            echo -n "Enable USB to Dante bridge? (y/n): "
+            read choice
+            if [ "$choice" = "y" ]; then
+                systemctl enable usb-dante-bridge.service
+                systemctl start usb-dante-bridge.service
+                echo -e "${GREEN}USB bridge enabled${NC}"
+            fi
+        else
+            echo -e "${RED}No USB audio devices found${NC}"
+        fi
     fi
-    save_config
     sleep 2
 }
 
 test_audio() {
-    echo "Testing Dante audio routing..."
-    echo
+    echo "Audio Test Options:"
     echo "1) Generate test tone to Dante output"
-    echo "2) Record from Dante input"
-    echo "3) List available Dante devices"
+    echo "2) List available audio devices"
+    echo "3) Test USB audio device"
     echo "4) Cancel"
     echo -n "Choice: "
     read choice
@@ -143,26 +168,22 @@ test_audio() {
     case $choice in
         1)
             echo "Generating 1kHz test tone for 3 seconds..."
-            speaker-test -D dante_out -c 2 -t sine -f 1000 -l 1 2>/dev/null || \
+            INFERNO_NAME=${DANTE_DEVICE_NAME:-ndi-bridge} INFERNO_INTERFACE=br0 \
+                speaker-test -D dante -c 2 -t sine -f 1000 -l 1 2>/dev/null || \
                 echo -e "${RED}Failed to generate test tone${NC}"
             ;;
         2)
-            echo "Recording 5 seconds from Dante input..."
-            arecord -D dante_in -f cd -d 5 /tmp/dante_test.wav 2>/dev/null
-            if [ -f /tmp/dante_test.wav ]; then
-                echo -e "${GREEN}Recording saved to /tmp/dante_test.wav${NC}"
-                echo "Playing back recording..."
-                aplay /tmp/dante_test.wav 2>/dev/null
-            else
-                echo -e "${RED}Recording failed${NC}"
-            fi
-            ;;
-        3)
             echo "Available ALSA devices:"
             aplay -l
-            echo
-            echo "Dante devices (if configured):"
-            aplay -L | grep dante
+            ;;
+        3)
+            USB_CARD=$(aplay -l | grep -E "USB Audio|Arturia" | head -1 | sed 's/card \([0-9]\).*/\1/')
+            if [ -n "$USB_CARD" ]; then
+                echo "Testing USB audio device (card $USB_CARD)..."
+                speaker-test -D plughw:$USB_CARD,0 -c 2 -t sine -f 1000 -l 1 2>/dev/null
+            else
+                echo -e "${RED}No USB audio device found${NC}"
+            fi
             ;;
     esac
     
@@ -179,23 +200,33 @@ show_config() {
     echo "Channels: ${DANTE_CHANNELS:-2}"
     echo "Sample Rate: ${DANTE_SAMPLE_RATE:-48000} Hz"
     echo "Mode: ${DANTE_MODE:-bidirectional}"
-    echo "Enabled: ${DANTE_ENABLED:-true}"
-    echo "PTP Device: ${DANTE_PTP_DEVICE:-/dev/ptp0}"
+    echo
+    echo "Service Status:"
+    echo "---------------"
+    echo -n "Statime PTP: "
+    systemctl is-active statime.service
+    echo -n "Inferno ALSA: "
+    systemctl is-active inferno-alsa.service
+    echo -n "USB Bridge: "
+    systemctl is-active usb-dante-bridge.service
     echo
     echo "Press Enter to continue..."
     read
 }
 
-restart_service() {
-    echo -n "Restarting Dante service..."
-    systemctl restart dante-bridge.service 2>/dev/null
+restart_services() {
+    echo -n "Restarting Dante services..."
+    systemctl restart statime.service 2>/dev/null
     sleep 2
+    systemctl restart inferno-alsa.service 2>/dev/null
+    sleep 1
+    systemctl restart usb-dante-bridge.service 2>/dev/null
     
-    if systemctl is-active dante-bridge.service >/dev/null 2>&1; then
+    if systemctl is-active inferno-alsa.service >/dev/null 2>&1; then
         echo -e " ${GREEN}OK${NC}"
     else
         echo -e " ${RED}FAILED${NC}"
-        echo "Check logs with: journalctl -u dante-bridge.service"
+        echo "Check logs with: journalctl -u inferno-alsa.service"
     fi
     sleep 2
 }
@@ -211,18 +242,18 @@ while true; do
         1) set_device_name ;;
         2) set_channels ;;
         3) set_sample_rate ;;
-        4) set_audio_mode ;;
-        5) toggle_service ;;
+        4) toggle_services ;;
+        5) toggle_usb_bridge ;;
         6) test_audio ;;
         7) show_config ;;
-        8) restart_service ;;
+        8) restart_services ;;
         9) 
             if [ "$NEED_RESTART" = "true" ]; then
-                echo -e "${YELLOW}Configuration changed. Restart service? (y/n)${NC}"
+                echo -e "${YELLOW}Configuration changed. Restart services? (y/n)${NC}"
                 read -n 1 restart
                 echo
                 if [ "$restart" = "y" ]; then
-                    restart_service
+                    restart_services
                 fi
             fi
             exit 0
