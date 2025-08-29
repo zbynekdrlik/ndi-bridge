@@ -10,35 +10,10 @@ source "${SCRIPT_DIR}/../lib/box_control.sh"
 # Test configuration
 TEST_NAME="Capture Test Suite"
 
-# Ensure filesystem is read-only (critical for valid testing)
-ensure_filesystem_readonly() {
+# Check filesystem is read-only
+check_filesystem_readonly() {
     local fs_status=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'" 2>/dev/null)
-    
-    if [ "$fs_status" = "rw" ]; then
-        log_error "CRITICAL: Filesystem is read-write!"
-        log_error "Tests cannot proceed on read-write filesystem"
-        log_info "Attempting to remount as read-only..."
-        
-        box_ssh "ndi-bridge-ro" 2>/dev/null || box_ssh "mount -o remount,ro /"
-        sleep 2
-        
-        # Verify it's now read-only
-        fs_status=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'" 2>/dev/null)
-        if [ "$fs_status" = "ro" ]; then
-            log_info "Filesystem successfully remounted as read-only"
-            return 0
-        else
-            log_error "Failed to remount filesystem as read-only"
-            log_error "Tests MUST NOT proceed with read-write filesystem"
-            return 1
-        fi
-    elif [ "$fs_status" = "ro" ]; then
-        log_info "✓ Filesystem is read-only (correct for testing)"
-        return 0
-    else
-        log_error "Could not determine filesystem status"
-        return 1
-    fi
+    [ "$fs_status" = "ro" ]
 }
 
 # Initialize test logs
@@ -53,16 +28,11 @@ if ! box_ping; then
     exit 1
 fi
 
-# CRITICAL: Ensure filesystem is read-only before testing
-log_test "Pre-test: Filesystem read-only check"
-if ! ensure_filesystem_readonly; then
-    log_error "FATAL: Cannot proceed with tests on read-write filesystem"
-    log_error "This would produce invalid test results"
-    record_test "Filesystem Read-Only Check" "FAIL" "Tests aborted - filesystem not read-only"
-    print_test_summary
+# Check filesystem is read-only before testing
+if ! check_filesystem_readonly; then
+    log_error "Filesystem is read-write - tests cannot proceed"
     exit 1
 fi
-record_test "Filesystem Read-Only Check" "PASS" "Filesystem is read-only"
 
 # Test 1: Check capture device
 log_test "Test 1: Capture device detection"
