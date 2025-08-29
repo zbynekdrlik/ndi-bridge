@@ -1,0 +1,232 @@
+#!/bin/bash
+# Configure Dante audio bridge settings
+
+CONFIG_FILE="/etc/ndi-bridge/dante.conf"
+NEED_RESTART=false
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+show_menu() {
+    clear
+    echo "================================"
+    echo "   Dante Audio Configuration    "
+    echo "================================"
+    echo
+    echo "1) Set Device Name"
+    echo "2) Configure Channels (2-64)"
+    echo "3) Set Sample Rate"
+    echo "4) Configure Audio Mode"
+    echo "5) Enable/Disable Service"
+    echo "6) Test Audio Routing"
+    echo "7) Show Current Config"
+    echo "8) Restart Service"
+    echo "9) Exit"
+    echo
+    echo -n "Select option: "
+}
+
+load_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+    else
+        echo -e "${RED}Configuration file not found!${NC}"
+        echo "Creating default configuration..."
+        mkdir -p /etc/ndi-bridge
+        cat > "$CONFIG_FILE" << 'EOF'
+# Dante Audio Bridge Configuration
+DANTE_INTERFACE=br0
+DANTE_CHANNELS=2
+DANTE_SAMPLE_RATE=48000
+DANTE_DEVICE_NAME=ndi-bridge
+DANTE_ENABLED=true
+DANTE_MODE=bidirectional
+DANTE_PTP_DEVICE=/dev/ptp0
+EOF
+    fi
+}
+
+save_config() {
+    cat > "$CONFIG_FILE" << EOF
+# Dante Audio Bridge Configuration
+DANTE_INTERFACE=${DANTE_INTERFACE:-br0}
+DANTE_CHANNELS=${DANTE_CHANNELS:-2}
+DANTE_SAMPLE_RATE=${DANTE_SAMPLE_RATE:-48000}
+DANTE_DEVICE_NAME=${DANTE_DEVICE_NAME:-ndi-bridge}
+DANTE_ENABLED=${DANTE_ENABLED:-true}
+DANTE_MODE=${DANTE_MODE:-bidirectional}
+DANTE_PTP_DEVICE=${DANTE_PTP_DEVICE:-/dev/ptp0}
+EOF
+    echo -e "${GREEN}Configuration saved${NC}"
+    NEED_RESTART=true
+}
+
+set_device_name() {
+    echo -n "Enter Dante device name (current: ${DANTE_DEVICE_NAME:-ndi-bridge}): "
+    read new_name
+    if [ -n "$new_name" ]; then
+        DANTE_DEVICE_NAME="$new_name"
+        save_config
+    fi
+}
+
+set_channels() {
+    echo "Current channels: ${DANTE_CHANNELS:-2}"
+    echo -n "Enter number of channels (2-64): "
+    read new_channels
+    if [[ "$new_channels" =~ ^[0-9]+$ ]] && [ "$new_channels" -ge 2 ] && [ "$new_channels" -le 64 ]; then
+        DANTE_CHANNELS="$new_channels"
+        save_config
+    else
+        echo -e "${RED}Invalid channel count!${NC}"
+        sleep 2
+    fi
+}
+
+set_sample_rate() {
+    echo "Select sample rate:"
+    echo "1) 44100 Hz"
+    echo "2) 48000 Hz"
+    echo -n "Choice (current: ${DANTE_SAMPLE_RATE:-48000}): "
+    read choice
+    case $choice in
+        1) DANTE_SAMPLE_RATE=44100; save_config ;;
+        2) DANTE_SAMPLE_RATE=48000; save_config ;;
+        *) echo -e "${RED}Invalid choice${NC}"; sleep 2 ;;
+    esac
+}
+
+set_audio_mode() {
+    echo "Select audio routing mode:"
+    echo "1) USB to Dante only"
+    echo "2) Dante to USB only"
+    echo "3) Bidirectional"
+    echo -n "Choice (current: ${DANTE_MODE:-bidirectional}): "
+    read choice
+    case $choice in
+        1) DANTE_MODE="usb2dante"; save_config ;;
+        2) DANTE_MODE="dante2usb"; save_config ;;
+        3) DANTE_MODE="bidirectional"; save_config ;;
+        *) echo -e "${RED}Invalid choice${NC}"; sleep 2 ;;
+    esac
+}
+
+toggle_service() {
+    if [ "${DANTE_ENABLED}" = "true" ]; then
+        DANTE_ENABLED="false"
+        systemctl disable dante-bridge.service 2>/dev/null
+        systemctl stop dante-bridge.service 2>/dev/null
+        echo -e "${YELLOW}Dante service disabled${NC}"
+    else
+        DANTE_ENABLED="true"
+        systemctl enable dante-bridge.service 2>/dev/null
+        systemctl start dante-bridge.service 2>/dev/null
+        echo -e "${GREEN}Dante service enabled${NC}"
+    fi
+    save_config
+    sleep 2
+}
+
+test_audio() {
+    echo "Testing Dante audio routing..."
+    echo
+    echo "1) Generate test tone to Dante output"
+    echo "2) Record from Dante input"
+    echo "3) List available Dante devices"
+    echo "4) Cancel"
+    echo -n "Choice: "
+    read choice
+    
+    case $choice in
+        1)
+            echo "Generating 1kHz test tone for 3 seconds..."
+            speaker-test -D dante_out -c 2 -t sine -f 1000 -l 1 2>/dev/null || \
+                echo -e "${RED}Failed to generate test tone${NC}"
+            ;;
+        2)
+            echo "Recording 5 seconds from Dante input..."
+            arecord -D dante_in -f cd -d 5 /tmp/dante_test.wav 2>/dev/null
+            if [ -f /tmp/dante_test.wav ]; then
+                echo -e "${GREEN}Recording saved to /tmp/dante_test.wav${NC}"
+                echo "Playing back recording..."
+                aplay /tmp/dante_test.wav 2>/dev/null
+            else
+                echo -e "${RED}Recording failed${NC}"
+            fi
+            ;;
+        3)
+            echo "Available ALSA devices:"
+            aplay -l
+            echo
+            echo "Dante devices (if configured):"
+            aplay -L | grep dante
+            ;;
+    esac
+    
+    echo
+    echo "Press Enter to continue..."
+    read
+}
+
+show_config() {
+    echo "Current Dante Configuration:"
+    echo "============================"
+    echo "Device Name: ${DANTE_DEVICE_NAME:-ndi-bridge}"
+    echo "Interface: ${DANTE_INTERFACE:-br0}"
+    echo "Channels: ${DANTE_CHANNELS:-2}"
+    echo "Sample Rate: ${DANTE_SAMPLE_RATE:-48000} Hz"
+    echo "Mode: ${DANTE_MODE:-bidirectional}"
+    echo "Enabled: ${DANTE_ENABLED:-true}"
+    echo "PTP Device: ${DANTE_PTP_DEVICE:-/dev/ptp0}"
+    echo
+    echo "Press Enter to continue..."
+    read
+}
+
+restart_service() {
+    echo -n "Restarting Dante service..."
+    systemctl restart dante-bridge.service 2>/dev/null
+    sleep 2
+    
+    if systemctl is-active dante-bridge.service >/dev/null 2>&1; then
+        echo -e " ${GREEN}OK${NC}"
+    else
+        echo -e " ${RED}FAILED${NC}"
+        echo "Check logs with: journalctl -u dante-bridge.service"
+    fi
+    sleep 2
+}
+
+# Main loop
+load_config
+
+while true; do
+    show_menu
+    read choice
+    
+    case $choice in
+        1) set_device_name ;;
+        2) set_channels ;;
+        3) set_sample_rate ;;
+        4) set_audio_mode ;;
+        5) toggle_service ;;
+        6) test_audio ;;
+        7) show_config ;;
+        8) restart_service ;;
+        9) 
+            if [ "$NEED_RESTART" = "true" ]; then
+                echo -e "${YELLOW}Configuration changed. Restart service? (y/n)${NC}"
+                read -n 1 restart
+                echo
+                if [ "$restart" = "y" ]; then
+                    restart_service
+                fi
+            fi
+            exit 0
+            ;;
+        *) echo -e "${RED}Invalid option${NC}"; sleep 1 ;;
+    esac
+done

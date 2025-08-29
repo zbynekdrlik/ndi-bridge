@@ -15,6 +15,12 @@ install_helper_scripts() {
         chmod +x /mnt/usb/usr/local/bin/ndi-bridge-*
         chmod +x /mnt/usb/usr/local/bin/ndi-display-*
         
+        # Also make Dante scripts executable if they exist
+        if ls /mnt/usb/usr/local/bin/ndi-bridge-dante-* >/dev/null 2>&1; then
+            chmod +x /mnt/usb/usr/local/bin/ndi-bridge-dante-*
+            log "  Dante helper scripts installed"
+        fi
+        
         # Copy VDO.Ninja intercom scripts and service (PipeWire only)
         if [ -f "$HELPER_DIR/vdo-ninja-intercom-pipewire" ]; then
             cp "$HELPER_DIR/vdo-ninja-intercom-pipewire" /mnt/usb/usr/local/bin/

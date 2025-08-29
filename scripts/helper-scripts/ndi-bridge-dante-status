@@ -1,0 +1,103 @@
+#!/bin/bash
+# Show Dante audio bridge status
+
+echo "================================"
+echo "    Dante Audio Bridge Status   "
+echo "================================"
+echo
+
+# Check if service is running
+SERVICE_STATUS=$(systemctl is-active dante-bridge.service 2>/dev/null)
+if [ "$SERVICE_STATUS" = "active" ]; then
+    echo -e "Service Status: \033[32mRUNNING\033[0m"
+    
+    # Get process info
+    DANTE_PID=$(pgrep -f inferno)
+    if [ -n "$DANTE_PID" ]; then
+        echo "Process ID: $DANTE_PID"
+        
+        # Get memory usage
+        MEM_USAGE=$(ps -o rss= -p $DANTE_PID | awk '{print $1/1024 " MB"}')
+        echo "Memory Usage: $MEM_USAGE"
+    fi
+else
+    echo -e "Service Status: \033[31mSTOPPED\033[0m"
+fi
+
+echo
+
+# Show configuration
+if [ -f /etc/ndi-bridge/dante.conf ]; then
+    echo "Configuration:"
+    echo "--------------"
+    source /etc/ndi-bridge/dante.conf
+    echo "  Device Name: ${DANTE_DEVICE_NAME:-ndi-bridge}"
+    echo "  Interface: ${DANTE_INTERFACE:-br0}"
+    echo "  Channels: ${DANTE_CHANNELS:-2}"
+    echo "  Sample Rate: ${DANTE_SAMPLE_RATE:-48000} Hz"
+    echo "  Mode: ${DANTE_MODE:-bidirectional}"
+else
+    echo "Configuration file not found"
+fi
+
+echo
+
+# Check network interface
+INTERFACE=${DANTE_INTERFACE:-br0}
+if ip link show $INTERFACE &>/dev/null; then
+    echo "Network Interface ($INTERFACE):"
+    echo "----------------------------"
+    IP_ADDR=$(ip -4 addr show $INTERFACE | grep inet | awk '{print $2}')
+    echo "  IP Address: ${IP_ADDR:-Not configured}"
+    
+    # Check multicast support (required for Dante)
+    MULTICAST=$(ip link show $INTERFACE | grep -o "MULTICAST")
+    if [ -n "$MULTICAST" ]; then
+        echo -e "  Multicast: \033[32mEnabled\033[0m"
+    else
+        echo -e "  Multicast: \033[31mDisabled\033[0m (Required for Dante)"
+    fi
+fi
+
+echo
+
+# Check PTP status
+PTP_STATUS=$(systemctl is-active ptp4l.service 2>/dev/null)
+if [ "$PTP_STATUS" = "active" ]; then
+    echo -e "PTP Time Sync: \033[32mActive\033[0m"
+    
+    # Check if PTP device exists
+    if [ -e /dev/ptp0 ]; then
+        echo "  PTP Device: /dev/ptp0 present"
+    fi
+else
+    echo -e "PTP Time Sync: \033[33mInactive\033[0m (Recommended for Dante)"
+fi
+
+echo
+
+# Check ALSA devices
+echo "ALSA Dante Devices:"
+echo "------------------"
+if aplay -l 2>/dev/null | grep -q "dante"; then
+    aplay -l | grep dante
+else
+    # Check if Inferno plugin is loaded
+    if [ -f /usr/lib/x86_64-linux-gnu/alsa-lib/libalsa_pcm_inferno.so ]; then
+        echo "  Inferno ALSA plugin installed"
+        echo "  Devices: dante_in (capture), dante_out (playback)"
+    else
+        echo "  Inferno ALSA plugin not found"
+    fi
+fi
+
+echo
+
+# Show recent logs
+echo "Recent Logs:"
+echo "-----------"
+journalctl -u dante-bridge.service -n 5 --no-pager 2>/dev/null | tail -5 || echo "No logs available"
+
+echo
+echo "Use 'ndi-bridge-dante-config' to modify settings"
+echo "Use 'ndi-bridge-dante-logs' to view full logs"
