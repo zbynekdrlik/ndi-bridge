@@ -148,9 +148,9 @@ ndi-bridge.exe "USB Video Device" "Camera 1" # Windows
 - `ndi-bridge-logs` - View service logs
 - `ndi-bridge-netstat` - Network bridge status
 - `ndi-bridge-help` - Show all commands
-- `vdo-ninja-intercom-status` - Check intercom service status
 - `vdo-ninja-intercom-logs` - View intercom logs
 - `vdo-ninja-intercom-restart` - Restart intercom service
+- `systemctl status vdo-ninja-intercom` - Check intercom service status
 
 #### mDNS Network Access
 Devices are accessible via mDNS/Avahi with automatic hostname resolution:
@@ -175,12 +175,14 @@ The NDI Bridge appliance includes built-in bidirectional audio intercom function
 
 ### Intercom Features
 - **Automatic Connection**: Connects to VDO.Ninja room at boot without user interaction
-- **Audio Only**: Microphone-only mode prevents camera access conflicts
+- **Audio Only**: Microphone-only mode with explicit video disabled (novideo parameter)
 - **USB Audio Support**: Uses USB audio device (3.5mm jack) for local audio I/O
+- **Auto Volume**: Automatically sets volume to 100% on startup
 - **PipeWire Audio**: Modern Linux audio system for low-latency communication
 - **VNC Monitoring**: Remote desktop access on port 5999 (no password)
 - **Auto-recovery**: Automatically restarts if connection drops
 - **Persistent Configuration**: Settings preserved across reboots
+- **Read-Only Safe**: All data stored in tmpfs, works with read-only root filesystem
 
 ### Intercom Configuration
 
@@ -211,17 +213,21 @@ This shows all connected NDI Bridge devices in the room.
 #### Check Service Status
 ```bash
 ssh root@cam1.local
-vdo-ninja-intercom-status
+systemctl status vdo-ninja-intercom
 ```
 
 #### View Logs
 ```bash
 vdo-ninja-intercom-logs
+# or
+journalctl -u vdo-ninja-intercom -f
 ```
 
 #### Restart Service
 ```bash
 vdo-ninja-intercom-restart
+# or
+systemctl restart vdo-ninja-intercom
 ```
 
 #### Audio Issues
