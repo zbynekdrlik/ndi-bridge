@@ -27,6 +27,66 @@
 - Partial success = Complete failure
 - All tests must pass before declaring feature operational
 
+## Test Suite Design Requirements
+
+### MANDATORY: Read-Only Filesystem Check
+**EVERY test script MUST start with read-only filesystem verification!**
+
+```bash
+# CRITICAL: First verify filesystem is read-only
+echo -e "\n${YELLOW}CRITICAL CHECK: Filesystem Status${NC}"
+
+if ssh_cmd "mount | grep ' / ' | grep -q 'ro,'"; then
+    print_test_result "Filesystem is READ-ONLY (required for test validity)" "PASS"
+else
+    echo -e "${RED}FATAL ERROR: Filesystem is NOT read-only!${NC}"
+    echo "Tests cannot proceed - filesystem must be read-only to ensure real-world conditions"
+    echo "Run 'ndi-bridge-ro' on the device and try again"
+    exit 1
+fi
+```
+
+**Why this is CRITICAL:**
+- The appliance runs with read-only root filesystem in production
+- Features that work in read-write mode OFTEN FAIL in read-only mode
+- This has caused COUNTLESS false positives where features appear to work but fail in production
+- Every implementation MUST work with read-only filesystem or it's BROKEN
+
+### Test Script Structure
+Every test script must follow this structure:
+1. **Read-only filesystem check** (FIRST, ALWAYS)
+2. Service enabled/active checks
+3. Process running checks
+4. Configuration file checks (in tmpfs paths)
+5. Functionality tests
+6. Error pattern checks in logs
+7. Resilience tests (restart, reconnect, etc.)
+
+### Test Naming Convention
+- `test_<feature>.sh` - Feature-specific tests
+- Tests must be executable (`chmod +x`)
+- Must accept device IP as first argument
+- Must return exit code 0 for success, 1 for failure
+
+### Common Test Patterns
+```bash
+# SSH command wrapper
+ssh_cmd() {
+    sshpass -p newlevel ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR root@${DEVICE_IP} "$1"
+}
+
+# Test result printer
+print_test_result() {
+    if [ "$2" = "PASS" ]; then
+        echo -e "${GREEN}✓${NC} $1"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}✗${NC} $1"
+        ((TESTS_FAILED++))
+    fi
+}
+```
+
 ### Known Issues That Took 10+ Builds to Find:
 - Menu `read` commands need `< /dev/tty` when called from other scripts
 - Services must be enabled AND started
