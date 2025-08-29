@@ -1,0 +1,61 @@
+#!/bin/bash
+# Generate unique, persistent MAC address for bridge interface
+# Based on the hardware's physical ethernet MAC addresses
+
+set -e
+
+# Output file for systemd-networkd
+OUTPUT_FILE="/etc/systemd/network/10-br0.netdev.d/mac.conf"
+mkdir -p "$(dirname "$OUTPUT_FILE")"
+
+# Get all physical ethernet MACs and sort to find the lowest
+MACS=()
+for iface in $(ls /sys/class/net/ | grep -E "^(eth|eno|enp|ens)"); do
+    if [ -f "/sys/class/net/${iface}/address" ]; then
+        MAC=$(cat /sys/class/net/${iface}/address 2>/dev/null)
+        if [ -n "$MAC" ] && [ "$MAC" != "00:00:00:00:00:00" ]; then
+            MACS+=("$MAC")
+        fi
+    fi
+done
+
+if [ ${#MACS[@]} -eq 0 ]; then
+    echo "Error: No physical ethernet interfaces found!"
+    # Generate a random locally administered MAC as fallback
+    RANDOM_BYTES=$(od -An -N4 -tx1 /dev/urandom | tr -d ' ')
+    # Set locally administered bit (0x02) and unicast bit
+    BRIDGE_MAC="02:${RANDOM_BYTES:0:2}:${RANDOM_BYTES:2:2}:${RANDOM_BYTES:4:2}:${RANDOM_BYTES:6:2}:00"
+else
+    # Sort MACs and use the lowest one as seed
+    IFS=$'\n' SORTED_MACS=($(sort <<<"${MACS[*]}"))
+    BASE_MAC="${SORTED_MACS[0]}"
+    
+    echo "Using base MAC: ${BASE_MAC}"
+    
+    # Convert to locally administered MAC by setting bit 0x02
+    # This ensures it's unique per device but won't conflict with hardware MACs
+    IFS=':' read -ra ADDR <<< "$BASE_MAC"
+    
+    # Set the locally administered bit (0x02) in the first octet
+    FIRST_OCTET=$(printf "%02x" $((0x${ADDR[0]} | 0x02)))
+    # Clear the multicast bit (0x01) to ensure it's unicast
+    FIRST_OCTET=$(printf "%02x" $((0x${FIRST_OCTET} & 0xFE)))
+    
+    # Construct the bridge MAC
+    BRIDGE_MAC="${FIRST_OCTET}:${ADDR[1]}:${ADDR[2]}:${ADDR[3]}:${ADDR[4]}:${ADDR[5]}"
+fi
+
+echo "Generated bridge MAC: ${BRIDGE_MAC}"
+
+# Write systemd-networkd drop-in configuration
+cat > "$OUTPUT_FILE" << EOF
+[NetDev]
+MACAddress=${BRIDGE_MAC}
+EOF
+
+echo "Bridge MAC configuration written to ${OUTPUT_FILE}"
+
+# Also save to a file for reference
+echo "${BRIDGE_MAC}" > /etc/ndi-bridge-mac
+
+exit 0

@@ -28,6 +28,9 @@ Kind=bridge
 STP=false
 EOFBRIDGE
 
+# Create directory for drop-in configs
+mkdir -p /etc/systemd/network/10-br0.netdev.d/
+
 # Configure physical interfaces to join bridge
 cat > /etc/systemd/network/20-eth.network << EOFETH
 [Match]
@@ -132,6 +135,38 @@ EOFNSS
 # HTTP service advertisement for web interface was copied to /etc/avahi/services/
 
 EOFNET
+
+    # Copy the MAC generation script (from helper-scripts after chroot)
+    if [ -f "scripts/helper-scripts/generate-bridge-mac" ]; then
+        cp scripts/helper-scripts/generate-bridge-mac /mnt/usb/usr/local/bin/
+        chmod +x /mnt/usb/usr/local/bin/generate-bridge-mac
+        log "  Installed generate-bridge-mac script"
+    fi
+    
+    # Create service to generate unique MAC on first boot
+    cat > /mnt/usb/etc/systemd/system/generate-bridge-mac.service << 'EOFMACSERVICE'
+[Unit]
+Description=Generate unique MAC address for bridge interface
+Before=systemd-networkd.service
+After=systemd-modules-load.service
+ConditionPathExists=!/etc/ndi-bridge-mac
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/generate-bridge-mac
+RemainAfterExit=yes
+
+[Install]
+WantedBy=network.target
+EOFMACSERVICE
+
+    # Enable the MAC generation service in chroot
+    cat >> /mnt/usb/tmp/configure-system.sh << 'EOFMACENABLE'
+
+# Enable MAC generation service
+systemctl enable generate-bridge-mac.service 2>/dev/null || true
+
+EOFMACENABLE
 }
 
 export -f configure_network
