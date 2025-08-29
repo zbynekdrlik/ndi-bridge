@@ -25,8 +25,12 @@ npm install -g wetty@2.0.2 2>&1 | grep -v "^npm notice\|^npm WARN" || true
 # Disable default nginx site
 rm -f /etc/nginx/sites-enabled/default
 
-# Create nginx configuration for NDI Bridge
-cat > /etc/nginx/sites-available/ndi-bridge << 'EOFNGINX'
+# Copy enhanced nginx configuration if available
+if [ -f "$(dirname "$0")/../files/nginx/ndi-bridge-enhanced" ]; then
+    cp "$(dirname "$0")/../files/nginx/ndi-bridge-enhanced" /etc/nginx/sites-available/ndi-bridge
+else
+    # Fallback to inline configuration
+    cat > /etc/nginx/sites-available/ndi-bridge << 'EOFNGINX'
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -64,6 +68,7 @@ server {
     }
 }
 EOFNGINX
+fi
 
 # Enable the site
 ln -s /etc/nginx/sites-available/ndi-bridge /etc/nginx/sites-enabled/
@@ -76,8 +81,17 @@ chmod 644 /etc/nginx/.htpasswd
 # Create web root directory
 mkdir -p /var/www/ndi-bridge
 
-# Create landing page
-cat > /var/www/ndi-bridge/index.html << 'EOFHTML'
+# Copy web files if available
+WEB_DIR="$(dirname "$0")/../web"
+if [ -d "$WEB_DIR" ]; then
+    # Copy enhanced HTML files
+    [ -f "$WEB_DIR/index-enhanced.html" ] && cp "$WEB_DIR/index-enhanced.html" /var/www/ndi-bridge/index.html
+    [ -f "$WEB_DIR/intercom.html" ] && cp "$WEB_DIR/intercom.html" /var/www/ndi-bridge/intercom.html
+fi
+
+# Create fallback landing page if no enhanced version copied
+if [ ! -f /var/www/ndi-bridge/index.html ]; then
+    cat > /var/www/ndi-bridge/index.html << 'EOFHTML'
 <!DOCTYPE html>
 <html lang="en">
 <head>

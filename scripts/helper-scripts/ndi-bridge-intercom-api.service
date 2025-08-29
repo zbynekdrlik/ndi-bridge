@@ -1,0 +1,18 @@
+[Unit]
+Description=NDI Bridge Intercom API Server
+After=network.target ndi-bridge-intercom.service
+Wants=ndi-bridge-intercom.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/ndi-bridge-intercom-api
+Restart=always
+RestartSec=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

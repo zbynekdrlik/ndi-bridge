@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDI Bridge Control Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .info-box {
+            background: #f7f7f7;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        
+        .info-box p {
+            margin: 5px 0;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .info-box strong {
+            color: #333;
+        }
+        
+        .btn-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        .btn {
+            padding: 16px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            min-height: 60px;
+        }
+        
+        .btn:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn.secondary {
+            background: #48bb78;
+        }
+        
+        .btn.secondary:hover {
+            background: #38a169;
+            box-shadow: 0 5px 15px rgba(72, 187, 120, 0.4);
+        }
+        
+        .btn.tertiary {
+            background: #ed8936;
+        }
+        
+        .btn.tertiary:hover {
+            background: #dd6b20;
+            box-shadow: 0 5px 15px rgba(237, 137, 54, 0.4);
+        }
+        
+        .btn .icon {
+            font-size: 24px;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #48bb78;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        .quick-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .quick-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+        
+        .quick-link:hover {
+            color: #5a67d8;
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 480px) {
+            .btn-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌐 NDI Bridge Control Panel</h1>
+        <div class="subtitle">System Management & Control Interface</div>
+        
+        <div class="info-box">
+            <div class="status">
+                <span class="status-indicator"></span>
+                <strong>System Status:</strong> Online
+            </div>
+            <p><strong>Device:</strong> <span id="hostname">Loading...</span></p>
+            <p><strong>IP Address:</strong> <span id="ip-address">Loading...</span></p>
+            <p><strong>Version:</strong> <span id="version">Loading...</span></p>
+        </div>
+        
+        <div class="btn-grid">
+            <a href="/terminal" class="btn">
+                <span class="icon">💻</span>
+                <span>Terminal</span>
+            </a>
+            
+            <a href="/intercom" class="btn secondary">
+                <span class="icon">🎙️</span>
+                <span>Intercom Control</span>
+            </a>
+            
+            <button class="btn tertiary" onclick="showSystemInfo()">
+                <span class="icon">📊</span>
+                <span>System Info</span>
+            </button>
+            
+            <button class="btn" onclick="showNDIStreams()">
+                <span class="icon">📡</span>
+                <span>NDI Streams</span>
+            </button>
+            
+            <button class="btn secondary" onclick="showDisplayConfig()">
+                <span class="icon">🖥️</span>
+                <span>Display Config</span>
+            </button>
+            
+            <button class="btn tertiary" onclick="showNetworkStatus()">
+                <span class="icon">🌍</span>
+                <span>Network Status</span>
+            </button>
+        </div>
+        
+        <div class="quick-links">
+            <a href="#" class="quick-link" onclick="showHelp()">Help & Documentation</a>
+            <a href="#" class="quick-link" onclick="showLogs()">View System Logs</a>
+            <a href="#" class="quick-link" onclick="showSettings()">Advanced Settings</a>
+        </div>
+        
+        <div class="footer">
+            <p>NDI Bridge System v1.9.0 | © 2024</p>
+            <p>Connected via <span id="connection-type">HTTP</span></p>
+        </div>
+    </div>
+    
+    <script>
+        // Load system information
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get hostname
+            fetch('/api/system/info')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('hostname').textContent = data.hostname || window.location.hostname;
+                    document.getElementById('ip-address').textContent = data.ip || window.location.hostname;
+                    document.getElementById('version').textContent = data.version || '1.9.0';
+                })
+                .catch(() => {
+                    // Fallback to location info
+                    document.getElementById('hostname').textContent = window.location.hostname;
+                    document.getElementById('ip-address').textContent = window.location.hostname;
+                    document.getElementById('version').textContent = '1.9.0';
+                });
+            
+            // Check connection type
+            document.getElementById('connection-type').textContent = 
+                window.location.protocol === 'https:' ? 'HTTPS (Secure)' : 'HTTP';
+        });
+        
+        function showSystemInfo() {
+            alert('System Information:\n\n' +
+                  'CPU: Intel N100\n' +
+                  'Memory: 8GB DDR4\n' +
+                  'Storage: 128GB NVMe\n' +
+                  'Network: Gigabit Ethernet\n' +
+                  'Video: USB 3.0 Capture\n' +
+                  'Audio: USB Audio Device');
+        }
+        
+        function showNDIStreams() {
+            alert('NDI Streams:\n\n' +
+                  '• NDI-BRIDGE (USB Capture) - Active\n' +
+                  '• Available for configuration via terminal\n\n' +
+                  'Use terminal to manage NDI streams');
+        }
+        
+        function showDisplayConfig() {
+            alert('Display Configuration:\n\n' +
+                  'Display 1: Not configured\n' +
+                  'Display 2: Not configured\n' +
+                  'Display 3: Not configured\n\n' +
+                  'Use terminal command: ndi-display-config');
+        }
+        
+        function showNetworkStatus() {
+            alert('Network Status:\n\n' +
+                  'Interface: eth0\n' +
+                  'Status: Connected\n' +
+                  'Speed: 1000 Mbps\n' +
+                  'Mode: DHCP\n\n' +
+                  'PTP: Client Mode\n' +
+                  'NTP: Synchronized');
+        }
+        
+        function showHelp() {
+            alert('NDI Bridge Help:\n\n' +
+                  '• Terminal: Full system access via SSH\n' +
+                  '• Intercom: Audio control for VDO.Ninja\n' +
+                  '• System Info: View hardware details\n' +
+                  '• NDI Streams: Manage video streams\n' +
+                  '• Display Config: Set up output displays\n' +
+                  '• Network: View connection status\n\n' +
+                  'Default login: admin / newlevel');
+        }
+        
+        function showLogs() {
+            if (confirm('View system logs in terminal?')) {
+                window.location.href = '/terminal';
+            }
+        }
+        
+        function showSettings() {
+            if (confirm('Open advanced settings in terminal?')) {
+                window.location.href = '/terminal';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,4 +1,0 @@
-#!/bin/bash
-# View VDO.Ninja intercom service logs
-
-journalctl -u vdo-ninja-intercom.service -f --no-pager
