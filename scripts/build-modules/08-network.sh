@@ -148,16 +148,20 @@ EOFNET
 [Unit]
 Description=Generate unique MAC address for bridge interface
 Before=systemd-networkd.service
+Before=remount-rw.service
 After=systemd-modules-load.service
 ConditionPathExists=!/etc/ndi-bridge-mac
+DefaultDependencies=no
 
 [Service]
 Type=oneshot
+ExecStartPre=/bin/mount -o remount,rw /
 ExecStart=/usr/local/bin/generate-bridge-mac
+ExecStartPost=/bin/mount -o remount,ro /
 RemainAfterExit=yes
 
 [Install]
-WantedBy=network.target
+WantedBy=sysinit.target
 EOFMACSERVICE
 
     # Enable the MAC generation service in chroot
