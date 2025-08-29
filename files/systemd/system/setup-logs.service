@@ -1,6 +1,6 @@
 [Unit]
 Description=Setup log directories in tmpfs
-Before=ndi-bridge.service
+Before=ndi-capture.service
 After=local-fs.target
 
 [Service]

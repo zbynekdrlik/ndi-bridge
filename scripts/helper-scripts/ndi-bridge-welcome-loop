@@ -12,7 +12,7 @@ while true; do
                 clear
                 echo "=== NDI Bridge Logs (Recent 100 lines) ==="
                 echo ""
-                journalctl -u ndi-bridge -n 100 --no-pager | less
+                journalctl -u ndi-capture -n 100 --no-pager | less
                 echo ""
                 echo "Press any key to return to dashboard..."
                 read -n 1 -s -r
@@ -26,7 +26,7 @@ while true; do
                 if [ -n "$new_name" ]; then
                     /usr/local/bin/ndi-bridge-set-name "$new_name"
                     echo "Name updated. Restarting service..."
-                    systemctl restart ndi-bridge
+                    systemctl restart ndi-capture
                     sleep 2
                 fi
                 ;;

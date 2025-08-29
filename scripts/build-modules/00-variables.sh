@@ -3,7 +3,7 @@
 # This module defines all global variables used throughout the build process
 
 # Build Script Version - Auto-incremented with each build
-BUILD_SCRIPT_VERSION="1.9.2"
+BUILD_SCRIPT_VERSION="1.9.3"
 BUILD_SCRIPT_DATE="2025-08-29"
 
 # Build timestamp - Generated at build time (local timezone)
@@ -11,7 +11,7 @@ BUILD_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"
 
 # Configuration
 USB_DEVICE="${1:-/dev/sdb}"
-NDI_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-bridge"
+NDI_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-capture"
 NDI_DISPLAY_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-display"
 NDI_SDK_PATH="$(dirname "$0")/../NDI SDK for Linux"
 

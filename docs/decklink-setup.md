@@ -38,10 +38,10 @@ cmake -DUSE_DECKLINK=OFF ..
 ### List all devices
 ```bash
 # List Media Foundation devices
-ndi-bridge.exe -t mf -l
+ndi-capture.exe -t mf -l
 
 # List DeckLink devices
-ndi-bridge.exe -t dl -l
+ndi-capture.exe -t dl -l
 ```
 
 Output:
@@ -53,10 +53,10 @@ Output:
 ### Use specific DeckLink device
 ```bash
 # By name
-ndi-bridge.exe -t dl -d "DeckLink Mini Recorder" -n "SDI Stream"
+ndi-capture.exe -t dl -d "DeckLink Mini Recorder" -n "SDI Stream"
 
 # Interactive selection
-ndi-bridge.exe -t dl
+ndi-capture.exe -t dl
 ```
 
 ### DeckLink Features

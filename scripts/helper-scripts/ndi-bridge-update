@@ -1,5 +1,5 @@
 #!/bin/bash
-# Update NDI Bridge binary from USB or network
+# Update NDI Capture binary from USB or network
 
 set -e
 
@@ -44,7 +44,7 @@ case $option in
         echo "Available USB devices:"
         lsblk -o NAME,SIZE,TYPE,MOUNTPOINT | grep -E "disk|part"
         echo ""
-        read -p "Enter path to ndi-bridge binary (e.g., /mnt/usb/ndi-bridge): " BINARY_PATH
+        read -p "Enter path to ndi-capture binary (e.g., /mnt/usb/ndi-capture): " BINARY_PATH
         
         if [ ! -f "$BINARY_PATH" ]; then
             error "Binary not found at $BINARY_PATH"
@@ -53,10 +53,10 @@ case $option in
     2)
         # Update from network
         echo ""
-        read -p "Enter URL to ndi-bridge binary: " BINARY_URL
+        read -p "Enter URL to ndi-capture binary: " BINARY_URL
         
         log "Downloading binary..."
-        BINARY_PATH="/tmp/ndi-bridge-new"
+        BINARY_PATH="/tmp/ndi-capture-new"
         if ! wget -O "$BINARY_PATH" "$BINARY_URL"; then
             error "Failed to download binary"
         fi
@@ -74,7 +74,7 @@ fi
 # Check version
 log "Checking new binary version..."
 NEW_VERSION=$("$BINARY_PATH" --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo "Unknown")
-CURRENT_VERSION=$(/opt/ndi-bridge/ndi-bridge --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo "Unknown")
+CURRENT_VERSION=$(/opt/ndi-bridge/ndi-capture --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo "Unknown")
 
 echo ""
 echo "Current version: $CURRENT_VERSION"
@@ -91,30 +91,30 @@ fi
 mount -o remount,rw / 2>/dev/null || true
 
 # Stop service
-log "Stopping NDI Bridge service..."
-systemctl stop ndi-bridge
+log "Stopping NDI Capture service..."
+systemctl stop ndi-capture
 
 # Backup current binary
 log "Backing up current binary..."
-cp /opt/ndi-bridge/ndi-bridge /opt/ndi-bridge/ndi-bridge.backup
+cp /opt/ndi-bridge/ndi-capture /opt/ndi-bridge/ndi-capture.backup
 
 # Copy new binary
 log "Installing new binary..."
-cp "$BINARY_PATH" /opt/ndi-bridge/ndi-bridge
-chmod +x /opt/ndi-bridge/ndi-bridge
+cp "$BINARY_PATH" /opt/ndi-bridge/ndi-capture
+chmod +x /opt/ndi-bridge/ndi-capture
 
 # Start service
-log "Starting NDI Bridge service..."
-systemctl start ndi-bridge
+log "Starting NDI Capture service..."
+systemctl start ndi-capture
 
 # Check if service started successfully
 sleep 2
-if systemctl is-active --quiet ndi-bridge; then
-    log "Update successful! NDI Bridge is running with version $NEW_VERSION"
+if systemctl is-active --quiet ndi-capture; then
+    log "Update successful! NDI Capture is running with version $NEW_VERSION"
 else
     warn "Service failed to start, rolling back..."
-    cp /opt/ndi-bridge/ndi-bridge.backup /opt/ndi-bridge/ndi-bridge
-    systemctl start ndi-bridge
+    cp /opt/ndi-bridge/ndi-capture.backup /opt/ndi-bridge/ndi-capture
+    systemctl start ndi-capture
     error "Update failed, rolled back to previous version"
 fi
 

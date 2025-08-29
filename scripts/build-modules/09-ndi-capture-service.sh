@@ -1,23 +1,23 @@
 #!/bin/bash
-# NDI service configuration module
+# NDI Capture service configuration module
 
 configure_ndi_service() {
     log "Configuring NDI Bridge service..."
     
-    # Copy NDI Bridge binary BEFORE chroot (so it's accessible)
-    if [ -f build/bin/ndi-bridge ]; then
+    # Copy NDI Capture binary BEFORE chroot (so it's accessible)
+    if [ -f build/bin/ndi-capture ]; then
         mkdir -p /mnt/usb/opt/ndi-bridge
-        cp build/bin/ndi-bridge /mnt/usb/opt/ndi-bridge/
-        chmod +x /mnt/usb/opt/ndi-bridge/ndi-bridge
-        log "NDI Bridge binary copied"
+        cp build/bin/ndi-capture /mnt/usb/opt/ndi-bridge/
+        chmod +x /mnt/usb/opt/ndi-bridge/ndi-capture
+        log "NDI Capture binary copied"
     else
-        log "ERROR: ndi-bridge binary not found at build/bin/ndi-bridge"
+        log "ERROR: ndi-capture binary not found at build/bin/ndi-capture"
         exit 1
     fi
     
     # Copy systemd service files BEFORE chroot
     mkdir -p /mnt/usb/etc/systemd/system
-    for service in ndi-bridge.service setup-logs.service ndi-bridge-collector.service; do
+    for service in ndi-capture.service setup-logs.service ndi-bridge-collector.service; do
         if [ -f files/systemd/system/$service ]; then
             cp files/systemd/system/$service /mnt/usb/etc/systemd/system/
             log "  Copied $service"
@@ -62,7 +62,7 @@ while [ ! -e "$DEVICE" ]; do
     sleep 2
 done
 
-# Check time synchronization before starting NDI Bridge
+# Check time synchronization before starting NDI Capture
 # This ensures optimal frame synchronization quality
 check_time_sync() {
     # First try PTP sync check
@@ -91,13 +91,13 @@ check_time_sync
 
 # Main loop with restart and logging to tmpfs
 while true; do
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NDI Bridge: $DEVICE -> $NDI_NAME"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NDI Capture: $DEVICE -> $NDI_NAME"
     if [ -w /var/log/ndi-bridge ]; then
-        LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-bridge "$DEVICE" "$NDI_NAME" 2>&1 | tee -a /var/log/ndi-bridge/ndi-bridge.log
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] NDI Bridge exited, restarting in 5 seconds..." | tee -a /var/log/ndi-bridge/ndi-bridge.log
+        LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-capture "$DEVICE" "$NDI_NAME" 2>&1 | tee -a /var/log/ndi-bridge/ndi-capture.log
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] NDI Capture exited, restarting in 5 seconds..." | tee -a /var/log/ndi-bridge/ndi-capture.log
     else
-        LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-bridge "$DEVICE" "$NDI_NAME" 2>&1
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] NDI Bridge exited, restarting in 5 seconds..."
+        LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-capture "$DEVICE" "$NDI_NAME" 2>&1
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] NDI Capture exited, restarting in 5 seconds..."
     fi
     sleep 5
 done
@@ -105,12 +105,12 @@ EOFRUN
 chmod +x /opt/ndi-bridge/run.sh
 
 # Systemd service files were copied before chroot
-# ndi-bridge.service is now in /etc/systemd/system/
+# ndi-capture.service is now in /etc/systemd/system/
 
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl enable ndi-bridge
+    systemctl enable ndi-capture
 else
-    update-rc.d ndi-bridge enable 2>/dev/null || true
+    update-rc.d ndi-capture enable 2>/dev/null || true
 fi
 
 # setup-logs.service was copied before chroot

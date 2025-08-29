@@ -117,14 +117,14 @@ This creates a complete NDI Bridge appliance that:
 
 ```bash
 # Interactive device selection
-./ndi-bridge
+./ndi-capture
 
 # Direct device specification
-./ndi-bridge /dev/video0 "Camera 1"          # Linux
-ndi-bridge.exe "USB Video Device" "Camera 1" # Windows
+./ndi-capture /dev/video0 "Camera 1"          # Linux
+ndi-capture.exe "USB Video Device" "Camera 1" # Windows
 
 # With parameters
-./ndi-bridge -d /dev/video0 -n "Studio Camera" -v
+./ndi-capture -d /dev/video0 -n "Studio Camera" -v
 ```
 
 ### USB Appliance
@@ -311,8 +311,8 @@ Edit variables in `scripts/build-modules/00-variables.sh`:
 
 ### USB Recovery Issues
 If device doesn't recover after reconnect:
-- Check system logs: `journalctl -u ndi-bridge`
-- Manually restart: `systemctl restart ndi-bridge`
+- Check system logs: `journalctl -u ndi-capture`
+- Manually restart: `systemctl restart ndi-capture`
 - Verify USB power management settings
 
 ## Development

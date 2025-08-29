@@ -26,10 +26,10 @@ fi
 log_test "Test 1: Core services"
 
 # Check capture service
-if assert_service_active "ndi-bridge"; then
-    record_test "NDI Bridge Service" "PASS"
+if assert_service_active "ndi-capture"; then
+    record_test "NDI Capture Service" "PASS"
 else
-    record_test "NDI Bridge Service" "FAIL" "Core service not running"
+    record_test "NDI Capture Service" "FAIL" "Core service not running"
 fi
 
 # Check nginx

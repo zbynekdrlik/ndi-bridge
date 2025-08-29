@@ -132,10 +132,10 @@ Even with the SDK installed for building, users need:
 After building with DeckLink support:
 ```bash
 # List DeckLink devices
-ndi-bridge.exe -t dl -l
+ndi-capture.exe -t dl -l
 
 # Use a specific DeckLink device
-ndi-bridge.exe -t dl -d "DeckLink Mini Recorder" -n "My NDI Stream"
+ndi-capture.exe -t dl -d "DeckLink Mini Recorder" -n "My NDI Stream"
 ```
 
 ## License Compliance

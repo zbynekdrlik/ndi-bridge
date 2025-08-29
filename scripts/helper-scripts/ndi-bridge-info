@@ -23,7 +23,7 @@ echo ""
 
 # Software Versions
 echo -e "${CYAN}Software Versions:${NC}"
-echo "  NDI-Bridge:     $(/opt/ndi-bridge/ndi-bridge --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo 'Unknown')"
+echo "  NDI-Capture:    $(/opt/ndi-bridge/ndi-capture --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo 'Unknown')"
 echo "  Build Script:   $(cat /etc/ndi-bridge/build-script-version 2>/dev/null || echo 'Unknown')"
 echo "  Build Date:     $(cat /etc/ndi-bridge/build-date 2>/dev/null || echo 'Unknown')"
 echo ""
@@ -72,16 +72,16 @@ echo ""
 
 # Service Status
 echo -e "${CYAN}Service Status:${NC}"
-if systemctl is-active --quiet ndi-bridge; then
-    echo -e "  NDI Bridge:     ${GREEN}● Running${NC}"
+if systemctl is-active --quiet ndi-capture; then
+    echo -e "  NDI Capture:    ${GREEN}● Running${NC}"
     # Show recent log entries
     echo "  Recent logs:"
-    journalctl -u ndi-bridge -n 3 --no-pager | tail -n +2 | sed 's/^/    /'
+    journalctl -u ndi-capture -n 3 --no-pager | tail -n +2 | sed 's/^/    /'
 else
-    echo -e "  NDI Bridge:     ${RED}● Stopped${NC}"
+    echo -e "  NDI Capture:    ${RED}● Stopped${NC}"
     # Show why it's not running
     echo "  Last error:"
-    journalctl -u ndi-bridge -n 5 --no-pager | grep -i error | tail -1 | sed 's/^/    /'
+    journalctl -u ndi-capture -n 5 --no-pager | grep -i error | tail -1 | sed 's/^/    /'
 fi
 echo ""
 

@@ -52,9 +52,9 @@ fi
 # Quick service check
 echo ""
 echo "Service status after deployment:"
-bridge_status=$(box_service_status "ndi-bridge")
+bridge_status=$(box_service_status "ndi-capture")
 display_status=$(box_service_status "ndi-display@1")
-echo "  ndi-bridge: $bridge_status"
+echo "  ndi-capture: $bridge_status"
 echo "  ndi-display@1: $display_status"
 
 # Reboot
@@ -89,10 +89,10 @@ fi
 # Check services
 echo ""
 echo "Service status after reboot:"
-bridge_status=$(box_service_status "ndi-bridge")
+bridge_status=$(box_service_status "ndi-capture")
 display_status=$(box_service_status "ndi-display@1")
 capture_state=$(box_ssh "cat /var/run/ndi-bridge/capture_state 2>/dev/null || echo none")
-echo "  ndi-bridge: $bridge_status"
+echo "  ndi-capture: $bridge_status"
 echo "  ndi-display@1: $display_status"
 echo "  capture state: $capture_state"
 

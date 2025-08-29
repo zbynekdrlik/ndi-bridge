@@ -69,13 +69,13 @@ public:
 ### Command-Line Selection
 ```bash
 # Use Media Foundation (webcams, USB capture)
-ndi-bridge.exe -t mf
+ndi-capture.exe -t mf
 
 # Use DeckLink (professional broadcast)
-ndi-bridge.exe -t dl
+ndi-capture.exe -t dl
 
 # Interactive selection (default)
-ndi-bridge.exe
+ndi-capture.exe
 ```
 
 ### Interactive Mode

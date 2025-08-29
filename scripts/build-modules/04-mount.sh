@@ -30,6 +30,10 @@ mount_filesystems() {
 
 unmount_all() {
     log "Unmounting filesystems..."
+    # Critical: sync all data to disk before unmounting to prevent filesystem corruption
+    sync
+    sync
+    sleep 2
     umount /mnt/usb/boot/efi 2>/dev/null || true
     umount /mnt/usb 2>/dev/null || true
     

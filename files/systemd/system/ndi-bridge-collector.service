@@ -1,7 +1,7 @@
 [Unit]
 Description=NDI Bridge Metrics Collector
-After=ndi-bridge.service
-Wants=ndi-bridge.service
+After=ndi-capture.service
+Wants=ndi-capture.service
 
 [Service]
 Type=simple

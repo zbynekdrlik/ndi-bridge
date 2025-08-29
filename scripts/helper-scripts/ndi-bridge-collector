@@ -8,7 +8,7 @@ mkdir -p /var/run/ndi-bridge
 # Main collection loop
 while true; do
     # 1. Get current FPS from last metrics entry (only if recent)
-    METRICS_LINE=$(journalctl -u ndi-bridge -n 200 --no-pager 2>/dev/null | grep "METRICS|" | tail -1)
+    METRICS_LINE=$(journalctl -u ndi-capture -n 200 --no-pager 2>/dev/null | grep "METRICS|" | tail -1)
     if [ -n "$METRICS_LINE" ]; then
         # Extract timestamp and check if recent (within 5 seconds)
         METRICS_TIME=$(echo "$METRICS_LINE" | cut -d' ' -f1-3)
@@ -39,7 +39,7 @@ while true; do
     fi
     
     # 2. Get 10-minute FPS history and calculate average
-    FPS_HISTORY=$(journalctl -u ndi-bridge --since "10 minutes ago" --no-pager 2>/dev/null | grep "METRICS|" | sed -n 's/.*FPS:\([0-9.]*\).*/\1/p')
+    FPS_HISTORY=$(journalctl -u ndi-capture --since "10 minutes ago" --no-pager 2>/dev/null | grep "METRICS|" | sed -n 's/.*FPS:\([0-9.]*\).*/\1/p')
     if [ -n "$FPS_HISTORY" ]; then
         # Calculate average
         AVG_FPS=$(echo "$FPS_HISTORY" | awk '{sum+=$1; count++} END {if(count>0) printf "%.2f", sum/count; else print "0"}')
@@ -77,9 +77,9 @@ while true; do
     if [ ! -e "$DEVICE" ]; then
         # Device doesn't exist
         echo "NO_DEVICE" > /var/run/ndi-bridge/capture_state
-    elif systemctl is-active --quiet ndi-bridge; then
+    elif systemctl is-active --quiet ndi-capture; then
         # Service is running, check if actually capturing (has recent metrics)
-        LAST_METRIC_TIME=$(journalctl -u ndi-bridge -n 10 --no-pager 2>/dev/null | grep "METRICS|" | tail -1 | cut -d' ' -f1-3)
+        LAST_METRIC_TIME=$(journalctl -u ndi-capture -n 10 --no-pager 2>/dev/null | grep "METRICS|" | tail -1 | cut -d' ' -f1-3)
         if [ -n "$LAST_METRIC_TIME" ]; then
             # Check if metric is recent (within last 5 seconds)
             LAST_EPOCH=$(date -d "$LAST_METRIC_TIME" +%s 2>/dev/null || echo "0")
@@ -90,7 +90,7 @@ while true; do
                 echo "CAPTURING" > /var/run/ndi-bridge/capture_state
             else
                 # Check for recent errors
-                RECENT_ERROR=$(journalctl -u ndi-bridge -n 5 --no-pager 2>/dev/null | grep -E "ERROR|Failed to open device")
+                RECENT_ERROR=$(journalctl -u ndi-capture -n 5 --no-pager 2>/dev/null | grep -E "ERROR|Failed to open device")
                 if [ -n "$RECENT_ERROR" ]; then
                     echo "ERROR" > /var/run/ndi-bridge/capture_state
                 else

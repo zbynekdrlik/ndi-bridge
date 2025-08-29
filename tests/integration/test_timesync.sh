@@ -160,7 +160,7 @@ fi
 log_test "Test 7: Time sync impact on services"
 
 # Check if NDI services are affected by time sync
-ndi_time_errors=$(box_ssh "journalctl -u ndi-bridge -n 100 --no-pager | grep -iE 'time|clock|sync' | grep -iE 'error|fail' | wc -l")
+ndi_time_errors=$(box_ssh "journalctl -u ndi-capture -n 100 --no-pager | grep -iE 'time|clock|sync' | grep -iE 'error|fail' | wc -l")
 if [ "$ndi_time_errors" -eq 0 ]; then
     record_test "NDI Time Stability" "PASS" "No time-related errors in NDI service"
 else

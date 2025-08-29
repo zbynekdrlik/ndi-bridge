@@ -299,11 +299,11 @@ test_build() {
     make -j$(nproc) > make.log 2>&1
     
     # Check if binary was created
-    if [ -f "ndi-bridge" ]; then
-        log_info "Build test successful - ndi-bridge binary created"
+    if [ -f "ndi-capture" ]; then
+        log_info "Build test successful - ndi-capture binary created"
         
         # Test binary
-        if ./ndi-bridge --help > /dev/null 2>&1; then
+        if ./ndi-capture --help > /dev/null 2>&1; then
             log_info "Binary test successful"
         else
             log_warn "Binary created but help test failed"
@@ -382,7 +382,7 @@ main() {
     log_info "Environment is ready for NDI Bridge development!"
     echo
     echo "Next steps:"
-    echo "  1. Build NDI Bridge: mkdir build && cd build && cmake .. && make"
+    echo "  1. Build NDI Capture: mkdir build && cd build && cmake .. && make"
     echo "  2. Create USB appliance: sudo ./build-image-for-rufus.sh"
     echo "  3. See CLAUDE.md for more details"
     echo
