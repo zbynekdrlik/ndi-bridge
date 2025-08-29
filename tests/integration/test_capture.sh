@@ -65,8 +65,8 @@ fi
 
 # Test 3: Capture status and metrics
 log_test "Test 3: Capture status and metrics"
-log_info "Waiting 30 seconds for capture to stabilize after boot..."
-sleep 30  # Give proper time for capture to stabilize after boot
+log_info "Waiting 60 seconds for capture to stabilize after boot (issue #38)..."
+sleep 60  # Full stabilization period as per issue #38
 
 capture_status=$(box_get_capture_status)
 if [ -n "$capture_status" ]; then

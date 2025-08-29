@@ -5,6 +5,9 @@
 # Create runtime directory
 mkdir -p /var/run/ndi-bridge
 
+# Track service start time for stabilization period
+SERVICE_START_FILE="/var/run/ndi-bridge/capture_start_time"
+
 # Main collection loop
 while true; do
     # 1. Get current FPS from last metrics entry (only if recent)
@@ -78,6 +81,30 @@ while true; do
         # Device doesn't exist
         echo "NO_DEVICE" > /var/run/ndi-bridge/capture_state
     elif systemctl is-active --quiet ndi-capture; then
+        # Check if this is a fresh start (service just became active)
+        if [ ! -f "$SERVICE_START_FILE" ]; then
+            # Record the start time
+            date +%s > "$SERVICE_START_FILE"
+        fi
+        
+        # Check if we're in stabilization period (first 60 seconds)
+        if [ -f "$SERVICE_START_FILE" ]; then
+            START_TIME=$(cat "$SERVICE_START_FILE")
+            CURRENT_TIME=$(date +%s)
+            ELAPSED=$((CURRENT_TIME - START_TIME))
+            
+            if [ "$ELAPSED" -lt 60 ]; then
+                # Still stabilizing
+                echo "STABILIZING" > /var/run/ndi-bridge/capture_state
+                echo "$ELAPSED" > /var/run/ndi-bridge/stabilizing_seconds
+                # Skip the rest of the checks during stabilization
+                sleep 1
+                continue
+            else
+                # Stabilization complete - clean up the seconds file
+                rm -f /var/run/ndi-bridge/stabilizing_seconds
+            fi
+        fi
         # Service is running, check if actually capturing (has recent metrics)
         LAST_METRIC_TIME=$(journalctl -u ndi-capture -n 10 --no-pager 2>/dev/null | grep "METRICS|" | tail -1 | cut -d' ' -f1-3)
         if [ -n "$LAST_METRIC_TIME" ]; then
@@ -102,6 +129,9 @@ while true; do
         fi
     else
         echo "STOPPED" > /var/run/ndi-bridge/capture_state
+        # Clear the start time when service stops
+        rm -f "$SERVICE_START_FILE"
+        rm -f /var/run/ndi-bridge/stabilizing_seconds
     fi
     
     # 5. Get NDI stream name from config
