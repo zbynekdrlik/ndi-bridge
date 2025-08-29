@@ -71,6 +71,9 @@ class IntercomAPIHandler(BaseHTTPRequestHandler):
     def handle_status(self):
         """Get current intercom status"""
         try:
+            # Debug: Log the command being run
+            print(f"Running command: {[CONTROL_SCRIPT, 'status']}", file=sys.stderr, flush=True)
+            
             result = subprocess.run(
                 [CONTROL_SCRIPT, "status"],
                 capture_output=True,
@@ -78,15 +81,25 @@ class IntercomAPIHandler(BaseHTTPRequestHandler):
                 timeout=5
             )
             
+            # Debug: Log the result
+            print(f"Command return code: {result.returncode}", file=sys.stderr, flush=True)
+            print(f"Command stdout length: {len(result.stdout)}", file=sys.stderr, flush=True)
+            print(f"Command stderr: {result.stderr}", file=sys.stderr, flush=True)
+            
             if result.returncode == 0:
                 # Parse JSON output from control script
+                print(f"Parsing JSON from stdout: {result.stdout[:100]}...", file=sys.stderr, flush=True)
                 status_data = json.loads(result.stdout)
+                print(f"Parsed data: {status_data}", file=sys.stderr, flush=True)
                 self.send_json_response(status_data)
             else:
+                print(f"Command failed with code {result.returncode}", file=sys.stderr, flush=True)
                 self.send_error(500, "Failed to get status")
         except subprocess.TimeoutExpired:
+            print("Command timed out", file=sys.stderr, flush=True)
             self.send_error(504, "Command timeout")
         except Exception as e:
+            print(f"Exception: {e}", file=sys.stderr, flush=True)
             self.send_error(500, str(e))
     
     def handle_health(self):

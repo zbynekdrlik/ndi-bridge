@@ -16,8 +16,8 @@ flock -n 200 || { echo "Another control operation in progress"; exit 1; }
 
 # Function to get USB audio devices
 get_usb_audio_devices() {
-    local usb_sink=$(pactl list sinks short 2>/dev/null | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
-    local usb_source=$(pactl list sources short 2>/dev/null | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+    local usb_sink=$(pactl list sinks short 2>&1 | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+    local usb_source=$(pactl list sources short 2>&1 | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
     
     if [ -z "$usb_sink" ] || [ -z "$usb_source" ]; then
         echo "ERROR: USB audio devices not found"
@@ -34,18 +34,18 @@ get_status() {
     local usb_source=$(echo "$devices" | cut -d'|' -f2)
     
     # Get sink (output) status
-    local sink_info=$(pactl list sinks 2>/dev/null | grep -A 10 "Name: $usb_sink")
+    local sink_info=$(pactl list sinks 2>&1 | grep -A 10 "Name: $usb_sink")
     local sink_volume=$(echo "$sink_info" | grep "Volume:" | head -1 | grep -oP '\d+%' | head -1 | tr -d '%')
     local sink_muted=$(echo "$sink_info" | grep "Mute:" | awk '{print $2}')
     
     # Get source (input) status
-    local source_info=$(pactl list sources 2>/dev/null | grep -A 10 "Name: $usb_source")
+    local source_info=$(pactl list sources 2>&1 | grep -A 10 "Name: $usb_source")
     local source_volume=$(echo "$source_info" | grep "Volume:" | head -1 | grep -oP '\d+%' | head -1 | tr -d '%')
     local source_muted=$(echo "$source_info" | grep "Mute:" | awk '{print $2}')
     
     # Check if intercom service is running
     local service_status="stopped"
-    if systemctl is-active --quiet vdo-ninja-intercom.service; then
+    if systemctl is-active --quiet ndi-bridge-intercom.service; then
         service_status="running"
     fi
     
@@ -81,16 +81,16 @@ set_mute() {
     
     case "$target" in
         output|speaker)
-            pactl set-sink-mute "$usb_sink" "$state"
+            pactl set-sink-mute "$usb_sink" "$state" 2>&1 | grep -v "cookie" || true
             echo "Output $([ "$state" = "1" ] && echo "muted" || echo "unmuted")"
             ;;
         input|mic|microphone)
-            pactl set-source-mute "$usb_source" "$state"
+            pactl set-source-mute "$usb_source" "$state" 2>&1 | grep -v "cookie" || true
             echo "Input $([ "$state" = "1" ] && echo "muted" || echo "unmuted")"
             ;;
         both|all)
-            pactl set-sink-mute "$usb_sink" "$state"
-            pactl set-source-mute "$usb_source" "$state"
+            pactl set-sink-mute "$usb_sink" "$state" 2>&1 | grep -v "cookie" || true
+            pactl set-source-mute "$usb_source" "$state" 2>&1 | grep -v "cookie" || true
             echo "All audio $([ "$state" = "1" ] && echo "muted" || echo "unmuted")"
             ;;
         *)
@@ -110,19 +110,19 @@ toggle_mute() {
     
     case "$target" in
         output|speaker)
-            pactl set-sink-mute "$usb_sink" toggle
-            local new_state=$(pactl list sinks 2>/dev/null | grep -A 10 "Name: $usb_sink" | grep "Mute:" | awk '{print $2}')
+            pactl set-sink-mute "$usb_sink" toggle 2>&1 | grep -v "cookie" || true
+            local new_state=$(pactl list sinks 2>&1 | grep -A 10 "Name: $usb_sink" | grep "Mute:" | awk '{print $2}')
             echo "Output $([ "$new_state" = "yes" ] && echo "muted" || echo "unmuted")"
             ;;
         input|mic|microphone)
-            pactl set-source-mute "$usb_source" toggle
-            local new_state=$(pactl list sources 2>/dev/null | grep -A 10 "Name: $usb_source" | grep "Mute:" | awk '{print $2}')
+            pactl set-source-mute "$usb_source" toggle 2>&1 | grep -v "cookie" || true
+            local new_state=$(pactl list sources 2>&1 | grep -A 10 "Name: $usb_source" | grep "Mute:" | awk '{print $2}')
             echo "Input $([ "$new_state" = "yes" ] && echo "muted" || echo "unmuted")"
             ;;
         both|all)
             # For both, we toggle each independently
-            pactl set-sink-mute "$usb_sink" toggle
-            pactl set-source-mute "$usb_source" toggle
+            pactl set-sink-mute "$usb_sink" toggle 2>&1 | grep -v "cookie" || true
+            pactl set-source-mute "$usb_source" toggle 2>&1 | grep -v "cookie" || true
             echo "Toggled mute for both input and output"
             ;;
         *)
@@ -149,16 +149,16 @@ set_volume() {
     
     case "$target" in
         output|speaker)
-            pactl set-sink-volume "$usb_sink" "${volume}%"
+            pactl set-sink-volume "$usb_sink" "${volume}%" 2>&1 | grep -v "cookie" || true
             echo "Output volume set to ${volume}%"
             ;;
         input|mic|microphone)
-            pactl set-source-volume "$usb_source" "${volume}%"
+            pactl set-source-volume "$usb_source" "${volume}%" 2>&1 | grep -v "cookie" || true
             echo "Input volume set to ${volume}%"
             ;;
         both|all)
-            pactl set-sink-volume "$usb_sink" "${volume}%"
-            pactl set-source-volume "$usb_source" "${volume}%"
+            pactl set-sink-volume "$usb_sink" "${volume}%" 2>&1 | grep -v "cookie" || true
+            pactl set-source-volume "$usb_source" "${volume}%" 2>&1 | grep -v "cookie" || true
             echo "All volumes set to ${volume}%"
             ;;
         *)
@@ -171,12 +171,12 @@ set_volume() {
 # Function to restart intercom service
 restart_service() {
     echo "Restarting intercom service..."
-    systemctl restart vdo-ninja-intercom.service
+    systemctl restart ndi-bridge-intercom.service
     
     # Wait for service to start
     sleep 3
     
-    if systemctl is-active --quiet vdo-ninja-intercom.service; then
+    if systemctl is-active --quiet ndi-bridge-intercom.service; then
         echo "Intercom service restarted successfully"
     else
         echo "Failed to restart intercom service"
