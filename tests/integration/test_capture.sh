@@ -6,15 +6,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/common.sh"
 source "${SCRIPT_DIR}/../lib/assertions.sh"
 source "${SCRIPT_DIR}/../lib/box_control.sh"
+source "${SCRIPT_DIR}/../lib/ro_check.sh"
 
 # Test configuration
 TEST_NAME="Capture Test Suite"
-
-# Check filesystem is read-only
-check_filesystem_readonly() {
-    local fs_status=$(box_ssh "mount | grep 'on / ' | grep -o 'r[ow]'" 2>/dev/null)
-    [ "$fs_status" = "ro" ]
-}
 
 # Initialize test logs
 setup_test_logs
@@ -28,9 +23,8 @@ if ! box_ping; then
     exit 1
 fi
 
-# Check filesystem is read-only before testing
-if ! check_filesystem_readonly; then
-    log_error "Filesystem is read-write - tests cannot proceed"
+# Verify filesystem is read-only before testing
+if ! verify_readonly_filesystem; then
     exit 1
 fi
 
