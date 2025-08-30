@@ -2,9 +2,9 @@
 # Dante Device Advertiser Service
 # Keeps device visible in Dante Controller
 
-export INFERNO_NAME=${DANTE_DEVICE_NAME:-${HOSTNAME:-ndi-bridge}}
-export INFERNO_INTERFACE=${DANTE_INTERFACE:-br0}
-export INFERNO_SAMPLE_RATE=96000
+export INFERNO_NAME=${INFERNO_NAME:-${DANTE_DEVICE_NAME:-${HOSTNAME:-ndi-bridge}}}
+export INFERNO_INTERFACE=${INFERNO_INTERFACE:-${DANTE_INTERFACE:-br0}}
+export INFERNO_SAMPLE_RATE=${INFERNO_SAMPLE_RATE:-96000}
 
 # Source configuration if available
 [ -f /etc/ndi-bridge/dante.conf ] && source /etc/ndi-bridge/dante.conf

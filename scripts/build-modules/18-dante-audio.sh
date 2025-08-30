@@ -194,6 +194,7 @@ Type=oneshot
 RemainAfterExit=yes
 Environment="INFERNO_NAME=ndi-bridge"
 Environment="INFERNO_INTERFACE=br0"
+Environment="INFERNO_SAMPLE_RATE=96000"
 Environment="HOME=/root"
 # Just check that the ALSA plugin is available
 ExecStart=/bin/bash -c 'aplay -L | grep -q dante && echo "Dante ALSA device available"'
@@ -211,6 +212,7 @@ cat > /usr/local/bin/usb-dante-bridge << 'EOFBRIDGE'
 
 export INFERNO_NAME=${HOSTNAME:-ndi-bridge}
 export INFERNO_INTERFACE=br0
+export INFERNO_SAMPLE_RATE=96000
 
 # Find first USB audio device (skip HDMI)
 USB_CARD=$(aplay -l 2>/dev/null | grep -E "USB Audio|Arturia|Behringer|Focusrite|Scarlett" | head -1 | sed 's/card \([0-9]\).*/\1/')
@@ -244,6 +246,9 @@ Wants=inferno-alsa.service
 
 [Service]
 Type=simple
+Environment="INFERNO_NAME=ndi-bridge"
+Environment="INFERNO_INTERFACE=br0"
+Environment="INFERNO_SAMPLE_RATE=96000"
 ExecStart=/usr/local/bin/usb-dante-bridge
 Restart=on-failure
 RestartSec=10
@@ -263,6 +268,9 @@ PartOf=statime.service
 
 [Service]
 Type=simple
+Environment="INFERNO_NAME=ndi-bridge"
+Environment="INFERNO_INTERFACE=br0"
+Environment="INFERNO_SAMPLE_RATE=96000"
 ExecStart=/usr/local/bin/dante-advertiser
 Restart=always
 RestartSec=10
