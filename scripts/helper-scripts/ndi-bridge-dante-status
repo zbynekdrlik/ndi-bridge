@@ -53,7 +53,7 @@ if [ -f /etc/ndi-bridge/dante.conf ]; then
     echo "  Device Name: $DEVICE_NAME"
     echo "  Interface: ${DANTE_INTERFACE:-br0}"
     echo "  Channels: ${DANTE_CHANNELS:-2}"
-    echo "  Sample Rate: ${DANTE_SAMPLE_RATE:-48000} Hz"
+    echo "  Sample Rate: ${DANTE_SAMPLE_RATE:-96000} Hz"
     echo "  Mode: ${DANTE_MODE:-bidirectional}"
 else
     echo "Configuration file not found"

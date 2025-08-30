@@ -21,8 +21,8 @@ DANTE_INTERFACE=br0
 # Number of audio channels (2 = stereo, up to 64 supported)
 DANTE_CHANNELS=2
 
-# Sample rate (48000 or 44100)
-DANTE_SAMPLE_RATE=48000
+# Sample rate (96000, 48000 or 44100)
+DANTE_SAMPLE_RATE=96000
 
 # Device name for Dante network
 DANTE_DEVICE_NAME=ndi-bridge
@@ -176,24 +176,25 @@ StandardError=journal
 WantedBy=multi-user.target
 EOFSTATIME
 
-# Create Inferno ALSA service to keep device active
+# Create Inferno ALSA service (does NOT hold the device open)
+# This service just ensures the Inferno daemon is available
 cat > /etc/systemd/system/inferno-alsa.service << 'EOFINFERNO'
 [Unit]
-Description=Inferno Dante ALSA device
-After=statime.service sound.target
+Description=Inferno Dante ALSA daemon
+After=statime.service network-online.target
 Wants=statime.service
+Requires=statime.service
 
 [Service]
-Type=simple
+Type=oneshot
+RemainAfterExit=yes
 Environment="INFERNO_NAME=ndi-bridge"
 Environment="INFERNO_INTERFACE=br0"
 Environment="HOME=/root"
-ExecStart=/usr/bin/arecord -D dante -f cd -t raw -q /dev/null
-Restart=always
-RestartSec=5
+# Just check that the ALSA plugin is available
+ExecStart=/bin/bash -c 'aplay -L | grep -q dante && echo "Dante ALSA device available"'
+# No restart - this is just a check service
 User=root
-StandardOutput=null
-StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -217,11 +218,12 @@ fi
 
 echo "Bridging USB audio card $USB_CARD to Dante network"
 
-# Start bidirectional bridge
-arecord -D plughw:${USB_CARD},0 -f cd -t raw 2>/dev/null | aplay -D dante -f cd -t raw 2>/dev/null &
+# Start bidirectional bridge at 96kHz
+# Format: S32_LE, 96000 Hz, stereo
+arecord -D plughw:${USB_CARD},0 -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null | aplay -D dante -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null &
 CAPTURE_PID=$!
 
-arecord -D dante -f cd -t raw 2>/dev/null | aplay -D plughw:${USB_CARD},0 -f cd -t raw 2>/dev/null &
+arecord -D dante -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null | aplay -D plughw:${USB_CARD},0 -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null &
 PLAYBACK_PID=$!
 
 echo "Bridge active (Capture PID: $CAPTURE_PID, Playback PID: $PLAYBACK_PID)"

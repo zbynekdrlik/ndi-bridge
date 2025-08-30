@@ -217,7 +217,24 @@ is_ptp_synchronized() {
     fi
 }
 
+is_dante_mode() {
+    # Check if Dante/Statime service is running (indicates Dante mode)
+    if systemctl is-active statime >/dev/null 2>&1; then
+        return 0
+    fi
+    return 1
+}
+
 manage_services() {
+    # Skip management if in Dante mode - let Statime handle PTP
+    if is_dante_mode; then
+        log_msg "Dante mode active - skipping PTP management"
+        # Stop our PTP services to avoid conflicts
+        systemctl stop ptp4l 2>/dev/null || true
+        systemctl stop phc2sys 2>/dev/null || true
+        return
+    fi
+    
     if is_ptp_synchronized; then
         # PTP is working well - disable NTP
         if systemctl is-active chrony >/dev/null 2>&1 || systemctl is-active chronyd >/dev/null 2>&1; then

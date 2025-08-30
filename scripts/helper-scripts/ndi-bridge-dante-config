@@ -40,7 +40,7 @@ load_config() {
 # Dante Audio Bridge Configuration
 DANTE_INTERFACE=br0
 DANTE_CHANNELS=2
-DANTE_SAMPLE_RATE=48000
+DANTE_SAMPLE_RATE=96000
 DANTE_DEVICE_NAME=ndi-bridge
 DANTE_ENABLED=true
 DANTE_MODE=bidirectional
@@ -53,7 +53,7 @@ save_config() {
 # Dante Audio Bridge Configuration
 DANTE_INTERFACE=${DANTE_INTERFACE:-br0}
 DANTE_CHANNELS=${DANTE_CHANNELS:-2}
-DANTE_SAMPLE_RATE=${DANTE_SAMPLE_RATE:-48000}
+DANTE_SAMPLE_RATE=${DANTE_SAMPLE_RATE:-96000}
 DANTE_DEVICE_NAME=${DANTE_DEVICE_NAME:-ndi-bridge}
 DANTE_ENABLED=${DANTE_ENABLED:-true}
 DANTE_MODE=${DANTE_MODE:-bidirectional}
@@ -91,11 +91,13 @@ set_sample_rate() {
     echo "Select sample rate:"
     echo "1) 44100 Hz"
     echo "2) 48000 Hz"
-    echo -n "Choice (current: ${DANTE_SAMPLE_RATE:-48000}): "
+    echo "3) 96000 Hz (Professional)"
+    echo -n "Choice (current: ${DANTE_SAMPLE_RATE:-96000}): "
     read choice
     case $choice in
         1) DANTE_SAMPLE_RATE=44100; save_config ;;
         2) DANTE_SAMPLE_RATE=48000; save_config ;;
+        3) DANTE_SAMPLE_RATE=96000; save_config ;;
         *) echo -e "${RED}Invalid choice${NC}"; sleep 2 ;;
     esac
 }
@@ -198,7 +200,7 @@ show_config() {
     echo "Device Name: ${DANTE_DEVICE_NAME:-ndi-bridge}"
     echo "Interface: ${DANTE_INTERFACE:-br0}"
     echo "Channels: ${DANTE_CHANNELS:-2}"
-    echo "Sample Rate: ${DANTE_SAMPLE_RATE:-48000} Hz"
+    echo "Sample Rate: ${DANTE_SAMPLE_RATE:-96000} Hz"
     echo "Mode: ${DANTE_MODE:-bidirectional}"
     echo
     echo "Service Status:"
