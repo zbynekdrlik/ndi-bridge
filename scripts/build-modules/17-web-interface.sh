@@ -26,8 +26,8 @@ npm install -g wetty@2.0.2 2>&1 | grep -v "^npm notice\|^npm WARN" || true
 rm -f /etc/nginx/sites-enabled/default
 
 # Copy enhanced nginx configuration if available
-if [ -f "$(dirname "$0")/../files/nginx/ndi-bridge-enhanced" ]; then
-    cp "$(dirname "$0")/../files/nginx/ndi-bridge-enhanced" /etc/nginx/sites-available/ndi-bridge
+if [ -f "$(dirname "$0")/../files/nginx/ndi-bridge" ]; then
+    cp "$(dirname "$0")/../files/nginx/ndi-bridge" /etc/nginx/sites-available/ndi-bridge
 else
     # Fallback to inline configuration
     cat > /etc/nginx/sites-available/ndi-bridge << 'EOFNGINX'
