@@ -40,11 +40,11 @@ if [ ! -d "$INFERNO_DIR" ]; then
     git clone --recurse-submodules https://github.com/teodly/inferno.git
 fi
 
-cd "$INFERNO_DIR"
+cd "$INFERNO_DIR" || { echo "Failed to enter Inferno directory"; exit 1; }
 git pull
 git submodule update --init --recursive
 
-# Remove lock file to avoid version conflicts
+# Remove lock file to avoid version conflicts  
 rm -f Cargo.lock
 
 # Build Inferno
