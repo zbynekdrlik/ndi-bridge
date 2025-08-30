@@ -8,5 +8,5 @@ if ! command -v pipewire &> /dev/null || ! command -v wireplumber &> /dev/null; 
     exit 1
 fi
 
-echo "Starting VDO.Ninja Intercom with PipeWire..."
-exec /usr/local/bin/vdo-ninja-intercom-pipewire "$@"
+echo "Starting NDI Bridge Intercom with PipeWire..."
+exec /usr/local/bin/ndi-bridge-intercom-pipewire "$@"

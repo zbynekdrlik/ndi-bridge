@@ -15,20 +15,32 @@ install_helper_scripts() {
         chmod +x /mnt/usb/usr/local/bin/ndi-bridge-*
         chmod +x /mnt/usb/usr/local/bin/ndi-display-*
         
-        # Copy VDO.Ninja intercom scripts and service (PipeWire only)
-        if [ -f "$HELPER_DIR/vdo-ninja-intercom-pipewire" ]; then
-            cp "$HELPER_DIR/vdo-ninja-intercom-pipewire" /mnt/usb/usr/local/bin/
-            chmod +x /mnt/usb/usr/local/bin/vdo-ninja-intercom-pipewire
+        # Copy NDI Bridge intercom scripts and service (PipeWire only)
+        if [ -f "$HELPER_DIR/ndi-bridge-intercom-pipewire" ]; then
+            cp "$HELPER_DIR/ndi-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/ndi-bridge-intercom-pipewire
         fi
         
         # Copy launcher (PipeWire only, no fallback)
-        if [ -f "$HELPER_DIR/vdo-ninja-intercom-launcher" ]; then
-            cp "$HELPER_DIR/vdo-ninja-intercom-launcher" /mnt/usb/usr/local/bin/
-            chmod +x /mnt/usb/usr/local/bin/vdo-ninja-intercom-launcher
+        if [ -f "$HELPER_DIR/ndi-bridge-intercom-launcher" ]; then
+            cp "$HELPER_DIR/ndi-bridge-intercom-launcher" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/ndi-bridge-intercom-launcher
         fi
         
-        if [ -f "$HELPER_DIR/vdo-ninja-intercom.service" ]; then
-            cp "$HELPER_DIR/vdo-ninja-intercom.service" /mnt/usb/etc/systemd/system/
+        # Copy intercom control and config scripts
+        for script in ndi-bridge-intercom-control ndi-bridge-intercom-config ndi-bridge-intercom-status ndi-bridge-intercom-logs ndi-bridge-intercom-restart ndi-bridge-intercom-api; do
+            if [ -f "$HELPER_DIR/$script" ]; then
+                cp "$HELPER_DIR/$script" /mnt/usb/usr/local/bin/
+                chmod +x /mnt/usb/usr/local/bin/$script
+            fi
+        done
+        
+        if [ -f "$HELPER_DIR/ndi-bridge-intercom.service" ]; then
+            cp "$HELPER_DIR/ndi-bridge-intercom.service" /mnt/usb/etc/systemd/system/
+        fi
+        
+        if [ -f "$HELPER_DIR/ndi-bridge-intercom-api.service" ]; then
+            cp "$HELPER_DIR/ndi-bridge-intercom-api.service" /mnt/usb/etc/systemd/system/
         fi
         
         # Setup Chrome profile with VDO.Ninja permissions (pre-granted)

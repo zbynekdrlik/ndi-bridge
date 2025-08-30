@@ -1,0 +1,22 @@
+[Unit]
+Description=NDI Bridge Intercom API Server
+After=network.target ndi-bridge-intercom.service
+Wants=ndi-bridge-intercom.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/python3 /usr/local/bin/ndi-bridge-intercom-api
+Restart=always
+RestartSec=5
+
+# PipeWire environment
+Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="PULSE_RUNTIME_PATH=/run/user/0/pulse"
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

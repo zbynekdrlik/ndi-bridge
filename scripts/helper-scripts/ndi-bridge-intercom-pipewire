@@ -1,5 +1,5 @@
 #!/bin/bash
-# VDO.Ninja Intercom for NDI Bridge with PipeWire
+# NDI Bridge Intercom with PipeWire
 # Connects to VDO.Ninja room with real USB audio using PipeWire
 
 # Don't exit on error - some commands may fail but we continue
@@ -52,7 +52,7 @@ ROOM="${VDO_ROOM:-nl_interkom}"
 PROFILE_DIR="/tmp/chrome-vdo-profile"
 DISPLAY_NUM=99
 
-echo "=== VDO.Ninja Intercom Starting (PipeWire) ==="
+echo "=== NDI Bridge Intercom Starting (PipeWire) ==="
 echo "Device: $HOSTNAME"
 echo "Room: $ROOM"
 

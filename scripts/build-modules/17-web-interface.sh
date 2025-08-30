@@ -58,6 +58,26 @@ server {
         proxy_request_buffering off;
     }
     
+    # Intercom web interface
+    location /intercom {
+        auth_basic "NDI Bridge Login";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        alias /var/www/ndi-bridge/intercom.html;
+    }
+    
+    # Intercom API endpoints
+    location /api/intercom/ {
+        auth_basic "NDI Bridge Login";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        
+        proxy_pass http://127.0.0.1:8089/api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
     # API endpoints for future use
     location /api/ {
         return 503;
@@ -75,6 +95,13 @@ chmod 644 /etc/nginx/.htpasswd
 
 # Create web root directory
 mkdir -p /var/www/ndi-bridge
+
+# Copy web files if available
+WEB_DIR="$(dirname "$0")/../web"
+if [ -d "$WEB_DIR" ]; then
+    # Copy intercom HTML if available
+    [ -f "$WEB_DIR/intercom.html" ] && cp "$WEB_DIR/intercom.html" /var/www/ndi-bridge/intercom.html
+fi
 
 # Create landing page
 cat > /var/www/ndi-bridge/index.html << 'EOFHTML'
@@ -217,6 +244,7 @@ cat > /var/www/ndi-bridge/index.html << 'EOFHTML'
         
         <div class="btn-container">
             <a href="/terminal/" class="btn">Open Terminal</a>
+            <a href="/intercom" class="btn btn-secondary">Intercom Control</a>
             <button class="btn btn-secondary" onclick="refreshInfo()">Refresh</button>
         </div>
         
