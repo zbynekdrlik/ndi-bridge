@@ -33,6 +33,10 @@ apt-get install -y -qq pipewire pipewire-alsa pipewire-pulse wireplumber pulseau
 echo "Installing ALSA utilities..."
 apt-get install -y -qq alsa-utils 2>&1 | head -10
 
+# Install Python3 for API server
+echo "Installing Python3 for API server..."
+apt-get install -y -qq python3 python3-minimal 2>&1 | head -10
+
 # Enable NDI Bridge intercom services
 echo "Enabling NDI Bridge intercom services..."
 systemctl enable ndi-bridge-intercom.service 2>/dev/null || true

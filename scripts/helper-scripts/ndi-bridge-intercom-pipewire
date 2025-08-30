@@ -70,7 +70,7 @@ export DISPLAY=:$DISPLAY_NUM
 # Start VNC server for remote monitoring
 echo "Starting VNC server on port 5999..."
 # Use setsid to completely detach VNC from this process group
-setsid x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+setsid x11vnc -noshm -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
 sleep 2
 echo "VNC server detached and running"
 
