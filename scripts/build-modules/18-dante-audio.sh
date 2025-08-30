@@ -156,7 +156,8 @@ pcm.dante {
 }
 EOFALSA
 
-# Also create system-wide configuration
+# Also create system-wide configuration  
+# CRITICAL: Must use 'type inferno' directly, NOT 'type plug'!
 cp /root/.asoundrc /etc/asound.conf
 
 # Create Statime systemd service

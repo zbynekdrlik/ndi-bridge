@@ -1,6 +1,6 @@
 #!/bin/bash
 # Dante Device Advertiser Service
-# Keeps device visible in Dante Controller
+# Keeps device visible in Dante Controller with both RX and TX channels
 
 export INFERNO_NAME=${INFERNO_NAME:-${DANTE_DEVICE_NAME:-${HOSTNAME:-ndi-bridge}}}
 export INFERNO_INTERFACE=${INFERNO_INTERFACE:-${DANTE_INTERFACE:-br0}}
@@ -10,10 +10,11 @@ export INFERNO_SAMPLE_RATE=${INFERNO_SAMPLE_RATE:-96000}
 [ -f /etc/ndi-bridge/dante.conf ] && source /etc/ndi-bridge/dante.conf
 
 echo "Starting Dante advertiser for device '$INFERNO_NAME' on interface '$INFERNO_INTERFACE'"
+echo "Advertising both TX (destination) and RX (source) channels at ${INFERNO_SAMPLE_RATE}Hz"
 
 # Function to check if ports are open
 check_ports() {
-    netstat -tuln 2>/dev/null | grep -E ":(8700|8800) " | grep -q "$INFERNO_INTERFACE"
+    netstat -tuln 2>/dev/null | grep -E ":(8700|8800) " | grep -q "0.0.0.0:\*"
 }
 
 # Main loop
@@ -21,22 +22,37 @@ while true; do
     if ! check_ports; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Dante advertisement..."
         
-        # Start a dummy recording process to activate Inferno
-        # This opens the discovery ports and advertises on the network
-        arecord -D dante -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null >/dev/null &
-        ADVERTISE_PID=$!
+        # Create a named pipe for audio loopback
+        PIPE=/tmp/dante-duplex-$$
+        mkfifo $PIPE 2>/dev/null || true
+        
+        # Start TX (destination): Play from pipe to Dante
+        # This advertises TX channels (device appears as destination)
+        cat $PIPE | aplay -D dante -f S32_LE -r ${INFERNO_SAMPLE_RATE} -c 2 -t raw -B 1000000 2>/dev/null &
+        TX_PID=$!
+        
+        # Start RX (source): Record from Dante to pipe
+        # This advertises RX channels (device appears as source)
+        arecord -D dante -f S32_LE -r ${INFERNO_SAMPLE_RATE} -c 2 -t raw -B 1000000 2>/dev/null > $PIPE &
+        RX_PID=$!
+        
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Duplex active (TX: $TX_PID, RX: $RX_PID)"
         
         # Give it time to initialize
         sleep 2
         
         if check_ports; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Dante discovery ports opened successfully"
+            echo "Device visible as both source AND destination in Dante Controller"
         else
             echo "$(date '+%Y-%m-%d %H:%M:%S') - Warning: Discovery ports not opened"
         fi
         
-        # Keep the process running
-        wait $ADVERTISE_PID
+        # Wait for either process to exit
+        wait $TX_PID $RX_PID
+        
+        # Cleanup
+        rm -f $PIPE
         echo "$(date '+%Y-%m-%d %H:%M:%S') - Advertiser process ended, restarting..."
     else
         # Ports are open, just monitor
