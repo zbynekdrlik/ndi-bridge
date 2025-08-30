@@ -190,6 +190,49 @@ Fixes #25"
 
 **Build takes 10-15 minutes. Image output: `ndi-bridge.img` (8GB)**
 
+## Clean Repository Build Process
+
+**Building USB Image from Freshly Cloned Repository:**
+
+1. **Clone and enter repository:**
+```bash
+git clone https://github.com/yourusername/ndi-bridge.git
+cd ndi-bridge
+```
+
+2. **Setup build environment (installs dependencies and NDI SDK):**
+```bash
+./setup-build-environment.sh
+```
+This will:
+- Install all build dependencies (cmake, libv4l-dev, etc.)
+- Download and install NDI SDK v6 to project directory
+- Verify the installation
+
+3. **Build application binaries:**
+```bash
+./build.sh
+```
+This creates ndi-capture and ndi-display binaries in `build/bin/`
+
+4. **Increment version number:**
+```bash
+# Edit scripts/build-modules/00-variables.sh
+# Change BUILD_SCRIPT_VERSION (e.g., "1.9.5" → "1.9.6")
+```
+
+5. **Build USB image:**
+```bash
+sudo ./build-image-for-rufus.sh > build.log 2>&1 &
+tail -f build.log  # Monitor progress
+```
+Build takes 10-15 minutes. Output: `ndi-bridge.img` (8GB)
+
+**Common Issues & Solutions:**
+- `losetup package not found` → Fixed: use util-linux package instead
+- `NDI SDK directory not found` → Fixed: installer extracts to current dir, not home
+- `libndi.so.6.2.0 not found` → Fixed: NDI SDK v6 has libndi.so.6.2.1
+
 ## Quick Commands
 
 ### Application Build (AUTO-APPROVED)

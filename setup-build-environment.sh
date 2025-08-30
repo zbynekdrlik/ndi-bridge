@@ -139,7 +139,7 @@ install_build_deps() {
         "e2fsprogs"
         "debootstrap"
         "kpartx"
-        "losetup"
+        "util-linux"
         "grub2-common"
         "grub-pc-bin"
         "grub-efi-amd64-bin"
@@ -198,15 +198,28 @@ install_ndi_sdk() {
     
     # Run installer non-interactively
     log_info "Installing NDI SDK..."
-    echo "y" | ./"$INSTALLER" > /dev/null
+    # The installer extracts to current directory, not home directory
+    yes | ./"$INSTALLER" 2>&1 | grep -v "^$"
     
     # Move SDK to project directory
     cd - > /dev/null
-    if [ -d ~/NDI\ SDK\ for\ Linux ]; then
-        mv ~/NDI\ SDK\ for\ Linux ./ 2>/dev/null || cp -r ~/NDI\ SDK\ for\ Linux ./ 
+    
+    # Look for the SDK in temp directory first (where installer extracted it)
+    if [ -d "$TEMP_DIR/NDI SDK for Linux" ]; then
+        log_info "Moving NDI SDK from temp directory to project root..."
+        mv "$TEMP_DIR/NDI SDK for Linux" "./" || cp -r "$TEMP_DIR/NDI SDK for Linux" "./"
+        log_info "NDI SDK installed to project directory"
+    elif [ -d "$TEMP_DIR/NDI_SDK_Linux" ]; then
+        log_info "Moving NDI SDK from temp directory to project root..."
+        mv "$TEMP_DIR/NDI_SDK_Linux" "./NDI SDK for Linux" || cp -r "$TEMP_DIR/NDI_SDK_Linux" "./NDI SDK for Linux"
+        log_info "NDI SDK installed to project directory"
+    elif [ -d ~/NDI\ SDK\ for\ Linux ]; then
+        log_info "Moving NDI SDK from home directory to project root..."
+        mv ~/NDI\ SDK\ for\ Linux ./ 2>/dev/null || cp -r ~/NDI\ SDK\ for\ Linux ./
         log_info "NDI SDK installed to project directory"
     else
-        log_error "NDI SDK installation failed - directory not found"
+        log_error "NDI SDK installation failed - directory not found in expected locations"
+        log_error "Checked: $TEMP_DIR/NDI SDK for Linux, $TEMP_DIR/NDI_SDK_Linux, ~/NDI SDK for Linux"
         exit 1
     fi
     
