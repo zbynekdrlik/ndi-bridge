@@ -139,16 +139,18 @@ EOFDANTECFG
 
 # Create ALSA configuration for Inferno
 cat > /root/.asoundrc << 'EOFALSA'
-# Inferno ALSA configuration
+# Inferno ALSA PCM device
 pcm.inferno {
     type inferno
     RX_CHANNELS 2
     TX_CHANNELS 2
 }
 
+# Dante uses inferno type directly (not plug!)
 pcm.dante {
-    type plug
-    slave.pcm inferno
+    type inferno
+    RX_CHANNELS 2
+    TX_CHANNELS 2
 }
 EOFALSA
 
@@ -249,9 +251,35 @@ User=root
 WantedBy=multi-user.target
 EOFUSBBRIDGE
 
+# Create Dante advertiser service
+cat > /etc/systemd/system/dante-advertiser.service << 'EOFADV'
+[Unit]
+Description=Dante Device Advertiser
+After=statime.service network-online.target
+Wants=statime.service
+PartOf=statime.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/dante-advertiser
+Restart=always
+RestartSec=10
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOFADV
+
+# Copy advertiser script
+cp /tmp/helper-scripts/dante-advertiser /usr/local/bin/
+chmod +x /usr/local/bin/dante-advertiser
+
 # Enable services
 systemctl enable statime.service 2>/dev/null || true
 systemctl enable inferno-alsa.service 2>/dev/null || true
+systemctl enable dante-advertiser.service 2>/dev/null || true
 # USB bridge is optional - only enable if USB audio device is present
 systemctl enable usb-dante-bridge.service 2>/dev/null || true
 

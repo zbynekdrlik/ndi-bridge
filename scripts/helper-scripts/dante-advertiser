@@ -1,0 +1,47 @@
+#!/bin/bash
+# Dante Device Advertiser Service
+# Keeps device visible in Dante Controller
+
+export INFERNO_NAME=${DANTE_DEVICE_NAME:-${HOSTNAME:-ndi-bridge}}
+export INFERNO_INTERFACE=${DANTE_INTERFACE:-br0}
+
+# Source configuration if available
+[ -f /etc/ndi-bridge/dante.conf ] && source /etc/ndi-bridge/dante.conf
+
+echo "Starting Dante advertiser for device '$INFERNO_NAME' on interface '$INFERNO_INTERFACE'"
+
+# Function to check if ports are open
+check_ports() {
+    netstat -tuln 2>/dev/null | grep -E ":(8700|8800) " | grep -q "$INFERNO_INTERFACE"
+}
+
+# Main loop
+while true; do
+    if ! check_ports; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Starting Dante advertisement..."
+        
+        # Start a dummy recording process to activate Inferno
+        # This opens the discovery ports and advertises on the network
+        arecord -D dante -f S32_LE -r 48000 -c 2 -t raw 2>/dev/null >/dev/null &
+        ADVERTISE_PID=$!
+        
+        # Give it time to initialize
+        sleep 2
+        
+        if check_ports; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Dante discovery ports opened successfully"
+        else
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - Warning: Discovery ports not opened"
+        fi
+        
+        # Keep the process running
+        wait $ADVERTISE_PID
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Advertiser process ended, restarting..."
+    else
+        # Ports are open, just monitor
+        sleep 30
+    fi
+    
+    # Brief pause before restart
+    sleep 1
+done
