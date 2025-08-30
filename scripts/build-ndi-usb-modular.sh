@@ -49,9 +49,9 @@ copy_ndi_files() {
     
     # Copy NDI libraries
     mkdir -p /mnt/usb/usr/local/lib
-    cp "$NDI_SDK_PATH/lib/x86_64-linux-gnu/libndi.so.6.2.0" /mnt/usb/usr/local/lib/
+    cp "$NDI_SDK_PATH/lib/x86_64-linux-gnu/libndi.so.6.2.1" /mnt/usb/usr/local/lib/
     cd /mnt/usb/usr/local/lib
-    ln -s libndi.so.6.2.0 libndi.so.6
+    ln -s libndi.so.6.2.1 libndi.so.6
     ln -s libndi.so.6 libndi.so
     cd - > /dev/null
 }
