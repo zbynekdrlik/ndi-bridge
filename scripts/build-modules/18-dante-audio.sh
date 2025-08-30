@@ -139,18 +139,20 @@ EOFDANTECFG
 
 # Create ALSA configuration for Inferno
 cat > /root/.asoundrc << 'EOFALSA'
-# Inferno ALSA PCM device
+# Inferno ALSA PCM device at 96kHz
 pcm.inferno {
     type inferno
     RX_CHANNELS 2
     TX_CHANNELS 2
+    SAMPLE_RATE 96000
 }
 
-# Dante uses inferno type directly (not plug!)
+# Dante at 96kHz for professional network
 pcm.dante {
     type inferno
     RX_CHANNELS 2
     TX_CHANNELS 2
+    SAMPLE_RATE 96000
 }
 EOFALSA
 
