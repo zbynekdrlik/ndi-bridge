@@ -7,6 +7,8 @@ configure_dante_audio() {
     
     # Create Dante configuration directory
     mkdir -p /mnt/usb/etc/ndi-bridge
+    mkdir -p /mnt/usb/opt/inferno
+    mkdir -p /mnt/usb/opt/statime
     
     # Create default Dante configuration
     cat > /mnt/usb/etc/ndi-bridge/dante.conf << 'EOFDANTE'
@@ -32,33 +34,68 @@ DANTE_ENABLED=true
 DANTE_MODE=bidirectional
 EOFDANTE
     
-    # Add Dante setup to chroot configuration script
-    cat >> /mnt/usb/tmp/configure-system.sh << 'EOFDANTECFG'
+    # Check if pre-compiled binaries exist
+    DANTE_PKG_DIR="$(dirname "$0")/../build/dante-package"
+    
+    if [ -f "$DANTE_PKG_DIR/lib/libasound_module_pcm_inferno.so" ] && \
+       [ -f "$DANTE_PKG_DIR/bin/statime" ]; then
+        log "Using pre-compiled Dante binaries..."
+        
+        # Copy pre-compiled binaries
+        mkdir -p /mnt/usb/usr/lib/x86_64-linux-gnu/alsa-lib
+        cp "$DANTE_PKG_DIR/lib/libasound_module_pcm_inferno.so" \
+           /mnt/usb/usr/lib/x86_64-linux-gnu/alsa-lib/
+        
+        mkdir -p /mnt/usb/usr/local/bin
+        [ -f "$DANTE_PKG_DIR/bin/inferno2pipe" ] && \
+            cp "$DANTE_PKG_DIR/bin/inferno2pipe" /mnt/usb/usr/local/bin/
+        
+        cp "$DANTE_PKG_DIR/bin/statime" /mnt/usb/usr/local/bin/
+        
+        # Copy Statime config
+        if [ -f "$DANTE_PKG_DIR/config/statime.conf" ]; then
+            cp "$DANTE_PKG_DIR/config/statime.conf" /mnt/usb/etc/statime.conf
+        fi
+        
+        log "Pre-compiled Dante binaries installed"
+        
+        # Still need to create services and configs in chroot
+        cat >> /mnt/usb/tmp/configure-system.sh << 'EOFDANTECFG'
+echo "Configuring Dante audio services..."
+EOFDANTECFG
+        
+    else
+        log "Pre-compiled binaries not found, will compile in chroot..."
+        
+        # Add full compilation to chroot script
+        cat >> /mnt/usb/tmp/configure-system.sh << 'EOFDANTECFG'
 
-# Install Dante audio bridge dependencies
-echo "Installing Dante audio bridge dependencies..."
+# Install Dante audio bridge with compilation
+echo "Installing Dante audio bridge..."
 
-# Install build dependencies and Rust
+# Install Rust from Ubuntu repositories (faster than rustup)
+echo "Installing Rust from Ubuntu repos..."
 apt-get update -qq
-apt-get install -y -qq curl build-essential pkg-config libasound2-dev git 2>&1 | head -20
+apt-get install -y -qq rustc-1.82 cargo-1.82 pkg-config libasound2-dev build-essential git 2>&1 | tail -10
 
-# Install Rust using rustup (needed for latest version)
-echo "Installing Rust toolchain..."
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable 2>&1 | tail -10
-source /root/.cargo/env
+# Create symlinks for cargo and rustc
+update-alternatives --install /usr/bin/cargo cargo /usr/bin/cargo-1.82 100
+update-alternatives --install /usr/bin/rustc rustc /usr/bin/rustc-1.82 100
+
+# Verify Rust installation
+rustc --version
 
 # Clone and build Inferno
-echo "Building Inferno Dante implementation..."
+echo "Building Inferno Dante implementation (this will take 5-10 minutes)..."
 cd /opt
-git clone --recurse-submodules https://github.com/teodly/inferno.git 2>&1 | head -10
+git clone --recurse-submodules https://github.com/teodly/inferno.git 2>&1 | head -5
 cd inferno
 
 # Remove lock file to avoid version conflicts
 rm -f Cargo.lock
 
-# Build Inferno (this may take a while)
-echo "Compiling Inferno (this will take 5-10 minutes)..."
-cargo build --release 2>&1 | tail -20
+# Build Inferno
+cargo build --release 2>&1 | tail -10
 
 # Install the ALSA plugin
 if [ -f target/release/libasound_module_pcm_inferno.so ]; then
@@ -69,25 +106,36 @@ else
     echo "Warning: Inferno ALSA plugin not found"
 fi
 
-# Install inferno2pipe utility
+# Install inferno2pipe utility if built
 if [ -f target/release/inferno2pipe ]; then
     cp target/release/inferno2pipe /usr/local/bin/
-    echo "inferno2pipe utility installed"
 fi
 
 # Clone and build Statime (PTP daemon for Inferno)
 echo "Building Statime PTP daemon..."
 cd /opt
-git clone --recurse-submodules -b inferno-dev https://github.com/teodly/statime.git 2>&1 | head -10
+git clone --recurse-submodules -b inferno-dev https://github.com/teodly/statime.git 2>&1 | head -5
 cd statime
-cargo build --release 2>&1 | tail -20
+cargo build --release 2>&1 | tail -10
+
+# Install Statime
+if [ -f target/release/statime ]; then
+    cp target/release/statime /usr/local/bin/
+    echo "Statime installed"
+fi
 
 # Copy Statime configuration
 if [ -f inferno-ptpv1.toml ]; then
     cp inferno-ptpv1.toml /etc/statime.conf
-    # Update interface to br0
     sed -i 's/interface = ".*"/interface = "br0"/' /etc/statime.conf
 fi
+
+echo "Dante compilation complete"
+EOFDANTECFG
+    fi
+    
+    # Add common configuration (services, ALSA config, etc.)
+    cat >> /mnt/usb/tmp/configure-system.sh << 'EOFCOMMON'
 
 # Create ALSA configuration for Inferno
 cat > /root/.asoundrc << 'EOFALSA'
@@ -117,7 +165,7 @@ Conflicts=chronyd.service ntp.service
 
 [Service]
 Type=simple
-ExecStart=/opt/statime/target/release/statime -c /etc/statime.conf
+ExecStart=/usr/local/bin/statime -c /etc/statime.conf
 Restart=always
 RestartSec=5
 User=root
@@ -160,7 +208,7 @@ export INFERNO_NAME=${HOSTNAME:-ndi-bridge}
 export INFERNO_INTERFACE=br0
 
 # Find first USB audio device (skip HDMI)
-USB_CARD=$(aplay -l | grep -E "USB Audio|Arturia|Behringer|Focusrite|Scarlett" | head -1 | sed 's/card \([0-9]\).*/\1/')
+USB_CARD=$(aplay -l 2>/dev/null | grep -E "USB Audio|Arturia|Behringer|Focusrite|Scarlett" | head -1 | sed 's/card \([0-9]\).*/\1/')
 
 if [ -z "$USB_CARD" ]; then
     echo "No USB audio device found"
@@ -199,14 +247,14 @@ User=root
 WantedBy=multi-user.target
 EOFUSBBRIDGE
 
-# Enable services but don't start them in chroot
+# Enable services
 systemctl enable statime.service 2>/dev/null || true
 systemctl enable inferno-alsa.service 2>/dev/null || true
-# USB bridge is optional - enable only if USB audio device is present
+# USB bridge is optional - only enable if USB audio device is present
 systemctl enable usb-dante-bridge.service 2>/dev/null || true
 
 echo "Dante audio bridge configuration complete"
-EOFDANTECFG
+EOFCOMMON
 }
 
 export -f configure_dante_audio
