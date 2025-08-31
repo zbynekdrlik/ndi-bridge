@@ -7,11 +7,18 @@ composable and focused on single responsibilities.
 """
 
 import os
+import sys
 import pytest
 import yaml
 from pathlib import Path
 from typing import Dict, List, Optional
 import testinfra
+
+# Add fixtures directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent / "fixtures"))
+
+# Import shared fixtures to make them available to all tests
+from fixtures.device import *  # noqa: F401, F403
 
 
 def pytest_addoption(parser):

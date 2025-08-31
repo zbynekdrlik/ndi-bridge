@@ -27,75 +27,190 @@
 - Partial success = Complete failure
 - All tests must pass before declaring feature operational
 
-## Test Suite Design Requirements
+## Modern Test Suite Architecture (2025)
 
-### MANDATORY: Read-Only Filesystem Check
-**EVERY test script MUST start with read-only filesystem verification!**
+### Testing Framework: pytest + testinfra
+**Industry-standard framework for embedded/hardware testing with SSH-based remote execution**
 
-**Use the existing module `tests/lib/ro_check.sh`:**
-```bash
-#!/bin/bash
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+### Core Testing Principles
 
-# Source the RO check module
-source "${SCRIPT_DIR}/lib/ro_check.sh" || {
-    echo "ERROR: Could not load ro_check.sh module"
-    exit 1
-}
+#### 1. Atomic Tests - One Test, One Assertion
+**CRITICAL: Each test must validate exactly ONE thing**
+```python
+# BAD: Multiple assertions in one test
+def test_capture():
+    assert device_exists()
+    assert service_active()
+    assert fps == 30
+    
+# GOOD: Atomic tests
+def test_capture_device_exists():
+    """Test that /dev/video0 exists."""
+    assert host.file("/dev/video0").exists
 
-# Set up variables for the module
-TEST_BOX_IP="${1:-}"  # Device IP from first argument
-SSH_USER="root"
-SSH_PASS="newlevel"
+def test_capture_service_active():
+    """Test that ndi-capture service is running."""
+    assert host.service("ndi-capture").is_running
 
-# CRITICAL: Verify filesystem is read-only
-echo -e "\n${YELLOW}CRITICAL CHECK: Filesystem Status${NC}"
-if ! verify_readonly_filesystem "$TEST_BOX_IP"; then
-    exit 1
-fi
+def test_capture_fps_stable():
+    """Test that capture maintains 30fps."""
+    metrics = host.file("/var/run/ndi-bridge/fps").content_string
+    assert float(metrics) >= 29.0
 ```
 
-**Why this is CRITICAL:**
-- The appliance runs with read-only root filesystem in production
-- Features that work in read-write mode OFTEN FAIL in read-only mode
-- This has caused COUNTLESS false positives where features appear to work but fail in production
-- Every implementation MUST work with read-only filesystem or it's BROKEN
+#### 2. AAA Pattern (Arrange-Act-Assert)
+**Every test follows this structure:**
+```python
+def test_stabilization_duration():
+    # Arrange: Set up test conditions
+    host.run("systemctl restart ndi-capture")
+    
+    # Act: Perform the action
+    time.sleep(30)
+    
+    # Assert: Verify the outcome
+    state = host.file("/var/run/ndi-bridge/capture_state").content_string
+    assert state == "RUNNING"
+```
 
-### Test Script Structure
-Every test script must follow this structure:
-1. **Read-only filesystem check** (FIRST, ALWAYS)
-2. Service enabled/active checks
-3. Process running checks
-4. Configuration file checks (in tmpfs paths)
-5. Functionality tests
-6. Error pattern checks in logs
-7. Resilience tests (restart, reconnect, etc.)
+#### 3. Test Organization by Category
+```
+tests/
+├── unit/                    # Pure logic tests (no device needed)
+├── component/               # Single component tests
+│   ├── capture/            # One directory per component
+│   │   ├── test_device_detection.py
+│   │   ├── test_service_active.py
+│   │   └── test_fps_stability.py
+│   ├── display/
+│   ├── audio/
+│   └── network/
+├── integration/            # Multi-component interaction tests
+├── system/                 # End-to-end tests
+├── performance/            # Benchmarks and metrics
+└── fixtures/               # Shared test utilities
+```
 
-### Test Naming Convention
-- `test_<feature>.sh` - Feature-specific tests
-- Tests must be executable (`chmod +x`)
-- Must accept device IP as first argument
-- Must return exit code 0 for success, 1 for failure
+### Test Execution
 
-### Common Test Patterns
+#### Running Tests
 ```bash
-# SSH command wrapper
-ssh_cmd() {
-    sshpass -p newlevel ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR root@${DEVICE_IP} "$1"
-}
+# Install dependencies
+pip install -r tests/requirements.txt
 
-# Test result printer
-print_test_result() {
-    if [ "$2" = "PASS" ]; then
-        echo -e "${GREEN}✓${NC} $1"
-        ((TESTS_PASSED++))
-    else
-        echo -e "${RED}✗${NC} $1"
-        ((TESTS_FAILED++))
-    fi
+# Run all tests
+pytest --host 10.77.9.143
+
+# Run specific category
+pytest tests/component/capture/ --host 10.77.9.143
+
+# Run with parallel execution
+pytest -n auto --host 10.77.9.143
+
+# Run only critical tests
+pytest -m critical --host 10.77.9.143
+```
+
+#### Test Markers
+- `@pytest.mark.critical` - Must pass for release
+- `@pytest.mark.slow` - Takes >5 seconds
+- `@pytest.mark.requires_usb` - Needs USB device
+- `@pytest.mark.destructive` - Modifies system
+
+### Writing New Tests
+
+#### 1. Create Atomic Test File
+```python
+# tests/component/capture/test_new_feature.py
+import pytest
+
+def test_specific_behavior(host):
+    """Test one specific behavior."""
+    # One test, one assertion
+    result = host.run("command")
+    assert result.succeeded
+```
+
+#### 2. Use Fixtures for Common Operations
+```python
+@pytest.fixture
+def restart_service(host):
+    """Fixture to restart a service."""
+    def _restart(service_name):
+        host.run(f"systemctl restart {service_name}")
+        time.sleep(2)
+    return _restart
+
+def test_service_recovery(host, restart_service):
+    restart_service("ndi-capture")
+    assert host.service("ndi-capture").is_running
+```
+
+#### 3. Parallel Test Execution
+Tests are designed to run in parallel by default:
+- Each test is independent (no shared state)
+- Fixtures handle setup/teardown
+- Use `pytest-xdist` for auto-parallelization
+
+### Migration from Bash Tests
+
+**Current State**: 83 tests in 11 bash files (violates atomic principle)
+**Target State**: Each test as separate Python function
+
+**Migration Process**:
+1. Identify logical test units in bash scripts
+2. Create atomic pytest function for each
+3. Place in appropriate category directory
+4. Use testinfra for SSH operations
+
+**Example Migration**:
+```bash
+# OLD: bash test with multiple checks
+test_capture() {
+    check_device
+    check_service
+    check_fps
 }
 ```
+
+```python
+# NEW: Three atomic tests
+def test_capture_device_present(host):
+    assert host.file("/dev/video0").exists
+
+def test_capture_service_enabled(host):
+    assert host.service("ndi-capture").is_enabled
+
+def test_capture_fps_nominal(host):
+    fps = float(host.file("/var/run/ndi-bridge/fps").content_string)
+    assert 29.0 <= fps <= 31.0
+```
+
+### CI/CD Integration
+
+```yaml
+# .github/workflows/test.yml
+name: Test Suite
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+      - run: pip install -r tests/requirements.txt
+      - run: pytest --host ${{ secrets.TEST_DEVICE_IP }}
+```
+
+### Best Practices
+
+1. **Test Independence**: Each test must be runnable in isolation
+2. **Fast Feedback**: Component tests <1s, integration <5s
+3. **Clear Naming**: `test_<component>_<behavior>_<expected_result>`
+4. **No Test Interdependencies**: Tests never depend on execution order
+5. **Use Markers**: Tag tests appropriately for selective execution
+6. **Fixture Reuse**: Common operations in fixtures, not duplicated
+7. **Descriptive Docstrings**: Each test has clear documentation
 
 ### Known Issues That Took 10+ Builds to Find:
 - Menu `read` commands need `< /dev/tty` when called from other scripts
