@@ -325,19 +325,41 @@ echo "Chrome started with PID $CHROME_PID"
 # Give Chrome time to create audio streams
 sleep 10
 
-# Enable self-monitoring (always on for intercom)
-echo "Enabling self-monitoring..."
-/usr/local/bin/ndi-bridge-intercom-monitor enable 50 >/dev/null 2>&1 || true
+# Set default audio configuration
+echo "Setting default audio configuration..."
 
-# Force any Chrome audio streams to use USB devices
-echo "Ensuring Chrome uses USB audio..."
+# Set hardware output (headphone) volume to 100%
+if [ -n "$USB_SINK" ]; then
+    echo "  Setting headphone hardware volume to 100%"
+    pactl set-sink-volume "$USB_SINK" 100%
+fi
+
+# Set hardware input (mic) volume to 100% but MUTED by default
+if [ -n "$USB_SOURCE" ]; then
+    echo "  Setting microphone hardware volume to 100% (muted)"
+    pactl set-source-volume "$USB_SOURCE" 100%
+    pactl set-source-mute "$USB_SOURCE" 1  # Start muted
+fi
+
+# Enable self-monitoring at 100% volume
+echo "  Enabling self-monitoring at 100% volume"
+/usr/local/bin/ndi-bridge-intercom-monitor enable 100 >/dev/null 2>&1 || true
+
+# Wait a bit more for Chrome to fully establish audio
+sleep 5
+
+# Force any Chrome audio streams to use USB devices and set volume
+echo "Configuring Chrome audio..."
 if [ -n "$USB_SINK" ]; then
     for stream in $(pactl list sink-inputs short | awk '{print $1}'); do
         current_sink=$(pactl list sink-inputs short | grep "^$stream" | awk '{print $2}')
         if [ "$current_sink" != "$(pactl list sinks short | grep "$USB_SINK" | awk '{print $1}')" ]; then
-            echo "Moving output stream $stream to USB audio"
+            echo "  Moving output stream $stream to USB audio"
             pactl move-sink-input "$stream" "$USB_SINK" 2>/dev/null || true
         fi
+        # Set Chrome/Others volume to 90%
+        echo "  Setting Others volume to 90% for stream $stream"
+        pactl set-sink-input-volume "$stream" 90% 2>/dev/null || true
     done
 fi
 
