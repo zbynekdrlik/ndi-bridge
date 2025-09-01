@@ -48,7 +48,25 @@ async def startup_event():
     """Initialize services on startup"""
     # Start audio monitoring task
     asyncio.create_task(audio_monitor_task())
+    
+    # Delay loading defaults to let PipeWire stabilize
+    asyncio.create_task(load_defaults_after_delay())
+    
     print("NDI Bridge Intercom API started on port 8000")
+
+async def load_defaults_after_delay():
+    """Load default settings after a delay to let audio system stabilize"""
+    await asyncio.sleep(15)  # Wait for PipeWire and Chrome to fully initialize
+    try:
+        if await state_manager.load_defaults():
+            print("Loaded saved default settings")
+            # Get and log the actual state after loading
+            state = await state_manager.get_state()
+            print(f"Applied settings: mic_vol={state['mic_volume']}%, speaker_vol={state['speaker_volume']}%, mic_muted={state['mic_muted']}, speaker_muted={state['speaker_muted']}")
+        else:
+            print("No default settings found, using system defaults")
+    except Exception as e:
+        print(f"Failed to load defaults: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
