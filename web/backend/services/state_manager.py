@@ -33,15 +33,24 @@ class StateManager:
         devices = await ShellExecutor.get_usb_audio_devices()
         self.state["devices"] = devices
         
-        # Get volume levels
-        if devices["output"]:
-            success, output = await ShellExecutor.pactl(["get-sink-volume", devices["output"]])
-            if success:
-                # Parse volume percentage
-                import re
-                match = re.search(r'(\d+)%', output)
-                if match:
-                    self.state["speaker_volume"] = int(match.group(1))
+        # Get Chrome volume (Others Volume)
+        success, output = await ShellExecutor.pactl(["list", "sink-inputs"])
+        if success:
+            current_sink_input = None
+            in_chrome = False
+            for line in output.split('\n'):
+                if 'Sink Input #' in line:
+                    current_sink_input = line.split('#')[1].strip()
+                    in_chrome = False
+                elif current_sink_input and 'application.name = "Google Chrome"' in line:
+                    in_chrome = True
+                elif in_chrome and 'Volume:' in line and 'balance' not in line:
+                    # Parse volume percentage from Chrome
+                    import re
+                    match = re.search(r'(\d+)%', line)
+                    if match:
+                        self.state["speaker_volume"] = int(match.group(1))
+                        break
             
             # Get mute state
             success, output = await ShellExecutor.pactl(["get-sink-mute", devices["output"]])
@@ -89,38 +98,55 @@ class StateManager:
             
             # When mic is muted, also mute the monitor loopback
             # When unmuted, restore monitor to previous volume
-            if muted:
-                # Mute monitor by setting volume to 0
-                await ShellExecutor.run_command(
-                    "/usr/local/bin/ndi-bridge-intercom-monitor",
-                    ["volume", "0"]
-                )
-            else:
-                # Restore monitor volume
-                monitor_vol = self.state.get("monitor_volume", 50)
-                await ShellExecutor.run_command(
-                    "/usr/local/bin/ndi-bridge-intercom-monitor",
-                    ["volume", str(monitor_vol)]
-                )
+            try:
+                if muted:
+                    # Mute monitor by setting volume to 0
+                    await ShellExecutor.run_command(
+                        "/usr/local/bin/ndi-bridge-intercom-monitor",
+                        ["volume", "0"]
+                    )
+                else:
+                    # Restore monitor volume
+                    monitor_vol = self.state.get("monitor_volume", 50)
+                    await ShellExecutor.run_command(
+                        "/usr/local/bin/ndi-bridge-intercom-monitor",
+                        ["volume", str(monitor_vol)]
+                    )
+            except Exception as e:
+                print(f"Warning: Failed to adjust monitor volume during mute: {e}")
+                # Don't fail the whole operation if monitor control fails
             
             await self.save_runtime_state()
         
         return success
     
     async def set_speaker_volume(self, volume: int) -> bool:
-        """Set speaker volume (0-100)"""
-        devices = await ShellExecutor.get_usb_audio_devices()
-        if not devices["output"]:
+        """Set speaker volume (0-100) - ONLY affects Chrome/VDO audio, not monitor"""
+        # Find Chrome sink inputs and adjust their volume
+        # This way monitor volume stays independent
+        volume = max(0, min(100, volume))  # Clamp to 0-100
+        
+        success, output = await ShellExecutor.pactl(["list", "sink-inputs"])
+        if not success:
             return False
         
-        volume = max(0, min(100, volume))  # Clamp to 0-100
-        success, _ = await ShellExecutor.pactl(["set-sink-volume", devices["output"], f"{volume}%"])
-        
-        if success:
-            self.state["speaker_volume"] = volume
-            await self.save_runtime_state()
-        
-        return success
+        # Parse sink inputs to find Chrome
+        chrome_found = False
+        current_sink_input = None
+        for line in output.split('\n'):
+            if 'Sink Input #' in line:
+                current_sink_input = line.split('#')[1].strip()
+            elif current_sink_input and 'application.name = "Google Chrome"' in line:
+                # Found Chrome, set its volume
+                success, _ = await ShellExecutor.pactl(
+                    ["set-sink-input-volume", current_sink_input, f"{volume}%"]
+                )
+                chrome_found = True
+                
+        # Always save state even if Chrome not found yet
+        self.state["speaker_volume"] = volume
+        await self.save_runtime_state()
+        return True
     
     async def set_mic_volume(self, volume: int) -> bool:
         """Set microphone volume (0-100)"""
