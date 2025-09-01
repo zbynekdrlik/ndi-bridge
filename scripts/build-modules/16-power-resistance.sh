@@ -65,7 +65,7 @@ configure_readonly_root() {
 # Configure filesystem for read-only operation
 # First update fstab to mount root as read-only
 ROOT_UUID=\$(blkid -s UUID -o value $ROOT_PARTITION)
-sed -i "s|UUID=.* / ext4 .*|UUID=\$ROOT_UUID / ext4 ro,noatime,errors=remount-ro 0 1|" /etc/fstab
+sed -i "s|UUID=.* / ext4 .*|UUID=\$ROOT_UUID / ext4 rw,noatime,errors=remount-ro 0 1|" /etc/fstab
 
 # DO NOT enable remount-rw service - it breaks power failure protection!
 # The service exists for emergency use only and must remain disabled
