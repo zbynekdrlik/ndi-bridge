@@ -1,5 +1,5 @@
 #!/bin/bash
-# VDO.Ninja Intercom for NDI Bridge with PipeWire
+# NDI Bridge Intercom with PipeWire
 # Connects to VDO.Ninja room with real USB audio using PipeWire
 
 # Don't exit on error - some commands may fail but we continue
@@ -52,7 +52,7 @@ ROOM="${VDO_ROOM:-nl_interkom}"
 PROFILE_DIR="/tmp/chrome-vdo-profile"
 DISPLAY_NUM=99
 
-echo "=== VDO.Ninja Intercom Starting (PipeWire) ==="
+echo "=== NDI Bridge Intercom Starting (PipeWire) ==="
 echo "Device: $HOSTNAME"
 echo "Room: $ROOM"
 
@@ -70,7 +70,7 @@ export DISPLAY=:$DISPLAY_NUM
 # Start VNC server for remote monitoring
 echo "Starting VNC server on port 5999..."
 # Use setsid to completely detach VNC from this process group
-setsid x11vnc -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+setsid x11vnc -noshm -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
 sleep 2
 echo "VNC server detached and running"
 
@@ -187,29 +187,26 @@ echo "PipeWire started"
 echo "Configuring USB audio devices..."
 
 # Find USB devices
-USB_SINK=$(pactl list sinks short | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
-USB_SOURCE=$(pactl list sources short | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+# HARDCODED for CSCTEK USB Audio and HID device
+USB_SINK=$(pactl list sinks short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+USB_SOURCE=$(pactl list sources short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
 
 if [ -n "$USB_SINK" ]; then
     echo "Setting default output to: $USB_SINK"
     pactl set-default-sink "$USB_SINK"
-    # Set volume to 100% and ensure unmuted
-    echo "Setting output volume to 100%"
-    pactl set-sink-volume "$USB_SINK" 100%
-    pactl set-sink-mute "$USB_SINK" 0
+    # Don't set volume here - let web interface manage defaults
+    # The web service will load saved defaults after startup
 else
-    echo "WARNING: USB Audio output not found"
+    echo "ERROR: CSCTEK USB Audio HID output not found"
 fi
 
 if [ -n "$USB_SOURCE" ]; then
     echo "Setting default input to: $USB_SOURCE"
     pactl set-default-source "$USB_SOURCE"
-    # Set microphone volume to 100% and ensure unmuted
-    echo "Setting microphone volume to 100%"
-    pactl set-source-volume "$USB_SOURCE" 100%
-    pactl set-source-mute "$USB_SOURCE" 0
+    # Don't set volume here - let web interface manage defaults
+    # The web service will load saved defaults after startup
 else
-    echo "WARNING: USB Audio input not found"
+    echo "ERROR: CSCTEK USB Audio HID input not found"
 fi
 
 # Verify defaults are set
@@ -223,8 +220,8 @@ echo "=== Audio Devices ==="
 # Show cards in a cleaner format
 for card in $(pactl list cards short 2>/dev/null | awk '{print $2}'); do
     desc=$(pactl list cards 2>/dev/null | grep -A 2 "Name: $card" | grep "Description:" | cut -d: -f2- | sed 's/^ //')
-    if echo "$card" | grep -q "usb.*HID\|USB.*Audio"; then
-        echo "  ✓ USB Audio (3.5mm): $desc"
+    if echo "$card" | grep -q "CSCTEK_USB_Audio_and_HID"; then
+        echo "  ✓ CSCTEK USB Audio HID (3.5mm): $desc"
     elif echo "$card" | grep -q "Elgato"; then
         echo "  ⚠ Elgato (capture device - not used for audio)"
     else

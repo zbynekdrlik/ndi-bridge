@@ -1,5 +1,103 @@
 # CLAUDE.md - NDI Bridge Development Guide
 
+## WEB INTERFACE ARCHITECTURE (2025 Standard)
+
+### Technology Stack
+**Backend**: FastAPI (Python)
+**Frontend**: Vue 3 (Options API) + Vuetify 3
+**Real-time**: WebSockets for live updates
+**Deployment**: No build step - Vue from CDN
+
+### Why This Stack
+1. **AI Coding Consistency**: Enforced structure prevents context loss
+2. **Mobile-First**: Vuetify provides Material Design components
+3. **No Build Complexity**: Deploy by copying files
+4. **Real-time Updates**: Native WebSocket support
+5. **Shell Integration**: Python subprocess for existing scripts
+
+### Project Structure (MUST FOLLOW)
+```
+web/
+├── backend/
+│   ├── main.py                  # FastAPI app entry
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── [feature].py         # Feature-specific endpoints
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── shell_executor.py    # Shell command wrapper
+│   │   └── state_manager.py     # State management
+│   └── models/
+│       ├── __init__.py
+│       └── schemas.py           # Pydantic models
+├── frontend/
+│   ├── index.html               # Vue app entry
+│   ├── js/
+│   │   ├── app.js               # Main Vue app
+│   │   ├── components/          # Vue components
+│   │   └── services/            # API/WebSocket clients
+│   └── css/
+│       └── overrides.css        # Minimal custom styles
+└── requirements.txt             # FastAPI, uvicorn only
+```
+
+### Component Pattern (MUST USE)
+```javascript
+// Every Vue component MUST follow this structure
+export default {
+    name: 'ComponentName',
+    template: `...`,  // Vuetify components only
+    data() {
+        return {
+            // All reactive data here
+        }
+    },
+    mounted() {
+        // WebSocket connections here
+    },
+    methods: {
+        // All methods here
+    },
+    computed: {
+        // Computed properties here
+    }
+}
+```
+
+### API Pattern (MUST USE)
+```python
+from fastapi import APIRouter
+from pydantic import BaseModel
+
+router = APIRouter(prefix="/api/module")
+
+class RequestModel(BaseModel):
+    """Always use Pydantic models"""
+    field: type
+
+@router.post("/endpoint")
+async def endpoint_name(request: RequestModel):
+    """Always async, always typed"""
+    # Shell execution
+    result = await execute_command("script", ["args"])
+    # WebSocket broadcast
+    await broadcast_state({"key": "value"})
+    return {"status": "success"}
+```
+
+### State Management Rules
+1. **ALL state lives in backend** (FastAPI)
+2. **Frontend is display-only** (Vue reflects backend state)
+3. **Updates via WebSocket** (No polling)
+4. **Configuration persistence** must be explicit user action
+
+### Mobile-First Design Rules
+1. **Use Vuetify components exclusively** - No custom UI elements
+2. **Touch targets minimum 48x48px** - Material Design spec
+3. **Bottom navigation on mobile** - Thumb-friendly
+4. **Responsive breakpoints**: xs (mobile), sm (tablet), md+ (desktop)
+5. **Test on actual mobile devices** - Not just browser resize
+
 ## CRITICAL: Debugging & Testing Requirements
 
 **NEVER assume a fix works without testing on actual hardware!**
