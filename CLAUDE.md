@@ -645,31 +645,34 @@ sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
 
 The project uses **pytest + testinfra** for atomic testing (one test = one assertion).
 
-### Quick Start
+### Running Tests
 ```bash
-# Configure test IP (persistent)
+# Configure test IP (persistent across sessions)
 nano tests/test_config.yaml  # Set: host: 10.77.9.188
 
-# Run tests (handles SSH key changes automatically)
-./tests/test-device.sh        # Uses IP from config
-./tests/test-device.sh 10.77.9.189  # Override IP
+# Run all tests
+python3 -m pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q --tb=no
 
-# Or run pytest directly
-python3 -m pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q
+# Run specific component tests
+python3 -m pytest tests/component/core/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q
+python3 -m pytest tests/component/capture/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q
+
+# Use helper scripts
+./tests/run_all_tests.sh        # Runs all test categories
+./tests/test-device.sh           # Auto-handles SSH key changes for reflashed devices
 ```
 
+### Test Configuration Priority
+1. Command line: `--host 10.77.9.188`
+2. Config file: `tests/test_config.yaml`
+3. Environment: `export NDI_TEST_HOST=10.77.9.188`
+4. Default: `10.77.9.143`
+
 ### SSH Key Handling for Reflashed Devices
-Add to `~/.ssh/config` for test IPs:
+When testing multiple devices on same IP, add to `~/.ssh/config`:
 ```bash
 Host 10.77.9.*
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
 ```
-
-### Verify Test Tools in Image
-```bash
-sudo losetup --partscan --find --show ndi-bridge.img
-sudo mount /dev/loop0p2 /mnt/ndi-image
-ls /mnt/ndi-image/opt/ndi-bridge-tests/  # Test suite location
-sudo umount /mnt/ndi-image && sudo losetup -d /dev/loop0
-```
+Or use `./tests/test-device.sh` which handles this automatically.
