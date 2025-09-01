@@ -17,7 +17,8 @@ def test_capture_device_exists(host):
 def test_capture_device_is_character_device(host):
     """Test that /dev/video0 is a character device."""
     device = host.file("/dev/video0")
-    assert device.is_character_device, "/dev/video0 is not a character device"
+    # Use is_special instead of is_character which doesn't exist
+    assert device.exists and device.is_special, "/dev/video0 is not a character device"
 
 
 def test_capture_device_has_correct_permissions(host):

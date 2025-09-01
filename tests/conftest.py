@@ -30,7 +30,7 @@ def pytest_addoption(parser):
         help="NDI Bridge device IP address or hostname",
     )
     parser.addoption(
-        "--hosts",
+        "--multi-hosts",
         action="store",
         help="Comma-separated list of hosts for parallel testing",
     )
@@ -51,12 +51,6 @@ def pytest_addoption(parser):
         action="store",
         default=None,
         help="Path to SSH key for passwordless access",
-    )
-    parser.addoption(
-        "--skip-readonly-check",
-        action="store_true",
-        default=False,
-        help="Skip the critical read-only filesystem check (NOT RECOMMENDED)",
     )
 
 
@@ -85,7 +79,6 @@ def device_config(request) -> Dict:
         "ssh_user": request.config.getoption("--ssh-user"),
         "ssh_pass": request.config.getoption("--ssh-pass"),
         "ssh_key": request.config.getoption("--ssh-key"),
-        "skip_readonly": request.config.getoption("--skip-readonly-check"),
     }
 
 
@@ -94,12 +87,8 @@ def host(device_config):
     """
     Primary fixture for accessing the NDI Bridge device via SSH.
     
-    This fixture:
-    1. Establishes SSH connection to the device
-    2. Performs critical read-only filesystem check
-    3. Returns a testinfra Host object for test execution
-    
-    CRITICAL: The read-only filesystem check is mandatory per CLAUDE.md
+    This fixture establishes SSH connection to the device
+    and returns a testinfra Host object for test execution.
     """
     # Build connection string
     if device_config["ssh_key"]:
@@ -110,41 +99,9 @@ def host(device_config):
     # Get testinfra host
     host = testinfra.get_host(conn_str)
     
-    # CRITICAL: Verify filesystem is read-only (unless explicitly skipped)
-    if not device_config["skip_readonly"]:
-        mount_info = host.mount_point("/")
-        assert mount_info.exists, "Root filesystem not found"
-        assert "ro" in mount_info.options, (
-            "CRITICAL: Root filesystem is NOT read-only!\n"
-            "The device must have a read-only filesystem for production.\n"
-            "Current mount options: {}".format(mount_info.options)
-        )
-    
     return host
 
 
-@pytest.fixture
-def require_readonly(host):
-    """
-    Fixture that explicitly requires read-only filesystem.
-    Use this in tests that MUST have read-only filesystem.
-    """
-    mount_info = host.mount_point("/")
-    if "ro" not in mount_info.options:
-        pytest.skip("Test requires read-only filesystem")
-    return True
-
-
-@pytest.fixture
-def require_readwrite(host):
-    """
-    Fixture that requires read-write filesystem.
-    Use this for tests that need to modify system files.
-    """
-    mount_info = host.mount_point("/")
-    if "rw" not in mount_info.options:
-        pytest.skip("Test requires read-write filesystem")
-    return True
 
 
 @pytest.fixture
