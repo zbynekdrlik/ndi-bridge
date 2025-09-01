@@ -177,8 +177,9 @@ The NDI Bridge appliance includes built-in bidirectional audio intercom function
 - **Automatic Connection**: Connects to VDO.Ninja room at boot without user interaction
 - **Audio Only**: Microphone-only mode with explicit video disabled (novideo parameter)
 - **USB Audio Support**: Uses USB audio device (3.5mm jack) for local audio I/O
-- **Auto Volume**: Automatically sets volume to 100% on startup
+- **Ultra-Low Latency Monitoring**: Self-monitoring with 0.67ms latency (32-sample buffer @ 48kHz)
 - **PipeWire Audio**: Modern Linux audio system for low-latency communication
+- **Web Control Interface**: Control intercom settings via web browser at `http://device:8000`
 - **VNC Monitoring**: Remote desktop access on port 5999 (no password)
 - **Auto-recovery**: Automatically restarts if connection drops
 - **Persistent Configuration**: Settings preserved across reboots
@@ -200,7 +201,21 @@ vncviewer cam1.local:5999    # No password required
 vncviewer ndi-bridge-cam1.local:5999    # Alternative full hostname
 ```
 
-#### Web Interface
+#### Web Control Interface
+Control the intercom settings from any browser:
+```
+http://cam1.local:8000          # Device web interface
+http://192.168.1.100:8000       # Using IP address
+```
+
+Features:
+- **Mic Mute**: Large button for quick mute/unmute (affects both VDO and self-monitor)
+- **Others Volume**: Control volume of other participants (0-100%)
+- **Self Monitor Volume**: Adjust how loud you hear yourself (0-100%)
+- **Mic Gain**: Adjust microphone sensitivity if others can't hear you well
+- **Save Defaults**: Save current settings to persist across reboots
+
+#### VDO.Ninja Room View
 Access the VDO.Ninja control page from any browser:
 ```
 https://vdo.ninja/?room=nl_interkom&view
@@ -213,21 +228,23 @@ This shows all connected NDI Bridge devices in the room.
 #### Check Service Status
 ```bash
 ssh root@cam1.local
-systemctl status vdo-ninja-intercom
+systemctl status ndi-bridge-intercom       # Main intercom service
+systemctl status ndi-bridge-intercom-web   # Web control interface
 ```
 
 #### View Logs
 ```bash
-vdo-ninja-intercom-logs
+ndi-bridge-intercom-logs
 # or
-journalctl -u vdo-ninja-intercom -f
+journalctl -u ndi-bridge-intercom -f
+journalctl -u ndi-bridge-intercom-web -f   # Web interface logs
 ```
 
 #### Restart Service
 ```bash
-vdo-ninja-intercom-restart
+ndi-bridge-intercom-restart
 # or
-systemctl restart vdo-ninja-intercom
+systemctl restart ndi-bridge-intercom
 ```
 
 #### Audio Issues
