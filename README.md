@@ -317,6 +317,31 @@ If device doesn't recover after reconnect:
 
 ## Development
 
+### Testing
+
+The project includes a comprehensive test suite using pytest + testinfra for infrastructure testing:
+
+```bash
+# Install test dependencies
+pip3 install -r tests/requirements.txt
+
+# Configure test target
+cp tests/test_config.yaml.example tests/test_config.yaml
+nano tests/test_config.yaml  # Update with your device IP
+
+# Run tests
+pytest tests/ -v                           # All tests with verbose output
+pytest tests/component/core/ -q            # Core system tests only
+./tests/test-device.sh 10.77.9.188         # Helper script for easy testing
+```
+
+Test categories:
+- **Core**: System services, filesystem, boot sequence
+- **Capture**: USB device detection, FPS monitoring, stabilization
+- **Display**: NDI output, DRM/KMS functionality
+- **Network**: DHCP, mDNS, MAC persistence
+- **Audio**: PipeWire, intercom functionality
+
 ### Repository Structure
 ```
 ndi-bridge/
