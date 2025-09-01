@@ -52,13 +52,22 @@ copy_ndi_files() {
         log "NDI Display binary not found, skipping"
     fi
     
-    # Copy NDI libraries
+    # Copy NDI libraries (version agnostic - works with 6.2.0 or 6.2.1)
     mkdir -p /mnt/usb/usr/local/lib
-    cp "$NDI_SDK_PATH/lib/x86_64-linux-gnu/libndi.so.6.2.0" /mnt/usb/usr/local/lib/
-    cd /mnt/usb/usr/local/lib
-    ln -s libndi.so.6.2.0 libndi.so.6
-    ln -s libndi.so.6 libndi.so
-    cd - > /dev/null
+    # Find the actual NDI library file
+    NDI_LIB=$(ls "$NDI_SDK_PATH/lib/x86_64-linux-gnu"/libndi.so.6.* 2>/dev/null | head -1)
+    if [ -f "$NDI_LIB" ]; then
+        NDI_LIB_NAME=$(basename "$NDI_LIB")
+        cp "$NDI_LIB" /mnt/usb/usr/local/lib/
+        cd /mnt/usb/usr/local/lib
+        ln -s "$NDI_LIB_NAME" libndi.so.6
+        ln -s libndi.so.6 libndi.so
+        cd - > /dev/null
+        log "NDI library $NDI_LIB_NAME copied successfully"
+    else
+        log "ERROR: No NDI library found in $NDI_SDK_PATH/lib/x86_64-linux-gnu/"
+        exit 1
+    fi
 }
 
 # Assemble the full configuration script

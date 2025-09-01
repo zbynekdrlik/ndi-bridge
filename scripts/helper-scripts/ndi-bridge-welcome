@@ -387,17 +387,27 @@ else
 fi
 echo ""
 
-# VDO.NINJA INTERCOM
-echo -e "${CYAN}▶ VDO.NINJA INTERCOM${NC}"
-if systemctl is-active vdo-ninja-intercom --quiet 2>/dev/null; then
+# NDI BRIDGE INTERCOM
+echo -e "${CYAN}▶ NDI BRIDGE INTERCOM${NC}"
+if systemctl is-active ndi-bridge-intercom --quiet 2>/dev/null; then
     echo -e "  Status:      ${GREEN}● Running${NC}"
     echo "  Room:        nl_interkom"
     echo "  Device ID:   $(hostname)"
     echo "  VNC Access:  $(hostname).local:5999"
+    echo "  Web Control: http://$(hostname).local/intercom"
+    # Show audio status if available
+    if [ -x /usr/local/bin/ndi-bridge-intercom-control ]; then
+        audio_status=$(/usr/local/bin/ndi-bridge-intercom-control status 2>/dev/null | grep -A1 '"output"' | grep '"muted"' | grep -o 'true\|false')
+        if [ "$audio_status" = "true" ]; then
+            echo -e "  Audio:       ${RED}MUTED${NC}"
+        else
+            echo -e "  Audio:       ${GREEN}ACTIVE${NC}"
+        fi
+    fi
 else
     echo -e "  Status:      ${YELLOW}○ Not running${NC}"
-    if [ -f /usr/local/bin/vdo-ninja-intercom-launcher ]; then
-        echo "  Ready to start (run: systemctl start vdo-ninja-intercom)"
+    if [ -f /usr/local/bin/ndi-bridge-intercom-launcher ]; then
+        echo "  Ready to start (run: systemctl start ndi-bridge-intercom)"
     else
         echo "  Chrome intercom not installed"
     fi

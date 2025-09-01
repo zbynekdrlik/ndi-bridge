@@ -4,7 +4,7 @@
 
 # Build Script Version - Auto-incremented with each build
 BUILD_SCRIPT_VERSION="1.12.0"
-BUILD_SCRIPT_DATE="2025-08-30"
+BUILD_SCRIPT_DATE="2025-09-01"
 
 # Build timestamp - Generated at build time (local timezone)
 BUILD_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"
