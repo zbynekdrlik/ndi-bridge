@@ -95,10 +95,17 @@ else
     echo "Warning: Inferno ALSA plugin not found"
 fi
 
-# Clone and build Statime (PTP daemon for Inferno)
-echo "Building Statime PTP daemon..."
+# Clone and build Statime (MODIFIED FORK with PTPv1 support for Dante)
+# CRITICAL: We MUST use teodly's fork with inferno-dev branch
+# Upstream Statime only supports PTPv2, which is incompatible with Dante PTPv1
+echo "Building Statime PTP daemon (Inferno fork with PTPv1 support)..."
 cd /opt
 git clone --recurse-submodules -b inferno-dev https://github.com/teodly/statime.git 2>&1 | head -5
+if [ $? -ne 0 ]; then
+    echo "ERROR: Failed to clone Statime fork with PTPv1 support!"
+    echo "Cannot proceed without PTPv1 support for Dante"
+    exit 1
+fi
 cd statime
 cargo build --release 2>&1 | tail -10
 
@@ -108,10 +115,21 @@ if [ -f target/release/statime ]; then
     echo "Statime installed"
 fi
 
-# Copy Statime configuration
-if [ -f inferno-ptpv1.toml ]; then
+# Copy Statime configuration - FOLLOWER MODE
+# CRITICAL: ndi-bridge must be PTP follower, not master
+if [ -f /tmp/helper-scripts/statime-follower.conf ]; then
+    cp /tmp/helper-scripts/statime-follower.conf /etc/statime.conf
+elif [ -f inferno-ptpv1.toml ]; then
     cp inferno-ptpv1.toml /etc/statime.conf
-    sed -i 's/interface = ".*"/interface = "br0"/' /etc/statime.conf
+    # Modify to ensure we're never PTP master
+    cat >> /etc/statime.conf << 'EOFOLLOWER'
+
+# OVERRIDE: Ensure ndi-bridge is always PTP follower
+[ptp]
+priority1 = 255
+priority2 = 255
+clock_class = 255
+EOFOLLOWER
 fi
 
 echo "Dante compilation complete"

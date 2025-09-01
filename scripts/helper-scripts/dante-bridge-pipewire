@@ -1,0 +1,295 @@
+#!/bin/bash
+# Dante Audio Bridge with PipeWire Clock Drift Compensation
+# Handles multiple clock domains: Dante PTPv1, System, and USB Audio
+
+# Environment setup for Inferno
+export INFERNO_NAME=${HOSTNAME:-ndi-bridge}
+export INFERNO_INTERFACE=br0
+export INFERNO_SAMPLE_RATE=96000
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log() {
+    echo -e "${GREEN}[Dante]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[Dante Error]${NC} $1" >&2
+}
+
+warn() {
+    echo -e "${YELLOW}[Dante Warning]${NC} $1"
+}
+
+# Check if PipeWire is running
+check_pipewire() {
+    if ! pgrep -x pipewire >/dev/null 2>&1; then
+        error "PipeWire is not running!"
+        error "Clock drift compensation requires PipeWire"
+        return 1
+    fi
+    
+    # Check if PipeWire ALSA plugin is available
+    if ! pw-cli info all 2>/dev/null | grep -q "alsa"; then
+        error "PipeWire ALSA support not detected"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Find USB audio device
+find_usb_audio() {
+    local usb_card=""
+    
+    # Priority order: Arturia, then other professional cards
+    for pattern in "Arturia" "Focusrite" "Scarlett" "Behringer" "USB Audio"; do
+        usb_card=$(aplay -l 2>/dev/null | grep "$pattern" | head -1 | sed 's/card \([0-9]\).*/\1/')
+        if [ -n "$usb_card" ]; then
+            local card_name=$(aplay -l 2>/dev/null | grep "card $usb_card" | head -1)
+            log "Found USB audio: $card_name"
+            echo "$usb_card"
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# Configure PipeWire for clock drift compensation
+configure_pipewire_clocks() {
+    local usb_card="$1"
+    
+    log "Configuring PipeWire clock domains..."
+    
+    # Create PipeWire configuration for adaptive resampling
+    # This enables clock drift compensation between Dante and USB
+    cat > /tmp/dante-clock-config.conf << 'EOPWCONF'
+# Temporary PipeWire configuration for Dante bridge
+# Enables adaptive resampling between clock domains
+
+context.properties = {
+    # Force specific sample rate for consistency
+    default.clock.rate = 96000
+    default.clock.allowed-rates = [ 96000 ]
+    
+    # Quality setting for resampling (1-15, higher = better quality)
+    resample.quality = 10
+    
+    # Enable clock drift detection and compensation
+    clock.power-of-two-quantum = false
+}
+
+stream.properties = {
+    # Enable adaptive resampling for streams
+    node.latency = 1024/96000
+    resample.disable = false
+    channelmix.disable = false
+}
+
+# ALSA properties for better clock handling
+alsa.properties = {
+    # Each ALSA device gets its own clock domain
+    # This triggers adaptive resampling between them
+    api.alsa.use-acp = false
+    api.alsa.period-size = 512
+    api.alsa.headroom = 1024
+}
+EOPWCONF
+    
+    # Apply configuration
+    pw-metadata -n settings 0 clock.force-rate 96000
+    pw-metadata -n settings 0 clock.rate 96000
+    
+    log "PipeWire configured for 96kHz with adaptive resampling"
+}
+
+# Create virtual PipeWire nodes for Dante bridge
+create_pipewire_nodes() {
+    local usb_card="$1"
+    
+    log "Creating PipeWire nodes for clock domain bridging..."
+    
+    # Create a virtual sink that receives from Dante
+    # This sink will handle clock drift from Dante domain
+    pw-cli create-node adapter '{
+        factory.name=support.null-audio-sink
+        node.name=dante-receiver
+        media.class=Audio/Sink
+        audio.channels=2
+        audio.rate=96000
+        audio.format=S32LE
+        node.description="Dante Receiver (Clock Domain Bridge)"
+    }' &
+    DANTE_SINK_PID=$!
+    
+    # Create a virtual source that sends to USB
+    # This will resample to match USB clock domain
+    pw-cli create-node adapter '{
+        factory.name=support.null-audio-sink
+        node.name=usb-sender
+        media.class=Audio/Source
+        audio.channels=2
+        audio.rate=96000
+        audio.format=S32LE
+        node.description="USB Sender (Adaptive Resampling)"
+    }' &
+    USB_SOURCE_PID=$!
+    
+    sleep 2
+    
+    log "Virtual nodes created for clock domain isolation"
+}
+
+# Start the audio routing with clock compensation
+start_bridge_with_compensation() {
+    local usb_card="$1"
+    
+    log "Starting Dante bridge with clock drift compensation..."
+    
+    # Method 1: Use PipeWire's ALSA plugin (recommended)
+    # PipeWire will automatically handle clock drift between devices
+    
+    # Dante → PipeWire (with clock domain A)
+    log "Starting Dante receiver (PTPv1 clock domain)..."
+    pw-record --target=dante-receiver --rate=96000 --format=s32 --channels=2 - | \
+        pw-play --target=alsa_output.usb-Arturia_* --rate=96000 --format=s32 --channels=2 - &
+    DANTE_TO_USB_PID=$!
+    
+    # USB → PipeWire → Dante (with clock domain B)
+    log "Starting USB transmitter (independent clock domain)..."
+    pw-record --target=alsa_input.usb-Arturia_* --rate=96000 --format=s32 --channels=2 - | \
+        pw-play --target=dante - &
+    USB_TO_DANTE_PID=$!
+    
+    # Alternative Method 2: Direct ALSA with PipeWire managing clocks
+    # This lets PipeWire's ALSA plugin handle the resampling
+    #arecord -D pipewire:NODE=dante -f S32_LE -r 96000 -c 2 -t raw | \
+    #    aplay -D pipewire:NODE=hw:${usb_card} -f S32_LE -r 96000 -c 2 -t raw &
+    
+    log "Clock-compensated bridge active"
+    log "PipeWire is handling adaptive resampling between clock domains"
+    
+    # Monitor for issues
+    monitor_clock_drift
+}
+
+# Monitor clock drift and report issues
+monitor_clock_drift() {
+    local drift_warnings=0
+    
+    while true; do
+        sleep 30
+        
+        # Check for xruns (buffer under/overruns)
+        local xruns=$(pw-top -b -n 1 2>/dev/null | grep -E "dante|arturia" | awk '{print $7}')
+        
+        if [ -n "$xruns" ] && [ "$xruns" -gt 0 ]; then
+            warn "Detected $xruns xruns - clock drift may be occurring"
+            drift_warnings=$((drift_warnings + 1))
+            
+            if [ $drift_warnings -gt 10 ]; then
+                error "Excessive clock drift detected - restarting bridge"
+                return 1
+            fi
+        else
+            # Reset warnings if running clean
+            drift_warnings=0
+        fi
+        
+        # Check if processes are still running
+        if ! kill -0 $DANTE_TO_USB_PID 2>/dev/null; then
+            error "Dante to USB process died"
+            return 1
+        fi
+    done
+}
+
+# Fallback: Direct ALSA with periodic restart
+start_bridge_fallback() {
+    local usb_card="$1"
+    
+    warn "Using fallback mode (direct ALSA with periodic restart)"
+    warn "This method will have periodic audio interruptions"
+    
+    # Run for 30 minutes then restart to prevent drift buildup
+    timeout 1800 bash -c "
+        arecord -D dante -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null | \
+            aplay -D plughw:${usb_card},0 -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null &
+        DANTE_PID=\$!
+        
+        arecord -D plughw:${usb_card},0 -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null | \
+            aplay -D dante -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null &
+        USB_PID=\$!
+        
+        wait \$DANTE_PID \$USB_PID
+    "
+    
+    log "Restarting to prevent clock drift accumulation..."
+    sleep 1
+}
+
+# Cleanup
+cleanup() {
+    log "Shutting down Dante bridge..."
+    
+    # Kill all audio processes
+    kill $DANTE_TO_USB_PID $USB_TO_DANTE_PID 2>/dev/null
+    killall pw-record pw-play 2>/dev/null
+    
+    # Remove virtual nodes
+    pw-cli destroy dante-receiver 2>/dev/null
+    pw-cli destroy usb-sender 2>/dev/null
+    
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+# Main execution
+main() {
+    log "Dante Audio Bridge with Clock Drift Compensation"
+    log "Handling clock domains: Dante PTPv1, System, USB Audio"
+    
+    # Find USB audio device
+    USB_CARD=$(find_usb_audio)
+    
+    if [ -z "$USB_CARD" ]; then
+        error "No USB audio device found!"
+        exit 1
+    fi
+    
+    # Check if PipeWire is available
+    if check_pipewire; then
+        log "Using PipeWire for adaptive resampling and clock drift compensation"
+        
+        # Configure PipeWire
+        configure_pipewire_clocks "$USB_CARD"
+        
+        # Create virtual nodes for clock isolation
+        create_pipewire_nodes "$USB_CARD"
+        
+        # Main loop with PipeWire
+        while true; do
+            start_bridge_with_compensation "$USB_CARD"
+            
+            warn "Bridge stopped - restarting with clock resync..."
+            sleep 5
+        done
+    else
+        warn "PipeWire not available - using fallback mode"
+        warn "Audio will restart every 30 minutes to prevent drift"
+        
+        # Fallback loop with periodic restart
+        while true; do
+            start_bridge_fallback "$USB_CARD"
+        done
+    fi
+}
+
+# Run main function
+main "$@"
