@@ -1,20 +1,4 @@
-# NDI Bridge Test Configuration
-# This file is used by the test suite to determine target device settings
-# IMPORTANT: Update this file when testing different devices
-
-# Target device IP address
-host: 10.77.9.188
-
-# SSH credentials
+host: 10.77.9.200
 ssh_user: root
 ssh_pass: newlevel
 ssh_key: ~/.ssh/ndi_test_key
-
-# Optional settings
-timeout: 30
-parallel: false
-
-# Multiple hosts for parallel testing (optional)
-# multi_hosts:
-#   - 10.77.9.188
-#   - 10.77.9.189

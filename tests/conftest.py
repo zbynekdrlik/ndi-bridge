@@ -31,16 +31,31 @@ def pytest_addoption(parser):
     """Add custom command line options for NDI Bridge testing."""
     # Priority: 1. Command line, 2. test_config.yaml, 3. Environment, 4. Default
     default_host = "10.77.9.143"
+    default_ssh_user = "root"
+    default_ssh_pass = "newlevel"
+    default_ssh_key = None
     
     # First check test_config.yaml
     config_file = Path(__file__).parent / "test_config.yaml"
     if config_file.exists():
         with open(config_file, "r") as f:
             test_config = yaml.safe_load(f)
-            if test_config and "host" in test_config:
-                default_host = test_config["host"]
-    # Then check environment variable
-    elif os.environ.get("NDI_TEST_HOST"):
+            if test_config:
+                if "host" in test_config:
+                    default_host = test_config["host"]
+                if "ssh_user" in test_config:
+                    default_ssh_user = test_config["ssh_user"]
+                if "ssh_pass" in test_config:
+                    default_ssh_pass = test_config["ssh_pass"]
+                if "ssh_key" in test_config:
+                    # Expand ~ to home directory for SSH key path
+                    ssh_key = test_config["ssh_key"]
+                    if ssh_key and ssh_key.startswith("~"):
+                        ssh_key = os.path.expanduser(ssh_key)
+                    default_ssh_key = ssh_key
+    
+    # Then check environment variable for host
+    if os.environ.get("NDI_TEST_HOST"):
         default_host = os.environ.get("NDI_TEST_HOST")
     
     parser.addoption(
@@ -57,19 +72,19 @@ def pytest_addoption(parser):
     parser.addoption(
         "--ssh-user",
         action="store",
-        default="root",
+        default=default_ssh_user,
         help="SSH username for device access",
     )
     parser.addoption(
         "--ssh-pass",
         action="store",
-        default="newlevel",
+        default=default_ssh_pass,
         help="SSH password for device access",
     )
     parser.addoption(
         "--ssh-key",
         action="store",
-        default=None,
+        default=default_ssh_key,
         help="Path to SSH key for passwordless access",
     )
 
@@ -193,14 +208,5 @@ def pytest_collection_modifyitems(config, items):
 # Test result hooks
 def pytest_runtest_makereport(item, call):
     """Add extra information to test reports."""
-    if call.when == "call":
-        if hasattr(item, "funcargs"):
-            if "host" in item.funcargs:
-                host = item.funcargs["host"]
-                # Add device info to test metadata
-                item.user_properties.append(
-                    ("device", host.run("hostname").stdout.strip())
-                )
-                item.user_properties.append(
-                    ("version", host.run("cat /etc/ndi-bridge-version 2>/dev/null || echo 'unknown'").stdout.strip())
-                )
+    # Temporarily disabled - causing hangs with certain test configurations
+    pass
