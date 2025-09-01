@@ -15,12 +15,46 @@ setup_web_interface() {
         fi
     done
     
+    # Copy new FastAPI/Vue web interface BEFORE chroot
+    WEB_DIR="$(dirname "$0")/../web"
+    if [ -d "$WEB_DIR/backend" ] && [ -d "$WEB_DIR/frontend" ]; then
+        log "Copying FastAPI/Vue intercom interface..."
+        
+        # Create directory structure
+        mkdir -p /mnt/usb/opt/ndi-bridge-web/backend
+        mkdir -p /mnt/usb/opt/ndi-bridge-web/frontend
+        
+        # Copy backend files
+        cp -r "$WEB_DIR/backend"/* /mnt/usb/opt/ndi-bridge-web/backend/
+        
+        # Copy frontend files  
+        cp -r "$WEB_DIR/frontend"/* /mnt/usb/opt/ndi-bridge-web/frontend/
+        
+        # Copy systemd service if available
+        if [ -f "$WEB_DIR/ndi-bridge-intercom-web.service" ]; then
+            cp "$WEB_DIR/ndi-bridge-intercom-web.service" /mnt/usb/etc/systemd/system/
+        fi
+        
+        log "  FastAPI/Vue interface copied"
+    fi
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFWEB'
 
 # Install wetty dependencies and nginx for web interface
 apt-get update -qq 2>&1 | grep -v "^Get:\|^Hit:\|^Reading" || true
-apt-get install -y -qq nginx nodejs npm apache2-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building\|^Unpacking\|^Setting up\|Processing triggers\|database" || true
+apt-get install -y -qq nginx nodejs npm apache2-utils python3-pip 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building\|^Unpacking\|^Setting up\|Processing triggers\|database" || true
 npm install -g wetty@2.0.2 2>&1 | grep -v "^npm notice\|^npm WARN" || true
+
+# Install FastAPI dependencies for new intercom interface
+if [ -f /opt/ndi-bridge-web/backend/requirements.txt ]; then
+    echo "Installing FastAPI dependencies..."
+    pip3 install -r /opt/ndi-bridge-web/backend/requirements.txt --break-system-packages 2>&1 | grep -v "Requirement already satisfied" || true
+    
+    # Enable the new intercom web service
+    if [ -f /etc/systemd/system/ndi-bridge-intercom-web.service ]; then
+        systemctl enable ndi-bridge-intercom-web.service || true
+    fi
+fi
 
 # Disable default nginx site
 rm -f /etc/nginx/sites-enabled/default
@@ -33,17 +67,43 @@ server {
     
     server_name _;
     
-    # Basic authentication
-    auth_basic "NDI Bridge Login";
-    auth_basic_user_file /etc/nginx/.htpasswd;
-    
-    # Root directory for static files
-    root /var/www/ndi-bridge;
+    # Root directory for intercom frontend (no auth for intercom)
+    root /opt/ndi-bridge-web/frontend;
     index index.html;
     
-    # Proxy everything to wetty terminal
+    # Serve intercom interface at root
     location / {
-        proxy_pass http://127.0.0.1:7681;
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # Intercom API endpoints
+    location /api/intercom/ {
+        proxy_pass http://127.0.0.1:8000/api/intercom/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # WebSocket support for real-time updates
+    location /ws {
+        proxy_pass http://127.0.0.1:8000/ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # Terminal interface (with authentication)
+    location /terminal/ {
+        auth_basic "NDI Bridge Terminal";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        
+        proxy_pass http://127.0.0.1:7681/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -52,15 +112,27 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 86400;
-        
-        # Disable buffering for WebSocket
         proxy_buffering off;
         proxy_request_buffering off;
     }
     
-    # API endpoints for future use
-    location /api/ {
-        return 503;
+    # FastAPI documentation
+    location /docs {
+        proxy_pass http://127.0.0.1:8000/docs;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    location /openapi.json {
+        proxy_pass http://127.0.0.1:8000/openapi.json;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 EOFNGINX
@@ -73,184 +145,8 @@ ln -s /etc/nginx/sites-available/ndi-bridge /etc/nginx/sites-enabled/
 htpasswd -b -c /etc/nginx/.htpasswd admin newlevel
 chmod 644 /etc/nginx/.htpasswd
 
-# Create web root directory
-mkdir -p /var/www/ndi-bridge
-
-# Create landing page
-cat > /var/www/ndi-bridge/index.html << 'EOFHTML'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NDI Bridge Control Panel</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-        
-        .container {
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        
-        .info-box {
-            background: #f7f7f7;
-            border-left: 4px solid #667eea;
-            padding: 15px;
-            margin-bottom: 25px;
-            border-radius: 4px;
-        }
-        
-        .info-box p {
-            margin: 5px 0;
-            color: #555;
-            font-size: 14px;
-        }
-        
-        .info-box strong {
-            color: #333;
-        }
-        
-        .btn-container {
-            display: flex;
-            gap: 10px;
-            margin-top: 30px;
-        }
-        
-        .btn {
-            flex: 1;
-            padding: 12px 24px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.3s;
-            text-decoration: none;
-            text-align: center;
-            display: inline-block;
-        }
-        
-        .btn:hover {
-            background: #5a67d8;
-        }
-        
-        .btn-secondary {
-            background: #48bb78;
-        }
-        
-        .btn-secondary:hover {
-            background: #38a169;
-        }
-        
-        .status {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 20px;
-            padding: 10px;
-            background: #f0fdf4;
-            border-radius: 5px;
-        }
-        
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            background: #48bb78;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7);
-            }
-            70% {
-                box-shadow: 0 0 0 10px rgba(72, 187, 120, 0);
-            }
-            100% {
-                box-shadow: 0 0 0 0 rgba(72, 187, 120, 0);
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>NDI Bridge Control Panel</h1>
-        <p class="subtitle">Web-based management interface</p>
-        
-        <div class="info-box">
-            <p><strong>Device:</strong> <span id="hostname">Loading...</span></p>
-            <p><strong>IP Address:</strong> <span id="ipaddr">Loading...</span></p>
-            <p><strong>NDI Name:</strong> <span id="ndiname">Loading...</span></p>
-        </div>
-        
-        <div class="btn-container">
-            <a href="/terminal/" class="btn">Open Terminal</a>
-            <button class="btn btn-secondary" onclick="refreshInfo()">Refresh</button>
-        </div>
-        
-        <div class="status">
-            <div class="status-dot"></div>
-            <span>System Online</span>
-        </div>
-    </div>
-    
-    <script>
-        function refreshInfo() {
-            // Get hostname from window location
-            document.getElementById('hostname').textContent = window.location.hostname;
-            document.getElementById('ipaddr').textContent = window.location.host;
-            
-            // For NDI name, we'll need to fetch from config
-            // For now, extract from hostname
-            const hostname = window.location.hostname;
-            let ndiName = hostname;
-            if (hostname.includes('ndi-bridge-')) {
-                ndiName = hostname.replace('ndi-bridge-', '').replace('.local', '');
-            } else if (hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-                // IP address, use default
-                ndiName = 'ndi-bridge';
-            }
-            document.getElementById('ndiname').textContent = ndiName;
-        }
-        
-        // Load info on page load
-        window.addEventListener('load', refreshInfo);
-    </script>
-</body>
-</html>
-EOFHTML
+# Note: Web interface files are already copied before chroot in setup_web_interface()
+# The intercom frontend is served directly from /opt/ndi-bridge-web/frontend/
 
 # Create tmux session wrapper for shared persistent sessions
 cat > /usr/local/bin/ndi-bridge-tmux-session << 'EOFTMUX'
@@ -352,12 +248,14 @@ case "$1" in
         HOSTNAME=$(hostname)
         echo ""
         echo -e "${CYAN}Access URLs:${NC}"
-        echo "  http://${HOSTNAME}.local/"
+        echo "  Intercom: http://${HOSTNAME}.local/ (no auth)"
+        echo "  Terminal: http://${HOSTNAME}.local/terminal/ (auth required)"
         if [ -n "$IP" ]; then
-            echo "  http://${IP}/"
+            echo "  Intercom: http://${IP}/ (no auth)"
+            echo "  Terminal: http://${IP}/terminal/ (auth required)"
         fi
         echo ""
-        echo -e "${CYAN}Credentials:${NC}"
+        echo -e "${CYAN}Terminal Credentials:${NC}"
         echo "  Username: admin"
         echo "  Password: newlevel"
         ;;

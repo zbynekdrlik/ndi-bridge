@@ -19,7 +19,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step() { echo -e "${BLUE}[STEP]${NC} $1"; }
 
 # Configuration
-NDI_SDK_VERSION="6.2.0"
+NDI_SDK_VERSION="6.2.1"
 NDI_SDK_URL="https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v6_Linux.tar.gz"
 NDI_SDK_DIR="NDI SDK for Linux"
 
