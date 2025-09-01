@@ -328,22 +328,39 @@ sleep 10
 # Set default audio configuration
 echo "Setting default audio configuration..."
 
-# Set hardware output (headphone) volume to 100%
-if [ -n "$USB_SINK" ]; then
-    echo "  Setting headphone hardware volume to 100%"
-    pactl set-sink-volume "$USB_SINK" 100%
+# Check if saved configuration exists
+if [ -f "/etc/ndi-bridge/intercom.conf" ]; then
+    echo "  Using saved configuration from /etc/ndi-bridge/intercom.conf"
+    # The web service will load and apply saved settings
+    # Just set hardware volumes to 100% for maximum range
+    if [ -n "$USB_SINK" ]; then
+        echo "  Setting headphone hardware volume to 100%"
+        pactl set-sink-volume "$USB_SINK" 100%
+    fi
+    if [ -n "$USB_SOURCE" ]; then
+        echo "  Setting microphone hardware volume to 100%"
+        pactl set-source-volume "$USB_SOURCE" 100%
+        # Don't force mute - let saved config decide
+    fi
+else
+    echo "  No saved configuration, using defaults"
+    # Set hardware output (headphone) volume to 100%
+    if [ -n "$USB_SINK" ]; then
+        echo "  Setting headphone hardware volume to 100%"
+        pactl set-sink-volume "$USB_SINK" 100%
+    fi
+    
+    # Set hardware input (mic) volume to 100% but MUTED by default
+    if [ -n "$USB_SOURCE" ]; then
+        echo "  Setting microphone hardware volume to 100% (muted)"
+        pactl set-source-volume "$USB_SOURCE" 100%
+        pactl set-source-mute "$USB_SOURCE" 1  # Start muted
+    fi
+    
+    # Enable self-monitoring at 100% volume
+    echo "  Enabling self-monitoring at 100% volume"
+    /usr/local/bin/ndi-bridge-intercom-monitor enable 100 >/dev/null 2>&1 || true
 fi
-
-# Set hardware input (mic) volume to 100% but MUTED by default
-if [ -n "$USB_SOURCE" ]; then
-    echo "  Setting microphone hardware volume to 100% (muted)"
-    pactl set-source-volume "$USB_SOURCE" 100%
-    pactl set-source-mute "$USB_SOURCE" 1  # Start muted
-fi
-
-# Enable self-monitoring at 100% volume
-echo "  Enabling self-monitoring at 100% volume"
-/usr/local/bin/ndi-bridge-intercom-monitor enable 100 >/dev/null 2>&1 || true
 
 # Wait a bit more for Chrome to fully establish audio
 sleep 5
@@ -357,9 +374,12 @@ if [ -n "$USB_SINK" ]; then
             echo "  Moving output stream $stream to USB audio"
             pactl move-sink-input "$stream" "$USB_SINK" 2>/dev/null || true
         fi
-        # Set Chrome/Others volume to 90%
-        echo "  Setting Others volume to 90% for stream $stream"
-        pactl set-sink-input-volume "$stream" 90% 2>/dev/null || true
+        # Only set default volume if no saved config exists
+        if [ ! -f "/etc/ndi-bridge/intercom.conf" ]; then
+            # Set Chrome/Others volume to 90%
+            echo "  Setting Others volume to 90% for stream $stream"
+            pactl set-sink-input-volume "$stream" 90% 2>/dev/null || true
+        fi
     done
 fi
 
