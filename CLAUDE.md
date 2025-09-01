@@ -640,3 +640,107 @@ sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
 
 **Note**: The box's SSH may show welcome screen. Add `-o LogLevel=ERROR` to suppress it.
 - Use TDD test driven development. Working and full tests sucess are most important part.
+
+## Testing with pytest
+
+### Test Framework
+The project uses **pytest + testinfra** for modern infrastructure testing:
+- **Atomic Testing**: Each test validates exactly one thing
+- **SSH-based**: Tests run remotely against target devices
+- **Categories**: Tests organized by component (core, capture, network, etc.)
+
+### Running Tests
+
+**Configure target device IP (persistent across sessions):**
+```bash
+# Edit test configuration file
+nano tests/test_config.yaml
+# Set: host: 10.77.9.188 (or your device IP)
+```
+
+**Quick test examples:**
+```bash
+# Test core services
+python3 -m pytest tests/component/core/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q
+
+# Run all tests
+python3 -m pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+
+# Run with password instead of key
+python3 -m pytest tests/ --host 10.77.9.188 --ssh-pass newlevel -q
+
+# Use helper script (reads IP from test_config.yaml)
+./tests/run_all_tests.sh
+```
+
+### SSH Key Management for Changing Devices
+
+Since the same IP may have different devices (reflashed boxes), SSH host key verification will fail. Handle this automatically:
+
+**Option 1: Disable host key checking for test IPs (recommended for test environment):**
+```bash
+# Add to ~/.ssh/config
+Host 10.77.9.*
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+```
+
+**Option 2: Clear old key before testing new device:**
+```bash
+# Remove old host key
+ssh-keygen -f ~/.ssh/known_hosts -R 10.77.9.188
+
+# Or use this one-liner before testing
+ssh-keygen -R 10.77.9.188 2>/dev/null; python3 -m pytest tests/ --host 10.77.9.188
+```
+
+**Option 3: Create test wrapper script:**
+```bash
+#!/bin/bash
+# test-device.sh - Handles SSH key changes automatically
+IP="${1:-$(grep "^host:" tests/test_config.yaml | awk '{print $2}')}"
+ssh-keygen -R "$IP" 2>/dev/null
+ssh-keyscan -H "$IP" >> ~/.ssh/known_hosts 2>/dev/null
+python3 -m pytest tests/ --host "$IP" --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+```
+
+### Test Configuration Priority
+
+Tests find the target device IP in this order:
+1. Command line: `--host 10.77.9.188`
+2. Config file: `tests/test_config.yaml`
+3. Environment: `export NDI_TEST_HOST=10.77.9.188`
+4. Default fallback: `10.77.9.143`
+
+### Verifying Test Environment in Images
+
+**Check if image has test dependencies:**
+```bash
+# Mount image
+sudo losetup --partscan --find --show ndi-bridge.img
+sudo mount /dev/loop0p2 /mnt/ndi-image
+
+# Verify Python test tools
+ls /mnt/ndi-image/usr/bin/python3
+ls /mnt/ndi-image/usr/local/lib/python3.*/dist-packages/pytest*
+ls /mnt/ndi-image/opt/ndi-bridge-tests/
+
+# Cleanup
+sudo umount /mnt/ndi-image
+sudo losetup -d /dev/loop0
+```
+
+### Test Categories and Markers
+
+Tests are organized by component with markers:
+- `@pytest.mark.critical` - Must-pass tests
+- `@pytest.mark.capture` - Video capture tests
+- `@pytest.mark.network` - Network functionality
+- `@pytest.mark.slow` - Long-running tests (>5s)
+
+Run specific categories:
+```bash
+pytest -m critical  # Run only critical tests
+pytest -m "not slow"  # Skip slow tests
+```

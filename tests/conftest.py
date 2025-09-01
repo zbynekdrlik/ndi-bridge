@@ -109,12 +109,17 @@ def host(device_config):
     
     This fixture establishes SSH connection to the device
     and returns a testinfra Host object for test execution.
+    
+    Note: To handle changing SSH host keys (when same IP has different device),
+    add StrictHostKeyChecking=no to the connection string for test environments.
     """
-    # Build connection string
+    # Build connection string with SSH options to handle changing host keys
+    ssh_opts = "ssh_config=StrictHostKeyChecking=no,UserKnownHostsFile=/dev/null,LogLevel=ERROR"
+    
     if device_config["ssh_key"]:
-        conn_str = f"ssh://{device_config['ssh_user']}@{device_config['host']}?ssh_identity_file={device_config['ssh_key']}"
+        conn_str = f"ssh://{device_config['ssh_user']}@{device_config['host']}?ssh_identity_file={device_config['ssh_key']}&{ssh_opts}"
     else:
-        conn_str = f"ssh://{device_config['ssh_user']}@{device_config['host']}?password={device_config['ssh_pass']}"
+        conn_str = f"ssh://{device_config['ssh_user']}@{device_config['host']}?password={device_config['ssh_pass']}&{ssh_opts}"
     
     # Get testinfra host
     host = testinfra.get_host(conn_str)
