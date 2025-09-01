@@ -67,6 +67,25 @@ PREFS
         # This is a fallback for backward compatibility
         create_inline_helper_scripts
     fi
+    
+    # Copy test suite to the image
+    log "Installing test suite..."
+    local TEST_DIR="$(dirname "$0")/../tests"
+    
+    if [ -d "$TEST_DIR" ]; then
+        # Create test directory on target
+        mkdir -p /mnt/usb/opt/ndi-bridge-tests
+        
+        # Copy all test files
+        cp -r "$TEST_DIR"/* /mnt/usb/opt/ndi-bridge-tests/
+        
+        # Make test scripts executable
+        find /mnt/usb/opt/ndi-bridge-tests -name "*.sh" -exec chmod +x {} \;
+        
+        log "Test suite installed to /opt/ndi-bridge-tests"
+    else
+        log "Warning: Test suite not found at $TEST_DIR"
+    fi
 }
 
 create_inline_helper_scripts() {
