@@ -311,15 +311,15 @@ test_build() {
     log_info "Compiling..."
     make -j$(nproc) > make.log 2>&1
     
-    # Check if binary was created
-    if [ -f "ndi-capture" ]; then
+    # Check if binary was created (binaries are in bin/ subdirectory)
+    if [ -f "bin/ndi-capture" ]; then
         log_info "Build test successful - ndi-capture binary created"
         
         # Test binary
-        if ./ndi-capture --help > /dev/null 2>&1; then
+        if ./bin/ndi-capture --version > /dev/null 2>&1; then
             log_info "Binary test successful"
         else
-            log_warn "Binary created but help test failed"
+            log_warn "Binary created but version test failed"
         fi
     else
         log_error "Build test failed - no binary created"
