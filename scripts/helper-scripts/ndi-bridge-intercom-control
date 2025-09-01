@@ -11,17 +11,20 @@ export PULSE_RUNTIME_PATH=/run/user/0/pulse
 # Suppress PulseAudio cookie warnings
 export PULSE_COOKIE=/tmp/.pulse-cookie
 
-# Function to get USB audio devices
+# Function to get USB audio devices - FIXED to CSCTEK USB HID
 get_usb_audio_devices() {
-    local usb_sink=$(pactl list sinks short 2>&1 | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
-    local usb_source=$(pactl list sources short 2>&1 | grep -E "USB.*Audio|usb" | grep -v monitor | awk '{print $2}' | head -1)
+    # HARDCODED for CSCTEK USB Audio and HID device
+    # This ensures intercom always uses the correct device
+    local usb_sink=$(pactl list sinks short 2>&1 | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    local usb_source=$(pactl list sources short 2>&1 | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
     
+    # No fallback - only use CSCTEK device
     if [ -z "$usb_sink" ]; then
-        usb_sink=$(pactl list sinks short 2>&1 | awk '!/monitor/{print $2}' | head -1)
+        echo "ERROR: CSCTEK USB Audio HID device not found (output)" >&2
     fi
     
     if [ -z "$usb_source" ]; then
-        usb_source=$(pactl list sources short 2>&1 | awk '!/monitor/{print $2}' | head -1)
+        echo "ERROR: CSCTEK USB Audio HID device not found (input)" >&2
     fi
     
     echo "$usb_sink $usb_source"

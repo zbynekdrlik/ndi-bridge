@@ -52,27 +52,29 @@ class ShellExecutor:
     
     @staticmethod
     async def get_usb_audio_devices() -> dict:
-        """Get USB audio input and output devices"""
+        """Get USB audio input and output devices - FIXED to CSCTEK USB HID device"""
+        # HARDCODED for CSCTEK USB Audio and HID device
+        # This ensures intercom always uses the correct device
         devices = {
             "input": None,
             "output": None
         }
         
-        # Get sinks (output devices)
+        # Get sinks (output devices) - Look specifically for CSCTEK
         success, output = await ShellExecutor.pactl(["list", "sinks", "short"])
         if success:
             for line in output.split('\n'):
-                if 'usb' in line.lower() or 'USB' in line:
+                if 'CSCTEK_USB_Audio_and_HID' in line:
                     parts = line.split('\t')
                     if len(parts) >= 2:
                         devices["output"] = parts[1]
                         break
         
-        # Get sources (input devices)
+        # Get sources (input devices) - Look specifically for CSCTEK
         success, output = await ShellExecutor.pactl(["list", "sources", "short"])
         if success:
             for line in output.split('\n'):
-                if ('usb' in line.lower() or 'USB' in line) and 'monitor' not in line:
+                if 'CSCTEK_USB_Audio_and_HID' in line and 'monitor' not in line:
                     parts = line.split('\t')
                     if len(parts) >= 2:
                         devices["input"] = parts[1]
