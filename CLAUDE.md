@@ -668,6 +668,15 @@ python3 -m pytest tests/component/capture/ --host 10.77.9.188 --ssh-key ~/.ssh/n
 3. Environment: `export NDI_TEST_HOST=10.77.9.188`
 4. Default: `10.77.9.143`
 
+### Test Categories and Markers
+```bash
+# Run by category
+pytest -m critical       # Must-pass tests only
+pytest -m capture       # Video capture tests
+pytest -m network       # Network functionality
+pytest -m "not slow"    # Skip slow tests (>5s)
+```
+
 ### SSH Key Handling for Reflashed Devices
 When testing multiple devices on same IP, add to `~/.ssh/config`:
 ```bash
