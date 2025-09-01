@@ -1,6 +1,6 @@
 #!/bin/bash
 # Dante audio bridge configuration using Inferno implementation
-# This module adds Dante audio networking support
+# Clean, production-ready implementation focused on Dante→USB playback
 
 configure_dante_audio() {
     log "Configuring Dante audio bridge with Inferno..."
@@ -18,10 +18,10 @@ configure_dante_audio() {
 # Network interface (uses bridge by default)
 DANTE_INTERFACE=br0
 
-# Number of audio channels (2 = stereo, up to 64 supported)
+# Number of audio channels (2 = stereo)
 DANTE_CHANNELS=2
 
-# Sample rate (96000, 48000 or 44100)
+# Sample rate - MUST BE 96000 for professional Dante networks
 DANTE_SAMPLE_RATE=96000
 
 # Device name for Dante network
@@ -29,9 +29,6 @@ DANTE_DEVICE_NAME=ndi-bridge
 
 # Enable auto-start
 DANTE_ENABLED=true
-
-# Audio routing mode (usb2dante, dante2usb, bidirectional)
-DANTE_MODE=bidirectional
 EOFDANTE
     
     # Check if pre-compiled binaries exist
@@ -47,28 +44,20 @@ EOFDANTE
            /mnt/usb/usr/lib/x86_64-linux-gnu/alsa-lib/
         
         mkdir -p /mnt/usb/usr/local/bin
-        [ -f "$DANTE_PKG_DIR/bin/inferno2pipe" ] && \
-            cp "$DANTE_PKG_DIR/bin/inferno2pipe" /mnt/usb/usr/local/bin/
-        
         cp "$DANTE_PKG_DIR/bin/statime" /mnt/usb/usr/local/bin/
         
-        # Copy Statime config
+        # Copy Statime config if available
         if [ -f "$DANTE_PKG_DIR/config/statime.conf" ]; then
             cp "$DANTE_PKG_DIR/config/statime.conf" /mnt/usb/etc/statime.conf
         fi
         
         log "Pre-compiled Dante binaries installed"
         
-        # Still need to create services and configs in chroot
-        cat >> /mnt/usb/tmp/configure-system.sh << 'EOFDANTECFG'
-echo "Configuring Dante audio services..."
-EOFDANTECFG
-        
     else
         log "Pre-compiled binaries not found, will compile in chroot..."
         
-        # Add full compilation to chroot script
-        cat >> /mnt/usb/tmp/configure-system.sh << 'EOFDANTECFG'
+        # Add compilation to chroot script
+        cat >> /mnt/usb/tmp/configure-system.sh << 'EOFDANTECOMPILE'
 
 # Install Dante audio bridge with compilation
 echo "Installing Dante audio bridge..."
@@ -106,11 +95,6 @@ else
     echo "Warning: Inferno ALSA plugin not found"
 fi
 
-# Install inferno2pipe utility if built
-if [ -f target/release/inferno2pipe ]; then
-    cp target/release/inferno2pipe /usr/local/bin/
-fi
-
 # Clone and build Statime (PTP daemon for Inferno)
 echo "Building Statime PTP daemon..."
 cd /opt
@@ -131,23 +115,20 @@ if [ -f inferno-ptpv1.toml ]; then
 fi
 
 echo "Dante compilation complete"
-EOFDANTECFG
+EOFDANTECOMPILE
     fi
     
-    # Add common configuration (services, ALSA config, etc.)
-    cat >> /mnt/usb/tmp/configure-system.sh << 'EOFCOMMON'
+    # Add common configuration (services, ALSA config)
+    cat >> /mnt/usb/tmp/configure-system.sh << 'EOFDANTECONFIG'
+
+# Configure Dante audio services
+echo "Configuring Dante audio services..."
 
 # Create ALSA configuration for Inferno
+# CRITICAL: Must use 'type inferno' directly, NOT 'type plug'!
 cat > /root/.asoundrc << 'EOFALSA'
-# Inferno ALSA PCM device at 96kHz
-pcm.inferno {
-    type inferno
-    RX_CHANNELS 2
-    TX_CHANNELS 2
-    SAMPLE_RATE 96000
-}
-
-# Dante at 96kHz for professional network
+# Inferno Dante PCM device at 96kHz
+# IMPORTANT: Must use 'type inferno' directly for discovery ports to open
 pcm.dante {
     type inferno
     RX_CHANNELS 2
@@ -156,146 +137,37 @@ pcm.dante {
 }
 EOFALSA
 
-# Also create system-wide configuration  
-# CRITICAL: Must use 'type inferno' directly, NOT 'type plug'!
+# Also create system-wide configuration
 cp /root/.asoundrc /etc/asound.conf
 
-# Create Statime systemd service
-cat > /etc/systemd/system/statime.service << 'EOFSTATIME'
-[Unit]
-Description=Statime PTP daemon for Inferno
-After=network-online.target
-Wants=network-online.target
-Conflicts=chronyd.service ntp.service
+# Copy service files from helper-scripts
+cp /tmp/helper-scripts/statime.service /etc/systemd/system/
+cp /tmp/helper-scripts/dante-bridge.service /etc/systemd/system/
 
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/statime -c /etc/statime.conf
-Restart=always
-RestartSec=5
-User=root
-StandardOutput=journal
-StandardError=journal
+# Copy the main bridge script
+cp /tmp/helper-scripts/dante-bridge /usr/local/bin/
+chmod +x /usr/local/bin/dante-bridge
 
-[Install]
-WantedBy=multi-user.target
-EOFSTATIME
-
-# Create Inferno ALSA service (does NOT hold the device open)
-# This service just ensures the Inferno daemon is available
-cat > /etc/systemd/system/inferno-alsa.service << 'EOFINFERNO'
-[Unit]
-Description=Inferno Dante ALSA daemon
-After=statime.service network-online.target
-Wants=statime.service
-Requires=statime.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-Environment="INFERNO_NAME=ndi-bridge"
-Environment="INFERNO_INTERFACE=br0"
-Environment="INFERNO_SAMPLE_RATE=96000"
-Environment="HOME=/root"
-# Just check that the ALSA plugin is available
-ExecStart=/bin/bash -c 'aplay -L | grep -q dante && echo "Dante ALSA device available"'
-# No restart - this is just a check service
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOFINFERNO
-
-# Create USB to Dante bridge daemon
-cat > /usr/local/bin/usb-dante-bridge << 'EOFBRIDGE'
-#!/bin/bash
-# Bridge USB audio to/from Dante network
-
-export INFERNO_NAME=${HOSTNAME:-ndi-bridge}
-export INFERNO_INTERFACE=br0
-export INFERNO_SAMPLE_RATE=96000
-
-# Find first USB audio device (skip HDMI)
-USB_CARD=$(aplay -l 2>/dev/null | grep -E "USB Audio|Arturia|Behringer|Focusrite|Scarlett" | head -1 | sed 's/card \([0-9]\).*/\1/')
-
-if [ -z "$USB_CARD" ]; then
-    echo "No USB audio device found"
-    exit 1
-fi
-
-echo "Bridging USB audio card $USB_CARD to Dante network"
-
-# Start bidirectional bridge at 96kHz
-# Format: S32_LE, 96000 Hz, stereo
-arecord -D plughw:${USB_CARD},0 -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null | aplay -D dante -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null &
-CAPTURE_PID=$!
-
-arecord -D dante -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null | aplay -D plughw:${USB_CARD},0 -f S32_LE -r 96000 -c 2 -t raw 2>/dev/null &
-PLAYBACK_PID=$!
-
-echo "Bridge active (Capture PID: $CAPTURE_PID, Playback PID: $PLAYBACK_PID)"
-wait $CAPTURE_PID $PLAYBACK_PID
-EOFBRIDGE
-chmod +x /usr/local/bin/usb-dante-bridge
-
-# Create service for USB-Dante bridge
-cat > /etc/systemd/system/usb-dante-bridge.service << 'EOFUSBBRIDGE'
-[Unit]
-Description=USB to Dante Audio Bridge
-After=inferno-alsa.service sound.target
-Wants=inferno-alsa.service
-
-[Service]
-Type=simple
-Environment="INFERNO_NAME=ndi-bridge"
-Environment="INFERNO_INTERFACE=br0"
-Environment="INFERNO_SAMPLE_RATE=96000"
-ExecStart=/usr/local/bin/usb-dante-bridge
-Restart=on-failure
-RestartSec=10
-User=root
-
-[Install]
-WantedBy=multi-user.target
-EOFUSBBRIDGE
-
-# Create Dante advertiser service
-cat > /etc/systemd/system/dante-advertiser.service << 'EOFADV'
-[Unit]
-Description=Dante Device Advertiser
-After=statime.service network-online.target
-Wants=statime.service
-PartOf=statime.service
-
-[Service]
-Type=simple
-Environment="INFERNO_NAME=ndi-bridge"
-Environment="INFERNO_INTERFACE=br0"
-Environment="INFERNO_SAMPLE_RATE=96000"
-ExecStart=/usr/local/bin/dante-advertiser
-Restart=always
-RestartSec=10
-User=root
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOFADV
-
-# Copy advertiser script
-cp /tmp/helper-scripts/dante-advertiser /usr/local/bin/
-chmod +x /usr/local/bin/dante-advertiser
+# Copy helper scripts for status and configuration
+for script in ndi-bridge-dante-status ndi-bridge-dante-config ndi-bridge-dante-logs; do
+    if [ -f /tmp/helper-scripts/$script ]; then
+        cp /tmp/helper-scripts/$script /usr/local/bin/
+        chmod +x /usr/local/bin/$script
+    fi
+done
 
 # Enable services
 systemctl enable statime.service 2>/dev/null || true
-systemctl enable inferno-alsa.service 2>/dev/null || true
-systemctl enable dante-advertiser.service 2>/dev/null || true
-# USB bridge is optional - only enable if USB audio device is present
-systemctl enable usb-dante-bridge.service 2>/dev/null || true
+systemctl enable dante-bridge.service 2>/dev/null || true
+
+# Disable conflicting time sync services when Dante is enabled
+systemctl disable ptp4l.service 2>/dev/null || true
+systemctl disable phc2sys.service 2>/dev/null || true
 
 echo "Dante audio bridge configuration complete"
-EOFCOMMON
+echo "Device will be visible as '${HOSTNAME:-ndi-bridge}' in Dante Controller"
+echo "Audio routing: Dante network ↔ USB audio interface (Arturia/Focusrite/etc)"
+EOFDANTECONFIG
 }
 
 export -f configure_dante_audio

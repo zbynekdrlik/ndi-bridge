@@ -1,0 +1,17 @@
+[Unit]
+Description=Statime PTP daemon for Dante
+After=network-online.target
+Wants=network-online.target
+# Conflicts with other time sync services
+Conflicts=ptp4l.service phc2sys.service chronyd.service ntp.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/statime -c /etc/statime.conf
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

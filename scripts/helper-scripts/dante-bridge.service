@@ -1,0 +1,24 @@
+[Unit]
+Description=Dante Audio Bridge
+After=network-online.target sound.target statime.service
+Wants=network-online.target statime.service
+Requires=statime.service
+
+[Service]
+Type=simple
+Environment="INFERNO_NAME=ndi-bridge"
+Environment="INFERNO_INTERFACE=br0"
+Environment="INFERNO_SAMPLE_RATE=96000"
+ExecStartPre=/bin/bash -c 'until systemctl is-active statime.service; do sleep 1; done'
+ExecStart=/usr/local/bin/dante-bridge
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Give time for cleanup
+TimeoutStopSec=15
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
