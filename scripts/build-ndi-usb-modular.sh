@@ -10,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source all modules in order
 source "$SCRIPT_DIR/build-modules/00-variables.sh"
 source "$SCRIPT_DIR/build-modules/01-functions.sh"
+source "$SCRIPT_DIR/build-modules/01a-cleanup.sh"
 source "$SCRIPT_DIR/build-modules/02-prerequisites.sh"
 source "$SCRIPT_DIR/build-modules/03-partition.sh"
 source "$SCRIPT_DIR/build-modules/04-mount.sh"
@@ -128,6 +129,9 @@ main() {
     log "Target device: $USB_DEVICE"
     
     check_prerequisites
+    
+    # Perform pre-build cleanup to ensure clean state
+    perform_build_cleanup
     
     # Warning about data erasure
     warn "This will ERASE ALL DATA on $USB_DEVICE"
