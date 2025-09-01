@@ -97,6 +97,16 @@
                                     Headphone Volume
                                 </v-card-title>
                                 <v-card-text>
+                                    <v-switch
+                                        v-model="state.speaker_muted"
+                                        @change="toggleSpeakerMute"
+                                        label="Mute Headphones"
+                                        color="error"
+                                        hide-details
+                                        class="mb-4"
+                                        inset
+                                    ></v-switch>
+                                    
                                     <v-slider
                                         v-model="state.speaker_volume"
                                         @end="updateSpeakerVolume"
@@ -117,18 +127,6 @@
                                         class="mt-2 vu-meter"
                                         :color="audioLevelColor(audioLevels.speaker)"
                                     ></v-progress-linear>
-                                    
-                                    <v-btn
-                                        block
-                                        class="mt-3"
-                                        :color="state.speaker_muted ? 'error' : 'default'"
-                                        @click="toggleSpeakerMute"
-                                    >
-                                        <v-icon left>
-                                            {{ state.speaker_muted ? 'mdi-volume-off' : 'mdi-volume-high' }}
-                                        </v-icon>
-                                        {{ state.speaker_muted ? 'Unmute' : 'Mute' }} Speaker
-                                    </v-btn>
                                 </v-card-text>
                             </v-card>
                         </v-col>
@@ -141,7 +139,7 @@
                                     Self Monitoring
                                 </v-card-title>
                                 <v-card-subtitle>
-                                    Hear yourself with ultra-low latency (~0.67ms @ 48kHz)
+                                    Hear yourself (~0.67ms latency)
                                 </v-card-subtitle>
                                 <v-card-text>
                                     <v-switch
@@ -151,6 +149,7 @@
                                         color="primary"
                                         hide-details
                                         class="mb-4"
+                                        inset
                                     ></v-switch>
                                     
                                     <v-slider
