@@ -72,11 +72,14 @@ enable_monitoring() {
         echo "true" > "$MONITOR_STATE_FILE"
         echo -e "${GREEN}Monitoring enabled${NC} (module: $module_id)"
         
+        # Wait a moment for PipeWire to create the sink input
+        sleep 0.5
+        
         # Set initial volume
         set_monitor_volume "$volume"
         
         # Report latency
-        latency=$(echo "scale=2; 32 / 48" | bc)
+        latency=$(echo "scale=2; 32 / 48" | bc 2>/dev/null || echo "0.67")
         echo "Target latency: ${latency}ms @ 48kHz (Ultra-low latency mode)"
         
         return 0
@@ -119,7 +122,9 @@ set_monitor_volume() {
     fi
     
     # Find the sink input created by our loopback module
-    sink_input=$(pactl list sink-inputs | grep -B 20 "application.name = \"NDI-Bridge-Monitor\"" | grep "Sink Input #" | sed 's/Sink Input #//')
+    # Look for the module ID in the owner module field
+    module_id=$(cat "$MONITOR_MODULE_FILE")
+    sink_input=$(pactl list sink-inputs | grep -B 3 "Owner Module: $module_id" | grep "Sink Input #" | sed 's/Sink Input #//')
     
     if [ -n "$sink_input" ]; then
         # Convert percentage to PulseAudio volume (0-65536)
@@ -154,10 +159,10 @@ get_status() {
             fi
             
             # Calculate latency
-            quantum=$(pw-metadata -n settings 0 clock.quantum | grep "value:" | cut -d"'" -f2)
-            rate=$(pw-metadata -n settings 0 clock.rate | grep "value:" | cut -d"'" -f2)
+            quantum=$(pw-metadata -n settings 0 clock.quantum 2>/dev/null | grep "value:" | cut -d"'" -f2)
+            rate=$(pw-metadata -n settings 0 clock.rate 2>/dev/null | grep "value:" | cut -d"'" -f2)
             if [ -n "$quantum" ] && [ -n "$rate" ]; then
-                latency=$(echo "scale=2; ($quantum * 1000) / $rate" | bc)
+                latency=$(echo "scale=2; ($quantum * 1000) / $rate" | bc 2>/dev/null || echo "0.67")
             fi
         fi
     fi

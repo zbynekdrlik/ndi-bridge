@@ -155,7 +155,9 @@ class StateManager:
                 "speaker_volume": self.state["speaker_volume"],
                 "mic_volume": self.state["mic_volume"],
                 "mic_muted": self.state["mic_muted"],
-                "speaker_muted": self.state["speaker_muted"]
+                "speaker_muted": self.state["speaker_muted"],
+                "monitor_enabled": self.state.get("monitor_enabled", False),
+                "monitor_volume": self.state.get("monitor_volume", 50)
             }
             
             # Write to temporary file first (atomic write)

@@ -133,6 +133,47 @@
                             </v-card>
                         </v-col>
 
+                        <!-- Self Monitoring -->
+                        <v-col cols="12" md="6">
+                            <v-card>
+                                <v-card-title>
+                                    <v-icon left>mdi-headphones</v-icon>
+                                    Self Monitoring
+                                </v-card-title>
+                                <v-card-subtitle>
+                                    Hear yourself with ultra-low latency (~0.67ms @ 48kHz)
+                                </v-card-subtitle>
+                                <v-card-text>
+                                    <v-switch
+                                        v-model="state.monitor_enabled"
+                                        @change="toggleMonitor"
+                                        label="Enable Self Monitor"
+                                        color="primary"
+                                        hide-details
+                                        class="mb-4"
+                                    ></v-switch>
+                                    
+                                    <v-slider
+                                        v-model="state.monitor_volume"
+                                        @end="setMonitorVolume"
+                                        :disabled="!state.monitor_enabled"
+                                        label="Monitor Volume"
+                                        :min="0"
+                                        :max="100"
+                                        :step="5"
+                                        thumb-label
+                                        color="primary"
+                                    >
+                                        <template v-slot:append>
+                                            <v-chip>{{ state.monitor_volume }}%</v-chip>
+                                        </template>
+                                    </v-slider>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+
+                    <v-row>
                         <!-- Microphone Volume -->
                         <v-col cols="12" md="6">
                             <v-card>
@@ -179,47 +220,6 @@
                                         <v-icon left>mdi-speaker</v-icon>
                                         {{ state.devices.output || 'No output device' }}
                                     </v-chip>
-                                </v-card-text>
-                            </v-card>
-                        </v-col>
-                    </v-row>
-
-                    <!-- Self Monitoring -->
-                    <v-row class="mt-4">
-                        <v-col cols="12">
-                            <v-card>
-                                <v-card-title>
-                                    <v-icon left>mdi-headphones</v-icon>
-                                    Self Monitoring
-                                </v-card-title>
-                                <v-card-subtitle>
-                                    Hear yourself with ultra-low latency (~0.67ms @ 48kHz)
-                                </v-card-subtitle>
-                                <v-card-text>
-                                    <v-switch
-                                        v-model="state.monitor_enabled"
-                                        @change="toggleMonitor"
-                                        label="Enable Self Monitor"
-                                        color="primary"
-                                        hide-details
-                                        class="mb-4"
-                                    ></v-switch>
-                                    
-                                    <v-slider
-                                        v-model="state.monitor_volume"
-                                        @end="setMonitorVolume"
-                                        :disabled="!state.monitor_enabled"
-                                        label="Monitor Volume"
-                                        :min="0"
-                                        :max="100"
-                                        :step="5"
-                                        thumb-label
-                                        color="primary"
-                                    >
-                                        <template v-slot:append>
-                                            <v-chip>{{ state.monitor_volume }}%</v-chip>
-                                        </template>
-                                    </v-slider>
                                 </v-card-text>
                             </v-card>
                         </v-col>
