@@ -15,9 +15,11 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Get IP from argument or config file
-if [ -n "$1" ]; then
+# Check if first argument looks like an IP address
+if [ -n "$1" ] && [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     IP="$1"
     echo -e "${GREEN}Using IP from command line: $IP${NC}"
+    shift  # Remove IP from arguments
 elif [ -f "$SCRIPT_DIR/test_config.yaml" ]; then
     IP=$(grep "^host:" "$SCRIPT_DIR/test_config.yaml" | awk '{print $2}')
     if [ -n "$IP" ]; then

@@ -113,13 +113,12 @@ def host(device_config):
     Note: To handle changing SSH host keys (when same IP has different device),
     add StrictHostKeyChecking=no to the connection string for test environments.
     """
-    # Build connection string with SSH options to handle changing host keys
-    ssh_opts = "ssh_config=StrictHostKeyChecking=no,UserKnownHostsFile=/dev/null,LogLevel=ERROR"
-    
+    # Build connection string
+    # Note: SSH host key handling should be done via ~/.ssh/config or by clearing known_hosts
     if device_config["ssh_key"]:
-        conn_str = f"ssh://{device_config['ssh_user']}@{device_config['host']}?ssh_identity_file={device_config['ssh_key']}&{ssh_opts}"
+        conn_str = f"ssh://{device_config['ssh_user']}@{device_config['host']}?ssh_identity_file={device_config['ssh_key']}"
     else:
-        conn_str = f"ssh://{device_config['ssh_user']}@{device_config['host']}?password={device_config['ssh_pass']}&{ssh_opts}"
+        conn_str = f"ssh://{device_config['ssh_user']}@{device_config['host']}?password={device_config['ssh_pass']}"
     
     # Get testinfra host
     host = testinfra.get_host(conn_str)
