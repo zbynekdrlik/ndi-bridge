@@ -40,7 +40,6 @@ apt-get install -y -qq python3 python3-minimal 2>&1 | head -10
 # Enable NDI Bridge intercom services
 echo "Enabling NDI Bridge intercom services..."
 systemctl enable ndi-bridge-intercom.service 2>/dev/null || true
-systemctl enable ndi-bridge-intercom-api.service 2>/dev/null || true
 
 echo "Chrome and NDI Bridge intercom installation complete"
 

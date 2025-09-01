@@ -15,12 +15,46 @@ setup_web_interface() {
         fi
     done
     
+    # Copy new FastAPI/Vue web interface BEFORE chroot
+    WEB_DIR="$(dirname "$0")/../web"
+    if [ -d "$WEB_DIR/backend" ] && [ -d "$WEB_DIR/frontend" ]; then
+        log "Copying FastAPI/Vue intercom interface..."
+        
+        # Create directory structure
+        mkdir -p /mnt/usb/opt/ndi-bridge-web/backend
+        mkdir -p /mnt/usb/opt/ndi-bridge-web/frontend
+        
+        # Copy backend files
+        cp -r "$WEB_DIR/backend"/* /mnt/usb/opt/ndi-bridge-web/backend/
+        
+        # Copy frontend files  
+        cp -r "$WEB_DIR/frontend"/* /mnt/usb/opt/ndi-bridge-web/frontend/
+        
+        # Copy systemd service if available
+        if [ -f "$WEB_DIR/ndi-bridge-intercom-web.service" ]; then
+            cp "$WEB_DIR/ndi-bridge-intercom-web.service" /mnt/usb/etc/systemd/system/
+        fi
+        
+        log "  FastAPI/Vue interface copied"
+    fi
+    
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFWEB'
 
 # Install wetty dependencies and nginx for web interface
 apt-get update -qq 2>&1 | grep -v "^Get:\|^Hit:\|^Reading" || true
-apt-get install -y -qq nginx nodejs npm apache2-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building\|^Unpacking\|^Setting up\|Processing triggers\|database" || true
+apt-get install -y -qq nginx nodejs npm apache2-utils python3-pip 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building\|^Unpacking\|^Setting up\|Processing triggers\|database" || true
 npm install -g wetty@2.0.2 2>&1 | grep -v "^npm notice\|^npm WARN" || true
+
+# Install FastAPI dependencies for new intercom interface
+if [ -f /opt/ndi-bridge-web/backend/requirements.txt ]; then
+    echo "Installing FastAPI dependencies..."
+    pip3 install -r /opt/ndi-bridge-web/backend/requirements.txt --break-system-packages 2>&1 | grep -v "Requirement already satisfied" || true
+    
+    # Enable the new intercom web service
+    if [ -f /etc/systemd/system/ndi-bridge-intercom-web.service ]; then
+        systemctl enable ndi-bridge-intercom-web.service || true
+    fi
+fi
 
 # Disable default nginx site
 rm -f /etc/nginx/sites-enabled/default
@@ -58,18 +92,40 @@ server {
         proxy_request_buffering off;
     }
     
-    # Intercom web interface
+    # Intercom web interface - NEW FastAPI/Vue version
     location /intercom {
-        auth_basic "NDI Bridge Login";
-        auth_basic_user_file /etc/nginx/.htpasswd;
-        alias /var/www/ndi-bridge/intercom.html;
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
     
-    # Intercom API endpoints
+    # NEW Intercom API endpoints (FastAPI)
     location /api/intercom/ {
-        auth_basic "NDI Bridge Login";
-        auth_basic_user_file /etc/nginx/.htpasswd;
-        
+        proxy_pass http://127.0.0.1:8000/api/intercom/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # WebSocket support for real-time updates
+    location /ws {
+        proxy_pass http://127.0.0.1:8000/ws;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # OLD API endpoint for backward compatibility (Python simple API)
+    location /api/intercom-old/ {
         proxy_pass http://127.0.0.1:8089/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -96,12 +152,7 @@ chmod 644 /etc/nginx/.htpasswd
 # Create web root directory
 mkdir -p /var/www/ndi-bridge
 
-# Copy web files if available
-WEB_DIR="$(dirname "$0")/../web"
-if [ -d "$WEB_DIR" ]; then
-    # Copy intercom HTML if available
-    [ -f "$WEB_DIR/intercom.html" ] && cp "$WEB_DIR/intercom.html" /var/www/ndi-bridge/intercom.html
-fi
+# Note: Web files are already copied before chroot in setup_web_interface()
 
 # Create landing page
 cat > /var/www/ndi-bridge/index.html << 'EOFHTML'

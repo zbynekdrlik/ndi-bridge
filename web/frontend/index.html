@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NDI Bridge Intercom</title>
+    
+    <!-- Vuetify CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@3.4.0/dist/vuetify.min.css" rel="stylesheet">
+    <!-- Material Design Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.x/css/materialdesignicons.min.css" rel="stylesheet">
+    
+    <!-- Custom styles -->
+    <style>
+        [v-cloak] { display: none; }
+        
+        /* Large mic mute button - primary control */
+        .mic-mute-btn {
+            height: 120px !important;
+            font-size: 24px !important;
+        }
+        
+        /* VU meter styles */
+        .vu-meter {
+            transition: all 0.1s ease;
+        }
+        
+        /* Mobile-first responsive */
+        @media (max-width: 600px) {
+            .mic-mute-btn {
+                height: 100px !important;
+                font-size: 20px !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app" v-cloak>
+        <v-app>
+            <v-app-bar color="primary" dark>
+                <v-app-bar-title>
+                    <v-icon left>mdi-microphone</v-icon>
+                    NDI Bridge Intercom
+                </v-app-bar-title>
+                <v-spacer></v-spacer>
+                <v-chip v-if="connected" color="success" small>
+                    <v-icon left small>mdi-check-circle</v-icon>
+                    Connected
+                </v-chip>
+                <v-chip v-else color="error" small>
+                    <v-icon left small>mdi-alert-circle</v-icon>
+                    Disconnected
+                </v-chip>
+            </v-app-bar>
+
+            <v-main>
+                <v-container fluid>
+                    <!-- PRIMARY CONTROL: Mic Mute Button -->
+                    <v-row>
+                        <v-col cols="12">
+                            <v-card>
+                                <v-card-text class="pa-4">
+                                    <v-btn
+                                        block
+                                        x-large
+                                        class="mic-mute-btn"
+                                        :color="state.mic_muted ? 'error' : 'success'"
+                                        @click="toggleMicMute"
+                                        :loading="loading.mic"
+                                    >
+                                        <v-icon size="48" class="mr-4">
+                                            {{ state.mic_muted ? 'mdi-microphone-off' : 'mdi-microphone' }}
+                                        </v-icon>
+                                        {{ state.mic_muted ? 'MICROPHONE MUTED' : 'MICROPHONE ACTIVE' }}
+                                    </v-btn>
+                                    
+                                    <!-- Live mic level indicator -->
+                                    <v-progress-linear
+                                        v-if="!state.mic_muted"
+                                        :model-value="audioLevels.mic"
+                                        height="8"
+                                        class="mt-3 vu-meter"
+                                        :color="audioLevelColor(audioLevels.mic)"
+                                    ></v-progress-linear>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+
+                    <!-- Volume Controls -->
+                    <v-row class="mt-4">
+                        <!-- Speaker/Headphone Volume -->
+                        <v-col cols="12" md="6">
+                            <v-card>
+                                <v-card-title>
+                                    <v-icon left>mdi-headphones</v-icon>
+                                    Headphone Volume
+                                </v-card-title>
+                                <v-card-text>
+                                    <v-slider
+                                        v-model="state.speaker_volume"
+                                        @end="updateSpeakerVolume"
+                                        :label="state.speaker_volume + '%'"
+                                        :disabled="state.speaker_muted"
+                                        thumb-label="always"
+                                        color="primary"
+                                        min="0"
+                                        max="100"
+                                        step="5"
+                                    ></v-slider>
+                                    
+                                    <!-- Speaker level indicator -->
+                                    <v-progress-linear
+                                        v-if="!state.speaker_muted"
+                                        :model-value="audioLevels.speaker"
+                                        height="6"
+                                        class="mt-2 vu-meter"
+                                        :color="audioLevelColor(audioLevels.speaker)"
+                                    ></v-progress-linear>
+                                    
+                                    <v-btn
+                                        block
+                                        class="mt-3"
+                                        :color="state.speaker_muted ? 'error' : 'default'"
+                                        @click="toggleSpeakerMute"
+                                    >
+                                        <v-icon left>
+                                            {{ state.speaker_muted ? 'mdi-volume-off' : 'mdi-volume-high' }}
+                                        </v-icon>
+                                        {{ state.speaker_muted ? 'Unmute' : 'Mute' }} Speaker
+                                    </v-btn>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+
+                        <!-- Microphone Volume -->
+                        <v-col cols="12" md="6">
+                            <v-card>
+                                <v-card-title>
+                                    <v-icon left>mdi-microphone-settings</v-icon>
+                                    Microphone Gain
+                                </v-card-title>
+                                <v-card-text>
+                                    <v-slider
+                                        v-model="state.mic_volume"
+                                        @end="updateMicVolume"
+                                        :label="state.mic_volume + '%'"
+                                        :disabled="state.mic_muted"
+                                        thumb-label="always"
+                                        color="secondary"
+                                        min="0"
+                                        max="100"
+                                        step="5"
+                                    ></v-slider>
+                                    
+                                    <v-chip class="mt-2" small>
+                                        <v-icon left small>mdi-information</v-icon>
+                                        Adjust if others can't hear you well
+                                    </v-chip>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+
+                    <!-- Device Status -->
+                    <v-row class="mt-4">
+                        <v-col cols="12">
+                            <v-card>
+                                <v-card-title>
+                                    <v-icon left>mdi-usb</v-icon>
+                                    Audio Devices
+                                </v-card-title>
+                                <v-card-text>
+                                    <v-chip class="mr-2" :color="state.devices.input ? 'success' : 'error'">
+                                        <v-icon left>mdi-microphone</v-icon>
+                                        {{ state.devices.input || 'No input device' }}
+                                    </v-chip>
+                                    <v-chip :color="state.devices.output ? 'success' : 'error'">
+                                        <v-icon left>mdi-speaker</v-icon>
+                                        {{ state.devices.output || 'No output device' }}
+                                    </v-chip>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+
+                    <!-- Save Settings -->
+                    <v-row class="mt-4">
+                        <v-col cols="12">
+                            <v-card>
+                                <v-card-actions>
+                                    <v-btn
+                                        color="primary"
+                                        variant="outlined"
+                                        @click="saveAsDefault"
+                                        :loading="loading.save"
+                                    >
+                                        <v-icon left>mdi-content-save</v-icon>
+                                        Save as Default
+                                    </v-btn>
+                                    <v-spacer></v-spacer>
+                                    <v-btn
+                                        variant="text"
+                                        @click="loadDefaults"
+                                        :loading="loading.load"
+                                    >
+                                        <v-icon left>mdi-restore</v-icon>
+                                        Load Defaults
+                                    </v-btn>
+                                </v-card-actions>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+                </v-container>
+            </v-main>
+
+            <!-- Snackbar for notifications -->
+            <v-snackbar
+                v-model="snackbar.show"
+                :color="snackbar.color"
+                :timeout="3000"
+                bottom
+            >
+                {{ snackbar.text }}
+            </v-snackbar>
+        </v-app>
+    </div>
+
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js"></script>
+    <!-- Vuetify -->
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@3.4.0/dist/vuetify.min.js"></script>
+    
+    <!-- App -->
+    <script type="module">
+        import IntercomApp from './js/app.js';
+        
+        const { createApp } = Vue;
+        const { createVuetify } = Vuetify;
+        
+        const vuetify = createVuetify({
+            theme: {
+                defaultTheme: 'dark',
+                themes: {
+                    dark: {
+                        colors: {
+                            primary: '#1976D2',
+                            secondary: '#424242',
+                            accent: '#82B1FF',
+                            error: '#FF5252',
+                            info: '#2196F3',
+                            success: '#4CAF50',
+                            warning: '#FFC107'
+                        }
+                    }
+                }
+            }
+        });
+        
+        createApp(IntercomApp).use(vuetify).mount('#app');
+    </script>
+</body>
+</html>
