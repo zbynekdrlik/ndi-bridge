@@ -23,7 +23,9 @@ export default {
                 devices: {
                     input: null,
                     output: null
-                }
+                },
+                monitor_enabled: false,
+                monitor_volume: 50
             },
             
             // Audio levels for VU meters
@@ -214,6 +216,15 @@ export default {
                     case 'full_state':
                         this.state = message.data;
                         break;
+                    
+                    case 'monitor':
+                        this.state.monitor_enabled = message.data.enabled;
+                        this.state.monitor_volume = message.data.volume;
+                        break;
+                    
+                    case 'monitor_volume':
+                        this.state.monitor_volume = message.data.volume;
+                        break;
                 }
             };
             
@@ -236,6 +247,42 @@ export default {
             this.snackbar.text = text;
             this.snackbar.color = color;
             this.snackbar.show = true;
+        },
+        
+        /**
+         * Toggle monitor state
+         */
+        async toggleMonitor() {
+            try {
+                const response = await this.api.setMonitorState(
+                    this.state.monitor_enabled,
+                    this.state.monitor_volume
+                );
+                if (response.status === 'success') {
+                    const status = this.state.monitor_enabled ? 'enabled' : 'disabled';
+                    this.showNotification(`Self monitoring ${status}`);
+                }
+            } catch (error) {
+                console.error('Failed to toggle monitor:', error);
+                this.showNotification('Failed to toggle monitor', 'error');
+                // Revert state
+                this.state.monitor_enabled = !this.state.monitor_enabled;
+            }
+        },
+        
+        /**
+         * Set monitor volume
+         */
+        async setMonitorVolume() {
+            try {
+                const response = await this.api.setMonitorVolume(this.state.monitor_volume);
+                if (response.status === 'success') {
+                    // Silent update - no notification for volume changes
+                }
+            } catch (error) {
+                console.error('Failed to set monitor volume:', error);
+                this.showNotification('Failed to set monitor volume', 'error');
+            }
         }
     }
 }

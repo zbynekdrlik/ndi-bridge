@@ -22,7 +22,9 @@ class StateManager:
             "devices": {
                 "input": None,
                 "output": None
-            }
+            },
+            "monitor_enabled": False,
+            "monitor_volume": 50
         }
         
     async def get_state(self) -> Dict[str, Any]:
@@ -58,6 +60,18 @@ class StateManager:
             success, output = await ShellExecutor.pactl(["get-source-mute", devices["input"]])
             if success:
                 self.state["mic_muted"] = "yes" in output
+        
+        # Get monitor status
+        success, output = await ShellExecutor.run_command(
+            "/usr/local/bin/ndi-bridge-intercom-monitor", ["status"]
+        )
+        if success:
+            try:
+                monitor_status = json.loads(output)
+                self.state["monitor_enabled"] = monitor_status.get("enabled", False)
+                self.state["monitor_volume"] = monitor_status.get("volume", 50)
+            except json.JSONDecodeError:
+                pass
         
         return self.state
     
@@ -173,9 +187,43 @@ class StateManager:
                     await self.set_mic_mute(config["mic_muted"])
                 if "speaker_muted" in config:
                     await self.set_speaker_mute(config["speaker_muted"])
+                if "monitor_enabled" in config:
+                    await self.set_monitor_state(config["monitor_enabled"], 
+                                                 config.get("monitor_volume", 50))
                 
                 return True
         except Exception as e:
             print(f"Failed to load defaults: {e}")
         
         return False
+    
+    async def set_monitor_state(self, enabled: bool, volume: int = 50) -> bool:
+        """Enable/disable self-monitoring"""
+        command = "enable" if enabled else "disable"
+        args = [command]
+        if enabled:
+            args.append(str(volume))
+        
+        success, _ = await ShellExecutor.run_command(
+            "/usr/local/bin/ndi-bridge-intercom-monitor", args
+        )
+        
+        if success:
+            self.state["monitor_enabled"] = enabled
+            self.state["monitor_volume"] = volume
+            await self.save_runtime_state()
+        
+        return success
+    
+    async def set_monitor_volume(self, volume: int) -> bool:
+        """Set monitor volume (0-100)"""
+        success, _ = await ShellExecutor.run_command(
+            "/usr/local/bin/ndi-bridge-intercom-monitor", 
+            ["volume", str(volume)]
+        )
+        
+        if success:
+            self.state["monitor_volume"] = volume
+            await self.save_runtime_state()
+        
+        return success
