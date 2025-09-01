@@ -1,12 +1,12 @@
 #!/bin/bash
-# Install VDO.Ninja Intercom with Chrome and Dependencies
+# Install NDI Bridge Intercom with Chrome and Dependencies
 # This module adds Chrome and PipeWire installation to the chroot configuration
 
 # Function to configure Chrome intercom - gets added to chroot script
 configure_chrome_intercom() {
     cat >> /mnt/usb/tmp/configure-system.sh << 'CHROME_EOF'
 
-echo "Installing VDO.Ninja Intercom with Chrome..."
+echo "Installing NDI Bridge Intercom with Chrome..."
 
 # Install Xvfb for virtual display
 echo "Installing Xvfb virtual display server..."
@@ -33,11 +33,15 @@ apt-get install -y -qq pipewire pipewire-alsa pipewire-pulse wireplumber pulseau
 echo "Installing ALSA utilities..."
 apt-get install -y -qq alsa-utils 2>&1 | head -10
 
-# Enable VDO.Ninja intercom service
-echo "Enabling VDO.Ninja intercom service..."
-systemctl enable vdo-ninja-intercom.service 2>/dev/null || true
+# Install Python3 for API server
+echo "Installing Python3 for API server..."
+apt-get install -y -qq python3 python3-minimal 2>&1 | head -10
 
-echo "Chrome and VDO.Ninja intercom installation complete"
+# Enable NDI Bridge intercom services
+echo "Enabling NDI Bridge intercom services..."
+systemctl enable ndi-bridge-intercom.service 2>/dev/null || true
+
+echo "Chrome and NDI Bridge intercom installation complete"
 
 CHROME_EOF
 }
