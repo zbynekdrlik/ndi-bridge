@@ -93,29 +93,94 @@ tests/
 
 ### Test Execution
 
-#### Running Tests
+#### Prerequisites
 ```bash
-# Install dependencies
-pip install -r tests/requirements.txt
+# Install test dependencies (one time setup)
+pip3 install -r tests/requirements.txt --break-system-packages
 
-# Run all tests
-pytest --host 10.77.9.143
+# Set up SSH key authentication (recommended)
+ssh-keygen -t ed25519 -f ~/.ssh/ndi_test_key -N ""
+sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@DEVICE_IP
+```
+
+#### Running Tests - Primary Method
+```bash
+# Run all tests with SSH key auth (RECOMMENDED)
+pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -v
 
 # Run specific category
-pytest tests/component/capture/ --host 10.77.9.143
+pytest tests/component/capture/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
 
-# Run with parallel execution
-pytest -n auto --host 10.77.9.143
+# Run with parallel execution (faster)
+pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -n auto
 
 # Run only critical tests
-pytest -m critical --host 10.77.9.143
+pytest tests/ -m critical --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
+
+# Quick summary without details
+pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q --tb=no
 ```
+
+#### Helper Scripts (Alternative Methods)
+
+**Why shell scripts exist**: For convenience and special use cases
+
+1. **tests/run_all_tests.sh** - Runs tests by category with summary
+   ```bash
+   ./tests/run_all_tests.sh 10.77.9.188 ~/.ssh/ndi_test_key
+   ```
+   Purpose: Shows category-by-category progress, useful for debugging
+
+2. **tests/run_test.py** - Wrapper for password authentication
+   ```bash
+   python3 tests/run_test.py --host=10.77.9.188
+   ```
+   Purpose: For environments where SSH keys can't be used
+
+3. **Legacy bash tests** (tests/integration/*.sh) - Being phased out
+   ```bash
+   ./tests/integration/test_basic.sh  # OLD METHOD - DO NOT USE
+   ```
+   Purpose: Kept for reference during migration, will be removed
 
 #### Test Markers
 - `@pytest.mark.critical` - Must pass for release
 - `@pytest.mark.slow` - Takes >5 seconds
 - `@pytest.mark.requires_usb` - Needs USB device
 - `@pytest.mark.destructive` - Modifies system
+
+#### Understanding Test Results
+
+```bash
+# Typical output
+========================= 140 passed, 2 skipped in 45.2s =========================
+```
+
+- **PASSED**: Test succeeded
+- **FAILED**: Test failed - investigate issue
+- **SKIPPED**: Optional feature not present (OK)
+- **ERROR**: Test couldn't run - check connectivity
+
+**Expected Results on Clean NDI Bridge**:
+- ~140 tests should pass
+- Some skips are normal (optional features like intercom)
+- Zero failures on properly configured device
+
+#### Quick Test Commands Reference
+
+```bash
+# Just test if device is working (critical tests only, fast)
+pytest -m critical --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -q
+
+# Full validation before deployment (all tests, detailed)
+pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -v
+
+# Debug specific component issues
+pytest tests/component/capture/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -vv
+
+# Generate HTML report
+pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key --html=report.html
+```
 
 ### Writing New Tests
 
