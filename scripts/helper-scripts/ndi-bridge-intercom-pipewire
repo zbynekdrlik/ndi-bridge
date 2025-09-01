@@ -194,10 +194,8 @@ USB_SOURCE=$(pactl list sources short | grep "CSCTEK_USB_Audio_and_HID" | grep -
 if [ -n "$USB_SINK" ]; then
     echo "Setting default output to: $USB_SINK"
     pactl set-default-sink "$USB_SINK"
-    # Set volume to 100% and ensure unmuted
-    echo "Setting output volume to 100%"
-    pactl set-sink-volume "$USB_SINK" 100%
-    pactl set-sink-mute "$USB_SINK" 0
+    # Don't set volume here - let web interface manage defaults
+    # The web service will load saved defaults after startup
 else
     echo "ERROR: CSCTEK USB Audio HID output not found"
 fi
@@ -205,10 +203,8 @@ fi
 if [ -n "$USB_SOURCE" ]; then
     echo "Setting default input to: $USB_SOURCE"
     pactl set-default-source "$USB_SOURCE"
-    # Set microphone volume to 100% and ensure unmuted
-    echo "Setting microphone volume to 100%"
-    pactl set-source-volume "$USB_SOURCE" 100%
-    pactl set-source-mute "$USB_SOURCE" 0
+    # Don't set volume here - let web interface manage defaults
+    # The web service will load saved defaults after startup
 else
     echo "ERROR: CSCTEK USB Audio HID input not found"
 fi
