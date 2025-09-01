@@ -76,3 +76,4 @@ ndi-tools.exe
 
 # Claude/Cline local files
 .claude/
+tests/.env

@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 """
 Simple test runner for NDI Bridge tests using sshpass for authentication.
+
+Usage:
+    python3 run_test.py --host=10.77.9.188
+    
+Or using environment variable:
+    export NDI_TEST_HOST=10.77.9.188
+    python3 run_test.py
 """
 
 import sys
@@ -8,10 +15,27 @@ import os
 import subprocess
 
 def main():
-    # Default host
-    host = "10.77.9.188"
-    if len(sys.argv) > 1 and "--host" in sys.argv[1]:
-        host = sys.argv[1].split("=")[1] if "=" in sys.argv[1] else sys.argv[2]
+    # Determine host from: 1) command line, 2) environment, 3) default
+    host = None
+    
+    # Check command line arguments
+    for i, arg in enumerate(sys.argv):
+        if arg.startswith("--host="):
+            host = arg.split("=")[1]
+            break
+        elif arg == "--host" and i + 1 < len(sys.argv):
+            host = sys.argv[i + 1]
+            break
+    
+    # Fall back to environment variable
+    if not host:
+        host = os.environ.get("NDI_TEST_HOST")
+    
+    # Fall back to default
+    if not host:
+        host = "10.77.9.143"
+        print(f"Warning: No host specified. Using default: {host}")
+        print("Set NDI_TEST_HOST environment variable or use --host=IP_ADDRESS")
     
     # Set environment for SSH password auth
     os.environ["SSHPASS"] = "newlevel"

@@ -93,6 +93,32 @@ tests/
 
 ### Test Execution
 
+#### Configuring Device IP Address
+
+The test suite supports multiple ways to specify the target device IP:
+
+1. **Environment Variable** (RECOMMENDED - set once per session):
+   ```bash
+   export NDI_TEST_HOST=10.77.9.188
+   pytest tests/ --ssh-key ~/.ssh/ndi_test_key  # No need to specify --host
+   ```
+
+2. **Command Line Argument** (for one-off tests):
+   ```bash
+   pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
+   ```
+
+3. **Configuration File** (for persistent settings):
+   ```bash
+   cp tests/.env.example tests/.env
+   # Edit tests/.env with your device IP
+   # Tests will use settings from .env file
+   ```
+
+4. **Default Fallback** (10.77.9.143 if nothing specified)
+
+**Priority Order**: Command line > Environment variable > Config file > Default
+
 #### Prerequisites
 ```bash
 # Install test dependencies (one time setup)
@@ -104,21 +130,30 @@ sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@DEVICE_IP
 ```
 
 #### Running Tests - Primary Method
+
+**IMPORTANT**: Replace `DEVICE_IP` with your actual device IP address (e.g., 10.77.9.188)
+
 ```bash
+# Set device IP as environment variable (RECOMMENDED for session)
+export NDI_TEST_HOST=10.77.9.188  # Change to your device IP
+
 # Run all tests with SSH key auth (RECOMMENDED)
-pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -v
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -v
+
+# Or specify IP directly each time
+pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -v
 
 # Run specific category
-pytest tests/component/capture/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
+pytest tests/component/capture/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
 
 # Run with parallel execution (faster)
-pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -n auto
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -n auto
 
 # Run only critical tests
-pytest tests/ -m critical --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
+pytest tests/ -m critical --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
 
 # Quick summary without details
-pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
 ```
 
 #### Helper Scripts (Alternative Methods)
@@ -127,13 +162,22 @@ pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q --tb=no
 
 1. **tests/run_all_tests.sh** - Runs tests by category with summary
    ```bash
-   ./tests/run_all_tests.sh 10.77.9.188 ~/.ssh/ndi_test_key
+   # Usage: ./tests/run_all_tests.sh [IP_ADDRESS] [SSH_KEY_PATH]
+   ./tests/run_all_tests.sh 10.77.9.188              # Uses default SSH key
+   ./tests/run_all_tests.sh 10.77.9.188 ~/.ssh/id_rsa  # Custom SSH key
+   
+   # Or using environment variable
+   export NDI_TEST_HOST=10.77.9.188
+   ./tests/run_all_tests.sh  # Will use $NDI_TEST_HOST if no IP provided
    ```
    Purpose: Shows category-by-category progress, useful for debugging
 
 2. **tests/run_test.py** - Wrapper for password authentication
    ```bash
    python3 tests/run_test.py --host=10.77.9.188
+   # Or
+   export NDI_TEST_HOST=10.77.9.188
+   python3 tests/run_test.py  # Will use $NDI_TEST_HOST
    ```
    Purpose: For environments where SSH keys can't be used
 

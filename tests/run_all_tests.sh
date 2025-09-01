@@ -1,7 +1,29 @@
 #!/bin/bash
 # Run all atomic tests against NDI Bridge device
+#
+# Usage:
+#   ./run_all_tests.sh [IP_ADDRESS] [SSH_KEY_PATH]
+#   
+# Or using environment variable:
+#   export NDI_TEST_HOST=10.77.9.188
+#   ./run_all_tests.sh
+#
+# If no IP is provided, it will use:
+# 1. First argument if provided
+# 2. $NDI_TEST_HOST environment variable
+# 3. Default fallback (10.77.9.143)
 
-HOST="${1:-10.77.9.188}"
+# Determine host IP
+if [ -n "$1" ]; then
+    HOST="$1"
+elif [ -n "$NDI_TEST_HOST" ]; then
+    HOST="$NDI_TEST_HOST"
+else
+    HOST="10.77.9.143"
+    echo "Warning: No IP specified. Using default: $HOST"
+    echo "Set NDI_TEST_HOST environment variable or pass IP as argument"
+fi
+
 SSH_KEY="${2:-~/.ssh/ndi_test_key}"
 
 echo "Running NDI Bridge Atomic Test Suite"

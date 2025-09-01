@@ -14,6 +14,12 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import testinfra
 
+# Try to load .env file if it exists
+env_file = Path(__file__).parent / ".env"
+if env_file.exists():
+    from dotenv import load_dotenv
+    load_dotenv(env_file)
+
 # Add fixtures directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "fixtures"))
 
@@ -23,11 +29,14 @@ from fixtures.device import *  # noqa: F401, F403
 
 def pytest_addoption(parser):
     """Add custom command line options for NDI Bridge testing."""
+    # Get default host from environment or use fallback
+    default_host = os.environ.get("NDI_TEST_HOST", "10.77.9.143")
+    
     parser.addoption(
         "--host",
         action="store",
-        default="10.77.9.143",
-        help="NDI Bridge device IP address or hostname",
+        default=default_host,
+        help="NDI Bridge device IP address or hostname (default: $NDI_TEST_HOST or 10.77.9.143)",
     )
     parser.addoption(
         "--multi-hosts",
