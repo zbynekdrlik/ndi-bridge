@@ -90,26 +90,6 @@ export default {
         },
         
         /**
-         * Toggle speaker mute
-         */
-        async toggleSpeakerMute() {
-            this.loading.speaker = true;
-            try {
-                const muted = !this.state.speaker_muted;
-                await this.api.setSpeakerMute(muted);
-                this.state.speaker_muted = muted;
-                this.showNotification(
-                    muted ? 'Speaker muted' : 'Speaker unmuted',
-                    muted ? 'warning' : 'success'
-                );
-            } catch (error) {
-                this.showNotification('Failed to toggle speaker', 'error');
-            } finally {
-                this.loading.speaker = false;
-            }
-        },
-        
-        /**
          * Update speaker volume
          */
         async updateSpeakerVolume() {
@@ -247,27 +227,6 @@ export default {
             this.snackbar.text = text;
             this.snackbar.color = color;
             this.snackbar.show = true;
-        },
-        
-        /**
-         * Toggle monitor state
-         */
-        async toggleMonitor() {
-            try {
-                const response = await this.api.setMonitorState(
-                    this.state.monitor_enabled,
-                    this.state.monitor_volume
-                );
-                if (response.status === 'success') {
-                    const status = this.state.monitor_enabled ? 'enabled' : 'disabled';
-                    this.showNotification(`Self monitoring ${status}`);
-                }
-            } catch (error) {
-                console.error('Failed to toggle monitor:', error);
-                this.showNotification('Failed to toggle monitor', 'error');
-                // Revert state
-                this.state.monitor_enabled = !this.state.monitor_enabled;
-            }
         },
         
         /**

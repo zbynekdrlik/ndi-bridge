@@ -325,6 +325,10 @@ echo "Chrome started with PID $CHROME_PID"
 # Give Chrome time to create audio streams
 sleep 10
 
+# Enable self-monitoring (always on for intercom)
+echo "Enabling self-monitoring..."
+/usr/local/bin/ndi-bridge-intercom-monitor enable 50 >/dev/null 2>&1 || true
+
 # Force any Chrome audio streams to use USB devices
 echo "Ensuring Chrome uses USB audio..."
 if [ -n "$USB_SINK" ]; then

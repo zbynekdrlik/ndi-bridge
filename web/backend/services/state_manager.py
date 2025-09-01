@@ -76,7 +76,7 @@ class StateManager:
         return self.state
     
     async def set_mic_mute(self, muted: bool) -> bool:
-        """Set microphone mute state"""
+        """Set microphone mute state - affects both VDO and monitoring"""
         devices = await ShellExecutor.get_usb_audio_devices()
         if not devices["input"]:
             return False
@@ -86,6 +86,23 @@ class StateManager:
         
         if success:
             self.state["mic_muted"] = muted
+            
+            # When mic is muted, also mute the monitor loopback
+            # When unmuted, restore monitor to previous volume
+            if muted:
+                # Mute monitor by setting volume to 0
+                await ShellExecutor.run_command(
+                    "/usr/local/bin/ndi-bridge-intercom-monitor",
+                    ["volume", "0"]
+                )
+            else:
+                # Restore monitor volume
+                monitor_vol = self.state.get("monitor_volume", 50)
+                await ShellExecutor.run_command(
+                    "/usr/local/bin/ndi-bridge-intercom-monitor",
+                    ["volume", str(monitor_vol)]
+                )
+            
             await self.save_runtime_state()
         
         return success
