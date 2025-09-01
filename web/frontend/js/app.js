@@ -74,15 +74,22 @@ export default {
          * PRIMARY CONTROL: Toggle microphone mute
          */
         async toggleMicMute() {
+            // Immediate UI feedback - toggle state optimistically
+            const newMutedState = !this.state.mic_muted;
+            this.state.mic_muted = newMutedState;
             this.loading.mic = true;
+            
             try {
                 const response = await this.api.toggleMicMute();
+                // Update with actual state from server
                 this.state.mic_muted = response.muted;
                 this.showNotification(
                     response.muted ? 'Microphone muted' : 'Microphone unmuted',
                     response.muted ? 'warning' : 'success'
                 );
             } catch (error) {
+                // Revert on error
+                this.state.mic_muted = !newMutedState;
                 this.showNotification('Failed to toggle microphone', 'error');
             } finally {
                 this.loading.mic = false;

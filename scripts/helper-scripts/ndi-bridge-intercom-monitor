@@ -132,8 +132,11 @@ set_monitor_volume() {
         pactl set-sink-input-volume "$sink_input" "$pa_volume"
         echo -e "${GREEN}Monitor volume set to ${volume}%${NC}"
         
-        # Save volume to state
-        echo "$volume" > "/var/run/ndi-bridge/monitor.volume"
+        # Save volume to state ONLY if not muting (volume > 0)
+        # This preserves the actual volume when muting/unmuting
+        if [ "$volume" -gt 0 ]; then
+            echo "$volume" > "/var/run/ndi-bridge/monitor.volume"
+        fi
         return 0
     else
         echo -e "${RED}Monitor sink input not found${NC}" >&2

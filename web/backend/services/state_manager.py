@@ -70,7 +70,7 @@ class StateManager:
             if success:
                 self.state["mic_muted"] = "yes" in output
         
-        # Get monitor status
+        # Get monitor enabled status
         success, output = await ShellExecutor.run_command(
             "/usr/local/bin/ndi-bridge-intercom-monitor", ["status"]
         )
@@ -78,44 +78,64 @@ class StateManager:
             try:
                 monitor_status = json.loads(output)
                 self.state["monitor_enabled"] = monitor_status.get("enabled", False)
-                self.state["monitor_volume"] = monitor_status.get("volume", 50)
+                # Don't read volume from status - use our stored state
+                # This preserves the user's desired volume even when muted
             except json.JSONDecodeError:
                 pass
+        
+        # Read saved monitor volume from file if available
+        try:
+            with open("/var/run/ndi-bridge/monitor.volume", "r") as f:
+                saved_volume = int(f.read().strip())
+                self.state["monitor_volume"] = saved_volume
+        except (FileNotFoundError, ValueError):
+            # Ensure monitor_volume has a default if not set
+            if "monitor_volume" not in self.state:
+                self.state["monitor_volume"] = 50
         
         return self.state
     
     async def set_mic_mute(self, muted: bool) -> bool:
         """Set microphone mute state - affects both VDO and monitoring"""
+        import asyncio
+        
         devices = await ShellExecutor.get_usb_audio_devices()
         if not devices["input"]:
             return False
         
         mute_value = "1" if muted else "0"
-        success, _ = await ShellExecutor.pactl(["set-source-mute", devices["input"], mute_value])
         
-        if success:
-            self.state["mic_muted"] = muted
-            
-            # When mic is muted, also mute the monitor loopback
-            # When unmuted, restore monitor to previous volume
+        # Run both operations in parallel for faster response
+        async def mute_mic():
+            return await ShellExecutor.pactl(["set-source-mute", devices["input"], mute_value])
+        
+        async def adjust_monitor():
             try:
                 if muted:
-                    # Mute monitor by setting volume to 0
+                    # Mute monitor by setting actual volume to 0 (but keep state)
                     await ShellExecutor.run_command(
                         "/usr/local/bin/ndi-bridge-intercom-monitor",
                         ["volume", "0"]
                     )
                 else:
-                    # Restore monitor volume
+                    # Restore monitor to the user's chosen volume
                     monitor_vol = self.state.get("monitor_volume", 50)
                     await ShellExecutor.run_command(
                         "/usr/local/bin/ndi-bridge-intercom-monitor",
                         ["volume", str(monitor_vol)]
                     )
+                return True
             except Exception as e:
                 print(f"Warning: Failed to adjust monitor volume during mute: {e}")
-                # Don't fail the whole operation if monitor control fails
-            
+                return False
+        
+        # Run both in parallel
+        results = await asyncio.gather(mute_mic(), adjust_monitor())
+        success = results[0][0]  # First result is (success, output) tuple
+        
+        if success:
+            self.state["mic_muted"] = muted
+            # Don't change self.state["monitor_volume"] - that's the target volume
             await self.save_runtime_state()
         
         return success
@@ -269,6 +289,13 @@ class StateManager:
         
         if success:
             self.state["monitor_volume"] = volume
+            # Also save to the monitor.volume file for persistence
+            try:
+                os.makedirs("/var/run/ndi-bridge", exist_ok=True)
+                with open("/var/run/ndi-bridge/monitor.volume", "w") as f:
+                    f.write(str(volume))
+            except Exception as e:
+                print(f"Failed to save monitor volume: {e}")
             await self.save_runtime_state()
         
         return success
