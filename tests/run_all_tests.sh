@@ -14,14 +14,22 @@
 # 3. Default fallback (10.77.9.143)
 
 # Determine host IP
+# Priority: 1. Command line arg, 2. test_config.yaml, 3. Environment var, 4. Default
 if [ -n "$1" ]; then
     HOST="$1"
+elif [ -f "$(dirname "$0")/test_config.yaml" ]; then
+    # Try to read from test_config.yaml
+    CONFIG_HOST=$(grep "^host:" "$(dirname "$0")/test_config.yaml" | awk '{print $2}')
+    if [ -n "$CONFIG_HOST" ]; then
+        HOST="$CONFIG_HOST"
+        echo "Using host from test_config.yaml: $HOST"
+    fi
 elif [ -n "$NDI_TEST_HOST" ]; then
     HOST="$NDI_TEST_HOST"
 else
     HOST="10.77.9.143"
     echo "Warning: No IP specified. Using default: $HOST"
-    echo "Set NDI_TEST_HOST environment variable or pass IP as argument"
+    echo "Update tests/test_config.yaml or set NDI_TEST_HOST environment variable"
 fi
 
 SSH_KEY="${2:-~/.ssh/ndi_test_key}"

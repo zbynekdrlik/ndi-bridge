@@ -93,14 +93,40 @@ tests/
 
 ### Test Execution
 
-#### Configuring Device IP Address
+#### IMPORTANT: Instructions for Claude (AI Assistant)
+
+**When running tests, ALWAYS check and update the test configuration first:**
+
+1. **Check current test device IP**:
+   ```bash
+   cat tests/test_config.yaml | grep "host:"
+   ```
+
+2. **Update if needed** (when user provides new IP):
+   ```bash
+   # Edit tests/test_config.yaml and update the host line
+   # Example: change "host: 10.77.9.143" to "host: 10.77.9.188"
+   ```
+
+3. **Run tests** (no need to specify IP, it uses config file):
+   ```bash
+   pytest tests/ --ssh-key ~/.ssh/ndi_test_key -v
+   # or
+   ./tests/run_all_tests.sh
+   ```
+
+**Why this approach**: The config file persists across shell sessions, so Claude won't forget the IP when running multiple commands.
+
+#### Configuring Device IP Address (for humans)
 
 The test suite supports multiple ways to specify the target device IP:
 
-1. **Environment Variable** (RECOMMENDED - set once per session):
+1. **Configuration File** (RECOMMENDED - persists across sessions):
    ```bash
-   export NDI_TEST_HOST=10.77.9.188
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key  # No need to specify --host
+   # Edit tests/test_config.yaml - set host: YOUR_IP
+   vim tests/test_config.yaml
+   # Then run tests without specifying IP:
+   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
    ```
 
 2. **Command Line Argument** (for one-off tests):
@@ -108,16 +134,15 @@ The test suite supports multiple ways to specify the target device IP:
    pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
    ```
 
-3. **Configuration File** (for persistent settings):
+3. **Environment Variable** (for current session):
    ```bash
-   cp tests/.env.example tests/.env
-   # Edit tests/.env with your device IP
-   # Tests will use settings from .env file
+   export NDI_TEST_HOST=10.77.9.188
+   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
    ```
 
 4. **Default Fallback** (10.77.9.143 if nothing specified)
 
-**Priority Order**: Command line > Environment variable > Config file > Default
+**Priority Order**: Command line > test_config.yaml > Environment variable > Default
 
 #### Prerequisites
 ```bash

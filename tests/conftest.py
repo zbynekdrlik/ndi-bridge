@@ -29,14 +29,25 @@ from fixtures.device import *  # noqa: F401, F403
 
 def pytest_addoption(parser):
     """Add custom command line options for NDI Bridge testing."""
-    # Get default host from environment or use fallback
-    default_host = os.environ.get("NDI_TEST_HOST", "10.77.9.143")
+    # Priority: 1. Command line, 2. test_config.yaml, 3. Environment, 4. Default
+    default_host = "10.77.9.143"
+    
+    # First check test_config.yaml
+    config_file = Path(__file__).parent / "test_config.yaml"
+    if config_file.exists():
+        with open(config_file, "r") as f:
+            test_config = yaml.safe_load(f)
+            if test_config and "host" in test_config:
+                default_host = test_config["host"]
+    # Then check environment variable
+    elif os.environ.get("NDI_TEST_HOST"):
+        default_host = os.environ.get("NDI_TEST_HOST")
     
     parser.addoption(
         "--host",
         action="store",
         default=default_host,
-        help="NDI Bridge device IP address or hostname (default: $NDI_TEST_HOST or 10.77.9.143)",
+        help="NDI Bridge device IP address or hostname (default: from test_config.yaml, $NDI_TEST_HOST, or 10.77.9.143)",
     )
     parser.addoption(
         "--multi-hosts",
