@@ -27,8 +27,8 @@ install_helper_scripts() {
             chmod +x /mnt/usb/usr/local/bin/ndi-bridge-intercom-launcher
         fi
         
-        # Copy intercom control and config scripts
-        for script in ndi-bridge-intercom-control ndi-bridge-intercom-config ndi-bridge-intercom-status ndi-bridge-intercom-logs ndi-bridge-intercom-restart ndi-bridge-intercom-api; do
+        # Copy intercom control and config scripts (no API script anymore)
+        for script in ndi-bridge-intercom-control ndi-bridge-intercom-config ndi-bridge-intercom-status ndi-bridge-intercom-logs ndi-bridge-intercom-restart; do
             if [ -f "$HELPER_DIR/$script" ]; then
                 cp "$HELPER_DIR/$script" /mnt/usb/usr/local/bin/
                 chmod +x /mnt/usb/usr/local/bin/$script
@@ -39,9 +39,6 @@ install_helper_scripts() {
             cp "$HELPER_DIR/ndi-bridge-intercom.service" /mnt/usb/etc/systemd/system/
         fi
         
-        if [ -f "$HELPER_DIR/ndi-bridge-intercom-api.service" ]; then
-            cp "$HELPER_DIR/ndi-bridge-intercom-api.service" /mnt/usb/etc/systemd/system/
-        fi
         
         # Setup Chrome profile with VDO.Ninja permissions (pre-granted)
         mkdir -p /mnt/usb/opt/chrome-vdo-profile/Default

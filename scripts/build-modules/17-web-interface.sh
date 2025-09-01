@@ -124,16 +124,6 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
     
-    # OLD API endpoint for backward compatibility (Python simple API)
-    location /api/intercom-old/ {
-        proxy_pass http://127.0.0.1:8089/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-    
     # API endpoints for future use
     location /api/ {
         return 503;
