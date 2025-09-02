@@ -15,6 +15,10 @@ NDI_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-capture"
 NDI_DISPLAY_BINARY_PATH="$(dirname "$0")/../build/bin/ndi-display"
 NDI_SDK_PATH="$(dirname "$0")/../NDI SDK for Linux"
 
+# Mount point - use local directory in repository to avoid conflicts
+# This allows multiple builds to run concurrently in different folders
+MOUNT_POINT="$(dirname "$0")/../build-mount"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -34,6 +38,7 @@ DEFAULT_HOSTNAME="ndi-bridge"
 # Export all variables
 export BUILD_SCRIPT_VERSION BUILD_SCRIPT_DATE BUILD_TIMESTAMP
 export USB_DEVICE NDI_BINARY_PATH NDI_DISPLAY_BINARY_PATH NDI_SDK_PATH
+export MOUNT_POINT
 export RED GREEN YELLOW NC
 export UBUNTU_VERSION UBUNTU_ARCH
 export ROOT_PASSWORD DEFAULT_HOSTNAME

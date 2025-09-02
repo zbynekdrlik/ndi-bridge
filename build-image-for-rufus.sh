@@ -31,26 +31,57 @@ fi
 # Check for required binaries - build them if missing
 echo "Checking for required binaries..."
 if [ ! -f "build/bin/ndi-capture" ] || [ ! -f "build/bin/ndi-display" ]; then
-    echo "ERROR: Required binaries missing. Building them now..."
-    if [ ! -d "build" ]; then
-        mkdir build
-        cd build
-        cmake -DCMAKE_BUILD_TYPE=Release ..
-        cd ..
+    echo "Required binaries missing. Setting up build environment..."
+    
+    # Check if NDI SDK is installed, if not run setup
+    if [ ! -d "NDI SDK for Linux" ]; then
+        echo "NDI SDK not found. Running setup script..."
+        if [ -f "setup-build-environment.sh" ]; then
+            ./setup-build-environment.sh
+            if [ $? -ne 0 ]; then
+                echo "ERROR: Setup script failed"
+                exit 1
+            fi
+        else
+            echo "ERROR: setup-build-environment.sh not found"
+            exit 1
+        fi
     fi
-    cd build
-    make -j$(nproc)
-    cd ..
+    
+    # Build the binaries using build.sh
+    echo "Building NDI binaries..."
+    if [ -f "build.sh" ]; then
+        ./build.sh
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Build script failed"
+            exit 1
+        fi
+    else
+        echo "ERROR: build.sh not found"
+        exit 1
+    fi
     
     # Verify binaries exist after build
     if [ ! -f "build/bin/ndi-capture" ] || [ ! -f "build/bin/ndi-display" ]; then
         echo "ERROR: Failed to build required binaries"
-        echo "Please run: cd build && make -j\$(nproc)"
         exit 1
     fi
 fi
 echo "✓ ndi-capture binary found"
 echo "✓ ndi-display binary found"
+
+# Clean up any stuck resources from previous builds
+echo "Cleaning up stuck resources from previous builds..."
+# Kill stuck build processes
+pkill -f "build-ndi-usb-modular" 2>/dev/null || true
+# Unmount any leftover mounts
+umount /mnt/usb/* 2>/dev/null || true
+umount /mnt/usb 2>/dev/null || true
+# Clean up stale loop devices
+for loop in $(losetup -a | grep "ndi-bridge.img" | cut -d: -f1); do
+    kpartx -d "$loop" 2>/dev/null || true
+    losetup -d "$loop" 2>/dev/null || true
+done
 
 # Create image file (8GB for Chrome and dependencies)
 IMAGE_FILE="${1:-ndi-bridge.img}"
