@@ -71,10 +71,10 @@
 **Issue**: Tests have wrong device path assumptions
 **Fix Needed**: Update to check actual device paths
 
-## Issues to Create
-1. Fix time sync tests to support chrony
-2. Fix welcome service enablement test
-3. Fix web interface index test
-4. Fix audio PipeWire tests
-5. Fix capture stabilization timeout
-6. Fix display device path tests
+## Issues Created
+1. [#69](https://github.com/zbynekdrlik/ndi-bridge/issues/69) - Fix time sync tests to support chrony
+2. [#70](https://github.com/zbynekdrlik/ndi-bridge/issues/70) - Fix welcome service enablement test
+3. [#71](https://github.com/zbynekdrlik/ndi-bridge/issues/71) - Fix web interface index test
+4. [#72](https://github.com/zbynekdrlik/ndi-bridge/issues/72) - Fix audio PipeWire tests
+5. [#73](https://github.com/zbynekdrlik/ndi-bridge/issues/73) - Fix capture stabilization timeout
+6. [#74](https://github.com/zbynekdrlik/ndi-bridge/issues/74) - Fix display device path tests

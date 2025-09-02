@@ -1,0 +1,89 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.3.2, pluggy-1.6.0
+rootdir: /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge-dev4/tests
+configfile: pytest.ini
+plugins: json-report-1.5.0, rerunfailures-14.0, testinfra-10.1.0, html-4.1.1, cov-5.0.0, timeout-2.3.1, xdist-3.6.1, metadata-3.1.1, clarity-1.0.1
+timeout: 30.0s
+timeout method: signal
+timeout func_only: False
+collected 171 items
+
+tests/component/audio/test_audio_system.py::test_alsa_utils_installed PASSED
+tests/component/audio/test_audio_system.py::test_alsa_devices_detected PASSED
+tests/component/audio/test_audio_system.py::test_alsa_playback_device_exists PASSED
+tests/component/audio/test_audio_system.py::test_alsa_default_device_configured PASSED
+tests/component/audio/test_audio_system.py::test_alsa_state_file_exists PASSED
+tests/component/audio/test_audio_system.py::test_proc_asound_exists PASSED
+tests/component/audio/test_audio_system.py::test_proc_asound_cards_populated PASSED
+tests/component/audio/test_audio_system.py::test_sound_modules_loaded PASSED
+tests/component/audio/test_audio_system.py::test_alsa_mixer_accessible PASSED
+tests/component/audio/test_audio_system.py::test_pipewire_installed PASSED
+tests/component/audio/test_audio_system.py::test_pulseaudio_installed PASSED
+tests/component/audio/test_audio_system.py::test_audio_device_permissions PASSED
+tests/component/audio/test_audio_system.py::test_speaker_test_available PASSED
+tests/component/audio/test_audio_system.py::test_speaker_test_runs PASSED
+tests/component/audio/test_vdo_intercom.py::test_chrome_or_chromium_installed PASSED
+tests/component/audio/test_vdo_intercom.py::test_chrome_executable PASSED
+tests/component/audio/test_vdo_intercom.py::test_vdo_ninja_intercom_script_exists SKIPPED
+tests/component/audio/test_vdo_intercom.py::test_vdo_ninja_intercom_service_exists PASSED
+tests/component/audio/test_vdo_intercom.py::test_pipewire_for_audio_routing PASSED
+tests/component/audio/test_vdo_intercom.py::test_pipewire_service_running PASSED
+tests/component/audio/test_vdo_intercom.py::test_wireplumber_installed PASSED
+tests/component/audio/test_vdo_intercom.py::test_pipewire_pulse_compatibility PASSED
+tests/component/audio/test_vdo_intercom.py::test_usb_audio_device_detected PASSED
+tests/component/audio/test_vdo_intercom.py::test_chrome_data_directory_configured PASSED
+tests/component/audio/test_vdo_intercom.py::test_chrome_flags_configured PASSED
+tests/component/audio/test_vdo_intercom.py::test_vdo_ninja_url_configured PASSED
+tests/component/audio/test_vdo_intercom.py::test_audio_permissions_for_chrome PASSED
+tests/component/audio/test_vdo_intercom.py::test_intercom_volume_control_script PASSED
+tests/component/audio/test_vdo_intercom.py::test_intercom_restart_capability PASSED
+tests/component/capture/test_device_detection.py::test_capture_device_exists PASSED
+tests/component/capture/test_device_detection.py::test_capture_device_is_character_device PASSED
+tests/component/capture/test_device_detection.py::test_capture_device_has_correct_permissions PASSED
+tests/component/capture/test_device_detection.py::test_capture_device_owned_by_video_group PASSED
+tests/component/capture/test_device_detection.py::test_usb_capture_device_connected PASSED
+tests/component/capture/test_fps_monitoring.py::test_fps_file_exists PASSED
+tests/component/capture/test_fps_monitoring.py::test_fps_value_is_numeric PASSED
+tests/component/capture/test_fps_monitoring.py::test_fps_within_acceptable_range PASSED
+tests/component/capture/test_fps_monitoring.py::test_frames_captured_increasing PASSED
+tests/component/capture/test_fps_monitoring.py::test_dropped_frames_file_exists PASSED
+tests/component/capture/test_fps_monitoring.py::test_dropped_frames_percentage_low PASSED
+tests/component/capture/test_service_status.py::test_ndi_capture_service_exists PASSED
+tests/component/capture/test_service_status.py::test_ndi_capture_service_enabled PASSED
+tests/component/capture/test_service_status.py::test_ndi_capture_service_running PASSED
+tests/component/capture/test_service_status.py::test_ndi_capture_process_exists PASSED
+tests/component/capture/test_service_status.py::test_ndi_capture_binary_exists PASSED
+tests/component/capture/test_service_status.py::test_ndi_capture_service_active_state PASSED
+tests/component/capture/test_stabilization.py::test_initial_state_is_stabilizing PASSED
+tests/component/capture/test_stabilization.py::test_stabilization_complete_file_created +++++++++++++++++++++++++++++++++++ Timeout ++++++++++++++++++++++++++++++++++++
+~~~~~~~~~~~~~~~ Stack of Thread-1 (run_server) (134438198101696) ~~~~~~~~~~~~~~~
+  File "/usr/lib/python3.12/threading.py", line 1030, in _bootstrap
+    self._bootstrap_inner()
+  File "/usr/lib/python3.12/threading.py", line 1073, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.12/threading.py", line 1010, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/newlevel/.local/lib/python3.12/site-packages/pytest_rerunfailures.py", line 433, in run_server
+    conn, _ = self.sock.accept()
+  File "/usr/lib/python3.12/socket.py", line 295, in accept
+    fd, addr = self._accept()
++++++++++++++++++++++++++++++++++++ Timeout ++++++++++++++++++++++++++++++++++++
+FAILED
+
+============================= slowest 10 durations =============================
+30.00s call     component/capture/test_stabilization.py::test_stabilization_complete_file_created
+11.47s call     component/audio/test_audio_system.py::test_speaker_test_runs
+3.93s call     component/capture/test_stabilization.py::test_initial_state_is_stabilizing
+2.59s call     component/capture/test_fps_monitoring.py::test_frames_captured_increasing
+1.26s call     component/audio/test_audio_system.py::test_alsa_state_file_exists
+0.95s call     component/audio/test_vdo_intercom.py::test_vdo_ninja_intercom_script_exists
+0.65s call     component/audio/test_vdo_intercom.py::test_vdo_ninja_intercom_service_exists
+0.64s call     component/audio/test_vdo_intercom.py::test_chrome_or_chromium_installed
+0.64s call     component/capture/test_service_status.py::test_ndi_capture_service_enabled
+0.63s call     component/audio/test_vdo_intercom.py::test_chrome_executable
+- Generated html report: file:///mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge-dev4/test-report.html -
+=========================== short test summary info ============================
+SKIPPED [1] tests/component/audio/test_vdo_intercom.py:48: Intercom script not found - feature may not be installed
+FAILED tests/component/capture/test_stabilization.py::test_stabilization_complete_file_created
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+============== 1 failed, 46 passed, 1 skipped in 68.11s (0:01:08) ==============
