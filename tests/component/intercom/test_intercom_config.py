@@ -27,7 +27,7 @@ class TestIntercomConfig:
     def test_config_save_and_load(self, host):
         """Test saving and loading configuration."""
         # Get current settings
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         original = json.loads(result.stdout)
         
         # Make filesystem writable
@@ -36,21 +36,21 @@ class TestIntercomConfig:
         try:
             # Change settings
             test_settings = {
-                "mic_volume": 55,
-                "speaker_volume": 45,
-                "monitor_level": 35
+                "in_volume": 55,
+                "out_volume": 45
             }
             
-            for key, value in test_settings.items():
-                host.run(f"ndi-bridge-intercom-control set {key} {value}")
+            # Set volumes
+            host.run(f"ndi-bridge-intercom-control set-volume input {test_settings['in_volume']}")
+            host.run(f"ndi-bridge-intercom-control set-volume output {test_settings['out_volume']}")
             
             # Save configuration
             result = host.run("ndi-bridge-intercom-config save")
             assert result.succeeded, "Config save should succeed"
             
             # Change settings again
-            host.run("ndi-bridge-intercom-control set mic_volume 90")
-            host.run("ndi-bridge-intercom-control set speaker_volume 85")
+            host.run("ndi-bridge-intercom-control set-volume input 90")
+            host.run("ndi-bridge-intercom-control set-volume output 85")
             
             # Load saved configuration
             result = host.run("ndi-bridge-intercom-config load")
@@ -58,17 +58,19 @@ class TestIntercomConfig:
             
             # Verify settings restored
             time.sleep(1)
-            result = host.run("ndi-bridge-intercom-control get")
+            result = host.run("ndi-bridge-intercom-control status")
             current = json.loads(result.stdout)
             
-            assert current["mic_volume"] == test_settings["mic_volume"], "Mic volume should be restored"
-            assert current["speaker_volume"] == test_settings["speaker_volume"], "Speaker volume should be restored"
+            assert current["input"]["volume"] == test_settings["in_volume"], "Input volume should be restored"
+            assert current["output"]["volume"] == test_settings["out_volume"], "Output volume should be restored"
             
         finally:
             # Restore original settings
-            for key in ["mic_volume", "speaker_volume", "monitor_level"]:
-                if key in original:
-                    host.run(f"ndi-bridge-intercom-control set {key} {original[key]}")
+            # Restore original volumes
+            if "input" in original:
+                host.run(f"ndi-bridge-intercom-control set-volume input {original['input']['volume']}")
+            if "output" in original:
+                host.run(f"ndi-bridge-intercom-control set-volume output {original['output']['volume']}")
             
             # Save original settings
             host.run("ndi-bridge-intercom-config save")
@@ -86,15 +88,15 @@ class TestIntercomConfig:
             try:
                 # Try JSON format
                 config = json.loads(content)
-                assert "mic_volume" in config or "settings" in config
+                assert "input" in config or "settings" in config
             except json.JSONDecodeError:
                 # Try key=value format
-                assert "mic_volume=" in content or "MIC_VOLUME=" in content
+                assert "volume" in content.lower() or "input" in content.lower()
     
     def test_config_persistence_across_restart(self, host):
         """Test that configuration persists across service restart."""
         # Get current settings
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         settings_before = json.loads(result.stdout)
         
         # Restart service
@@ -104,12 +106,12 @@ class TestIntercomConfig:
         time.sleep(10)
         
         # Check settings after restart
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         settings_after = json.loads(result.stdout)
         
         # Key settings should persist
-        assert settings_after["mic_volume"] == settings_before["mic_volume"], "Mic volume should persist"
-        assert settings_after["speaker_volume"] == settings_before["speaker_volume"], "Speaker volume should persist"
+        assert settings_after["input"]["volume"] == settings_before["input"]["volume"], "Input volume should persist"
+        assert settings_after["output"]["volume"] == settings_before["output"]["volume"], "Output volume should persist"
     
     def test_config_default_values(self, host):
         """Test that reasonable defaults are used."""
@@ -118,13 +120,13 @@ class TestIntercomConfig:
         
         if not config_file.exists:
             # No config file, should use defaults
-            result = host.run("ndi-bridge-intercom-control get")
+            result = host.run("ndi-bridge-intercom-control status")
             status = json.loads(result.stdout)
             
             # Check for reasonable defaults
-            assert 30 <= status["mic_volume"] <= 100, "Default mic volume should be reasonable"
-            assert 30 <= status["speaker_volume"] <= 100, "Default speaker volume should be reasonable"
-            assert status["mic_muted"] == False, "Mic should not be muted by default"
+            assert 30 <= status["input"]["volume"] <= 100, "Default input volume should be reasonable"
+            assert 30 <= status["output"]["volume"] <= 100, "Default output volume should be reasonable"
+            assert status["input"]["muted"] == False, "Input should not be muted by default"
     
     def test_config_save_requires_writable_filesystem(self, host):
         """Test that config save handles read-only filesystem correctly."""
@@ -162,7 +164,7 @@ class TestIntercomConfig:
             assert True, "Should reject invalid volume"
         else:
             # Check it was clamped to 100
-            result = host.run("ndi-bridge-intercom-control get")
+            result = host.run("ndi-bridge-intercom-control status")
             status = json.loads(result.stdout)
             assert status["mic_volume"] <= 100, "Volume should be clamped to 100"
     

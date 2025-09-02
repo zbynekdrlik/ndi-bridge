@@ -1,0 +1,39 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.3.2, pluggy-1.6.0
+rootdir: /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/tests
+configfile: pytest.ini
+plugins: json-report-1.5.0, rerunfailures-14.0, testinfra-10.1.0, html-4.1.1, cov-5.0.0, timeout-2.3.1, xdist-3.6.1, metadata-3.1.1, clarity-1.0.1
+timeout: 30.0s
+timeout method: signal
+timeout func_only: False
+collected 92 items
+
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_usb_audio_device_present PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_csctek_usb_audio_detected PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_sees_usb_audio PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_get_volumes PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_set_mic_volume PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_set_speaker_volume PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_mute_unmute_mic PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_monitor_control PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_monitor_latency PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_quantum_adjustment PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_device_exclusive_access PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_modules_loaded FAILED
+
+============================= slowest 10 durations =============================
+6.62s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_monitor_control
+2.73s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_mute_unmute_mic
+1.78s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_set_speaker_volume
+1.76s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_set_mic_volume
+0.94s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_modules_loaded
+0.71s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_csctek_usb_audio_detected
+0.53s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_quantum_adjustment
+0.45s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_get_volumes
+0.41s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_sees_usb_audio
+0.35s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_device_exclusive_access
+- Generated html report: file:///mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/test-report.html -
+=========================== short test summary info ============================
+FAILED tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_modules_loaded
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+======================== 1 failed, 11 passed in 17.75s =========================

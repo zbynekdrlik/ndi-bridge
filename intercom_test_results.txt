@@ -1,0 +1,67 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.3.2, pluggy-1.6.0
+rootdir: /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/tests
+configfile: pytest.ini
+plugins: json-report-1.5.0, rerunfailures-14.0, testinfra-10.1.0, html-4.1.1, cov-5.0.0, timeout-2.3.1, xdist-3.6.1, metadata-3.1.1, clarity-1.0.1
+timeout: 30.0s
+timeout method: signal
+timeout func_only: False
+collected 92 items
+
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_usb_audio_device_present PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_csctek_usb_audio_detected PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_sees_usb_audio PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_get_volumes PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_set_mic_volume PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_set_speaker_volume PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_mute_unmute_mic PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_monitor_control PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_monitor_latency PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_quantum_adjustment PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_device_exclusive_access PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_modules_loaded FAILED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_levels_readable PASSED
+tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_device_reconnection_handling PASSED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_directory_exists PASSED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_save_command_exists PASSED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_save_and_load PASSED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_file_format PASSED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_persistence_across_restart FAILED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_default_values PASSED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_save_requires_writable_filesystem PASSED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_backup_functionality PASSED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_validation FAILED
+tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_permissions PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_service_exists PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_service_enabled PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_service_running PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_service_configuration PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_launcher_script_exists PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_pipewire_script_exists PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_control_script_exists PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_config_script_exists PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_monitor_script_exists PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_helper_scripts_exist PASSED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_status_command FAILED
+tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_control_get_status FAILED
+
+============================= slowest 10 durations =============================
+24.71s call     component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_persistence_across_restart
+6.62s call     component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_save_and_load
+6.09s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_monitor_control
+3.44s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_mute_unmute_mic
+2.63s call     component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_helper_scripts_exist
+2.44s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_set_speaker_volume
+2.26s call     component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_pipewire_script_exists
+1.74s call     component/intercom/test_intercom_audio.py::TestIntercomAudio::test_audio_control_set_mic_volume
+1.71s call     component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_backup_functionality
+1.53s call     component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_directory_exists
+- Generated html report: file:///mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/test-report.html -
+=========================== short test summary info ============================
+FAILED tests/component/intercom/test_intercom_audio.py::TestIntercomAudio::test_pipewire_modules_loaded
+FAILED tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_persistence_across_restart
+FAILED tests/component/intercom/test_intercom_config.py::TestIntercomConfig::test_config_validation
+FAILED tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_status_command
+FAILED tests/component/intercom/test_intercom_core.py::TestIntercomCore::test_intercom_control_get_status
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 5 failures !!!!!!!!!!!!!!!!!!!!!!!!!!!
+=================== 5 failed, 31 passed in 68.55s (0:01:08) ====================

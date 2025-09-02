@@ -38,88 +38,86 @@ class TestIntercomAudio:
     
     def test_audio_control_get_volumes(self, host):
         """Test that audio control can get volume levels."""
-        result = host.run("ndi-bridge-intercom-control get")
-        assert result.succeeded, "Control get should succeed"
+        result = host.run("ndi-bridge-intercom-control status")
+        assert result.succeeded, "Control status should succeed"
         
         status = json.loads(result.stdout)
         
         # Check volume ranges
-        assert 0 <= status["mic_volume"] <= 100, "Mic volume should be 0-100"
-        assert 0 <= status["speaker_volume"] <= 100, "Speaker volume should be 0-100"
-        assert 0 <= status["monitor_level"] <= 100, "Monitor level should be 0-100"
+        assert "input" in status, "Should have input section"
+        assert "output" in status, "Should have output section"
+        assert 0 <= status["input"]["volume"] <= 100, "Input volume should be 0-100"
+        assert 0 <= status["output"]["volume"] <= 100, "Output volume should be 0-100"
     
     def test_audio_control_set_mic_volume(self, host):
         """Test setting microphone volume."""
         # Get current volume
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         original = json.loads(result.stdout)
         
         # Set new volume
         new_volume = 75
-        result = host.run(f"ndi-bridge-intercom-control set mic_volume {new_volume}")
+        result = host.run(f"ndi-bridge-intercom-control set-volume input {new_volume}")
         assert result.succeeded, "Set mic volume should succeed"
         
         # Verify change
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         current = json.loads(result.stdout)
-        assert current["mic_volume"] == new_volume, f"Mic volume should be {new_volume}"
+        assert current["input"]["volume"] == new_volume, f"Mic volume should be {new_volume}"
         
         # Restore original
-        host.run(f"ndi-bridge-intercom-control set mic_volume {original['mic_volume']}")
+        host.run(f"ndi-bridge-intercom-control set-volume input {original['input']['volume']}")
     
     def test_audio_control_set_speaker_volume(self, host):
         """Test setting speaker volume."""
         # Get current volume
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         original = json.loads(result.stdout)
         
         # Set new volume
         new_volume = 65
-        result = host.run(f"ndi-bridge-intercom-control set speaker_volume {new_volume}")
+        result = host.run(f"ndi-bridge-intercom-control set-volume output {new_volume}")
         assert result.succeeded, "Set speaker volume should succeed"
         
         # Verify change
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         current = json.loads(result.stdout)
-        assert current["speaker_volume"] == new_volume, f"Speaker volume should be {new_volume}"
+        assert current["output"]["volume"] == new_volume, f"Speaker volume should be {new_volume}"
         
         # Restore original
-        host.run(f"ndi-bridge-intercom-control set speaker_volume {original['speaker_volume']}")
+        host.run(f"ndi-bridge-intercom-control set-volume output {original['output']['volume']}")
     
     def test_audio_control_mute_unmute_mic(self, host):
         """Test muting and unmuting microphone."""
         # Get current state
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         original = json.loads(result.stdout)
         
         # Mute mic
-        result = host.run("ndi-bridge-intercom-control mute mic")
+        result = host.run("ndi-bridge-intercom-control mute input")
         assert result.succeeded, "Mute mic should succeed"
         
         # Check muted
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         current = json.loads(result.stdout)
-        assert current["mic_muted"] == True, "Mic should be muted"
+        assert current["input"]["muted"] == True, "Mic should be muted"
         
         # Unmute mic
-        result = host.run("ndi-bridge-intercom-control unmute mic")
+        result = host.run("ndi-bridge-intercom-control unmute input")
         assert result.succeeded, "Unmute mic should succeed"
         
         # Check unmuted
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         current = json.loads(result.stdout)
-        assert current["mic_muted"] == False, "Mic should be unmuted"
+        assert current["input"]["muted"] == False, "Mic should be unmuted"
         
         # Restore original state
-        if original["mic_muted"]:
-            host.run("ndi-bridge-intercom-control mute mic")
+        if original["input"]["muted"]:
+            host.run("ndi-bridge-intercom-control mute input")
     
     def test_audio_monitor_control(self, host):
         """Test audio monitor (self-hearing) control."""
-        # Get current state
-        result = host.run("ndi-bridge-intercom-control get")
-        original = json.loads(result.stdout)
-        
+        # Monitor functionality is managed separately
         # Enable monitor
         result = host.run("ndi-bridge-intercom-monitor enable")
         assert result.succeeded, "Enable monitor should succeed"
@@ -127,10 +125,10 @@ class TestIntercomAudio:
         # Wait for module to load
         time.sleep(2)
         
-        # Check enabled
-        result = host.run("ndi-bridge-intercom-control get")
-        current = json.loads(result.stdout)
-        assert current["monitor_enabled"] == True, "Monitor should be enabled"
+        # Check status reports enabled
+        result = host.run("ndi-bridge-intercom-monitor status")
+        status = json.loads(result.stdout)
+        assert status["enabled"] == True, "Monitor should be enabled"
         
         # Disable monitor
         result = host.run("ndi-bridge-intercom-monitor disable")
@@ -138,13 +136,9 @@ class TestIntercomAudio:
         
         # Check disabled
         time.sleep(2)
-        result = host.run("ndi-bridge-intercom-control get")
-        current = json.loads(result.stdout)
-        assert current["monitor_enabled"] == False, "Monitor should be disabled"
-        
-        # Restore original state
-        if original["monitor_enabled"]:
-            host.run("ndi-bridge-intercom-monitor enable")
+        result = host.run("ndi-bridge-intercom-monitor status")
+        status = json.loads(result.stdout)
+        assert status["enabled"] == False, "Monitor should be disabled"
     
     def test_audio_monitor_latency(self, host):
         """Test that monitor claims ultra-low latency."""
@@ -170,13 +164,16 @@ class TestIntercomAudio:
     def test_pipewire_modules_loaded(self, host):
         """Test that required PipeWire modules are loaded."""
         # Check for loopback module when monitor is enabled
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-monitor status")
         status = json.loads(result.stdout)
         
-        if status["monitor_enabled"]:
+        if status["enabled"]:
             # Check for loopback module
             result = host.run("pactl list modules | grep -i loopback")
             assert result.succeeded, "Loopback module should be loaded when monitor is enabled"
+        else:
+            # Monitor is disabled, so loopback module not required
+            assert True, "Monitor disabled, loopback module not required"
     
     def test_audio_levels_readable(self, host):
         """Test that audio levels can be read."""

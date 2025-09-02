@@ -100,7 +100,7 @@ class TestIntercomCore:
     
     def test_intercom_control_get_status(self, host):
         """Test that control script can get audio status."""
-        result = host.run("ndi-bridge-intercom-control get")
+        result = host.run("ndi-bridge-intercom-control status")
         assert result.succeeded, "Control get command should succeed"
         
         # Should return JSON
