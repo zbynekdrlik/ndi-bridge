@@ -19,11 +19,10 @@ log_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Check if build directory exists
+# Create build directory if it doesn't exist
 if [ ! -d "$BUILD_DIR" ]; then
-    log_error "Build directory not found at $BUILD_DIR"
-    log_info "Run ./setup-build-environment.sh first to set up the build environment"
-    exit 1
+    log_info "Creating build directory at $BUILD_DIR"
+    mkdir -p "$BUILD_DIR"
 fi
 
 # Check if cmake has been run
