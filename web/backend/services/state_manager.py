@@ -12,7 +12,7 @@ class StateManager:
     """Manage intercom state"""
     
     def __init__(self):
-        self.runtime_state_file = "/var/run/ndi-bridge/intercom.state"
+        self.runtime_state_file = "/var/run/media-bridge/intercom.state"
         self.config_file = "/etc/media-bridge/intercom.conf"
         self.state = {
             "mic_muted": False,
@@ -104,7 +104,7 @@ class StateManager:
         
         # Read saved monitor volume from file if available
         try:
-            with open("/var/run/ndi-bridge/monitor.volume", "r") as f:
+            with open("/var/run/media-bridge/monitor.volume", "r") as f:
                 saved_volume = int(f.read().strip())
                 self.state["monitor_volume"] = saved_volume
         except (FileNotFoundError, ValueError):
@@ -310,8 +310,8 @@ class StateManager:
             self.state["monitor_volume"] = volume
             # Also save to the monitor.volume file for persistence
             try:
-                os.makedirs("/var/run/ndi-bridge", exist_ok=True)
-                with open("/var/run/ndi-bridge/monitor.volume", "w") as f:
+                os.makedirs("/var/run/media-bridge", exist_ok=True)
+                with open("/var/run/media-bridge/monitor.volume", "w") as f:
                     f.write(str(volume))
             except Exception as e:
                 print(f"Failed to save monitor volume: {e}")

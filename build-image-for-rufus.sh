@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build NDI Bridge USB image for WSL/Windows (works with Rufus)
+# Build Media Bridge USB image for WSL/Windows (works with Rufus)
 
 set -e
 

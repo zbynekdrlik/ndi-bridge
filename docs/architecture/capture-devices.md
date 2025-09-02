@@ -2,7 +2,7 @@
 
 ## Overview
 
-NDI Bridge supports multiple video capture sources through a unified interface. Each capture implementation follows the `ICaptureDevice` interface, allowing seamless switching between different capture technologies.
+Media Bridge supports multiple video capture sources through a unified interface. Each capture implementation follows the `ICaptureDevice` interface, allowing seamless switching between different capture technologies.
 
 ## Supported Capture Types
 

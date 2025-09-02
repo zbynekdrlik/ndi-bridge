@@ -7,10 +7,10 @@ setup_base_system() {
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFBASE'
 
 # Set hostname
-echo "ndi-bridge" > /etc/hostname
+echo "media-bridge" > /etc/hostname
 cat > /etc/hosts << EOFHOSTS
 127.0.0.1 localhost
-127.0.1.1 ndi-bridge
+127.0.1.1 media-bridge
 EOFHOSTS
 
 # Set root password
@@ -38,7 +38,7 @@ if [ -f /etc/ssh/sshd_config ]; then
     sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config
     # Add SSH cipher/MAC configuration to prevent corruption issues
     echo "" >> /etc/ssh/sshd_config
-    echo "# NDI Bridge SSH configuration" >> /etc/ssh/sshd_config
+    echo "# Media Bridge SSH configuration" >> /etc/ssh/sshd_config
     echo "Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr" >> /etc/ssh/sshd_config
     echo "MACs umac-128-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com" >> /etc/ssh/sshd_config
     if command -v systemctl >/dev/null 2>&1; then
@@ -67,7 +67,7 @@ fi
 
 # Configure systemd-resolved to work with systemd-networkd
 mkdir -p /etc/systemd/resolved.conf.d
-cat > /etc/systemd/resolved.conf.d/ndi-bridge.conf << 'EOFRESOLVEDCONF'
+cat > /etc/systemd/resolved.conf.d/media-bridge.conf << 'EOFRESOLVEDCONF'
 [Resolve]
 # Use DNS from DHCP (systemd-networkd) with fallback servers
 FallbackDNS=8.8.8.8 8.8.4.4 1.1.1.1 1.0.0.1

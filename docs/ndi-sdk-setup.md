@@ -1,6 +1,6 @@
 # NDI SDK Setup Guide
 
-This guide explains how to set up the NDI SDK for the NDI Bridge project.
+This guide explains how to set up the NDI SDK for the Media Bridge project.
 
 ## Prerequisites
 

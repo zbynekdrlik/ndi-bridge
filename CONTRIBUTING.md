@@ -1,6 +1,6 @@
-# Contributing to NDI Bridge
+# Contributing to Media Bridge
 
-We welcome contributions to the NDI Bridge project! This document provides guidelines for contributing.
+We welcome contributions to the Media Bridge project! This document provides guidelines for contributing.
 
 ## Getting Started
 
@@ -94,7 +94,7 @@ cmake --build . --config Debug  # Windows
 ./ndi-capture --verbose
 
 # Test USB hot-plug recovery
-# 1. Start NDI Bridge
+# 1. Start Media Bridge
 # 2. Disconnect USB device
 # 3. Wait for recovery attempt
 # 4. Reconnect device

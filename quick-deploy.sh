@@ -47,7 +47,7 @@ sshpass -p newlevel ssh root@$BOX_IP "systemctl start ndi-capture ndi-display@1 
 
 # Quick status check
 echo -e "\n${GREEN}Deployment Status:${NC}"
-sshpass -p newlevel ssh root@$BOX_IP << 'EOF' 2>/dev/null | grep -v "NDI Bridge Status"
+sshpass -p newlevel ssh root@$BOX_IP << 'EOF' 2>/dev/null | grep -v "Media Bridge Status"
 echo "ndi-capture version: $(/opt/media-bridge/ndi-capture --version 2>/dev/null || echo 'error')"
 echo "ndi-display version: $(/opt/media-bridge/ndi-display --version 2>&1 | head -1 || echo 'error')"
 echo "Services:"

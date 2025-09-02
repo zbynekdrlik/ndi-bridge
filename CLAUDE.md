@@ -452,7 +452,7 @@ jobs:
 - Menu `read` commands need `< /dev/tty` when called from other scripts
 - Services must be enabled AND started
 - kbd package required for chvt but was missing
-- Stream names must match exactly (e.g., "NDI-BRIDGE (USB Capture)")
+- Stream names must match exactly (e.g., "MEDIA-BRIDGE (USB Capture)")
 
 ## CRITICAL: Modular Architecture Rules
 

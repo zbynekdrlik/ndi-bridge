@@ -2,7 +2,7 @@
 # NDI Capture service configuration module
 
 configure_ndi_service() {
-    log "Configuring NDI Bridge service..."
+    log "Configuring Media Bridge service..."
     
     # Copy NDI Capture binary BEFORE chroot (so it's accessible)
     if [ -f build/bin/ndi-capture ]; then

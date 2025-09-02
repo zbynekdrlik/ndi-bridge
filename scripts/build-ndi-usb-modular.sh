@@ -160,7 +160,7 @@ main() {
     log "The system will:"
     log "  - Boot automatically (0s GRUB timeout)"
     log "  - Get IP via DHCP"
-    log "  - Start NDI-Bridge automatically"
+    log "  - Start Media Bridge automatically"
     log "  - Show live logs on TTY1"
     log "  - Show system menu on TTY2"
     log ""

@@ -1,8 +1,8 @@
-# NDI Bridge Time Synchronization Implementation
+# Media Bridge Time Synchronization Implementation
 
 ## Overview
 
-This document describes the implementation of high-precision time synchronization in the NDI Bridge USB system. The implementation provides sub-microsecond accuracy when properly configured with PTP, or millisecond accuracy with NTP as a fallback.
+This document describes the implementation of high-precision time synchronization in the Media Bridge USB system. The implementation provides sub-microsecond accuracy when properly configured with PTP, or millisecond accuracy with NTP as a fallback.
 
 ## Implementation Details
 

@@ -410,7 +410,7 @@ endif()
 
 # Print configuration summary
 message(STATUS "")
-message(STATUS "NDI Bridge Configuration:")
+message(STATUS "Media Bridge Configuration:")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  Platform: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "  Build type: ${CMAKE_BUILD_TYPE}")

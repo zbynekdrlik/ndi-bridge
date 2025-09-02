@@ -1,5 +1,5 @@
 [Unit]
-Description=NDI Bridge Metrics Collector
+Description=Media Bridge Metrics Collector
 After=ndi-capture.service
 Wants=ndi-capture.service
 

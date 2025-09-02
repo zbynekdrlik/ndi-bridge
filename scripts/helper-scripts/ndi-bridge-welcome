@@ -1,5 +1,5 @@
 #!/bin/bash
-# Show NDI Bridge welcome screen with real-time status
+# Show Media Bridge welcome screen with real-time status
 clear
 
 # Colors
@@ -395,15 +395,15 @@ echo ""
 
 # NDI BRIDGE INTERCOM
 echo -e "${CYAN}▶ NDI BRIDGE INTERCOM${NC}"
-if systemctl is-active ndi-bridge-intercom --quiet 2>/dev/null; then
+if systemctl is-active media-bridge-intercom --quiet 2>/dev/null; then
     echo -e "  Status:      ${GREEN}● Running${NC}"
     echo "  Room:        nl_interkom"
     echo "  Device ID:   $(hostname)"
     echo "  VNC Access:  $(hostname).local:5999"
     echo "  Web Control: http://$(hostname).local/intercom"
     # Show audio status if available
-    if [ -x /usr/local/bin/ndi-bridge-intercom-control ]; then
-        audio_status=$(/usr/local/bin/ndi-bridge-intercom-control status 2>/dev/null | grep -A1 '"output"' | grep '"muted"' | grep -o 'true\|false')
+    if [ -x /usr/local/bin/media-bridge-intercom-control ]; then
+        audio_status=$(/usr/local/bin/media-bridge-intercom-control status 2>/dev/null | grep -A1 '"output"' | grep '"muted"' | grep -o 'true\|false')
         if [ "$audio_status" = "true" ]; then
             echo -e "  Audio:       ${RED}MUTED${NC}"
         else
@@ -412,8 +412,8 @@ if systemctl is-active ndi-bridge-intercom --quiet 2>/dev/null; then
     fi
 else
     echo -e "  Status:      ${YELLOW}○ Not running${NC}"
-    if [ -f /usr/local/bin/ndi-bridge-intercom-launcher ]; then
-        echo "  Ready to start (run: systemctl start ndi-bridge-intercom)"
+    if [ -f /usr/local/bin/media-bridge-intercom-launcher ]; then
+        echo "  Ready to start (run: systemctl start media-bridge-intercom)"
     else
         echo "  Chrome intercom not installed"
     fi
@@ -433,12 +433,12 @@ echo "  Credentials: admin/newlevel"
 HOSTNAME=$(hostname)
 
 # For short hostnames (like cam2), show both short and long form
-if [ ${#HOSTNAME} -le 10 ] && [[ "$HOSTNAME" != *"ndi-bridge"* ]]; then
+if [ ${#HOSTNAME} -le 10 ] && [[ "$HOSTNAME" != *"media-bridge"* ]]; then
     echo "  http://${HOSTNAME}.local/"
-    echo "  http://ndi-bridge-${HOSTNAME}.local/"
-elif [[ "$HOSTNAME" == *"ndi-bridge"* ]]; then
-    # Extract short name from ndi-bridge-xxx pattern
-    SHORT_NAME=$(echo "$HOSTNAME" | sed 's/ndi-bridge-//')
+    echo "  http://media-bridge-${HOSTNAME}.local/"
+elif [[ "$HOSTNAME" == *"media-bridge"* ]]; then
+    # Extract short name from media-bridge-xxx pattern
+    SHORT_NAME=$(echo "$HOSTNAME" | sed 's/media-bridge-//')
     if [ -n "$SHORT_NAME" ] && [ "$SHORT_NAME" != "$HOSTNAME" ]; then
         echo "  http://${SHORT_NAME}.local/"
     fi

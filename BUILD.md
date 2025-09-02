@@ -1,6 +1,6 @@
-# Building NDI Bridge
+# Building Media Bridge
 
-This guide covers building NDI Bridge from source on various platforms.
+This guide covers building Media Bridge from source on various platforms.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
@@ -36,7 +36,7 @@ This guide covers building NDI Bridge from source on various platforms.
 ### Clone and Build
 ```bash
 # Clone repository
-git clone https://github.com/zbynekdrlik/ndi-bridge.git
+git clone https://github.com/zbynekdrlik/media-bridge.git
 cd media-bridge
 
 # Create build directory
@@ -76,7 +76,7 @@ Using Visual Studio:
 # Generate Visual Studio solution
 cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release ..
 
-# Open NDIBridge.sln in Visual Studio
+# Open MediaBridge.sln in Visual Studio
 # Build -> Build Solution
 ```
 
@@ -142,7 +142,7 @@ sudo make install
 The executable will be in `build/ndi-capture`
 
 ### macOS (Not Supported)
-NDI Bridge currently does not support macOS. Windows and Linux are the supported platforms.
+Media Bridge currently does not support macOS. Windows and Linux are the supported platforms.
 
 ## Build Options
 
@@ -276,7 +276,7 @@ cmake --build . --config Release
 
 ## USB Appliance Build
 
-To create a bootable USB appliance that runs NDI Bridge automatically:
+To create a bootable USB appliance that runs Media Bridge automatically:
 
 ```bash
 # Build the binary first

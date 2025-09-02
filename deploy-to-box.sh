@@ -1,5 +1,5 @@
 #!/bin/bash
-# Fast deployment script to update running NDI-Bridge box without USB reflashing
+# Fast deployment script to update running Media Bridge box without USB reflashing
 # This extracts the latest build from the image and deploys it to a running box
 
 set -e
@@ -79,7 +79,7 @@ sleep 1
 EOF
 
 # Deploy core binaries
-log_info "Deploying NDI-Bridge binaries..."
+log_info "Deploying Media Bridge binaries..."
 if [ -f "$MOUNT_DIR/opt/media-bridge/ndi-capture" ]; then
     sshpass -p "$BOX_PASS" scp -o StrictHostKeyChecking=no \
         "$MOUNT_DIR/opt/media-bridge/ndi-capture" \

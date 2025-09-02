@@ -1,6 +1,6 @@
 #!/bin/bash
-# NDI Bridge Build Environment Setup Script
-# Automatically installs all dependencies needed to compile NDI Bridge and create USB appliances
+# Media Bridge Build Environment Setup Script
+# Automatically installs all dependencies needed to compile Media Bridge and create USB appliances
 # Works on Ubuntu/Debian (including WSL) and can be extended for other distros
 
 set -e
@@ -33,7 +33,7 @@ fi
 
 # Show help
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then
-    echo "NDI Bridge Build Environment Setup"
+    echo "Media Bridge Build Environment Setup"
     echo ""
     echo "Usage: $0 [OPTIONS]"
     echo ""
@@ -47,7 +47,7 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
     echo "  - Download and install NDI SDK v$NDI_SDK_VERSION"
     echo "  - Install USB creation tools (parted, debootstrap, etc.)"
     echo "  - Verify complete build environment"
-    echo "  - Test NDI Bridge compilation"
+    echo "  - Test Media Bridge compilation"
     echo ""
     exit 0
 fi
@@ -120,7 +120,7 @@ install_build_deps() {
         "tar"
     )
     
-    # NDI Bridge specific dependencies
+    # Media Bridge specific dependencies
     NDI_DEPS=(
         "libasound2-dev"  # ALSA development headers for audio output to HDMI (v1.8.4+)
         "libavcodec-dev"
@@ -300,7 +300,7 @@ verify_installation() {
 
 # Test build
 test_build() {
-    log_step "Testing NDI Bridge compilation..."
+    log_step "Testing Media Bridge compilation..."
     
     if [ "$DRY_RUN" = true ]; then
         log_info "Skipping build test in dry-run mode"
@@ -371,7 +371,7 @@ update_claude_md() {
     if [ ! -f "CLAUDE.md" ]; then
         log_step "Creating CLAUDE.md with build instructions..."
         cat > CLAUDE.md << 'EOF'
-# NDI Bridge - Development Guide
+# Media Bridge - Development Guide
 
 ## Quick Setup
 Run the environment setup script first:
@@ -405,7 +405,7 @@ EOF
 # Main execution
 main() {
     echo -e "${BLUE}========================================${NC}"
-    echo -e "${BLUE}   NDI Bridge Build Environment Setup   ${NC}"
+    echo -e "${BLUE}   Media Bridge Build Environment Setup   ${NC}"
     echo -e "${BLUE}========================================${NC}"
     echo
     
@@ -424,7 +424,7 @@ main() {
     echo -e "${GREEN}         SETUP COMPLETED SUCCESSFULLY   ${NC}"
     echo -e "${GREEN}========================================${NC}"
     echo
-    log_info "Environment is ready for NDI Bridge development!"
+    log_info "Environment is ready for Media Bridge development!"
     echo
     echo "Next steps:"
     echo "  1. Build NDI Capture: mkdir build && cd build && cmake .. && make"

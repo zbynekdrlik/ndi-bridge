@@ -90,7 +90,7 @@ EOFALIAS
 
 # NOTE: NDI service advertisement is handled by the NDI Bridge application itself
 # Remove any old NDI service file that might exist
-rm -f /etc/avahi/services/ndi-bridge.service 2>/dev/null || true
+rm -f /etc/avahi/services/media-bridge.service 2>/dev/null || true
 
 # Update HTTP service advertisement with device name
 cat > /etc/avahi/services/ndi-bridge-http.service << EOFHTTPSERVICE
