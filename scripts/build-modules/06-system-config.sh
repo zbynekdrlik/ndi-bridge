@@ -100,6 +100,18 @@ for tool in nload iftop bmon; do
     apt-get install -y -qq --no-install-recommends $tool 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || echo "  Warning: $tool not available"
 done
 
+# Python and testing tools (for pytest test suite)
+echo "Installing Python testing tools..."
+apt-get install -y -qq --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-venv \
+    sshpass 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+
+# Install pytest and testinfra in system Python (for on-device testing)
+pip3 install --break-system-packages pytest pytest-xdist pytest-timeout testinfra pyyaml python-dotenv 2>/dev/null || \
+    echo "  Warning: Python test packages installation failed (may not be needed on appliance)"
+
 # Disable WiFi completely (NDI Bridge needs Ethernet only)
 echo "Disabling WiFi and wireless modules..."
 # Blacklist iwlwifi and related modules to prevent boot hangs
