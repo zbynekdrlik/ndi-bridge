@@ -146,6 +146,14 @@ install_build_deps() {
         "dos2unix"
     )
     
+    # Python testing dependencies
+    TEST_DEPS=(
+        "python3"
+        "python3-pip"
+        "python3-venv"
+        "sshpass"  # For SSH password authentication in tests
+    )
+    
     # Time sync dependencies (for PTP support)
     TIME_DEPS=(
         "linuxptp"
@@ -154,7 +162,7 @@ install_build_deps() {
     )
     
     # Combine all dependencies
-    ALL_DEPS=("${BUILD_DEPS[@]}" "${NDI_DEPS[@]}" "${USB_DEPS[@]}" "${TIME_DEPS[@]}")
+    ALL_DEPS=("${BUILD_DEPS[@]}" "${NDI_DEPS[@]}" "${USB_DEPS[@]}" "${TEST_DEPS[@]}" "${TIME_DEPS[@]}")
     
     log_info "Installing ${#ALL_DEPS[@]} packages..."
     if [ "$DRY_RUN" = true ]; then
@@ -335,6 +343,29 @@ test_build() {
     rm -rf build-test
 }
 
+# Install Python test dependencies
+install_python_test_deps() {
+    log_step "Installing Python test dependencies..."
+    
+    if [ "$DRY_RUN" = true ]; then
+        log_info "Skipping Python package installation in dry-run mode"
+        return 0
+    fi
+    
+    # Install pytest and related packages
+    log_info "Installing pytest framework and dependencies..."
+    pip3 install --user pytest pytest-xdist pytest-timeout testinfra pyyaml python-dotenv
+    
+    # Verify installation
+    if python3 -m pytest --version > /dev/null 2>&1; then
+        log_info "pytest installed successfully"
+    else
+        log_warn "pytest installation may have issues - check manually"
+    fi
+    
+    log_info "Python test dependencies installed"
+}
+
 # Create CLAUDE.md if it doesn't exist
 update_claude_md() {
     if [ ! -f "CLAUDE.md" ]; then
@@ -383,6 +414,7 @@ main() {
     update_packages
     install_build_deps
     install_ndi_sdk
+    install_python_test_deps
     verify_installation
     test_build
     update_claude_md

@@ -1,0 +1,35 @@
+# Testing dependencies for NDI Bridge
+# Install with: pip install -r tests/requirements.txt
+
+# Core testing framework
+pytest==8.3.2
+pytest-testinfra==10.1.0
+
+# SSH and remote execution
+paramiko==3.4.0
+
+# Parallel testing
+pytest-xdist==3.6.1
+
+# Test reporting
+pytest-html==4.1.1
+pytest-json-report==1.5.0
+pytest-timeout==2.3.1
+
+# Retry flaky tests
+pytest-rerunfailures==14.0
+
+# Test markers and organization
+pytest-metadata==3.1.1
+
+# Code coverage
+pytest-cov==5.0.0
+
+# Better assertions
+pytest-clarity==1.0.1
+
+# Environment management
+python-dotenv==1.0.1
+
+# YAML configuration
+pyyaml==6.0.1

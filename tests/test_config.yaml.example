@@ -1,0 +1,13 @@
+# NDI Bridge Test Configuration Example
+# Copy this file to test_config.yaml and update with your device settings
+
+# Device connection settings
+host: 10.77.9.188
+ssh_user: root
+ssh_pass: newlevel
+
+# Optional: SSH key for passwordless authentication
+# ssh_key: ~/.ssh/ndi_test_key
+
+# Note: You can also use environment variables or command line arguments
+# See CLAUDE.md for configuration priority and usage details

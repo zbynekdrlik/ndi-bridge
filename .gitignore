@@ -76,3 +76,15 @@ ndi-tools.exe
 
 # Claude/Cline local files
 .claude/
+
+# Python test files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+tests/.env
+test-report.html
+tests/test-report.html
+*.coverage
+htmlcov/
