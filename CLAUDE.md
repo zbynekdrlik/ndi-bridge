@@ -175,19 +175,37 @@ def test_stabilization_duration():
 ```
 tests/
 ├── unit/                    # Pure logic tests (no device needed)
-├── component/               # Single component tests
-│   ├── capture/            # One directory per component
-│   │   ├── test_device_detection.py
-│   │   ├── test_service_active.py
-│   │   └── test_fps_stability.py
-│   ├── display/
-│   ├── audio/
-│   └── network/
-├── integration/            # Multi-component interaction tests
-├── system/                 # End-to-end tests
+├── component/               # Single component atomic tests (checking existence/state)
+│   ├── capture/            # Atomic capture tests
+│   │   ├── test_device_detection.py    # Device exists, permissions
+│   │   ├── test_service_status.py      # Service running/enabled
+│   │   └── test_fps_monitoring.py      # Metrics files exist
+│   ├── display/            # Atomic display tests
+│   │   ├── test_display_capability.py  # DRM devices, binaries exist
+│   │   └── test_ndi_display_service.py # Service template valid
+│   ├── audio/              # Atomic audio tests
+│   ├── network/            # Atomic network tests
+│   └── [component]/        # Each component gets atomic tests
+├── integration/            # Multi-component interaction & functional tests
+│   ├── test_capture_to_ndi.py         # Capture + NDI interaction
+│   └── test_display_functional.py     # FUNCTIONAL: Actually plays streams
+├── system/                 # End-to-end system tests
 ├── performance/            # Benchmarks and metrics
 └── fixtures/               # Shared test utilities
 ```
+
+**Test Placement Rules:**
+- **component/**: ONLY atomic tests that check one thing (file exists, service running, etc.)
+- **integration/**: Functional tests that actually USE the system (play streams, record audio, etc.)
+- **integration/**: Tests that involve multiple components working together
+- **system/**: Full end-to-end tests of complete workflows
+
+**Functional Test Definition:**
+A functional test is one that actually exercises the feature as a user would:
+- Display functional test: Actually plays an NDI stream for 30 seconds
+- Capture functional test: Would actually capture video and verify output
+- Audio functional test: Would actually play/record audio
+These belong in `integration/` NOT in `component/`
 
 ### Test Execution
 

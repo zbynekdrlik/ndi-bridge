@@ -24,21 +24,42 @@ pytest tests/ --tb=no --co                # List all tests without running
 
 ```
 tests/
-├── component/          # Unit tests for individual components
-│   ├── audio/         # Audio system and intercom tests
-│   ├── capture/       # Video capture and monitoring tests
-│   ├── core/          # Core system services tests
-│   ├── display/       # Display output tests
-│   ├── network/       # Network configuration tests
-│   ├── helpers/       # Helper script tests
-│   ├── timesync/      # Time synchronization tests
-│   └── web/           # Web interface tests
-├── integration/       # End-to-end integration tests
-├── performance/       # Performance and stress tests
-├── system/           # System-level tests
-├── unit/             # Unit tests for configuration
-└── fixtures/         # Test fixtures and utilities
+├── component/          # ATOMIC tests - check ONE thing (exists/enabled/running)
+│   ├── audio/         # Audio device exists, ALSA configured
+│   ├── capture/       # Device exists, service running, metrics files
+│   ├── core/          # Core services enabled/running
+│   ├── display/       # DRM devices exist, service templates valid
+│   ├── network/       # Network interfaces, DHCP status
+│   ├── helpers/       # Helper scripts exist and executable
+│   ├── timesync/      # PTP/NTP services configured
+│   └── web/           # Web server running, endpoints respond
+├── integration/       # FUNCTIONAL tests - actually USE the system
+│   ├── test_capture_to_ndi.py     # Multi-component interaction
+│   └── test_display_functional.py  # Actually plays streams for 30s
+├── performance/       # Performance benchmarks and stress tests
+├── system/           # Full end-to-end system workflows
+├── unit/             # Pure logic tests (no device needed)
+└── fixtures/         # Shared test utilities and helpers
 ```
+
+### Important: Test Placement Rules
+
+**Component Tests (Atomic)**
+- Check that something EXISTS (file, device, service)
+- Check that something is CONFIGURED (enabled, has permissions)
+- Check that something is RUNNING (service active, process exists)
+- DO NOT actually use the feature (no streaming, no audio playback)
+
+**Integration Tests (Functional)**
+- Actually USE the system as a user would
+- Play NDI streams to HDMI output
+- Capture video and verify NDI transmission
+- Record/play audio through devices
+- Test multi-component interactions
+
+**Example:**
+- `component/display/` - Check DRM device exists, service is valid
+- `integration/test_display_functional.py` - Actually play CG stream for 30 seconds with audio
 
 ## Configuration
 
