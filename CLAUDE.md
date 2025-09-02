@@ -304,11 +304,6 @@ pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
    ```
    Purpose: For environments where SSH keys can't be used
 
-3. **Legacy bash tests** (tests/integration/*.sh) - Being phased out
-   ```bash
-   ./tests/integration/test_basic.sh  # OLD METHOD - DO NOT USE
-   ```
-   Purpose: Kept for reference during migration, will be removed
 
 #### Test Markers
 - `@pytest.mark.critical` - Must pass for release
@@ -395,18 +390,9 @@ Tests are designed to run in parallel by default:
 3. Place in appropriate category directory
 4. Use testinfra for SSH operations
 
-**Example Migration**:
-```bash
-# OLD: bash test with multiple checks
-test_capture() {
-    check_device
-    check_service
-    check_fps
-}
-```
-
+**Atomic Test Example**:
 ```python
-# NEW: Three atomic tests
+# Each test validates exactly one thing
 def test_capture_device_present(host):
     assert host.file("/dev/video0").exists
 
