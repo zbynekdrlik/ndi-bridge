@@ -28,7 +28,7 @@ install_helper_scripts() {
         fi
         
         # Copy intercom control and config scripts (no API script anymore)
-        for script in ndi-bridge-intercom-control ndi-bridge-intercom-config ndi-bridge-intercom-status ndi-bridge-intercom-logs ndi-bridge-intercom-restart; do
+        for script in ndi-bridge-intercom-control ndi-bridge-intercom-config ndi-bridge-intercom-status ndi-bridge-intercom-logs ndi-bridge-intercom-restart ndi-bridge-intercom-monitor; do
             if [ -f "$HELPER_DIR/$script" ]; then
                 cp "$HELPER_DIR/$script" /mnt/usb/usr/local/bin/
                 chmod +x /mnt/usb/usr/local/bin/$script

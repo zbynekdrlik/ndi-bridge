@@ -35,6 +35,13 @@ setup_web_interface() {
             cp "$WEB_DIR/ndi-bridge-intercom-web.service" /mnt/usb/etc/systemd/system/
         fi
         
+        # Copy default intercom configuration
+        mkdir -p /mnt/usb/etc/ndi-bridge
+        if [ -f "$WEB_DIR/intercom-defaults.conf" ]; then
+            cp "$WEB_DIR/intercom-defaults.conf" /mnt/usb/etc/ndi-bridge/intercom.conf
+            log "  Default intercom configuration installed"
+        fi
+        
         log "  FastAPI/Vue interface copied"
     fi
     
