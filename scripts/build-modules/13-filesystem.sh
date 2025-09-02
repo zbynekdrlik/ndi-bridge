@@ -22,10 +22,17 @@ configure_filesystem() {
     
     cat >> /mnt/usb/tmp/configure-system.sh << EOFFS
 
-# Configure fstab with ext4 optimized for flash media
+# Configure fstab with Btrfs optimized for power failure resistance and fast boot
 cat > /etc/fstab << EOFFSTAB
 # /etc/fstab: static file system information
-UUID=$UUID_ROOT / ext4 defaults,noatime,discard 0 1
+# Btrfs mount options:
+# - noatime: reduce unnecessary writes
+# - ssd: optimize for SSD/flash storage
+# - space_cache=v2: faster mount times
+# - discard=async: background TRIM for flash
+# - commit=15: sync to disk every 15 seconds (balance between safety and performance)
+# - no compression for faster boot
+UUID=$UUID_ROOT / btrfs defaults,noatime,ssd,space_cache=v2,discard=async,commit=15 0 0
 UUID=$UUID_EFI /boot/efi vfat umask=0077 0 1
 EOFFSTAB
 
