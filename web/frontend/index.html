@@ -87,21 +87,23 @@
                         </v-col>
                     </v-row>
 
-                    <!-- Volume Controls -->
+                    <!-- Audio Controls -->
                     <v-row class="mt-4">
-                        <!-- Speaker/Headphone Volume -->
+                        <!-- Others Volume -->
                         <v-col cols="12" md="6">
                             <v-card>
                                 <v-card-title>
-                                    <v-icon left>mdi-headphones</v-icon>
-                                    Headphone Volume
+                                    <v-icon left>mdi-account-voice</v-icon>
+                                    Others Volume
                                 </v-card-title>
+                                <v-card-subtitle>
+                                    Volume of other participants
+                                </v-card-subtitle>
                                 <v-card-text>
                                     <v-slider
                                         v-model="state.speaker_volume"
                                         @end="updateSpeakerVolume"
                                         :label="state.speaker_volume + '%'"
-                                        :disabled="state.speaker_muted"
                                         thumb-label="always"
                                         color="primary"
                                         min="0"
@@ -111,41 +113,61 @@
                                     
                                     <!-- Speaker level indicator -->
                                     <v-progress-linear
-                                        v-if="!state.speaker_muted"
                                         :model-value="audioLevels.speaker"
                                         height="6"
                                         class="mt-2 vu-meter"
                                         :color="audioLevelColor(audioLevels.speaker)"
                                     ></v-progress-linear>
-                                    
-                                    <v-btn
-                                        block
-                                        class="mt-3"
-                                        :color="state.speaker_muted ? 'error' : 'default'"
-                                        @click="toggleSpeakerMute"
-                                    >
-                                        <v-icon left>
-                                            {{ state.speaker_muted ? 'mdi-volume-off' : 'mdi-volume-high' }}
-                                        </v-icon>
-                                        {{ state.speaker_muted ? 'Unmute' : 'Mute' }} Speaker
-                                    </v-btn>
                                 </v-card-text>
                             </v-card>
                         </v-col>
 
-                        <!-- Microphone Volume -->
+                        <!-- Self Monitor Volume -->
+                        <v-col cols="12" md="6">
+                            <v-card>
+                                <v-card-title>
+                                    <v-icon left>mdi-headphones</v-icon>
+                                    Self Monitor Volume
+                                </v-card-title>
+                                <v-card-subtitle>
+                                    How loud you hear yourself
+                                </v-card-subtitle>
+                                <v-card-text>
+                                    <v-slider
+                                        v-model="state.monitor_volume"
+                                        @end="setMonitorVolume"
+                                        label="Monitor Volume"
+                                        :min="0"
+                                        :max="100"
+                                        :step="5"
+                                        thumb-label="always"
+                                        color="primary"
+                                    >
+                                        <template v-slot:append>
+                                            <v-chip>{{ state.monitor_volume }}%</v-chip>
+                                        </template>
+                                    </v-slider>
+                                </v-card-text>
+                            </v-card>
+                        </v-col>
+                    </v-row>
+
+                    <v-row>
+                        <!-- Microphone Gain -->
                         <v-col cols="12" md="6">
                             <v-card>
                                 <v-card-title>
                                     <v-icon left>mdi-microphone-settings</v-icon>
                                     Microphone Gain
                                 </v-card-title>
+                                <v-card-subtitle>
+                                    Input sensitivity adjustment
+                                </v-card-subtitle>
                                 <v-card-text>
                                     <v-slider
                                         v-model="state.mic_volume"
                                         @end="updateMicVolume"
                                         :label="state.mic_volume + '%'"
-                                        :disabled="state.mic_muted"
                                         thumb-label="always"
                                         color="secondary"
                                         min="0"

@@ -56,7 +56,8 @@ apt-get install -y -qq --no-install-recommends \
     ca-certificates \
     iputils-ping \
     zstd \
-    kbd 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+    kbd \
+    usbutils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Try to install DHCP client (different package names in different Ubuntu versions)
 apt-get install -y -qq --no-install-recommends isc-dhcp-client 2>/dev/null || \

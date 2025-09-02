@@ -22,7 +22,9 @@ class StateManager:
             "devices": {
                 "input": None,
                 "output": None
-            }
+            },
+            "monitor_enabled": False,
+            "monitor_volume": 50
         }
         
     async def get_state(self) -> Dict[str, Any]:
@@ -31,17 +33,45 @@ class StateManager:
         devices = await ShellExecutor.get_usb_audio_devices()
         self.state["devices"] = devices
         
-        # Get volume levels
+        # Get Chrome volume (Others Volume)
+        chrome_found = False
+        success, output = await ShellExecutor.pactl(["list", "sink-inputs"])
+        if success:
+            current_sink_input = None
+            in_chrome = False
+            for line in output.split('\n'):
+                if 'Sink Input #' in line:
+                    current_sink_input = line.split('#')[1].strip()
+                    in_chrome = False
+                elif current_sink_input and 'application.name = "Google Chrome"' in line:
+                    in_chrome = True
+                elif in_chrome and 'Volume:' in line and 'balance' not in line:
+                    # Parse volume percentage from Chrome
+                    import re
+                    match = re.search(r'(\d+)%', line)
+                    if match:
+                        self.state["speaker_volume"] = int(match.group(1))
+                        chrome_found = True
+                        break
+        
+        # If Chrome not found, use saved value or default
+        if not chrome_found:
+            try:
+                if os.path.exists(self.config_file):
+                    with open(self.config_file, 'r') as f:
+                        config = json.load(f)
+                        self.state["speaker_volume"] = config.get("speaker_volume", 90)
+                elif os.path.exists(self.runtime_state_file):
+                    with open(self.runtime_state_file, 'r') as f:
+                        runtime = json.load(f)
+                        self.state["speaker_volume"] = runtime.get("speaker_volume", 90)
+                else:
+                    self.state["speaker_volume"] = 90  # Default
+            except:
+                self.state["speaker_volume"] = 90  # Default on error
+        
+        # Get mute state
         if devices["output"]:
-            success, output = await ShellExecutor.pactl(["get-sink-volume", devices["output"]])
-            if success:
-                # Parse volume percentage
-                import re
-                match = re.search(r'(\d+)%', output)
-                if match:
-                    self.state["speaker_volume"] = int(match.group(1))
-            
-            # Get mute state
             success, output = await ShellExecutor.pactl(["get-sink-mute", devices["output"]])
             if success:
                 self.state["speaker_muted"] = "yes" in output
@@ -59,37 +89,103 @@ class StateManager:
             if success:
                 self.state["mic_muted"] = "yes" in output
         
+        # Get monitor enabled status
+        success, output = await ShellExecutor.run_command(
+            "/usr/local/bin/ndi-bridge-intercom-monitor", ["status"]
+        )
+        if success:
+            try:
+                monitor_status = json.loads(output)
+                self.state["monitor_enabled"] = monitor_status.get("enabled", False)
+                # Don't read volume from status - use our stored state
+                # This preserves the user's desired volume even when muted
+            except json.JSONDecodeError:
+                pass
+        
+        # Read saved monitor volume from file if available
+        try:
+            with open("/var/run/ndi-bridge/monitor.volume", "r") as f:
+                saved_volume = int(f.read().strip())
+                self.state["monitor_volume"] = saved_volume
+        except (FileNotFoundError, ValueError):
+            # Ensure monitor_volume has a default if not set
+            if "monitor_volume" not in self.state:
+                self.state["monitor_volume"] = 50
+        
         return self.state
     
     async def set_mic_mute(self, muted: bool) -> bool:
-        """Set microphone mute state"""
+        """Set microphone mute state - affects both VDO and monitoring"""
+        import asyncio
+        
         devices = await ShellExecutor.get_usb_audio_devices()
         if not devices["input"]:
             return False
         
         mute_value = "1" if muted else "0"
-        success, _ = await ShellExecutor.pactl(["set-source-mute", devices["input"], mute_value])
+        
+        # Run both operations in parallel for faster response
+        async def mute_mic():
+            return await ShellExecutor.pactl(["set-source-mute", devices["input"], mute_value])
+        
+        async def adjust_monitor():
+            try:
+                if muted:
+                    # Mute monitor by setting actual volume to 0 (but keep state)
+                    await ShellExecutor.run_command(
+                        "/usr/local/bin/ndi-bridge-intercom-monitor",
+                        ["volume", "0"]
+                    )
+                else:
+                    # Restore monitor to the user's chosen volume
+                    monitor_vol = self.state.get("monitor_volume", 50)
+                    await ShellExecutor.run_command(
+                        "/usr/local/bin/ndi-bridge-intercom-monitor",
+                        ["volume", str(monitor_vol)]
+                    )
+                return True
+            except Exception as e:
+                print(f"Warning: Failed to adjust monitor volume during mute: {e}")
+                return False
+        
+        # Run both in parallel
+        results = await asyncio.gather(mute_mic(), adjust_monitor())
+        success = results[0][0]  # First result is (success, output) tuple
         
         if success:
             self.state["mic_muted"] = muted
+            # Don't change self.state["monitor_volume"] - that's the target volume
             await self.save_runtime_state()
         
         return success
     
     async def set_speaker_volume(self, volume: int) -> bool:
-        """Set speaker volume (0-100)"""
-        devices = await ShellExecutor.get_usb_audio_devices()
-        if not devices["output"]:
+        """Set speaker volume (0-100) - ONLY affects Chrome/VDO audio, not monitor"""
+        # Find Chrome sink inputs and adjust their volume
+        # This way monitor volume stays independent
+        volume = max(0, min(100, volume))  # Clamp to 0-100
+        
+        success, output = await ShellExecutor.pactl(["list", "sink-inputs"])
+        if not success:
             return False
         
-        volume = max(0, min(100, volume))  # Clamp to 0-100
-        success, _ = await ShellExecutor.pactl(["set-sink-volume", devices["output"], f"{volume}%"])
-        
-        if success:
-            self.state["speaker_volume"] = volume
-            await self.save_runtime_state()
-        
-        return success
+        # Parse sink inputs to find Chrome
+        chrome_found = False
+        current_sink_input = None
+        for line in output.split('\n'):
+            if 'Sink Input #' in line:
+                current_sink_input = line.split('#')[1].strip()
+            elif current_sink_input and 'application.name = "Google Chrome"' in line:
+                # Found Chrome, set its volume
+                success, _ = await ShellExecutor.pactl(
+                    ["set-sink-input-volume", current_sink_input, f"{volume}%"]
+                )
+                chrome_found = True
+                
+        # Always save state even if Chrome not found yet
+        self.state["speaker_volume"] = volume
+        await self.save_runtime_state()
+        return True
     
     async def set_mic_volume(self, volume: int) -> bool:
         """Set microphone volume (0-100)"""
@@ -141,7 +237,9 @@ class StateManager:
                 "speaker_volume": self.state["speaker_volume"],
                 "mic_volume": self.state["mic_volume"],
                 "mic_muted": self.state["mic_muted"],
-                "speaker_muted": self.state["speaker_muted"]
+                "speaker_muted": self.state["speaker_muted"],
+                "monitor_enabled": self.state.get("monitor_enabled", False),
+                "monitor_volume": self.state.get("monitor_volume", 50)
             }
             
             # Write to temporary file first (atomic write)
@@ -173,9 +271,50 @@ class StateManager:
                     await self.set_mic_mute(config["mic_muted"])
                 if "speaker_muted" in config:
                     await self.set_speaker_mute(config["speaker_muted"])
+                if "monitor_enabled" in config:
+                    await self.set_monitor_state(config["monitor_enabled"], 
+                                                 config.get("monitor_volume", 50))
                 
                 return True
         except Exception as e:
             print(f"Failed to load defaults: {e}")
         
         return False
+    
+    async def set_monitor_state(self, enabled: bool, volume: int = 50) -> bool:
+        """Enable/disable self-monitoring"""
+        command = "enable" if enabled else "disable"
+        args = [command]
+        if enabled:
+            args.append(str(volume))
+        
+        success, _ = await ShellExecutor.run_command(
+            "/usr/local/bin/ndi-bridge-intercom-monitor", args
+        )
+        
+        if success:
+            self.state["monitor_enabled"] = enabled
+            self.state["monitor_volume"] = volume
+            await self.save_runtime_state()
+        
+        return success
+    
+    async def set_monitor_volume(self, volume: int) -> bool:
+        """Set monitor volume (0-100)"""
+        success, _ = await ShellExecutor.run_command(
+            "/usr/local/bin/ndi-bridge-intercom-monitor", 
+            ["volume", str(volume)]
+        )
+        
+        if success:
+            self.state["monitor_volume"] = volume
+            # Also save to the monitor.volume file for persistence
+            try:
+                os.makedirs("/var/run/ndi-bridge", exist_ok=True)
+                with open("/var/run/ndi-bridge/monitor.volume", "w") as f:
+                    f.write(str(volume))
+            except Exception as e:
+                print(f"Failed to save monitor volume: {e}")
+            await self.save_runtime_state()
+        
+        return success

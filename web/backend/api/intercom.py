@@ -25,6 +25,8 @@ class StateResponse(BaseModel):
     mic_volume: int
     speaker_volume: int
     devices: dict
+    monitor_enabled: bool = False
+    monitor_volume: int = 50
 
 @router.get("/state", response_model=StateResponse)
 async def get_state():
@@ -128,3 +130,37 @@ async def get_audio_devices():
     """Get available audio devices"""
     devices = await ShellExecutor.get_usb_audio_devices()
     return devices
+
+# Monitoring endpoints
+class MonitorRequest(BaseModel):
+    enabled: bool
+    volume: Optional[int] = 50  # 0-100
+
+@router.post("/monitor")
+async def set_monitor_state(request: MonitorRequest):
+    """Enable/disable self-monitoring with volume control"""
+    success = await state_manager.set_monitor_state(request.enabled, request.volume)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to set monitor state")
+    
+    # Broadcast update via WebSocket
+    from main import app
+    await app.broadcast_state_update("monitor", {
+        "enabled": request.enabled,
+        "volume": request.volume
+    })
+    
+    return {"status": "success", "enabled": request.enabled, "volume": request.volume}
+
+@router.post("/monitor/volume")
+async def set_monitor_volume(request: VolumeRequest):
+    """Set monitor volume (0-100)"""
+    success = await state_manager.set_monitor_volume(request.volume)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to set monitor volume")
+    
+    # Broadcast update via WebSocket
+    from main import app
+    await app.broadcast_state_update("monitor_volume", {"volume": request.volume})
+    
+    return {"status": "success", "volume": request.volume}
