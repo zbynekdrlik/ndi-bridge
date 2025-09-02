@@ -31,17 +31,22 @@ def test_display_stream_playback_with_audio(host):
     cg_stream = None
     for line in result.stdout.split('\n'):
         if 'cg-obs' in line.lower() or 'cg' in line.lower():
-            # Extract the full stream name
-            if ':' in line:
-                cg_stream = line.split(':', 1)[1].strip()
-                break
+            # Extract the full stream name (format: "N: STREAM NAME")
+            if ': ' in line and not line.startswith('['):
+                # Split on ": " and take everything after the first colon
+                parts = line.split(': ', 1)
+                if len(parts) > 1:
+                    cg_stream = parts[1].strip()
+                    break
     
     if not cg_stream:
         # Fallback to any available stream
         for line in result.stdout.split('\n'):
-            if ':' in line and 'NDI' in line:
-                cg_stream = line.split(':', 1)[1].strip()
-                break
+            if ': ' in line and 'NDI' in line and not line.startswith('['):
+                parts = line.split(': ', 1)
+                if len(parts) > 1:
+                    cg_stream = parts[1].strip()
+                    break
     
     assert cg_stream, "No NDI streams available for testing"
     print(f"Using stream: {cg_stream}")
@@ -67,9 +72,16 @@ def test_display_stream_playback_with_audio(host):
                 connected_display = card_info
                 break
     
-    assert connected_display, "No monitor connected to any HDMI port"
-    assert display_id is not None, "Could not determine display ID"
-    print(f"Monitor connected to: {connected_display} (display {display_id})")
+    # If no monitor detected, use default display 1 (HDMI-A-2)
+    # Monitor might be off or connected later - NDI should still work
+    if not connected_display:
+        print("WARNING: No monitor detected (may be powered off or connected later)")
+        print("Using default display 1 (HDMI-A-2) for testing")
+        display_id = 1
+        connected_display = "HDMI-A-2 (headless)"
+    else:
+        assert display_id is not None, "Could not determine display ID"
+        print(f"Monitor connected to: {connected_display} (display {display_id})")
     
     # 3. Stop any existing display service and unbind console
     print(f"Preparing display {display_id}...")
@@ -233,7 +245,9 @@ def test_display_console_recovery(host):
             break
     
     if display_id is None:
-        pytest.skip("No monitor connected, skipping console recovery test")
+        # Use default display 1 even if no monitor detected
+        display_id = 1
+        print("No monitor detected, using default display 1 for console recovery test")
     
     print(f"Testing with display {display_id}")
     
