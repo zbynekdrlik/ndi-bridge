@@ -19,7 +19,7 @@ partition_usb() {
     parted -s $USB_DEVICE set 1 esp on
     
     # Create root partition (rest of disk)
-    parted -s $USB_DEVICE mkpart primary ext4 513MiB 100%
+    parted -s $USB_DEVICE mkpart primary f2fs 513MiB 100%
     
     # Wait for partitions to appear
     sleep 2
@@ -44,7 +44,7 @@ partition_usb() {
     # Format partitions
     log "Formatting partitions..."
     mkfs.fat -F32 $PART1  # EFI partition
-    mkfs.ext4 -F $PART2   # Root partition
+    mkfs.f2fs -f $PART2   # Root partition (F2FS for flash media)
     
     log "Partitioning complete"
 }

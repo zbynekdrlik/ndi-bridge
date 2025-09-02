@@ -81,7 +81,6 @@ assemble_configuration() {
     configure_ttys
     configure_filesystem
     configure_power_resistance
-    configure_readonly_root
     setup_web_interface
     
     # Replace the version and timestamp placeholders
@@ -127,9 +126,6 @@ run_chroot_setup() {
 cleanup() {
     log "Cleaning up..."
     rm -f /mnt/usb/tmp/configure-system.sh
-    
-    # Apply filesystem tuning after chroot
-    tune_filesystem
     
     sync
 }

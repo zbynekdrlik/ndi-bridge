@@ -4,14 +4,6 @@
 configure_filesystem() {
     log "Configuring filesystem and bootloader..."
     
-    # Copy systemd service files BEFORE chroot
-    mkdir -p /mnt/usb/etc/systemd/system
-    if [ -f files/systemd/system/remount-rw.service ]; then
-        cp files/systemd/system/remount-rw.service /mnt/usb/etc/systemd/system/
-        log "  Copied remount-rw.service"
-    else
-        warn "  remount-rw.service not found in files/systemd/system/"
-    fi
     
     # Determine partition device names (same logic as partition script)
     if [[ $USB_DEVICE == /dev/loop* ]]; then
@@ -30,21 +22,13 @@ configure_filesystem() {
     
     cat >> /mnt/usb/tmp/configure-system.sh << EOFFS
 
-# Configure fstab with tmpfs for volatile directories
+# Configure fstab for F2FS root filesystem
 cat > /etc/fstab << EOFFSTAB
 # /etc/fstab: static file system information
-UUID=$UUID_ROOT / ext4 errors=remount-ro 0 1
+UUID=$UUID_ROOT / f2fs defaults,noatime 0 1
 UUID=$UUID_EFI /boot/efi vfat umask=0077 0 1
-tmpfs /tmp tmpfs defaults,nosuid,nodev 0 0
-tmpfs /var/log tmpfs defaults,nosuid,nodev,size=100M 0 0
-tmpfs /var/tmp tmpfs defaults,nosuid,nodev 0 0
-tmpfs /var/lib/systemd tmpfs defaults,nosuid,nodev,size=50M 0 0
-tmpfs /var/lib/nginx tmpfs defaults,nosuid,nodev,size=50M 0 0
 EOFFSTAB
 
-# Create systemd directory structure that will be mounted as tmpfs
-mkdir -p /var/lib/systemd
-chmod 755 /var/lib/systemd
 
 # Install GRUB for both UEFI and legacy BIOS
 echo "Installing GRUB bootloader..."
@@ -83,11 +67,6 @@ update-grub 2>&1 | head -20
 echo "Updating initramfs..."
 update-initramfs -u -k all 2>&1 | head -20
 
-# remount-rw.service was copied before chroot
-# (Service is for read-only root filesystem preparation)
-
-# For now, keep it read-write but ready for read-only conversion
-# systemctl enable remount-rw
 
 EOFFS
 }

@@ -36,7 +36,7 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 - ✅ **Remote management** via SSH
 
 ### USB Appliance Features
-- ✅ Read-only root filesystem (power failure safe)
+- ✅ F2FS filesystem optimized for flash media (power failure safe)
 - ✅ Automatic NDI Bridge startup
 - ✅ Network bridge for daisy-chaining
 - ✅ TTY1: Live NDI logs display
@@ -183,7 +183,7 @@ The NDI Bridge appliance includes built-in bidirectional audio intercom function
 - **VNC Monitoring**: Remote desktop access on port 5999 (no password)
 - **Auto-recovery**: Automatically restarts if connection drops
 - **Persistent Configuration**: Settings preserved across reboots
-- **Read-Only Safe**: All data stored in tmpfs, works with read-only root filesystem
+- **Power Failure Safe**: F2FS provides atomic operations and crash recovery
 
 ### Intercom Configuration
 
