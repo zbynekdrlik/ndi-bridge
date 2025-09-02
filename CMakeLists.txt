@@ -17,20 +17,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Options
 option(BUILD_TESTS "Build unit tests" OFF)
-option(USE_DECKLINK "Build with DeckLink support" ON)
 option(VERBOSE_BUILD "Enable verbose build output" OFF)
-option(MF_SYNCHRONOUS_MODE "Use synchronous capture for lowest latency (experimental)" OFF)
 
-# Platform detection
-if(WIN32)
-    set(PLATFORM_WINDOWS TRUE)
-    add_definitions(-DPLATFORM_WINDOWS)
-    add_definitions(-D_WIN32_WINNT=0x0601)  # Windows 7 minimum
-elseif(UNIX AND NOT APPLE)
+# Platform detection - Linux only
+if(UNIX AND NOT APPLE)
     set(PLATFORM_LINUX TRUE)
     add_definitions(-DPLATFORM_LINUX)
 else()
-    message(FATAL_ERROR "Unsupported platform")
+    message(FATAL_ERROR "Media Bridge only supports Linux")
 endif()
 
 # Set build type if not specified
@@ -64,112 +58,27 @@ set(COMMON_SOURCES
     src/capture/BasicFormatConverter.cpp
 )
 
-# Platform-specific sources
-if(PLATFORM_WINDOWS)
-    set(PLATFORM_SOURCES
-        src/windows/media_foundation/mf_error_handling.h
-        src/windows/media_foundation/mf_error_handling.cpp
-        src/windows/media_foundation/mf_format_converter.h
-        src/windows/media_foundation/mf_format_converter.cpp
-        src/windows/media_foundation/mf_capture_device.h
-        src/windows/media_foundation/mf_capture_device.cpp
-        src/windows/media_foundation/mf_video_capture.h
-        src/windows/media_foundation/mf_video_capture.cpp
-        src/windows/media_foundation/media_foundation_capture.h
-        src/windows/media_foundation/media_foundation_capture.cpp
-    )
-    
-    # DeckLink sources (Windows)
-    if(USE_DECKLINK)
-        list(APPEND PLATFORM_SOURCES
-            # DeckLink main classes
-            src/capture/DeckLinkCaptureDevice.h
-            src/capture/DeckLinkCaptureDevice.cpp
-            src/capture/DeckLinkDeviceEnumerator.h
-            src/capture/DeckLinkDeviceEnumerator.cpp
-            # Refactored components (v1.2.0)
-            include/capture/DeckLinkCaptureCallback.h
-            src/capture/DeckLinkCaptureCallback.cpp
-            include/capture/DeckLinkFrameQueue.h
-            src/capture/DeckLinkFrameQueue.cpp
-            include/capture/DeckLinkStatistics.h
-            src/capture/DeckLinkStatistics.cpp
-            include/capture/DeckLinkFormatManager.h
-            src/capture/DeckLinkFormatManager.cpp
-            include/capture/DeckLinkDeviceInitializer.h
-            src/capture/DeckLinkDeviceInitializer.cpp
-            # Adapter
-            src/windows/decklink/decklink_capture.h
-            src/windows/decklink/decklink_capture.cpp
-        )
-    endif()
-    
-    # Windows compiler flags
-    add_compile_options(/W4)  # Warning level 4
-    if(MSVC)
-        add_compile_options(/MP)  # Multi-processor compilation
-        add_compile_options(/permissive-)  # Standards conformance
-        
-        # Disable specific warnings
-        add_compile_options(/wd4100)  # Unreferenced formal parameter
-        add_compile_options(/wd4189)  # Local variable initialized but not referenced
-    endif()
-elseif(PLATFORM_LINUX)
-    set(PLATFORM_SOURCES
-        src/linux/v4l2/v4l2_capture.cpp
-        src/linux/v4l2/v4l2_device_enumerator.cpp
-        src/linux/v4l2/v4l2_format_converter.cpp
-        src/linux/v4l2/v4l2_format_converter_avx2.cpp
-    )
-    
-    # Linux compiler flags
-    add_compile_options(-Wall -Wextra -Wpedantic)
-    add_compile_options(-Wno-unused-parameter)
-    
-    # Enable position independent code
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-    
-    # Add threading support
-    set(THREADS_PREFER_PTHREAD_FLAG ON)
-    find_package(Threads REQUIRED)
-endif()
+# Linux-specific sources
+set(PLATFORM_SOURCES
+    src/linux/v4l2/v4l2_capture.cpp
+    src/linux/v4l2/v4l2_device_enumerator.cpp
+    src/linux/v4l2/v4l2_format_converter.cpp
+    src/linux/v4l2/v4l2_format_converter_avx2.cpp
+)
 
-# Find NDI SDK
-if(WIN32)
-    # Try multiple possible NDI SDK locations on Windows
-    # Note: NDI 6 SDK uses capitalized directory names (Include, Lib, Bin)
-    find_path(NDI_INCLUDE_DIR
-        NAMES Processing.NDI.Lib.h
-        PATHS
-            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/include
-            $ENV{NDI_SDK_DIR}/Include
-            "C:/Program Files/NDI/NDI 5 SDK/include"
-            "C:/Program Files/NDI/NDI 6 SDK/Include"
-            "C:/Program Files/NewTek/NDI SDK/include"
-    )
+# Linux compiler flags
+add_compile_options(-Wall -Wextra -Wpedantic)
+add_compile_options(-Wno-unused-parameter)
 
-    find_library(NDI_LIBRARY
-        NAMES Processing.NDI.Lib.x64
-        PATHS
-            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/lib/x64
-            $ENV{NDI_SDK_DIR}/Lib/x64
-            "C:/Program Files/NDI/NDI 5 SDK/lib/x64"
-            "C:/Program Files/NDI/NDI 6 SDK/Lib/x64"
-            "C:/Program Files/NewTek/NDI SDK/lib/x64"
-    )
-    
-    # Find the DLL path - NDI 6 SDK stores DLLs in Bin directory
-    find_file(NDI_DLL
-        NAMES Processing.NDI.Lib.x64.dll
-        PATHS
-            ${CMAKE_CURRENT_SOURCE_DIR}/deps/ndi/bin/x64
-            $ENV{NDI_SDK_DIR}/Bin/x64
-            "C:/Program Files/NDI/NDI 5 SDK/Bin/x64"
-            "C:/Program Files/NDI/NDI 6 SDK/Bin/x64"
-            "C:/Program Files/NewTek/NDI SDK/bin/x64"
-    )
-else()
-    # Linux NDI SDK paths
+# Enable position independent code
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# Add threading support
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+# Find NDI SDK - Linux only
+# Linux NDI SDK paths
     # First check if NDI_SDK_DIR environment variable is set
     if(DEFINED ENV{NDI_SDK_DIR})
         set(NDI_SEARCH_PATHS
@@ -205,7 +114,6 @@ else()
         NAMES ndi
         PATHS ${NDI_LIB_SEARCH_PATHS}
     )
-endif()
 
 if(NOT NDI_INCLUDE_DIR)
     message(FATAL_ERROR "NDI SDK include directory not found. Please install NDI SDK or set NDI_SDK_DIR environment variable.")
@@ -215,41 +123,14 @@ if(NOT NDI_LIBRARY)
     message(FATAL_ERROR "NDI SDK library not found. Please install NDI SDK or set NDI_SDK_DIR environment variable.")
 endif()
 
-if(WIN32 AND NOT NDI_DLL)
-    message(FATAL_ERROR "NDI SDK DLL not found. Please install NDI SDK or set NDI_SDK_DIR environment variable.")
-endif()
-
 message(STATUS "NDI SDK found:")
 message(STATUS "  Include: ${NDI_INCLUDE_DIR}")
 message(STATUS "  Library: ${NDI_LIBRARY}")
-if(WIN32)
-    message(STATUS "  DLL: ${NDI_DLL}")
-endif()
 
 # Add NDI include directory
 include_directories(${NDI_INCLUDE_DIR})
 
-# Find DeckLink SDK (optional)
-if(USE_DECKLINK AND WIN32)
-    find_path(DECKLINK_INCLUDE_DIR
-        NAMES DeckLinkAPI.h DeckLinkAPI_h.h
-        PATHS
-            ${CMAKE_CURRENT_SOURCE_DIR}/deps/decklink/include
-            $ENV{DECKLINK_SDK_DIR}/include
-            "C:/Program Files/Blackmagic Design/DeckLink SDK/Win/include"
-            ${CMAKE_CURRENT_SOURCE_DIR}/docs/reference  # For DeckLinkAPI_h.h and DeckLinkAPI_i.c
-    )
-    
-    if(DECKLINK_INCLUDE_DIR)
-        message(STATUS "DeckLink SDK found: ${DECKLINK_INCLUDE_DIR}")
-        include_directories(${DECKLINK_INCLUDE_DIR})
-        add_definitions(-DHAS_DECKLINK)
-    else()
-        message(WARNING "DeckLink SDK not found. DeckLink support will be disabled.")
-        message(WARNING "To enable DeckLink support, copy DeckLinkAPI_h.h and DeckLinkAPI_i.c to docs/reference/")
-        set(USE_DECKLINK OFF)
-    endif()
-endif()
+# DeckLink support removed - Linux appliance uses V4L2 only
 
 # Main executable (capture application)
 add_executable(ndi-capture

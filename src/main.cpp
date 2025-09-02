@@ -8,21 +8,11 @@
 #include <thread>
 #include <chrono>
 
-#ifdef _WIN32
-#define NOMINMAX  // Prevent Windows.h from defining min/max macros
-#include <windows.h>
-#include <conio.h>
-#include "windows/media_foundation/media_foundation_capture.h"
-#include "windows/decklink/decklink_capture.h"
-#include "capture/DeckLinkDeviceEnumerator.h"
-#else
+// Linux-only includes
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
-#ifdef __linux__
 #include "linux/v4l2/v4l2_capture.h"
-#endif
-#endif
 
 #include "common/app_controller.h"
 #include "common/version.h"
