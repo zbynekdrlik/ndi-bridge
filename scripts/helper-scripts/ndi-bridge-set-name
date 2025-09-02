@@ -64,7 +64,7 @@ echo "$FULL_HOSTNAME" > /etc/hostname
 sed -i "s/127.0.1.1.*/127.0.1.1 $FULL_HOSTNAME $NEW_NAME/" /etc/hosts
 
 # Update NDI configuration
-sed -i "s/NDI_NAME=.*/NDI_NAME=\"$NEW_NAME\"/" /etc/ndi-bridge/config
+sed -i "s/NDI_NAME=.*/NDI_NAME=\"$NEW_NAME\"/" /etc/media-bridge/config
 
 # Update Avahi configuration with new hostname
 if [ -f /etc/avahi/avahi-daemon.conf ]; then

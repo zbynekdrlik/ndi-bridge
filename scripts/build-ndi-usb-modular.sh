@@ -1,5 +1,5 @@
 #!/bin/bash
-# NDI-Bridge USB Linux Builder - Modular Version
+# Media Bridge USB Linux Builder - Modular Version
 # This is the main script that sources all modules
 
 set -e
@@ -132,7 +132,7 @@ cleanup() {
 
 # Main execution
 main() {
-    log "Starting NDI-Bridge USB Linux Builder (Modular Version $BUILD_SCRIPT_VERSION)"
+    log "Starting Media Bridge USB Linux Builder (Modular Version $BUILD_SCRIPT_VERSION)"
     log "Target device: $USB_DEVICE"
     
     check_prerequisites

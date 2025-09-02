@@ -107,8 +107,8 @@ case "$1" in
             else
                 # Check policy to see if we can disable all consoles
                 ALLOW_NO_CONSOLE=false
-                if [ -f /etc/ndi-bridge/display-policy.conf ]; then
-                    source /etc/ndi-bridge/display-policy.conf
+                if [ -f /etc/media-bridge/display-policy.conf ]; then
+                    source /etc/media-bridge/display-policy.conf
                 fi
                 
                 if [ "$ALLOW_NO_CONSOLE" = "true" ]; then
@@ -117,7 +117,7 @@ case "$1" in
                     echo "Console disabled. SSH access required for recovery!"
                 else
                     echo "Error: Cannot disable console - no alternative display available"
-                    echo "To force, set ALLOW_NO_CONSOLE=true in /etc/ndi-bridge/display-policy.conf"
+                    echo "To force, set ALLOW_NO_CONSOLE=true in /etc/media-bridge/display-policy.conf"
                     exit 1
                 fi
             fi

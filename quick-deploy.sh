@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 BOX_IP="${1:-10.77.9.143}"
-IMAGE_FILE="ndi-bridge.img"
+IMAGE_FILE="media-bridge.img"
 
 # Colors
 GREEN='\033[0;32m'

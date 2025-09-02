@@ -3,7 +3,7 @@
 
 while true; do
     # Check if ndi-display binary exists
-    if [ -x /opt/ndi-bridge/ndi-display ]; then
+    if [ -x /opt/media-bridge/ndi-display ]; then
         # Create status directory if needed
         mkdir -p /var/run/ndi-display 2>/dev/null || mkdir -p /tmp/ndi-display
         
@@ -14,7 +14,7 @@ while true; do
         fi
         
         # Get display connections and write to file
-        /opt/ndi-bridge/ndi-display displays 2>/dev/null > "${STATUS_DIR}/hdmi-connections.tmp"
+        /opt/media-bridge/ndi-display displays 2>/dev/null > "${STATUS_DIR}/hdmi-connections.tmp"
         
         # Parse the output and create simple status files
         for i in 0 1 2; do

@@ -329,8 +329,8 @@ sleep 10
 echo "Setting default audio configuration..."
 
 # Check if saved configuration exists
-if [ -f "/etc/ndi-bridge/intercom.conf" ]; then
-    echo "  Using saved configuration from /etc/ndi-bridge/intercom.conf"
+if [ -f "/etc/media-bridge/intercom.conf" ]; then
+    echo "  Using saved configuration from /etc/media-bridge/intercom.conf"
     # The web service will load and apply saved settings
     # Just set hardware volumes to 100% for maximum range
     if [ -n "$USB_SINK" ]; then
@@ -370,9 +370,9 @@ echo "Configuring Chrome audio..."
 if [ -n "$USB_SINK" ]; then
     # Determine Chrome/Others volume to use
     CHROME_VOLUME="90"  # Default
-    if [ -f "/etc/ndi-bridge/intercom.conf" ]; then
+    if [ -f "/etc/media-bridge/intercom.conf" ]; then
         # Read saved speaker_volume from config
-        SAVED_VOLUME=$(python3 -c "import json; conf=json.load(open('/etc/ndi-bridge/intercom.conf')); print(conf.get('speaker_volume', 90))" 2>/dev/null)
+        SAVED_VOLUME=$(python3 -c "import json; conf=json.load(open('/etc/media-bridge/intercom.conf')); print(conf.get('speaker_volume', 90))" 2>/dev/null)
         if [ -n "$SAVED_VOLUME" ]; then
             CHROME_VOLUME="$SAVED_VOLUME"
             echo "  Using saved Others volume: ${CHROME_VOLUME}%"

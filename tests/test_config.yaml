@@ -1,4 +1,4 @@
 host: 10.77.8.120
 ssh_user: root
 ssh_pass: newlevel
-ssh_key: ~/.ssh/ndi_test_key
+ssh_key: ~/.ssh/media_test_key

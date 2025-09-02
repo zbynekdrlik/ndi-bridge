@@ -37,7 +37,7 @@ This guide covers building NDI Bridge from source on various platforms.
 ```bash
 # Clone repository
 git clone https://github.com/zbynekdrlik/ndi-bridge.git
-cd ndi-bridge
+cd media-bridge
 
 # Create build directory
 mkdir build && cd build

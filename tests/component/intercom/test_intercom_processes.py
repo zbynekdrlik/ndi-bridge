@@ -85,7 +85,7 @@ class TestIntercomProcesses:
     def test_display_environment_set(self, host):
         """Test that DISPLAY environment is set correctly."""
         # Check in the intercom process environment
-        result = host.run("systemctl show ndi-bridge-intercom --property Environment")
+        result = host.run("systemctl show media-bridge-intercom --property Environment")
         if "DISPLAY" in result.stdout:
             assert "DISPLAY=:99" in result.stdout or "DISPLAY=\":99\"" in result.stdout
     
@@ -150,7 +150,7 @@ class TestIntercomProcesses:
                 assert mem_percent < 20, f"Chrome using too much memory: {mem_percent}%"
         
         # Check overall intercom service memory
-        result = host.run("systemctl show ndi-bridge-intercom --property MemoryCurrent")
+        result = host.run("systemctl show media-bridge-intercom --property MemoryCurrent")
         if "MemoryCurrent=" in result.stdout:
             mem_bytes = result.stdout.split("=")[1].strip()
             if mem_bytes and mem_bytes != "[not set]":
@@ -161,7 +161,7 @@ class TestIntercomProcesses:
         """Test that Chrome push parameter matches device hostname."""
         # Get hostname
         hostname = host.run("hostname").stdout.strip()
-        device_name = hostname.replace("ndi-bridge-", "")
+        device_name = hostname.replace("media-bridge-", "")
         
         # Wait for Chrome to be running (especially after service restarts)
         chrome_found = False

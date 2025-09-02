@@ -4,7 +4,7 @@
 
 set -e
 
-CONFIG_FILE="/etc/ndi-bridge/intercom.conf"
+CONFIG_FILE="/etc/media-bridge/intercom.conf"
 CONFIG_DIR=$(dirname "$CONFIG_FILE")
 CONTROL_SCRIPT="/usr/local/bin/ndi-bridge-intercom-control"
 

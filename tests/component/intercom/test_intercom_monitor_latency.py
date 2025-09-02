@@ -15,13 +15,13 @@ class TestIntercomMonitorLatency:
     
     def test_monitor_script_exists(self, host):
         """Test that monitor script exists and is executable."""
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-monitor")
+        script = host.file("/usr/local/bin/media-bridge-intercom-monitor")
         assert script.exists, "Monitor script should exist"
         assert script.mode & 0o111, "Monitor script should be executable"
     
     def test_monitor_script_has_latency_configuration(self, host):
         """Test that monitor script contains latency configuration."""
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-monitor")
+        script = host.file("/usr/local/bin/media-bridge-intercom-monitor")
         content = script.content_string
         
         # Check for quantum configuration (32 samples for low latency)
@@ -34,7 +34,7 @@ class TestIntercomMonitorLatency:
     
     def test_monitor_enable_command(self, host):
         """Test that monitor can be enabled."""
-        result = host.run("ndi-bridge-intercom-monitor enable")
+        result = host.run("media-bridge-intercom-monitor enable")
         assert result.succeeded, "Monitor enable should succeed"
         
         # Should report success
@@ -42,7 +42,7 @@ class TestIntercomMonitorLatency:
     
     def test_monitor_disable_command(self, host):
         """Test that monitor can be disabled."""
-        result = host.run("ndi-bridge-intercom-monitor disable")
+        result = host.run("media-bridge-intercom-monitor disable")
         assert result.succeeded, "Monitor disable should succeed"
         
         # Should report success
@@ -50,7 +50,7 @@ class TestIntercomMonitorLatency:
     
     def test_monitor_status_command(self, host):
         """Test that monitor status command works."""
-        result = host.run("ndi-bridge-intercom-monitor status")
+        result = host.run("media-bridge-intercom-monitor status")
         assert result.succeeded, "Monitor status should succeed"
         
         # Should return JSON status
@@ -61,14 +61,14 @@ class TestIntercomMonitorLatency:
     def test_monitor_quantum_adjustment(self, host):
         """Test that quantum is adjusted when monitor is enabled."""
         # Disable monitor first
-        host.run("ndi-bridge-intercom-monitor disable")
+        host.run("media-bridge-intercom-monitor disable")
         time.sleep(2)
         
         # Get default quantum
         default_quantum = host.run("pw-metadata -n settings | grep clock.quantum || echo 'not set'").stdout
         
         # Enable monitor
-        result = host.run("ndi-bridge-intercom-monitor enable")
+        result = host.run("media-bridge-intercom-monitor enable")
         assert result.succeeded, "Should enable monitor"
         
         time.sleep(3)
@@ -83,13 +83,13 @@ class TestIntercomMonitorLatency:
             assert True, "Quantum was adjusted for monitor"
         
         # Disable monitor
-        host.run("ndi-bridge-intercom-monitor disable")
+        host.run("media-bridge-intercom-monitor disable")
     
     @pytest.mark.slow
     def test_monitor_loopback_module_loaded(self, host):
         """Test that PipeWire loopback module is loaded when monitor enabled."""
         # Enable monitor
-        host.run("ndi-bridge-intercom-monitor enable")
+        host.run("media-bridge-intercom-monitor enable")
         time.sleep(3)
         
         # Check for loopback module
@@ -102,14 +102,14 @@ class TestIntercomMonitorLatency:
             assert "latency" in result.stdout.lower() or "quantum" in result.stdout.lower()
         
         # Disable monitor
-        host.run("ndi-bridge-intercom-monitor disable")
+        host.run("media-bridge-intercom-monitor disable")
     
     def test_monitor_latency_calculation(self, host):
         """Test that latency calculation is correct for 32 samples at 48kHz."""
         # 32 samples at 48000 Hz = 0.667ms (0.67ms)
         # This is the ultra-low latency claim
         
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-monitor")
+        script = host.file("/usr/local/bin/media-bridge-intercom-monitor")
         content = script.content_string
         
         # Check for correct calculation or claim
@@ -125,7 +125,7 @@ class TestIntercomMonitorLatency:
     def test_monitor_audio_routing(self, host):
         """Test that monitor creates proper audio routing."""
         # Enable monitor
-        host.run("ndi-bridge-intercom-monitor enable")
+        host.run("media-bridge-intercom-monitor enable")
         time.sleep(3)
         
         try:
@@ -138,11 +138,11 @@ class TestIntercomMonitorLatency:
                 assert "alsa_output" in result.stdout.lower() or "output" in result.stdout.lower()
         finally:
             # Disable monitor
-            host.run("ndi-bridge-intercom-monitor disable")
+            host.run("media-bridge-intercom-monitor disable")
     
     def test_monitor_cpu_usage_claim(self, host):
         """Test that monitor script mentions low CPU usage."""
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-monitor")
+        script = host.file("/usr/local/bin/media-bridge-intercom-monitor")
         content = script.content_string
         
         # Monitor script exists and is functional
@@ -154,29 +154,29 @@ class TestIntercomMonitorLatency:
         """Test that monitor can be enabled and disabled repeatedly."""
         for cycle in range(3):
             # Enable
-            result = host.run("ndi-bridge-intercom-monitor enable")
+            result = host.run("media-bridge-intercom-monitor enable")
             assert result.succeeded, f"Enable cycle {cycle} should succeed"
             time.sleep(2)
             
             # Check status
-            result = host.run("ndi-bridge-intercom-monitor status")
+            result = host.run("media-bridge-intercom-monitor status")
             status = json.loads(result.stdout)
             assert status["enabled"] == True, f"Should be enabled in cycle {cycle}"
             
             # Disable
-            result = host.run("ndi-bridge-intercom-monitor disable")
+            result = host.run("media-bridge-intercom-monitor disable")
             assert result.succeeded, f"Disable cycle {cycle} should succeed"
             time.sleep(2)
             
             # Check status
-            result = host.run("ndi-bridge-intercom-monitor status")
+            result = host.run("media-bridge-intercom-monitor status")
             status = json.loads(result.stdout)
             assert status["enabled"] == False, f"Should be disabled in cycle {cycle}"
     
     def test_monitor_volume_control(self, host):
         """Test that monitor can be enabled/disabled."""
         # Monitor is controlled via separate monitor command, not main control
-        result = host.run("ndi-bridge-intercom-monitor status")
+        result = host.run("media-bridge-intercom-monitor status")
         assert result.succeeded, "Monitor status command should work"
         
         # Check that monitor status returns valid JSON
@@ -187,18 +187,18 @@ class TestIntercomMonitorLatency:
     def test_monitor_survives_intercom_restart(self, host):
         """Test that monitor setting survives service restart."""
         # Enable monitor
-        host.run("ndi-bridge-intercom-monitor enable")
+        host.run("media-bridge-intercom-monitor enable")
         time.sleep(2)
         
         # Get initial status
-        initial_status = host.run("ndi-bridge-intercom-monitor status").stdout
+        initial_status = host.run("media-bridge-intercom-monitor status").stdout
         
         # Restart intercom service
-        host.run("systemctl restart ndi-bridge-intercom")
+        host.run("systemctl restart media-bridge-intercom")
         time.sleep(35)  # Service restart takes 30+ seconds
         
         # Check monitor status
-        final_status = host.run("ndi-bridge-intercom-monitor status").stdout
+        final_status = host.run("media-bridge-intercom-monitor status").stdout
         
         # Status should be preserved (or at least command should work)
         assert final_status, "Monitor status should be available after restart"
@@ -210,7 +210,7 @@ class TestIntercomMonitorLatency:
         
         if not result.succeeded:
             # Try to enable monitor without USB audio
-            result = host.run("ndi-bridge-intercom-monitor enable 2>&1")
+            result = host.run("media-bridge-intercom-monitor enable 2>&1")
             
             # Should fail or warn about missing device
             assert "error" in result.stdout.lower() or "not found" in result.stdout.lower() or \
@@ -223,7 +223,7 @@ class TestIntercomMonitorLatency:
         
         if not result.succeeded:
             # Try to enable monitor without PipeWire
-            result = host.run("ndi-bridge-intercom-monitor enable 2>&1")
+            result = host.run("media-bridge-intercom-monitor enable 2>&1")
             
             # Should fail or indicate PipeWire requirement
             assert "pipewire" in result.stdout.lower() or "error" in result.stdout.lower()

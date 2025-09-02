@@ -23,9 +23,9 @@ echo ""
 
 # Software Versions
 echo -e "${CYAN}Software Versions:${NC}"
-echo "  NDI-Capture:    $(/opt/ndi-bridge/ndi-capture --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo 'Unknown')"
-echo "  Build Script:   $(cat /etc/ndi-bridge/build-script-version 2>/dev/null || echo 'Unknown')"
-echo "  Build Date:     $(cat /etc/ndi-bridge/build-date 2>/dev/null || echo 'Unknown')"
+echo "  NDI-Capture:    $(/opt/media-bridge/ndi-capture --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo 'Unknown')"
+echo "  Build Script:   $(cat /etc/media-bridge/build-script-version 2>/dev/null || echo 'Unknown')"
+echo "  Build Date:     $(cat /etc/media-bridge/build-date 2>/dev/null || echo 'Unknown')"
 echo ""
 
 # Network Configuration
@@ -48,7 +48,7 @@ echo ""
 
 # Video Device Status
 echo -e "${CYAN}Video Capture Device:${NC}"
-VIDEO_DEVICE=$(grep "^DEVICE=" /etc/ndi-bridge/config | cut -d'"' -f2)
+VIDEO_DEVICE=$(grep "^DEVICE=" /etc/media-bridge/config | cut -d'"' -f2)
 if [ -e "$VIDEO_DEVICE" ]; then
     echo "  Device:         $VIDEO_DEVICE ${GREEN}[PRESENT]${NC}"
     if command -v v4l2-ctl >/dev/null 2>&1; then
@@ -61,7 +61,7 @@ echo ""
 
 # NDI Configuration
 echo -e "${CYAN}NDI Configuration:${NC}"
-NDI_NAME=$(grep "^NDI_NAME=" /etc/ndi-bridge/config | cut -d'"' -f2)
+NDI_NAME=$(grep "^NDI_NAME=" /etc/media-bridge/config | cut -d'"' -f2)
 if [ -z "$NDI_NAME" ]; then
     NDI_NAME=$(hostname)
     echo "  NDI Name:       $NDI_NAME (default: hostname)"

@@ -20,7 +20,7 @@ while true; do
             s)
                 clear
                 echo "=== Set NDI Stream Name ==="
-                echo "Current name: $(cat /etc/ndi-bridge/config 2>/dev/null | grep NDI_NAME | cut -d'=' -f2 | tr -d '"' || echo 'Not set')"
+                echo "Current name: $(cat /etc/media-bridge/config 2>/dev/null | grep NDI_NAME | cut -d'=' -f2 | tr -d '"' || echo 'Not set')"
                 echo ""
                 read -p "Enter new NDI name: " new_name
                 if [ -n "$new_name" ]; then
@@ -60,7 +60,7 @@ while true; do
                 read -n 1 -s -r
                 ;;
             d)
-                if [ -x /opt/ndi-bridge/ndi-display ]; then
+                if [ -x /opt/media-bridge/ndi-display ]; then
                     # Launch the new clean display configuration menu directly
                     # Set TERM if not already set (needed for tput in the script)
                     [ -z "$TERM" ] && export TERM=xterm

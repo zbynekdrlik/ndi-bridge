@@ -8,7 +8,7 @@ set -e
 BOX_IP="${1:-10.77.9.143}"
 BOX_USER="root"
 BOX_PASS="newlevel"
-IMAGE_FILE="ndi-bridge.img"
+IMAGE_FILE="media-bridge.img"
 
 # Colors
 RED='\033[0;31m'

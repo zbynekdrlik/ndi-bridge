@@ -18,7 +18,7 @@ class TestIntercomIntegration:
     def test_service_restart_recovery(self, host):
         """Test that intercom recovers properly after service restart (30s expected)."""        
         # Get current settings
-        result = host.run("ndi-bridge-intercom-control status")
+        result = host.run("media-bridge-intercom-control status")
         assert result.succeeded, f"Failed to get initial status: {result.stderr}"
         settings_before = json.loads(result.stdout)
         
@@ -27,14 +27,14 @@ class TestIntercomIntegration:
         chrome_pid_before = chrome_result.stdout.strip()
         
         # Restart service
-        result = host.run("systemctl restart ndi-bridge-intercom")
+        result = host.run("systemctl restart media-bridge-intercom")
         assert result.succeeded, f"Service restart failed: {result.stderr}"
         
         # Wait for service to fully start (30s is expected)
         time.sleep(35)
         
         # Check service is running
-        service = host.service("ndi-bridge-intercom")
+        service = host.service("media-bridge-intercom")
         assert service.is_running, "Service should be running after restart"
         
         # Check Chrome is running with new PID
@@ -51,7 +51,7 @@ class TestIntercomIntegration:
             assert chrome_pid_after, "Chrome should be running after restart"
         
         # Check settings preserved
-        result = host.run("ndi-bridge-intercom-control status")
+        result = host.run("media-bridge-intercom-control status")
         assert result.succeeded, f"Failed to get status after restart: {result.stderr}"
         settings_after = json.loads(result.stdout)
         
@@ -99,7 +99,7 @@ class TestIntercomIntegration:
         
         # Get hostname for push parameter
         hostname = host.run("hostname").stdout.strip()
-        device_name = hostname.replace("ndi-bridge-", "")
+        device_name = hostname.replace("media-bridge-", "")
         assert f"push={device_name}" in chrome_cmd, f"Should use device name '{device_name}'"
         
         # Check Chrome profile directory exists

@@ -57,8 +57,8 @@ perform_build_cleanup() {
     cleanup_loop_devices() {
         log "  Checking for loop devices..."
         
-        # Find loop devices associated with ndi-bridge images
-        local loop_devices=$(losetup -a | grep -E "(ndi-bridge|loop.*\.img)" | cut -d: -f1)
+        # Find loop devices associated with media-bridge images
+        local loop_devices=$(losetup -a | grep -E "(media-bridge|loop.*\.img)" | cut -d: -f1)
         
         if [ -n "$loop_devices" ]; then
             log "  Found loop devices to clean"
@@ -95,9 +95,9 @@ perform_build_cleanup() {
         log "  Checking for temporary build files..."
         
         # Remove incomplete or temporary image files in current directory
-        if [ -f "ndi-bridge.img.tmp" ] || [ -f "ndi-bridge.img.incomplete" ]; then
+        if [ -f "media-bridge.img.tmp" ] || [ -f "media-bridge.img.incomplete" ]; then
             log "  Removing incomplete image files"
-            rm -f ndi-bridge.img.tmp ndi-bridge.img.incomplete 2>/dev/null || true
+            rm -f media-bridge.img.tmp media-bridge.img.incomplete 2>/dev/null || true
             cleanup_performed=true
         fi
         

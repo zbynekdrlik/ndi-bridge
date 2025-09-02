@@ -261,7 +261,7 @@ def test_display_console_recovery(host):
     host.run("echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
     
     # Use the capture stream as it's always available
-    cmd = f"timeout 5 /opt/media-bridge/ndi-display 'NDI-BRIDGE (USB Capture)' {display_id} > /dev/null 2>&1 || true"
+    cmd = f"timeout 5 /opt/media-bridge/ndi-display 'MEDIA-BRIDGE (USB Capture)' {display_id} > /dev/null 2>&1 || true"
     host.run(cmd)
     
     # 3. Restore console

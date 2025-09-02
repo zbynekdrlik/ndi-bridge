@@ -3,13 +3,13 @@
 # Manages low-latency mic monitoring through PipeWire loopback
 
 # Configuration
-MONITOR_STATE_FILE="/var/run/ndi-bridge/monitor.state"
-MONITOR_MODULE_FILE="/var/run/ndi-bridge/monitor.module"
+MONITOR_STATE_FILE="/var/run/media-bridge/monitor.state"
+MONITOR_MODULE_FILE="/var/run/media-bridge/monitor.module"
 DEFAULT_VOLUME=50
 DEFAULT_ENABLED=false
 
 # Ensure runtime directory exists
-mkdir -p /var/run/ndi-bridge
+mkdir -p /var/run/media-bridge
 
 # Colors for output
 RED='\033[0;31m'
@@ -135,7 +135,7 @@ set_monitor_volume() {
         # Save volume to state ONLY if not muting (volume > 0)
         # This preserves the actual volume when muting/unmuting
         if [ "$volume" -gt 0 ]; then
-            echo "$volume" > "/var/run/ndi-bridge/monitor.volume"
+            echo "$volume" > "/var/run/media-bridge/monitor.volume"
         fi
         return 0
     else
@@ -157,8 +157,8 @@ get_status() {
             enabled="true"
             
             # Get volume
-            if [ -f "/var/run/ndi-bridge/monitor.volume" ]; then
-                volume=$(cat "/var/run/ndi-bridge/monitor.volume")
+            if [ -f "/var/run/media-bridge/monitor.volume" ]; then
+                volume=$(cat "/var/run/media-bridge/monitor.volume")
             fi
             
             # Calculate latency
@@ -202,8 +202,8 @@ case "${1:-status}" in
     restart)
         # Get current volume if enabled
         volume=$DEFAULT_VOLUME
-        if [ -f "/var/run/ndi-bridge/monitor.volume" ]; then
-            volume=$(cat "/var/run/ndi-bridge/monitor.volume")
+        if [ -f "/var/run/media-bridge/monitor.volume" ]; then
+            volume=$(cat "/var/run/media-bridge/monitor.volume")
         fi
         
         disable_monitoring >/dev/null 2>&1

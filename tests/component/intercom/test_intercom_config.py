@@ -15,40 +15,40 @@ class TestIntercomConfig:
     
     def test_config_directory_exists(self, host):
         """Test that config directory exists."""
-        config_dir = host.file("/etc/ndi-bridge")
+        config_dir = host.file("/etc/media-bridge")
         assert config_dir.exists, "Config directory should exist"
         assert config_dir.is_directory, "Should be a directory"
     
     def test_config_save_command_exists(self, host):
         """Test that config save command exists."""
-        result = host.run("ndi-bridge-intercom-config --help")
+        result = host.run("media-bridge-intercom-config --help")
         assert result.succeeded or "save" in result.stdout.lower() or True
     
     def test_config_save_and_load(self, host):
         """Test that configuration commands exist and work."""
         # Make filesystem writable
-        host.run("ndi-bridge-rw")
+        host.run("media-bridge-rw")
         
         try:
             # Test save command exists and succeeds
-            result = host.run("ndi-bridge-intercom-config save")
+            result = host.run("media-bridge-intercom-config save")
             assert result.succeeded, "Config save command should succeed"
             
             # Test load command exists and succeeds  
-            result = host.run("ndi-bridge-intercom-config load")
+            result = host.run("media-bridge-intercom-config load")
             assert result.succeeded, "Config load command should succeed"
             
             # Check config file was created
-            config_file = host.file("/etc/ndi-bridge/intercom.conf")
+            config_file = host.file("/etc/media-bridge/intercom.conf")
             assert config_file.exists, "Config file should exist after save"
             
         finally:
             # Return to read-only
-            host.run("ndi-bridge-ro")
+            host.run("media-bridge-ro")
     
     def test_config_file_format(self, host):
         """Test that config file has correct format."""
-        config_file = host.file("/etc/ndi-bridge/intercom.conf")
+        config_file = host.file("/etc/media-bridge/intercom.conf")
         if config_file.exists:
             content = config_file.content_string
             
@@ -65,11 +65,11 @@ class TestIntercomConfig:
     def test_config_default_values(self, host):
         """Test that reasonable defaults are used."""
         # Check if config file exists
-        config_file = host.file("/etc/ndi-bridge/intercom.conf")
+        config_file = host.file("/etc/media-bridge/intercom.conf")
         
         if not config_file.exists:
             # No config file, should use defaults
-            result = host.run("ndi-bridge-intercom-control status")
+            result = host.run("media-bridge-intercom-control status")
             status = json.loads(result.stdout)
             
             # Check for reasonable defaults
@@ -80,10 +80,10 @@ class TestIntercomConfig:
     def test_config_save_requires_writable_filesystem(self, host):
         """Test that config save handles read-only filesystem correctly."""
         # Ensure filesystem is read-only
-        host.run("ndi-bridge-ro")
+        host.run("media-bridge-ro")
         
         # Try to save config
-        result = host.run("ndi-bridge-intercom-config save 2>&1")
+        result = host.run("media-bridge-intercom-config save 2>&1")
         
         # Should either fail gracefully or handle read-only
         if not result.succeeded:
@@ -92,18 +92,18 @@ class TestIntercomConfig:
     def test_config_backup_functionality(self, host):
         """Test that config can be backed up."""
         # Make filesystem writable
-        host.run("ndi-bridge-rw")
+        host.run("media-bridge-rw")
         
         try:
             # Create backup
-            result = host.run("cp /etc/ndi-bridge/intercom.conf /tmp/intercom.conf.backup 2>/dev/null || true")
+            result = host.run("cp /etc/media-bridge/intercom.conf /tmp/intercom.conf.backup 2>/dev/null || true")
             
             # If config exists, backup should work
-            if host.file("/etc/ndi-bridge/intercom.conf").exists:
+            if host.file("/etc/media-bridge/intercom.conf").exists:
                 backup = host.file("/tmp/intercom.conf.backup")
                 assert backup.exists, "Backup should be created"
         finally:
-            host.run("ndi-bridge-ro")
+            host.run("media-bridge-ro")
     
     def test_config_validation(self, host):
         """Test that config values can be set within normal range."""
@@ -111,21 +111,21 @@ class TestIntercomConfig:
         test_volumes = [25, 50, 75, 100]
         
         for volume in test_volumes:
-            result = host.run(f"ndi-bridge-intercom-control set-volume input {volume}")
+            result = host.run(f"media-bridge-intercom-control set-volume input {volume}")
             assert result.succeeded, f"Should set volume to {volume}"
             
             # Verify it was set
-            result = host.run("ndi-bridge-intercom-control status")
+            result = host.run("media-bridge-intercom-control status")
             status = json.loads(result.stdout)
             assert status["input"]["volume"] == volume, f"Volume should be {volume}"
         
         # Reset to reasonable default
-        result = host.run("ndi-bridge-intercom-control set-volume input 75")
+        result = host.run("media-bridge-intercom-control set-volume input 75")
         assert result.succeeded, "Should set volume to default"
     
     def test_config_permissions(self, host):
         """Test that config file has secure permissions."""
-        config_file = host.file("/etc/ndi-bridge/intercom.conf")
+        config_file = host.file("/etc/media-bridge/intercom.conf")
         if config_file.exists:
             # Should be owned by root
             assert config_file.user == "root", "Config should be owned by root"

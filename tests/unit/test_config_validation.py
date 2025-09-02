@@ -30,8 +30,8 @@ def test_invalid_ip_address_format():
 def test_valid_ndi_name_format():
     """Test validation of NDI stream name format."""
     valid_names = [
-        "NDI-BRIDGE",
-        "NDI-BRIDGE-01",
+        "MEDIA-BRIDGE",
+        "MEDIA-BRIDGE-01",
         "Camera_1",
         "Studio-Cam-A"
     ]

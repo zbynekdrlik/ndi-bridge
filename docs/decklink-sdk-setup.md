@@ -10,13 +10,13 @@ The DeckLink SDK files are proprietary files owned by Blackmagic Design and cann
 
 2. **Copy all IDL files to docs/reference**:
    ```cmd
-   copy "path\to\SDK\Win\include\*.idl" "path\to\ndi-bridge\docs\reference\"
-   copy "path\to\SDK\Win\include\DeckLinkAPIVersion.h" "path\to\ndi-bridge\docs\reference\"
+   copy "path\to\SDK\Win\include\*.idl" "path\to\media-bridge\docs\reference\"
+   copy "path\to\SDK\Win\include\DeckLinkAPIVersion.h" "path\to\media-bridge\docs\reference\"
    ```
 
 3. **Generate the required files** (from VS Developer Command Prompt):
    ```cmd
-   cd "path\to\ndi-bridge\docs\reference"
+   cd "path\to\media-bridge\docs\reference"
    generate-decklink-api.bat
    ```
 
@@ -39,8 +39,8 @@ Copy all the IDL files and the version header from the SDK to your project:
 ```cmd
 # From Windows Command Prompt or PowerShell:
 cd "path\to\Blackmagic DeckLink SDK 14.4\Win\include"
-copy *.idl "path\to\ndi-bridge\docs\reference\"
-copy DeckLinkAPIVersion.h "path\to\ndi-bridge\docs\reference\"
+copy *.idl "path\to\media-bridge\docs\reference\"
+copy DeckLinkAPIVersion.h "path\to\media-bridge\docs\reference\"
 ```
 
 ### Step 3: Generate C++ Files
@@ -52,7 +52,7 @@ The IDL files must be compiled using the Microsoft IDL compiler (MIDL) to genera
 
 2. **Navigate to the reference directory**:
    ```cmd
-   cd "C:\path\to\ndi-bridge\docs\reference"
+   cd "C:\path\to\media-bridge\docs\reference"
    ```
 
 3. **Run the generation script**:
@@ -70,7 +70,7 @@ The script will:
 
 If you prefer to run MIDL directly:
 ```cmd
-cd "path\to\ndi-bridge\docs\reference"
+cd "path\to\media-bridge\docs\reference"
 midl /h DeckLinkAPI_h.h /iid DeckLinkAPI_i.c DeckLinkAPI.idl
 ```
 

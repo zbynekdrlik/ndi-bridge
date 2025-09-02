@@ -74,7 +74,7 @@ fi
 # Check version
 log "Checking new binary version..."
 NEW_VERSION=$("$BINARY_PATH" --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo "Unknown")
-CURRENT_VERSION=$(/opt/ndi-bridge/ndi-capture --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo "Unknown")
+CURRENT_VERSION=$(/opt/media-bridge/ndi-capture --version 2>&1 | head -1 | awk '{for(i=1;i<=NF;i++) if($i ~ /[0-9]+\.[0-9]+\.[0-9]+/) print $i}' || echo "Unknown")
 
 echo ""
 echo "Current version: $CURRENT_VERSION"
@@ -93,12 +93,12 @@ systemctl stop ndi-capture
 
 # Backup current binary
 log "Backing up current binary..."
-cp /opt/ndi-bridge/ndi-capture /opt/ndi-bridge/ndi-capture.backup
+cp /opt/media-bridge/ndi-capture /opt/media-bridge/ndi-capture.backup
 
 # Copy new binary
 log "Installing new binary..."
-cp "$BINARY_PATH" /opt/ndi-bridge/ndi-capture
-chmod +x /opt/ndi-bridge/ndi-capture
+cp "$BINARY_PATH" /opt/media-bridge/ndi-capture
+chmod +x /opt/media-bridge/ndi-capture
 
 # Start service
 log "Starting NDI Capture service..."
@@ -110,7 +110,7 @@ if systemctl is-active --quiet ndi-capture; then
     log "Update successful! NDI Capture is running with version $NEW_VERSION"
 else
     warn "Service failed to start, rolling back..."
-    cp /opt/ndi-bridge/ndi-capture.backup /opt/ndi-bridge/ndi-capture
+    cp /opt/media-bridge/ndi-capture.backup /opt/media-bridge/ndi-capture
     systemctl start ndi-capture
     error "Update failed, rolled back to previous version"
 fi

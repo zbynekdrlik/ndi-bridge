@@ -28,23 +28,23 @@ echo "$HEADER_LINE"
 echo -e "${NC}"
 
 # Read metrics from collector
-FPS_CURRENT=$(cat /var/run/ndi-bridge/fps_current 2>/dev/null || echo "0.00")
-FPS_AVG=$(cat /var/run/ndi-bridge/fps_10min_avg 2>/dev/null || echo "0.00")
-FPS_MIN=$(cat /var/run/ndi-bridge/fps_10min_min 2>/dev/null || echo "0.00")
-FPS_MAX=$(cat /var/run/ndi-bridge/fps_10min_max 2>/dev/null || echo "0.00")
-FPS_ISSUES=$(cat /var/run/ndi-bridge/fps_issues 2>/dev/null || echo "0")
-FRAMES=$(cat /var/run/ndi-bridge/frames_total 2>/dev/null || echo "0")
-DROPPED=$(cat /var/run/ndi-bridge/frames_dropped 2>/dev/null || echo "0")
-LATENCY=$(cat /var/run/ndi-bridge/latency_ms 2>/dev/null || echo "N/A")
-NETWORK_MBPS=$(cat /var/run/ndi-bridge/network_mbps 2>/dev/null || echo "0.0")
-CAPTURE_STATE=$(cat /var/run/ndi-bridge/capture_state 2>/dev/null || echo "UNKNOWN")
+FPS_CURRENT=$(cat /var/run/media-bridge/fps_current 2>/dev/null || echo "0.00")
+FPS_AVG=$(cat /var/run/media-bridge/fps_10min_avg 2>/dev/null || echo "0.00")
+FPS_MIN=$(cat /var/run/media-bridge/fps_10min_min 2>/dev/null || echo "0.00")
+FPS_MAX=$(cat /var/run/media-bridge/fps_10min_max 2>/dev/null || echo "0.00")
+FPS_ISSUES=$(cat /var/run/media-bridge/fps_issues 2>/dev/null || echo "0")
+FRAMES=$(cat /var/run/media-bridge/frames_total 2>/dev/null || echo "0")
+DROPPED=$(cat /var/run/media-bridge/frames_dropped 2>/dev/null || echo "0")
+LATENCY=$(cat /var/run/media-bridge/latency_ms 2>/dev/null || echo "N/A")
+NETWORK_MBPS=$(cat /var/run/media-bridge/network_mbps 2>/dev/null || echo "0.0")
+CAPTURE_STATE=$(cat /var/run/media-bridge/capture_state 2>/dev/null || echo "UNKNOWN")
 
 # Try runtime file first, then config file
-STREAM_NAME=$(cat /var/run/ndi-bridge/stream_name 2>/dev/null)
+STREAM_NAME=$(cat /var/run/media-bridge/stream_name 2>/dev/null)
 if [ -z "$STREAM_NAME" ] || [ "$STREAM_NAME" = "none" ]; then
     # Try to get from config file
-    if [ -f /etc/ndi-bridge/config ]; then
-        STREAM_NAME=$(grep "^NDI_NAME=" /etc/ndi-bridge/config 2>/dev/null | cut -d'=' -f2 | tr -d '"')
+    if [ -f /etc/media-bridge/config ]; then
+        STREAM_NAME=$(grep "^NDI_NAME=" /etc/media-bridge/config 2>/dev/null | cut -d'=' -f2 | tr -d '"')
     fi
     # Fallback to hostname-based name
     if [ -z "$STREAM_NAME" ] || [ "$STREAM_NAME" = "none" ]; then
@@ -56,7 +56,7 @@ fi
 printf "${CYAN}▶ CAPTURE STATUS${NC}%*s${BOLD}[LIVE]${NC}\n" $((TERM_WIDTH - 25)) ""
 
 # Capture device
-DEVICE=$(cat /etc/ndi-bridge/config 2>/dev/null | grep DEVICE | cut -d'"' -f2 || echo "/dev/video0")
+DEVICE=$(cat /etc/media-bridge/config 2>/dev/null | grep DEVICE | cut -d'"' -f2 || echo "/dev/video0")
 
 # Better capture state detection - if we have recent FPS data, we're capturing
 # But don't override STABILIZING state
@@ -72,7 +72,7 @@ elif [ "$CAPTURE_STATE" = "ERROR" ]; then
     echo -e "  Status:      Check device connection"
 elif [ "$CAPTURE_STATE" = "STABILIZING" ]; then
     # Get stabilization progress (30 seconds total)
-    STAB_SECONDS=$(cat /var/run/ndi-bridge/stabilizing_seconds 2>/dev/null || echo "0")
+    STAB_SECONDS=$(cat /var/run/media-bridge/stabilizing_seconds 2>/dev/null || echo "0")
     STAB_REMAINING=$((30 - STAB_SECONDS))
     echo -e "  Capture:     ${YELLOW}●${NC} STABILIZING - $DEVICE"
     echo -e "  Status:      Initializing capture (${STAB_REMAINING}s remaining)..."
@@ -235,9 +235,9 @@ else
 fi
 echo "  Hostname:    $(hostname)"
 # Display version information if available
-if [ -f /etc/ndi-bridge-version ]; then
-    VERSION=$(grep "^VERSION=" /etc/ndi-bridge-version | cut -d'=' -f2)
-    COMMIT=$(grep "^COMMIT=" /etc/ndi-bridge-version | cut -d'=' -f2)
+if [ -f /etc/media-bridge-version ]; then
+    VERSION=$(grep "^VERSION=" /etc/media-bridge-version | cut -d'=' -f2)
+    COMMIT=$(grep "^COMMIT=" /etc/media-bridge-version | cut -d'=' -f2)
     echo "  Version:     v${VERSION} (${COMMIT})"
 fi
 echo "  Uptime:      $(uptime -p | sed 's/up //')"
@@ -280,7 +280,7 @@ echo -e "${CYAN}▶ DISPLAY OUTPUT (NDI → HDMI)${NC}"
 TERM_WIDTH=$(tput cols 2>/dev/null || echo 80)
 
 # Check if ndi-display binary exists
-if [ -x /opt/ndi-bridge/ndi-display ]; then
+if [ -x /opt/media-bridge/ndi-display ]; then
     # Check each display port
     for i in 0 1 2; do
         HDMI_NUM=$((i + 1))
@@ -422,9 +422,9 @@ echo ""
 
 # BUILD INFO
 echo -e "${CYAN}▶ BUILD INFO${NC}"
-echo "  NDI Capture: v$(/opt/ndi-bridge/ndi-capture --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo 'Unknown')"
-echo "  Image Built: $(cat /etc/ndi-bridge/build-timestamp 2>/dev/null || echo 'Unknown')"
-echo "  Build Ver:   $(cat /etc/ndi-bridge/build-script-version 2>/dev/null || echo 'Unknown')"
+echo "  NDI Capture: v$(/opt/media-bridge/ndi-capture --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo 'Unknown')"
+echo "  Image Built: $(cat /etc/media-bridge/build-timestamp 2>/dev/null || echo 'Unknown')"
+echo "  Build Ver:   $(cat /etc/media-bridge/build-script-version 2>/dev/null || echo 'Unknown')"
 echo ""
 
 # WEB INTERFACE - Show all access methods  
