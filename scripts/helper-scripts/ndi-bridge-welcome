@@ -234,6 +234,12 @@ else
     echo -e "  IP Address:  ${IP_ADDR}"
 fi
 echo "  Hostname:    $(hostname)"
+# Display version information if available
+if [ -f /etc/ndi-bridge-version ]; then
+    VERSION=$(grep "^VERSION=" /etc/ndi-bridge-version | cut -d'=' -f2)
+    COMMIT=$(grep "^COMMIT=" /etc/ndi-bridge-version | cut -d'=' -f2)
+    echo "  Version:     v${VERSION} (${COMMIT})"
+fi
 echo "  Uptime:      $(uptime -p | sed 's/up //')"
 echo ""
 
