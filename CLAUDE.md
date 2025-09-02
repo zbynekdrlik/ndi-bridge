@@ -628,8 +628,6 @@ npm run typecheck  # If exists
 ndi-bridge-info         # System status
 ndi-bridge-logs         # View logs
 ndi-bridge-set-name     # Change NDI name
-ndi-bridge-rw           # Mount filesystem read-write
-ndi-bridge-ro           # Return to read-only
 ```
 
 ## Project Structure
@@ -661,7 +659,7 @@ ndi-bridge-ro           # Return to read-only
 | mDNS fails in WSL | Use IP address or test from Windows |
 | --version hangs | Fixed in main.cpp - exits before init |
 | Scripts not updating | Removed inline scripts from 10-tty-config.sh |
-| Chrome shows no audio devices | Reboot device, make filesystem writable (`ndi-bridge-rw`), select USB device in Chrome |
+| Chrome shows no audio devices | Reboot device, select USB device in Chrome |
 | Audio device locked after testing | Stale PipeWire modules can lock devices - reboot clears state |
 
 ## NDI Display System (v1.6.8+)
@@ -702,11 +700,11 @@ The display system automatically handles resolution mismatches:
 3. Writes to `/var/run/ndi-bridge/` tmpfs files
 4. `ndi-bridge-welcome` reads and displays on TTY2
 
-### Read-Only Filesystem
-- Root filesystem is read-only for power failure protection
-- `/tmp`, `/var/log`, `/run` are tmpfs (RAM)
-- Use `ndi-bridge-rw` to make changes
-- Always return to read-only with `ndi-bridge-ro`
+### Btrfs Filesystem
+- Root filesystem uses Btrfs for power failure resistance
+- Copy-on-Write (CoW) for data integrity
+- Optimized for flash media with SSD mode
+- Fast boot with space_cache=v2 and no compression
 
 ### Time Sync (Critical for Quality)
 - PTP primary (microsecond precision)

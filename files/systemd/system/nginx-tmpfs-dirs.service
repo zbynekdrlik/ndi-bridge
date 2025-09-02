@@ -1,5 +1,5 @@
 [Unit]
-Description=Create nginx directories on tmpfs
+Description=Create nginx directories
 Before=nginx.service
 After=local-fs.target
 

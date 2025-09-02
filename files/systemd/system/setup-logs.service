@@ -1,5 +1,5 @@
 [Unit]
-Description=Setup log directories in tmpfs
+Description=Setup log directories
 Before=ndi-capture.service
 After=local-fs.target
 

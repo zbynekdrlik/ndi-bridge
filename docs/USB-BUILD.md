@@ -157,8 +157,8 @@ NDI_NAME=""            # Empty = use hostname
 - Service restart on failures
 
 ### Power Failure Resistance
-- Journaled ext4 filesystem
-- Read-write root (can be made read-only)
+- Btrfs filesystem with Copy-on-Write
+- Data integrity through CoW operations
 - Minimal writes to USB
 - Logs in tmpfs (RAM)
 
@@ -260,12 +260,6 @@ v4l2-ctl --list-devices
 - v2.0.0 - Multi-threaded architecture
 
 ## Advanced Topics
-
-### Read-Only Root
-To make the system more resilient:
-1. Edit `/etc/fstab` to mount root as read-only
-2. Move logs to tmpfs
-3. Disable unnecessary writes
 
 ### Custom Packages
 Add packages in `06-system-config.sh`:

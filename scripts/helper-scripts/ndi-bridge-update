@@ -87,9 +87,6 @@ if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Remount root as read-write
-mount -o remount,rw / 2>/dev/null || true
-
 # Stop service
 log "Stopping NDI Capture service..."
 systemctl stop ndi-capture

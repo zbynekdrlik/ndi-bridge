@@ -90,8 +90,6 @@ while true; do
                 echo "  ndi-bridge-info     - System information"
                 echo "  ndi-bridge-logs     - View service logs"
                 echo "  ndi-bridge-set-name - Change NDI name"
-                echo "  ndi-bridge-rw       - Mount filesystem read-write"
-                echo "  ndi-bridge-ro       - Return to read-only"
                 echo ""
                 echo "Press any key to continue..."
                 read -n 1 -s -r

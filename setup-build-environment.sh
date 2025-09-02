@@ -136,7 +136,7 @@ install_build_deps() {
     USB_DEPS=(
         "parted"
         "dosfstools"
-        "e2fsprogs"
+        "btrfs-progs"
         "debootstrap"
         "kpartx"
         "util-linux"
@@ -251,7 +251,7 @@ verify_installation() {
         "pkg-config"
         "parted"
         "mkfs.fat"
-        "mkfs.ext4"
+        "mkfs.btrfs"
         "debootstrap"
         "kpartx"
         "grub-install"

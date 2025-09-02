@@ -106,12 +106,6 @@ reset_config() {
 # Main command processing
 case "$1" in
     save)
-        # Check if filesystem is read-write
-        if mount | grep " / " | grep -q "ro,"; then
-            echo "Error: Filesystem is read-only"
-            echo "Run 'ndi-bridge-rw' first to make filesystem writable"
-            exit 1
-        fi
         save_config
         ;;
         
@@ -120,12 +114,6 @@ case "$1" in
         ;;
         
     reset)
-        # Check if filesystem is read-write
-        if mount | grep " / " | grep -q "ro,"; then
-            echo "Error: Filesystem is read-only"
-            echo "Run 'ndi-bridge-rw' first to make filesystem writable"
-            exit 1
-        fi
         reset_config
         ;;
         
@@ -147,7 +135,6 @@ case "$1" in
         echo "  reset - Reset to default settings and remove config"
         echo "  show  - Display saved configuration"
         echo ""
-        echo "Note: 'save' and 'reset' require writable filesystem (ndi-bridge-rw)"
         exit 1
         ;;
 esac

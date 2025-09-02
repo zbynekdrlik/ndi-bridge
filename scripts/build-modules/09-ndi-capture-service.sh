@@ -47,7 +47,7 @@ cat > /opt/ndi-bridge/run.sh << 'EOFRUN'
 source /etc/ndi-bridge/config
 [ -z "$NDI_NAME" ] && NDI_NAME=$(hostname)
 
-# Create log directory if it doesn't exist (tmpfs)
+# Create log directory if it doesn't exist
 mkdir -p /var/log/ndi-bridge 2>/dev/null || true
 
 # Wait for network
@@ -89,7 +89,7 @@ check_time_sync() {
 
 check_time_sync
 
-# Main loop with restart and logging to tmpfs
+# Main loop with restart and logging
 while true; do
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NDI Capture: $DEVICE -> $NDI_NAME"
     if [ -w /var/log/ndi-bridge ]; then
