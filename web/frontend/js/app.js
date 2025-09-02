@@ -23,7 +23,9 @@ export default {
                 devices: {
                     input: null,
                     output: null
-                }
+                },
+                monitor_enabled: false,
+                monitor_volume: 50
             },
             
             // Audio levels for VU meters
@@ -72,38 +74,25 @@ export default {
          * PRIMARY CONTROL: Toggle microphone mute
          */
         async toggleMicMute() {
+            // Immediate UI feedback - toggle state optimistically
+            const newMutedState = !this.state.mic_muted;
+            this.state.mic_muted = newMutedState;
             this.loading.mic = true;
+            
             try {
                 const response = await this.api.toggleMicMute();
+                // Update with actual state from server
                 this.state.mic_muted = response.muted;
                 this.showNotification(
                     response.muted ? 'Microphone muted' : 'Microphone unmuted',
                     response.muted ? 'warning' : 'success'
                 );
             } catch (error) {
+                // Revert on error
+                this.state.mic_muted = !newMutedState;
                 this.showNotification('Failed to toggle microphone', 'error');
             } finally {
                 this.loading.mic = false;
-            }
-        },
-        
-        /**
-         * Toggle speaker mute
-         */
-        async toggleSpeakerMute() {
-            this.loading.speaker = true;
-            try {
-                const muted = !this.state.speaker_muted;
-                await this.api.setSpeakerMute(muted);
-                this.state.speaker_muted = muted;
-                this.showNotification(
-                    muted ? 'Speaker muted' : 'Speaker unmuted',
-                    muted ? 'warning' : 'success'
-                );
-            } catch (error) {
-                this.showNotification('Failed to toggle speaker', 'error');
-            } finally {
-                this.loading.speaker = false;
             }
         },
         
@@ -214,6 +203,15 @@ export default {
                     case 'full_state':
                         this.state = message.data;
                         break;
+                    
+                    case 'monitor':
+                        this.state.monitor_enabled = message.data.enabled;
+                        this.state.monitor_volume = message.data.volume;
+                        break;
+                    
+                    case 'monitor_volume':
+                        this.state.monitor_volume = message.data.volume;
+                        break;
                 }
             };
             
@@ -236,6 +234,21 @@ export default {
             this.snackbar.text = text;
             this.snackbar.color = color;
             this.snackbar.show = true;
+        },
+        
+        /**
+         * Set monitor volume
+         */
+        async setMonitorVolume() {
+            try {
+                const response = await this.api.setMonitorVolume(this.state.monitor_volume);
+                if (response.status === 'success') {
+                    // Silent update - no notification for volume changes
+                }
+            } catch (error) {
+                console.error('Failed to set monitor volume:', error);
+                this.showNotification('Failed to set monitor volume', 'error');
+            }
         }
     }
 }

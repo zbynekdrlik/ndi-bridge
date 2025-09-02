@@ -94,4 +94,18 @@ export default class ApiService {
     async getDevices() {
         return await this.request('GET', '/devices');
     }
+    
+    /**
+     * Set monitor state
+     */
+    async setMonitorState(enabled, volume = 50) {
+        return await this.request('POST', '/monitor', { enabled, volume });
+    }
+    
+    /**
+     * Set monitor volume
+     */
+    async setMonitorVolume(volume) {
+        return await this.request('POST', '/monitor/volume', { volume });
+    }
 }

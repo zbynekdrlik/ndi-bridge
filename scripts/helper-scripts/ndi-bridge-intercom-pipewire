@@ -325,15 +325,71 @@ echo "Chrome started with PID $CHROME_PID"
 # Give Chrome time to create audio streams
 sleep 10
 
-# Force any Chrome audio streams to use USB devices
-echo "Ensuring Chrome uses USB audio..."
+# Set default audio configuration
+echo "Setting default audio configuration..."
+
+# Check if saved configuration exists
+if [ -f "/etc/ndi-bridge/intercom.conf" ]; then
+    echo "  Using saved configuration from /etc/ndi-bridge/intercom.conf"
+    # The web service will load and apply saved settings
+    # Just set hardware volumes to 100% for maximum range
+    if [ -n "$USB_SINK" ]; then
+        echo "  Setting headphone hardware volume to 100%"
+        pactl set-sink-volume "$USB_SINK" 100%
+    fi
+    if [ -n "$USB_SOURCE" ]; then
+        echo "  Setting microphone hardware volume to 100%"
+        pactl set-source-volume "$USB_SOURCE" 100%
+        # Don't force mute - let saved config decide
+    fi
+else
+    echo "  No saved configuration, using defaults"
+    # Set hardware output (headphone) volume to 100%
+    if [ -n "$USB_SINK" ]; then
+        echo "  Setting headphone hardware volume to 100%"
+        pactl set-sink-volume "$USB_SINK" 100%
+    fi
+    
+    # Set hardware input (mic) volume to 100% but MUTED by default
+    if [ -n "$USB_SOURCE" ]; then
+        echo "  Setting microphone hardware volume to 100% (muted)"
+        pactl set-source-volume "$USB_SOURCE" 100%
+        pactl set-source-mute "$USB_SOURCE" 1  # Start muted
+    fi
+    
+    # Enable self-monitoring at 100% volume
+    echo "  Enabling self-monitoring at 100% volume"
+    /usr/local/bin/ndi-bridge-intercom-monitor enable 100 >/dev/null 2>&1 || true
+fi
+
+# Wait a bit more for Chrome to fully establish audio
+sleep 5
+
+# Force any Chrome audio streams to use USB devices and set volume
+echo "Configuring Chrome audio..."
 if [ -n "$USB_SINK" ]; then
+    # Determine Chrome/Others volume to use
+    CHROME_VOLUME="90"  # Default
+    if [ -f "/etc/ndi-bridge/intercom.conf" ]; then
+        # Read saved speaker_volume from config
+        SAVED_VOLUME=$(python3 -c "import json; conf=json.load(open('/etc/ndi-bridge/intercom.conf')); print(conf.get('speaker_volume', 90))" 2>/dev/null)
+        if [ -n "$SAVED_VOLUME" ]; then
+            CHROME_VOLUME="$SAVED_VOLUME"
+            echo "  Using saved Others volume: ${CHROME_VOLUME}%"
+        fi
+    else
+        echo "  Using default Others volume: ${CHROME_VOLUME}%"
+    fi
+    
     for stream in $(pactl list sink-inputs short | awk '{print $1}'); do
         current_sink=$(pactl list sink-inputs short | grep "^$stream" | awk '{print $2}')
         if [ "$current_sink" != "$(pactl list sinks short | grep "$USB_SINK" | awk '{print $1}')" ]; then
-            echo "Moving output stream $stream to USB audio"
+            echo "  Moving output stream $stream to USB audio"
             pactl move-sink-input "$stream" "$USB_SINK" 2>/dev/null || true
         fi
+        # Always set the determined volume
+        echo "  Setting Others volume to ${CHROME_VOLUME}% for stream $stream"
+        pactl set-sink-input-volume "$stream" "${CHROME_VOLUME}%" 2>/dev/null || true
     done
 fi
 

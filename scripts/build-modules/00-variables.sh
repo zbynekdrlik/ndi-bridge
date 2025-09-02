@@ -3,8 +3,8 @@
 # This module defines all global variables used throughout the build process
 
 # Build Script Version - Auto-incremented with each build
-BUILD_SCRIPT_VERSION="1.9.8"
-BUILD_SCRIPT_DATE="2025-09-01"
+BUILD_SCRIPT_VERSION="1.9.9"
+BUILD_SCRIPT_DATE="2025-09-02"
 
 # Build timestamp - Generated at build time (local timezone)
 BUILD_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"

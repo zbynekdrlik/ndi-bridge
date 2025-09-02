@@ -46,6 +46,11 @@ class ShellExecutor:
             return False, str(e)
     
     @staticmethod
+    async def run_command(command: str, args: List[str] = None) -> Tuple[bool, str]:
+        """Run any command with arguments"""
+        return await ShellExecutor.execute(command, args)
+    
+    @staticmethod
     async def pactl(args: List[str]) -> Tuple[bool, str]:
         """Execute pactl command"""
         return await ShellExecutor.execute("pactl", args)
