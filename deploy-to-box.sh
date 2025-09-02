@@ -52,7 +52,7 @@ if ! sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 
     exit 1
 fi
 
-# No filesystem remount needed with F2FS
+# No filesystem remount needed with Btrfs (always writable)
 
 # Function to deploy files
 deploy_files() {

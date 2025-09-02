@@ -157,8 +157,8 @@ NDI_NAME=""            # Empty = use hostname
 - Service restart on failures
 
 ### Power Failure Resistance
-- F2FS filesystem (optimized for flash media)
-- Atomic write operations
+- Btrfs filesystem with Copy-on-Write
+- Data integrity through CoW operations
 - Minimal writes to USB
 - Logs in tmpfs (RAM)
 

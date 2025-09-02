@@ -1,5 +1,5 @@
 #!/bin/bash
-# System optimization module - F2FS provides power failure resistance
+# System optimization module - Btrfs provides power failure resistance
 
 configure_power_resistance() {
     log "Configuring system optimizations..."

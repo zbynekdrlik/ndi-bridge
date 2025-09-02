@@ -682,11 +682,11 @@ The display system automatically handles resolution mismatches:
 3. Writes to `/var/run/ndi-bridge/` tmpfs files
 4. `ndi-bridge-welcome` reads and displays on TTY2
 
-### F2FS Filesystem
-- Root filesystem uses F2FS for flash media optimization
-- Built-in power failure resistance through atomic operations
-- Better wear leveling and performance on USB drives
-- No need for read-only mode or manual remounting
+### Btrfs Filesystem
+- Root filesystem uses Btrfs for power failure resistance
+- Copy-on-Write (CoW) for data integrity
+- Optimized for flash media with SSD mode
+- Fast boot with space_cache=v2 and no compression
 
 ### Time Sync (Critical for Quality)
 - PTP primary (microsecond precision)
