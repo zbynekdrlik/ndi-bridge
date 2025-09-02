@@ -179,7 +179,7 @@ chmod +x /usr/local/bin/ndi-bridge-tmux-session
 
 # wetty.service was copied before chroot
 
-# Create nginx writable directories for read-only filesystem
+# Create nginx writable directories
 mkdir -p /var/lib/nginx/body
 mkdir -p /var/lib/nginx/proxy
 mkdir -p /var/lib/nginx/fastcgi

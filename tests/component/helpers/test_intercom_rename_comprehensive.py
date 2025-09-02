@@ -75,7 +75,6 @@ class TestIntercomRenameComprehensive:
             pytest.skip("Chrome not running, cannot test restart")
         
         # Test that restart command works
-        host.run("ndi-bridge-rw")
         restart_result = host.run("systemctl restart ndi-bridge-intercom")
         assert restart_result.succeeded, "Service restart should succeed"
         
@@ -99,8 +98,6 @@ class TestIntercomRenameComprehensive:
         
         assert new_chrome_found, "Chrome should restart after service restart"
         assert new_pid != original_pid, f"Chrome PID should change after restart (was {original_pid}, now {new_pid})"
-        
-        host.run("ndi-bridge-ro")
     
     @pytest.mark.slow
     @pytest.mark.destructive
@@ -126,7 +123,6 @@ class TestIntercomRenameComprehensive:
         ps_before = host.run("ps aux | grep -v grep | grep chrome | grep vdo.ninja || true").stdout
         
         # Perform the rename
-        host.run("ndi-bridge-rw")
         new_name = "pytest99"
         rename_result = host.run(f"ndi-bridge-set-name {new_name}")
         assert rename_result.succeeded, "Rename should succeed"
@@ -171,8 +167,6 @@ class TestIntercomRenameComprehensive:
         # Verify restoration
         restored_hostname = host.run("hostname").stdout.strip()
         assert restored_hostname == original_hostname, "Hostname should be restored"
-        
-        host.run("ndi-bridge-ro")
     
     def test_intercom_survives_reboot(self, host):
         """Test that intercom service is enabled and starts on boot."""
