@@ -5,7 +5,7 @@ Wants=ndi-capture.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/ndi-bridge-collector
+ExecStart=/usr/local/bin/media-bridge-collector
 Restart=always
 RestartSec=5
 StandardOutput=journal

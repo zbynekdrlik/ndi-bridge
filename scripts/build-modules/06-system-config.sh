@@ -160,13 +160,13 @@ echo "Timezone configured: $(timedatectl show --property=Timezone --value 2>/dev
 
 # Create version file for system identification
 echo "Creating version file..."
-cat > /etc/ndi-bridge-version << EOFVERSION
+cat > /etc/media-bridge-version << EOFVERSION
 VERSION=BUILD_SCRIPT_VERSION_PLACEHOLDER
 DATE=BUILD_SCRIPT_DATE_PLACEHOLDER
 TIMESTAMP=BUILD_TIMESTAMP_PLACEHOLDER
 COMMIT=GIT_COMMIT_PLACEHOLDER
 EOFVERSION
-echo "Version file created at /etc/ndi-bridge-version"
+echo "Version file created at /etc/media-bridge-version"
 
 # Clean up
 apt-get clean

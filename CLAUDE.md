@@ -1,4 +1,4 @@
-# CLAUDE.md - NDI Bridge Development Guide
+# CLAUDE.md - Media Bridge Development Guide
 
 ## WEB INTERFACE ARCHITECTURE (2025 Standard)
 
@@ -152,7 +152,7 @@ def test_capture_service_active():
 
 def test_capture_fps_stable():
     """Test that capture maintains 30fps."""
-    metrics = host.file("/var/run/ndi-bridge/fps").content_string
+    metrics = host.file("/var/run/media-bridge/fps").content_string
     assert float(metrics) >= 29.0
 ```
 
@@ -167,7 +167,7 @@ def test_stabilization_duration():
     time.sleep(30)
     
     # Assert: Verify the outcome
-    state = host.file("/var/run/ndi-bridge/capture_state").content_string
+    state = host.file("/var/run/media-bridge/capture_state").content_string
     assert state == "RUNNING"
 ```
 
@@ -341,7 +341,7 @@ pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
 - **SKIPPED**: Optional feature not present (OK)
 - **ERROR**: Test couldn't run - check connectivity
 
-**Expected Results on Clean NDI Bridge**:
+**Expected Results on Clean Media Bridge**:
 - ~140 tests should pass
 - Some skips are normal (optional features like intercom)
 - Zero failures on properly configured device
@@ -418,7 +418,7 @@ def test_capture_service_enabled(host):
     assert host.service("ndi-capture").is_enabled
 
 def test_capture_fps_nominal(host):
-    fps = float(host.file("/var/run/ndi-bridge/fps").content_string)
+    fps = float(host.file("/var/run/media-bridge/fps").content_string)
     assert 29.0 <= fps <= 31.0
 ```
 
@@ -530,7 +530,7 @@ Fixes #25"
 ## CRITICAL: USB Image Build Rules
 
 **ALWAYS DO:**
-1. Run from repository ROOT: `cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge`
+1. Run from repository ROOT: `cd /mnt/c/Users/newlevel/Documents/GitHub/media-bridge`
 2. Increment version: Edit `scripts/build-modules/00-variables.sh` → `BUILD_SCRIPT_VERSION`
 3. Run build: `sudo ./build-image-for-rufus.sh > build.log 2>&1 &` (MUST redirect ALL output to prevent Claude crashes)
 4. Monitor logs: `tail -f build.log` or check build-logs directory
@@ -539,7 +539,7 @@ Fixes #25"
 - Run build from `build/` directory (causes "file not found" errors)
 - Forget to increment version (can't identify deployed devices)
 
-**Build takes 10-15 minutes. Image output: `ndi-bridge.img` (8GB)**
+**Build takes 10-15 minutes. Image output: `media-bridge.img` (8GB)**
 
 ## Clean Repository Build Process
 
@@ -547,8 +547,8 @@ Fixes #25"
 
 1. **Clone and enter repository:**
 ```bash
-git clone https://github.com/yourusername/ndi-bridge.git
-cd ndi-bridge
+git clone https://github.com/yourusername/media-bridge.git
+cd media-bridge
 ```
 
 2. **Setup build environment (installs dependencies and NDI SDK):**
@@ -577,7 +577,7 @@ This creates ndi-capture and ndi-display binaries in `build/bin/`
 sudo ./build-image-for-rufus.sh > build.log 2>&1 &
 tail -f build.log  # Monitor progress
 ```
-Build takes 10-15 minutes. Output: `ndi-bridge.img` (8GB)
+Build takes 10-15 minutes. Output: `media-bridge.img` (8GB)
 
 **Common Issues & Solutions:**
 - `losetup package not found` → Fixed: use util-linux package instead
@@ -602,7 +602,7 @@ Build takes 10-15 minutes. Output: `ndi-bridge.img` (8GB)
 **Manual build (if needed):**
 ```bash
 # CRITICAL: Must be in build/ directory!
-cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/build
+cd /mnt/c/Users/newlevel/Documents/GitHub/media-bridge/build
 make ndi-display -j$(nproc)    # Display component
 make ndi-capture -j$(nproc)    # Capture component
 make -j$(nproc)                # Everything
@@ -625,9 +625,9 @@ npm run typecheck  # If exists
 
 ### USB Appliance Commands
 ```bash
-ndi-bridge-info         # System status
-ndi-bridge-logs         # View logs
-ndi-bridge-set-name     # Change NDI name
+media-bridge-info         # System status
+media-bridge-logs         # View logs
+media-bridge-set-name     # Change NDI name
 ```
 
 ## Project Structure
@@ -648,7 +648,7 @@ ndi-bridge-set-name     # Change NDI name
 ### Web Interface
 - URL: `http://device.local/` (admin/newlevel)
 - Terminal: Persistent tmux session via wetty
-- Config: `/etc/nginx/sites-available/ndi-bridge`
+- Config: `/etc/nginx/sites-available/media-bridge`
 
 ## Known Issues & Solutions
 
@@ -696,9 +696,9 @@ The display system automatically handles resolution mismatches:
 
 ### Metrics Collection Pipeline
 1. `v4l2_capture.cpp` emits: `METRICS|FPS:30|FRAMES:1234|DROPPED:0`
-2. `ndi-bridge-collector` service parses journalctl
-3. Writes to `/var/run/ndi-bridge/` tmpfs files
-4. `ndi-bridge-welcome` reads and displays on TTY2
+2. `media-bridge-collector` service parses journalctl
+3. Writes to `/var/run/media-bridge/` tmpfs files
+4. `media-bridge-welcome` reads and displays on TTY2
 
 ### Btrfs Filesystem
 - Root filesystem uses Btrfs for power failure resistance
@@ -728,7 +728,7 @@ For quick iteration during development, you can deploy directly to a running box
 ```bash
 # Option 1: Deploy specific binaries only (fastest)
 sshpass -p newlevel ssh root@10.77.9.143 "systemctl stop ndi-display@1"
-sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.143:/opt/ndi-bridge/
+sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.143:/opt/media-bridge/
 sshpass -p newlevel ssh root@10.77.9.143 "systemctl start ndi-display@1"
 
 # Option 2: Use quick-deploy.sh script (if created)

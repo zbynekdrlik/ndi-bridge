@@ -1,10 +1,10 @@
-# NDI Bridge
+# Media Bridge
 
-[![Version](https://img.shields.io/badge/version-2.1.6-blue.svg)](https://github.com/zbynekdrlik/ndi-bridge/releases)
+[![Version](https://img.shields.io/badge/version-2.1.6-blue.svg)](https://github.com/zbynekdrlik/media-bridge/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capture devices to NDI (Network Device Interface) streams. It enables seamless integration of HDMI capture cards, webcams, and professional video equipment into IP-based video workflows.
+Media Bridge is a high-performance, ultra-low-latency tool that bridges video capture devices to NDI (Network Device Interface) streams. It enables seamless integration of HDMI capture cards, webcams, and professional video equipment into IP-based video workflows.
 
 ## 🚀 Latest Updates (v2.1.6)
 
@@ -13,7 +13,7 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 - **Fixed Boot Issues**: USB systems now boot properly with correct partition layout
 - **Fixed TTY2 Display**: Welcome screen shows with proper colors and auto-refresh
 - **USB Hot-plug Recovery**: Automatic recovery when USB capture devices are disconnected/reconnected
-- **Bootable USB Appliance**: Ready-to-deploy Linux system with auto-starting NDI Bridge
+- **Bootable USB Appliance**: Ready-to-deploy Linux system with auto-starting Media Bridge
 - **Improved Stability**: Enhanced error handling and frame monitoring
 - **Network Bridge**: Dual ethernet port support for daisy-chaining devices
 
@@ -21,7 +21,7 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 
 ### Current Features (v2.1.6)
 - ✅ **USB Hot-plug Recovery** - Automatically restarts when devices disconnect/reconnect
-- ✅ **Bootable USB System** - Complete Linux appliance for dedicated NDI Bridge boxes
+- ✅ **Bootable USB System** - Complete Linux appliance for dedicated Media Bridge boxes
 - ✅ **Ultra-low latency pipeline** with multi-threading (Linux)
 - ✅ **Media Foundation** capture support (Windows)
 - ✅ **DeckLink** capture support with extreme latency optimization (Windows)
@@ -37,7 +37,7 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 
 ### USB Appliance Features
 - ✅ Btrfs filesystem with Copy-on-Write (power failure safe)
-- ✅ Automatic NDI Bridge startup
+- ✅ Automatic Media Bridge startup
 - ✅ Network bridge for daisy-chaining
 - ✅ TTY1: Live NDI logs display
 - ✅ TTY2: System status with build timestamp display
@@ -75,8 +75,8 @@ NDI Bridge is a high-performance, ultra-low-latency tool that bridges video capt
 
 ```bash
 # Clone repository
-git clone https://github.com/zbynekdrlik/ndi-bridge.git
-cd ndi-bridge
+git clone https://github.com/zbynekdrlik/media-bridge.git
+cd media-bridge
 
 # Create build directory
 mkdir build && cd build
@@ -93,7 +93,7 @@ make -j$(nproc)                    # Linux
 
 ```bash
 # On Ubuntu 22.04 or newer
-cd ndi-bridge
+cd media-bridge
 
 # Build the binary first
 mkdir build && cd build
@@ -105,8 +105,8 @@ cd ..
 sudo ./build-usb-with-log.sh /dev/sdX  # Replace sdX with your USB device
 ```
 
-This creates a complete NDI Bridge appliance that:
-- Boots directly into NDI Bridge
+This creates a complete Media Bridge appliance that:
+- Boots directly into Media Bridge
 - Auto-detects and uses the first video capture device
 - Provides network access via DHCP
 - Shows live logs on console
@@ -134,7 +134,7 @@ ndi-capture.exe "USB Video Device" "Camera 1" # Windows
 3. Connect network cable (either ethernet port)
 4. System automatically:
    - Gets IP via DHCP
-   - Starts streaming as "ndi-bridge" (or custom name)
+   - Starts streaming as "media-bridge" (or custom name)
    - Shows logs on TTY1 (Alt+F1)
    - Shows status on TTY2 (Alt+F2)
 
@@ -143,11 +143,11 @@ ndi-capture.exe "USB Video Device" "Camera 1" # Windows
 - Password: `newlevel`
 
 #### Helper Commands
-- `ndi-bridge-info` - Display system status
-- `ndi-bridge-set-name <name>` - Set device/stream name and mDNS aliases
-- `ndi-bridge-logs` - View service logs
-- `ndi-bridge-netstat` - Network bridge status
-- `ndi-bridge-help` - Show all commands
+- `media-bridge-info` - Display system status
+- `media-bridge-set-name <name>` - Set device/stream name and mDNS aliases
+- `media-bridge-logs` - View service logs
+- `media-bridge-netstat` - Network bridge status
+- `media-bridge-help` - Show all commands
 - `vdo-ninja-intercom-logs` - View intercom logs
 - `vdo-ninja-intercom-restart` - Restart intercom service
 - `systemctl status vdo-ninja-intercom` - Check intercom service status
@@ -157,10 +157,10 @@ Devices are accessible via mDNS/Avahi with automatic hostname resolution:
 
 ```bash
 # Set device name (on the appliance)
-sudo ndi-bridge-set-name cam1
+sudo media-bridge-set-name cam1
 
 # Access from any computer on the network
-ping ndi-bridge-cam1.local  # Full hostname
+ping media-bridge-cam1.local  # Full hostname
 ping cam1.local             # Short alias (convenience)
 
 # Future web interface will be available at:
@@ -171,7 +171,7 @@ NDI services are also advertised via mDNS for automatic discovery by NDI applica
 
 ## VDO.Ninja Intercom
 
-The NDI Bridge appliance includes built-in bidirectional audio intercom functionality using VDO.Ninja WebRTC technology. This enables remote production teams to communicate with operators at the device location.
+The Media Bridge appliance includes built-in bidirectional audio intercom functionality using VDO.Ninja WebRTC technology. This enables remote production teams to communicate with operators at the device location.
 
 ### Intercom Features
 - **Automatic Connection**: Connects to VDO.Ninja room at boot without user interaction
@@ -189,7 +189,7 @@ The NDI Bridge appliance includes built-in bidirectional audio intercom function
 
 The intercom connects to a VDO.Ninja room using the device hostname:
 - **Room Name**: `nl_interkom` (default)
-- **Device ID**: Uses hostname (e.g., `ndi-bridge-cam1`)
+- **Device ID**: Uses hostname (e.g., `media-bridge-cam1`)
 - **Audio Device**: USB Audio (3.5mm jack on device)
 
 ### Remote Access
@@ -198,7 +198,7 @@ The intercom connects to a VDO.Ninja room using the device hostname:
 ```bash
 # Connect to intercom display (using mDNS hostname)
 vncviewer cam1.local:5999    # No password required
-vncviewer ndi-bridge-cam1.local:5999    # Alternative full hostname
+vncviewer media-bridge-cam1.local:5999    # Alternative full hostname
 ```
 
 #### Web Control Interface
@@ -221,30 +221,30 @@ Access the VDO.Ninja control page from any browser:
 https://vdo.ninja/?room=nl_interkom&view
 ```
 
-This shows all connected NDI Bridge devices in the room.
+This shows all connected Media Bridge devices in the room.
 
 ### Troubleshooting Intercom
 
 #### Check Service Status
 ```bash
 ssh root@cam1.local
-systemctl status ndi-bridge-intercom       # Main intercom service
-systemctl status ndi-bridge-intercom-web   # Web control interface
+systemctl status media-bridge-intercom       # Main intercom service
+systemctl status media-bridge-intercom-web   # Web control interface
 ```
 
 #### View Logs
 ```bash
-ndi-bridge-intercom-logs
+media-bridge-intercom-logs
 # or
-journalctl -u ndi-bridge-intercom -f
-journalctl -u ndi-bridge-intercom-web -f   # Web interface logs
+journalctl -u media-bridge-intercom -f
+journalctl -u media-bridge-intercom-web -f   # Web interface logs
 ```
 
 #### Restart Service
 ```bash
-ndi-bridge-intercom-restart
+media-bridge-intercom-restart
 # or
-systemctl restart ndi-bridge-intercom
+systemctl restart media-bridge-intercom
 ```
 
 #### Audio Issues
@@ -361,7 +361,7 @@ Test categories:
 
 ### Repository Structure
 ```
-ndi-bridge/
+media-bridge/
 ├── src/                    # Source code
 │   ├── common/            # Shared components
 │   ├── windows/           # Windows-specific
@@ -402,7 +402,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Support
 
-- Open an [issue](https://github.com/zbynekdrlik/ndi-bridge/issues)
+- Open an [issue](https://github.com/zbynekdrlik/media-bridge/issues)
 - Include logs with `-v` flag
 - Specify OS and device details
 - Check existing issues first

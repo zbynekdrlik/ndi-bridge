@@ -83,15 +83,15 @@ PREFS
     
     if [ -d "$TEST_DIR" ]; then
         # Create test directory on target
-        mkdir -p /mnt/usb/opt/ndi-bridge-tests
+        mkdir -p /mnt/usb/opt/media-bridge-tests
         
         # Copy all test files
-        cp -r "$TEST_DIR"/* /mnt/usb/opt/ndi-bridge-tests/
+        cp -r "$TEST_DIR"/* /mnt/usb/opt/media-bridge-tests/
         
         # Make test scripts executable
-        find /mnt/usb/opt/ndi-bridge-tests -name "*.sh" -exec chmod +x {} \;
+        find /mnt/usb/opt/media-bridge-tests -name "*.sh" -exec chmod +x {} \;
         
-        log "Test suite installed to /opt/ndi-bridge-tests"
+        log "Test suite installed to /opt/media-bridge-tests"
     else
         log "Warning: Test suite not found at $TEST_DIR"
     fi

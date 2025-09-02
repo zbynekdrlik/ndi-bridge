@@ -65,7 +65,7 @@ def test_runtime_directories_created(host):
     """Test that runtime directories are created during boot."""
     runtime_dirs = [
         "/var/run/ndi-bridge",
-        "/var/log/ndi-bridge",
+        "/var/log/media-bridge",
         "/tmp"
     ]
     

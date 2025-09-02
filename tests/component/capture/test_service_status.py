@@ -33,7 +33,7 @@ def test_ndi_capture_process_exists(host):
 
 def test_ndi_capture_binary_exists(host):
     """Test that ndi-capture binary exists and is executable."""
-    binary = host.file("/opt/ndi-bridge/ndi-capture")
+    binary = host.file("/opt/media-bridge/ndi-capture")
     assert binary.exists, "ndi-capture binary not found"
     assert binary.is_executable, "ndi-capture binary is not executable"
 

@@ -146,7 +146,7 @@ def host(device_config):
 @pytest.fixture
 def ndi_version(host) -> str:
     """Get the NDI Bridge version from the device."""
-    cmd = host.run("cat /etc/ndi-bridge-version 2>/dev/null || echo 'unknown'")
+    cmd = host.run("cat /etc/media-bridge-version 2>/dev/null || echo 'unknown'")
     return cmd.stdout.strip()
 
 

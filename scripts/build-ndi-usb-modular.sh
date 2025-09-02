@@ -33,16 +33,16 @@ copy_ndi_files() {
     log "Copying NDI files..."
     
     # Create directories first
-    mkdir -p /mnt/usb/opt/ndi-bridge
+    mkdir -p /mnt/usb/opt/media-bridge
     
     # Copy NDI binary
-    cp "$NDI_BINARY_PATH" /mnt/usb/opt/ndi-bridge/
-    chmod +x /mnt/usb/opt/ndi-bridge/ndi-capture
+    cp "$NDI_BINARY_PATH" /mnt/usb/opt/media-bridge/
+    chmod +x /mnt/usb/opt/media-bridge/ndi-capture
     
     # Copy NDI Display binary if it exists
     if [ -f "$NDI_DISPLAY_BINARY_PATH" ]; then
-        cp "$NDI_DISPLAY_BINARY_PATH" /mnt/usb/opt/ndi-bridge/
-        chmod +x /mnt/usb/opt/ndi-bridge/ndi-display
+        cp "$NDI_DISPLAY_BINARY_PATH" /mnt/usb/opt/media-bridge/
+        chmod +x /mnt/usb/opt/media-bridge/ndi-display
         log "NDI Display binary copied"
     else
         log "NDI Display binary not found, skipping"

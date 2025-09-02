@@ -13,7 +13,7 @@ class StateManager:
     
     def __init__(self):
         self.runtime_state_file = "/var/run/ndi-bridge/intercom.state"
-        self.config_file = "/etc/ndi-bridge/intercom.conf"
+        self.config_file = "/etc/media-bridge/intercom.conf"
         self.state = {
             "mic_muted": False,
             "speaker_volume": 75,

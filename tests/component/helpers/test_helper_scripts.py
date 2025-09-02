@@ -66,21 +66,21 @@ def test_ndi_bridge_welcome_service_enabled(host):
 
 
 def test_ndi_bridge_collector_script_exists(host):
-    """Test that ndi-bridge-collector script exists."""
-    script = host.file("/usr/local/bin/ndi-bridge-collector")
-    assert script.exists, "ndi-bridge-collector script not found"
+    """Test that media-bridge-collector script exists."""
+    script = host.file("/usr/local/bin/media-bridge-collector")
+    assert script.exists, "media-bridge-collector script not found"
 
 
 def test_ndi_bridge_collector_service_enabled(host):
-    """Test that ndi-bridge-collector service is enabled."""
-    service = host.service("ndi-bridge-collector")
-    assert service.is_enabled, "ndi-bridge-collector service not enabled"
+    """Test that media-bridge-collector service is enabled."""
+    service = host.service("media-bridge-collector")
+    assert service.is_enabled, "media-bridge-collector service not enabled"
 
 
 def test_ndi_bridge_collector_service_running(host):
-    """Test that ndi-bridge-collector service is running."""
-    service = host.service("ndi-bridge-collector")
-    assert service.is_running, "ndi-bridge-collector service not running"
+    """Test that media-bridge-collector service is running."""
+    service = host.service("media-bridge-collector")
+    assert service.is_running, "media-bridge-collector service not running"
 
 
 @pytest.mark.helpers

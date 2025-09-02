@@ -125,7 +125,7 @@ The system creates a bridge (br0) combining all ethernet interfaces:
 To use static IP, modify the network configuration in module `08-network.sh`.
 
 ### NDI Settings
-Default configuration in `/etc/ndi-bridge/config`:
+Default configuration in `/etc/media-bridge/config`:
 ```bash
 DEVICE="/dev/video0"    # First video device
 NDI_NAME=""            # Empty = use hostname
@@ -271,7 +271,7 @@ apt-get install -y your-package
 Instead of bridging, configure bonding for redundancy in `08-network.sh`.
 
 ### Multiple Cameras
-Modify `/etc/ndi-bridge/config` to specify different devices or create multiple service instances.
+Modify `/etc/media-bridge/config` to specify different devices or create multiple service instances.
 
 ## Support
 

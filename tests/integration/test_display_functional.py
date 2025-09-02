@@ -24,7 +24,7 @@ def test_display_stream_playback_with_audio(host):
     
     # 1. Find available CG/NDI streams
     print("Finding available NDI streams...")
-    result = host.run("/opt/ndi-bridge/ndi-display list")
+    result = host.run("/opt/media-bridge/ndi-display list")
     assert result.succeeded, "Failed to list NDI streams"
     
     # Look for CG streams (prefer cg-obs or similar)
@@ -92,7 +92,7 @@ def test_display_stream_playback_with_audio(host):
     # 4. Start NDI display with the CG stream
     print(f"Starting NDI display with stream: {cg_stream}")
     # Use nohup to run in background
-    cmd = f"nohup /opt/ndi-bridge/ndi-display '{cg_stream}' {display_id} > /tmp/ndi-display-test.log 2>&1 & echo $!"
+    cmd = f"nohup /opt/media-bridge/ndi-display '{cg_stream}' {display_id} > /tmp/ndi-display-test.log 2>&1 & echo $!"
     result = host.run(cmd)
     pid = result.stdout.strip()
     print(f"NDI display started with PID: {pid}")
@@ -261,7 +261,7 @@ def test_display_console_recovery(host):
     host.run("echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
     
     # Use the capture stream as it's always available
-    cmd = f"timeout 5 /opt/ndi-bridge/ndi-display 'NDI-BRIDGE (USB Capture)' {display_id} > /dev/null 2>&1 || true"
+    cmd = f"timeout 5 /opt/media-bridge/ndi-display 'NDI-BRIDGE (USB Capture)' {display_id} > /dev/null 2>&1 || true"
     host.run(cmd)
     
     # 3. Restore console
@@ -359,7 +359,7 @@ def test_display_audio_diagnosis(host):
         
         # Quick test with CG stream
         host.run("echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
-        test_result = host.run(f"timeout 10 /opt/ndi-bridge/ndi-display 'RESOLUME-SNV (cg-obs)' {display_id} 2>&1 | grep -i audio")
+        test_result = host.run(f"timeout 10 /opt/media-bridge/ndi-display 'RESOLUME-SNV (cg-obs)' {display_id} 2>&1 | grep -i audio")
         
         if 'Audio output initialized' in test_result.stdout:
             print("✓ Audio initialization successful")

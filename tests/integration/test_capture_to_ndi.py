@@ -35,7 +35,7 @@ def test_capture_to_ndi_pipeline_active(host):
 def test_ndi_stream_discoverable(host):
     """Test that NDI stream is discoverable on network."""
     # Get device NDI name
-    ndi_name_file = host.file("/etc/ndi-bridge-name")
+    ndi_name_file = host.file("/etc/media-bridge-name")
     if ndi_name_file.exists:
         ndi_name = ndi_name_file.content_string.strip()
     else:

@@ -6,7 +6,7 @@ Wants=ndi-bridge-intercom.service
 [Service]
 Type=exec
 User=root
-WorkingDirectory=/opt/ndi-bridge-web/backend
+WorkingDirectory=/opt/media-bridge-web/backend
 ExecStart=/usr/bin/python3 -u -m uvicorn main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5

@@ -74,26 +74,26 @@ log_info "Stopping services..."
 sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no -t $BOX_USER@$BOX_IP << 'EOF'
 systemctl stop ndi-capture 2>/dev/null || true
 systemctl stop ndi-display@0 ndi-display@1 ndi-display@2 2>/dev/null || true
-systemctl stop ndi-bridge-collector 2>/dev/null || true
+systemctl stop media-bridge-collector 2>/dev/null || true
 sleep 1
 EOF
 
 # Deploy core binaries
 log_info "Deploying NDI-Bridge binaries..."
-if [ -f "$MOUNT_DIR/opt/ndi-bridge/ndi-capture" ]; then
+if [ -f "$MOUNT_DIR/opt/media-bridge/ndi-capture" ]; then
     sshpass -p "$BOX_PASS" scp -o StrictHostKeyChecking=no \
-        "$MOUNT_DIR/opt/ndi-bridge/ndi-capture" \
-        $BOX_USER@$BOX_IP:/opt/ndi-bridge/ndi-capture
+        "$MOUNT_DIR/opt/media-bridge/ndi-capture" \
+        $BOX_USER@$BOX_IP:/opt/media-bridge/ndi-capture
     sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP \
-        "chmod +x /opt/ndi-bridge/ndi-capture"
+        "chmod +x /opt/media-bridge/ndi-capture"
 fi
 
-if [ -f "$MOUNT_DIR/opt/ndi-bridge/ndi-display" ]; then
+if [ -f "$MOUNT_DIR/opt/media-bridge/ndi-display" ]; then
     sshpass -p "$BOX_PASS" scp -o StrictHostKeyChecking=no \
-        "$MOUNT_DIR/opt/ndi-bridge/ndi-display" \
-        $BOX_USER@$BOX_IP:/opt/ndi-bridge/ndi-display
+        "$MOUNT_DIR/opt/media-bridge/ndi-display" \
+        $BOX_USER@$BOX_IP:/opt/media-bridge/ndi-display
     sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP \
-        "chmod +x /opt/ndi-bridge/ndi-display"
+        "chmod +x /opt/media-bridge/ndi-display"
 fi
 
 # Deploy helper scripts
@@ -120,20 +120,20 @@ done
 
 # Deploy configuration files
 log_info "Deploying configuration..."
-if [ -d "$MOUNT_DIR/etc/ndi-bridge" ]; then
-    deploy_files "etc/ndi-bridge" "/etc/" "NDI configuration"
+if [ -d "$MOUNT_DIR/etc/media-bridge" ]; then
+    deploy_files "etc/media-bridge" "/etc/" "NDI configuration"
 fi
 
 # Update build version
-if [ -f "$MOUNT_DIR/etc/ndi-bridge/build-script-version" ]; then
-    VERSION=$(cat "$MOUNT_DIR/etc/ndi-bridge/build-script-version")
+if [ -f "$MOUNT_DIR/etc/media-bridge/build-script-version" ]; then
+    VERSION=$(cat "$MOUNT_DIR/etc/media-bridge/build-script-version")
     log_info "Updating to version $VERSION"
 fi
 
 # Deploy web interface if it exists
-if [ -d "$MOUNT_DIR/var/www/ndi-bridge" ]; then
+if [ -d "$MOUNT_DIR/var/www/media-bridge" ]; then
     log_info "Deploying web interface..."
-    deploy_files "var/www/ndi-bridge" "/var/www/" "web interface"
+    deploy_files "var/www/media-bridge" "/var/www/" "web interface"
 fi
 
 # Install new packages if needed (for audio support)
@@ -155,7 +155,7 @@ systemctl daemon-reload
 
 # Restart NDI services
 systemctl restart ndi-capture 2>/dev/null || true
-systemctl restart ndi-bridge-collector 2>/dev/null || true
+systemctl restart media-bridge-collector 2>/dev/null || true
 
 # Restart display services if they exist
 for i in 0 1 2; do
@@ -176,8 +176,8 @@ sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP "sync"
 log_info "Checking deployment status..."
 sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP << 'EOF'
 echo "=== Version Info ==="
-/opt/ndi-bridge/ndi-capture --version 2>/dev/null || echo "ndi-capture not found"
-/opt/ndi-bridge/ndi-display --version 2>&1 | head -3 || echo "ndi-display not found"
+/opt/media-bridge/ndi-capture --version 2>/dev/null || echo "ndi-capture not found"
+/opt/media-bridge/ndi-display --version 2>&1 | head -3 || echo "ndi-display not found"
 
 echo -e "\n=== Service Status ==="
 systemctl is-active ndi-capture || echo "ndi-capture: inactive"
