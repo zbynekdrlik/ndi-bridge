@@ -1,84 +1,59 @@
 """
-Atomic tests for VDO.Ninja intercom functionality.
+Basic compatibility tests for VDO.Ninja intercom components.
 
-Tests the Chrome-based intercom system with USB audio.
+This file contains legacy tests updated to work with current implementation.
+Most comprehensive tests are in tests/component/intercom/ directory.
 """
 
 import pytest
-import time
 
 
 def test_chrome_or_chromium_installed(host):
-    """Test that Chrome or Chromium is installed."""
+    """Test that Chrome is installed (Chromium not supported)."""
     chrome_result = host.run("which google-chrome")
-    chromium_result = host.run("which chromium-browser")
-    
-    assert chrome_result.rc == 0 or chromium_result.rc == 0, "Neither Chrome nor Chromium installed"
+    assert chrome_result.rc == 0, "Google Chrome should be installed"
 
 
 def test_chrome_executable(host):
-    """Test that Chrome/Chromium binary is executable."""
+    """Test that Chrome binary is executable."""
     chrome_result = host.run("which google-chrome")
-    if chrome_result.rc == 0:
-        chrome_path = chrome_result.stdout.strip()
-        chrome_file = host.file(chrome_path)
-        assert chrome_file.mode & 0o111, "Chrome not executable"
-    else:
-        chromium_result = host.run("which chromium-browser")
-        if chromium_result.rc == 0:
-            chromium_path = chromium_result.stdout.strip()
-            chromium_file = host.file(chromium_path)
-            assert chromium_file.mode & 0o111, "Chromium not executable"
-
-
-def test_vdo_ninja_intercom_script_exists(host):
-    """Test that VDO Ninja intercom script exists."""
-    # Check various possible names
-    possible_scripts = [
-        "/usr/local/bin/vdo-ninja-intercom",
-        "/usr/local/bin/ndi-bridge-intercom",
-        "/usr/local/bin/intercom"
-    ]
+    assert chrome_result.rc == 0, "Chrome should be found"
     
-    for script_path in possible_scripts:
-        if host.file(script_path).exists:
-            return  # Found one
-    
-    # Intercom might not be installed on all systems
-    pytest.skip("Intercom script not found - feature may not be installed")
+    chrome_path = chrome_result.stdout.strip()
+    chrome_file = host.file(chrome_path)
+    assert chrome_file.mode & 0o111, "Chrome should be executable"
 
 
-def test_vdo_ninja_intercom_service_exists(host):
-    """Test that VDO Ninja intercom service exists."""
-    result = host.run("systemctl list-unit-files | grep -E 'vdo-ninja|intercom'")
-    assert result.rc == 0, "Intercom service not found"
+def test_intercom_launcher_script_exists(host):
+    """Test that intercom launcher script exists."""
+    # Check for actual launcher script
+    launcher = host.file("/usr/local/bin/ndi-bridge-intercom-launcher")
+    assert launcher.exists, "Intercom launcher script should exist"
+    assert launcher.mode & 0o111, "Launcher should be executable"
+
+
+def test_intercom_service_exists(host):
+    """Test that intercom service exists."""
+    result = host.run("systemctl list-unit-files | grep ndi-bridge-intercom.service")
+    assert result.rc == 0, "ndi-bridge-intercom.service should exist"
 
 
 def test_pipewire_for_audio_routing(host):
     """Test that PipeWire is available for audio routing."""
     result = host.run("which pipewire")
-    assert result.rc == 0, "PipeWire not installed (required for USB audio)"
-
-
-def test_pipewire_service_running(host):
-    """Test that PipeWire service is running."""
-    result = host.run("pgrep pipewire")
-    if result.rc != 0:
-        # Might run as user service
-        user_result = host.run("systemctl --user status pipewire 2>/dev/null")
-        assert user_result.rc == 0 or result.rc == 0, "PipeWire not running"
+    assert result.rc == 0, "PipeWire should be installed"
 
 
 def test_wireplumber_installed(host):
     """Test that WirePlumber is installed for PipeWire."""
     result = host.run("which wireplumber")
-    assert result.rc == 0, "WirePlumber not installed"
+    assert result.rc == 0, "WirePlumber should be installed"
 
 
 def test_pipewire_pulse_compatibility(host):
     """Test that PipeWire PulseAudio compatibility is available."""
     result = host.run("which pipewire-pulse")
-    assert result.rc == 0, "pipewire-pulse not installed"
+    assert result.rc == 0, "pipewire-pulse should be installed"
 
 
 @pytest.mark.requires_usb
@@ -89,56 +64,51 @@ def test_usb_audio_device_detected(host):
         pytest.skip("No USB audio device connected")
 
 
-def test_chrome_data_directory_configured(host):
-    """Test that Chrome data directory is configured."""
-    # Check if using tmpfs for Chrome data
-    tmpfs_dir = host.file("/tmp/chrome-data")
-    ram_dir = host.file("/dev/shm/chrome-data")
-    
-    assert tmpfs_dir.exists or ram_dir.exists or True, "Chrome data directory consideration"
+def test_intercom_control_script_exists(host):
+    """Test that intercom control script exists."""
+    control_script = host.file("/usr/local/bin/ndi-bridge-intercom-control")
+    assert control_script.exists, "Intercom control script should exist"
+    assert control_script.mode & 0o111, "Control script should be executable"
 
 
-def test_chrome_flags_configured(host):
-    """Test that Chrome flags are configured for kiosk mode."""
-    # Check if script contains proper flags
-    script_result = host.run("grep -E 'kiosk|autoplay|no-sandbox' /usr/local/bin/*intercom* 2>/dev/null")
-    # Flags might be in service file instead
-    assert script_result.rc == 0 or True, "Chrome flags consideration"
+def test_intercom_config_script_exists(host):
+    """Test that intercom config script exists."""
+    config_script = host.file("/usr/local/bin/ndi-bridge-intercom-config")
+    assert config_script.exists, "Intercom config script should exist"
+    assert config_script.mode & 0o111, "Config script should be executable"
 
 
-def test_vdo_ninja_url_configured(host):
-    """Test that VDO.Ninja URL is configured."""
-    # Check for VDO.Ninja URL in scripts or config
-    result = host.run("grep -r 'vdo.ninja' /usr/local/bin/ /etc/ 2>/dev/null | head -1")
-    # URL might be hardcoded or configurable
-    assert result.rc == 0 or True, "VDO.Ninja URL consideration"
+def test_xvfb_installed(host):
+    """Test that Xvfb is installed for virtual display."""
+    result = host.run("which Xvfb")
+    assert result.rc == 0, "Xvfb should be installed"
 
 
-def test_audio_permissions_for_chrome(host):
-    """Test that Chrome can access audio devices."""
-    # Check if chrome/chromium user is in audio group
-    result = host.run("groups chromium 2>/dev/null || groups chrome 2>/dev/null || echo 'root'")
-    # Chrome might run as root or specific user
-    assert "audio" in result.stdout or "root" in result.stdout, "Chrome user not in audio group"
+def test_x11vnc_installed(host):
+    """Test that x11vnc is installed for remote access."""
+    result = host.run("which x11vnc")
+    assert result.rc == 0, "x11vnc should be installed"
 
 
-@pytest.mark.audio
-def test_intercom_volume_control_script(host):
-    """Test that volume control script exists."""
-    script = host.file("/usr/local/bin/set-audio-volume")
-    if not script.exists:
-        # Check alternative methods
-        amixer_result = host.run("which amixer")
-        assert amixer_result.rc == 0, "No volume control method found"
+def test_intercom_pipewire_script_exists(host):
+    """Test that PipeWire implementation script exists."""
+    script = host.file("/usr/local/bin/ndi-bridge-intercom-pipewire")
+    assert script.exists, "PipeWire implementation script should exist"
+    assert script.mode & 0o111, "Script should be executable"
 
 
-def test_intercom_restart_capability(host):
-    """Test that intercom can be restarted."""
-    # Check if restart script exists
-    restart_script = host.file("/usr/local/bin/restart-intercom")
-    if restart_script.exists:
-        assert restart_script.mode & 0o111, "Restart script not executable"
-    else:
-        # Check if can restart via systemd
-        result = host.run("systemctl list-units | grep -E 'intercom|vdo-ninja'")
-        assert result.rc == 0 or True, "Intercom restart capability"
+def test_intercom_monitor_script_exists(host):
+    """Test that monitor script exists."""
+    script = host.file("/usr/local/bin/ndi-bridge-intercom-monitor")
+    assert script.exists, "Monitor script should exist"
+    assert script.mode & 0o111, "Script should be executable"
+
+
+# Note: For comprehensive intercom testing, see tests/component/intercom/ directory:
+# - test_intercom_core.py: Core service and script tests
+# - test_intercom_processes.py: Runtime process tests
+# - test_intercom_audio.py: Audio functionality tests
+# - test_intercom_config.py: Configuration persistence tests
+# - test_intercom_web.py: Web interface tests
+# - test_intercom_integration.py: Complete workflow tests
+# - test_intercom_rename_comprehensive.py: Device rename tests (issue #53)
