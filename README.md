@@ -179,7 +179,7 @@ The NDI Bridge appliance includes built-in bidirectional audio intercom function
 - **USB Audio Support**: Uses USB audio device (3.5mm jack) for local audio I/O
 - **Ultra-Low Latency Monitoring**: Self-monitoring with 0.67ms latency (32-sample buffer @ 48kHz)
 - **PipeWire Audio**: Modern Linux audio system for low-latency communication
-- **Web Control Interface**: Control intercom settings via web browser at `http://device:8000`
+- **Web Control Interface**: Control intercom settings via web browser at `http://device`
 - **VNC Monitoring**: Remote desktop access on port 5999 (no password)
 - **Auto-recovery**: Automatically restarts if connection drops
 - **Persistent Configuration**: Settings preserved across reboots
@@ -204,8 +204,8 @@ vncviewer ndi-bridge-cam1.local:5999    # Alternative full hostname
 #### Web Control Interface
 Control the intercom settings from any browser:
 ```
-http://cam1.local:8000          # Device web interface
-http://192.168.1.100:8000       # Using IP address
+http://cam1.local               # Device web interface
+http://192.168.1.100            # Using IP address
 ```
 
 Features:
