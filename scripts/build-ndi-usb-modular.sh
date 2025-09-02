@@ -10,6 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Source all modules in order
 source "$SCRIPT_DIR/build-modules/00-variables.sh"
 source "$SCRIPT_DIR/build-modules/01-functions.sh"
+source "$SCRIPT_DIR/build-modules/01a-cleanup.sh"
 source "$SCRIPT_DIR/build-modules/02-prerequisites.sh"
 source "$SCRIPT_DIR/build-modules/03-partition.sh"
 source "$SCRIPT_DIR/build-modules/04-mount.sh"
@@ -147,6 +148,9 @@ main() {
     log "Target device: $USB_DEVICE"
     
     check_prerequisites
+    
+    # Note: Cleanup is now performed in build-image-for-rufus.sh before loop device creation
+    # to avoid interfering with the current build's loop device
     
     # Warning about data erasure
     warn "This will ERASE ALL DATA on $USB_DEVICE"
