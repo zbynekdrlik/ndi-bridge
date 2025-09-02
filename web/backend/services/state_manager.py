@@ -34,6 +34,7 @@ class StateManager:
         self.state["devices"] = devices
         
         # Get Chrome volume (Others Volume)
+        chrome_found = False
         success, output = await ShellExecutor.pactl(["list", "sink-inputs"])
         if success:
             current_sink_input = None
@@ -50,9 +51,27 @@ class StateManager:
                     match = re.search(r'(\d+)%', line)
                     if match:
                         self.state["speaker_volume"] = int(match.group(1))
+                        chrome_found = True
                         break
-            
-            # Get mute state
+        
+        # If Chrome not found, use saved value or default
+        if not chrome_found:
+            try:
+                if os.path.exists(self.config_file):
+                    with open(self.config_file, 'r') as f:
+                        config = json.load(f)
+                        self.state["speaker_volume"] = config.get("speaker_volume", 90)
+                elif os.path.exists(self.runtime_state_file):
+                    with open(self.runtime_state_file, 'r') as f:
+                        runtime = json.load(f)
+                        self.state["speaker_volume"] = runtime.get("speaker_volume", 90)
+                else:
+                    self.state["speaker_volume"] = 90  # Default
+            except:
+                self.state["speaker_volume"] = 90  # Default on error
+        
+        # Get mute state
+        if devices["output"]:
             success, output = await ShellExecutor.pactl(["get-sink-mute", devices["output"]])
             if success:
                 self.state["speaker_muted"] = "yes" in output
