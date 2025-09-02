@@ -118,6 +118,12 @@ hostname "$FULL_HOSTNAME"
 log "Restarting NDI Capture service..."
 systemctl restart ndi-capture
 
+# Restart Intercom service to use new name in VDO.Ninja
+if systemctl is-enabled --quiet ndi-bridge-intercom 2>/dev/null; then
+    log "Restarting Intercom service with new name..."
+    systemctl restart ndi-bridge-intercom
+fi
+
 # Restart Avahi to advertise new name and services
 if systemctl is-active --quiet avahi-daemon; then
     log "Restarting Avahi daemon..."
