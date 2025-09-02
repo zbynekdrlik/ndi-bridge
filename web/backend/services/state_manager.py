@@ -91,7 +91,7 @@ class StateManager:
         
         # Get monitor enabled status
         success, output = await ShellExecutor.run_command(
-            "/usr/local/bin/ndi-bridge-intercom-monitor", ["status"]
+            "/usr/local/bin/media-bridge-intercom-monitor", ["status"]
         )
         if success:
             try:
@@ -133,14 +133,14 @@ class StateManager:
                 if muted:
                     # Mute monitor by setting actual volume to 0 (but keep state)
                     await ShellExecutor.run_command(
-                        "/usr/local/bin/ndi-bridge-intercom-monitor",
+                        "/usr/local/bin/media-bridge-intercom-monitor",
                         ["volume", "0"]
                     )
                 else:
                     # Restore monitor to the user's chosen volume
                     monitor_vol = self.state.get("monitor_volume", 50)
                     await ShellExecutor.run_command(
-                        "/usr/local/bin/ndi-bridge-intercom-monitor",
+                        "/usr/local/bin/media-bridge-intercom-monitor",
                         ["volume", str(monitor_vol)]
                     )
                 return True
@@ -289,7 +289,7 @@ class StateManager:
             args.append(str(volume))
         
         success, _ = await ShellExecutor.run_command(
-            "/usr/local/bin/ndi-bridge-intercom-monitor", args
+            "/usr/local/bin/media-bridge-intercom-monitor", args
         )
         
         if success:
@@ -302,7 +302,7 @@ class StateManager:
     async def set_monitor_volume(self, volume: int) -> bool:
         """Set monitor volume (0-100)"""
         success, _ = await ShellExecutor.run_command(
-            "/usr/local/bin/ndi-bridge-intercom-monitor", 
+            "/usr/local/bin/media-bridge-intercom-monitor", 
             ["volume", str(volume)]
         )
         

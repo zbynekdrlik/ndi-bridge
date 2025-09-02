@@ -156,7 +156,7 @@ chmod 644 /etc/nginx/.htpasswd
 # The intercom frontend is served directly from /opt/media-bridge-web/frontend/
 
 # Create tmux session wrapper for shared persistent sessions
-cat > /usr/local/bin/ndi-bridge-tmux-session << 'EOFTMUX'
+cat > /usr/local/bin/media-bridge-tmux-session << 'EOFTMUX'
 #!/bin/bash
 # Persistent tmux session - shared across all connections
 
@@ -168,14 +168,14 @@ if ! tmux has-session -t $SESSION 2>/dev/null; then
     tmux new-session -d -s $SESSION
     
     # Start with welcome loop
-    tmux send-keys -t $SESSION "/usr/local/bin/ndi-bridge-welcome-loop" C-m
+    tmux send-keys -t $SESSION "/usr/local/bin/media-bridge-welcome-loop" C-m
 fi
 
 # Attach to the existing session (multiple connections share the same view)
 exec tmux attach-session -t $SESSION
 EOFTMUX
 
-chmod +x /usr/local/bin/ndi-bridge-tmux-session
+chmod +x /usr/local/bin/media-bridge-tmux-session
 
 # wetty.service was copied before chroot
 
@@ -201,7 +201,7 @@ systemctl start nginx
 systemctl start wetty
 
 # Create helper script for web interface management
-cat > /usr/local/bin/ndi-bridge-web << 'EOFWEBHELPER'
+cat > /usr/local/bin/media-bridge-web << 'EOFWEBHELPER'
 #!/bin/bash
 # Media Bridge Web Interface Management
 
@@ -322,14 +322,14 @@ case "$1" in
 esac
 EOFWEBHELPER
 
-chmod +x /usr/local/bin/ndi-bridge-web
+chmod +x /usr/local/bin/media-bridge-web
 
 # Add web interface info to the welcome script
 sed -i '/Web Interface (future)/c\
 echo -e "${CYAN}Web Interface:${NC}"\
 echo "  - http://${FULL_HOSTNAME}.local/"\
 echo "  - http://${NEW_NAME}.local/"\
-echo "  Username: admin, Password: newlevel"' /usr/local/bin/ndi-bridge-set-name
+echo "  Username: admin, Password: newlevel"' /usr/local/bin/media-bridge-set-name
 
 EOFWEB
 }

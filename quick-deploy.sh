@@ -38,8 +38,8 @@ sshpass -p newlevel scp $MOUNT_DIR/opt/media-bridge/ndi-display root@$BOX_IP:/op
 
 # Copy critical scripts
 echo "Deploying scripts..."
-sshpass -p newlevel scp $MOUNT_DIR/usr/local/bin/ndi-bridge-welcome root@$BOX_IP:/usr/local/bin/ 2>/dev/null || true
-sshpass -p newlevel scp $MOUNT_DIR/usr/local/bin/ndi-bridge-info root@$BOX_IP:/usr/local/bin/ 2>/dev/null || true
+sshpass -p newlevel scp $MOUNT_DIR/usr/local/bin/media-bridge-welcome root@$BOX_IP:/usr/local/bin/ 2>/dev/null || true
+sshpass -p newlevel scp $MOUNT_DIR/usr/local/bin/media-bridge-info root@$BOX_IP:/usr/local/bin/ 2>/dev/null || true
 
 # Restart services
 echo "Restarting services..."

@@ -92,13 +92,13 @@ The build system is organized into modules in `scripts/build-modules/`:
 
 ### Helper Scripts
 Management scripts in `scripts/helper-scripts/`:
-- `ndi-bridge-info` - System status display
-- `ndi-bridge-set-name` - Set device/stream name
-- `ndi-bridge-logs` - View service logs
-- `ndi-bridge-update` - Update NDI binary
-- `ndi-bridge-netstat` - Network status
-- `ndi-bridge-netmon` - Bandwidth monitor
-- `ndi-bridge-help` - Command help
+- `media-bridge-info` - System status display
+- `media-bridge-set-name` - Set device/stream name
+- `media-bridge-logs` - View service logs
+- `media-bridge-update` - Update NDI binary
+- `media-bridge-netstat` - Network status
+- `media-bridge-netmon` - Bandwidth monitor
+- `media-bridge-help` - Command help
 
 ## Customization
 

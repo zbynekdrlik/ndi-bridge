@@ -165,7 +165,7 @@ main() {
     log "  - Show system menu on TTY2"
     log ""
     log "SSH access: ssh root@<IP>"
-    log "Run 'ndi-bridge-help' for available commands"
+    log "Run 'media-bridge-help' for available commands"
 }
 
 # Run main function

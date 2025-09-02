@@ -6,7 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/root
-ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base / --command /usr/local/bin/ndi-bridge-tmux-session
+ExecStart=/usr/bin/node /usr/local/lib/node_modules/wetty/build/main.js --host 127.0.0.1 --port 7681 --base / --command /usr/local/bin/media-bridge-tmux-session
 Restart=always
 RestartSec=10
 Environment="NODE_ENV=production"

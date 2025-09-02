@@ -39,7 +39,7 @@ apt-get install -y -qq python3 python3-minimal 2>&1 | head -10
 
 # Enable Media Bridge intercom services
 echo "Enabling Media Bridge intercom services..."
-systemctl enable ndi-bridge-intercom.service 2>/dev/null || true
+systemctl enable media-bridge-intercom.service 2>/dev/null || true
 
 echo "Chrome and Media Bridge intercom installation complete"
 

@@ -1,5 +1,22 @@
 # CLAUDE.md - Media Bridge Development Guide
 
+## NAMING CONVENTIONS
+
+### Project Name: Media Bridge
+The project has been renamed from "NDI Bridge" to "Media Bridge" to better reflect its multi-purpose media handling capabilities.
+
+### File Naming Guidelines
+- **Helper Scripts**: Use `media-bridge-*` prefix (e.g., `media-bridge-info`, `media-bridge-logs`)
+- **Application Binaries**: Keep descriptive names (`ndi-capture`, `ndi-display`) - these describe what they do, not the project name
+- **Service Files**: Use `media-bridge-*` prefix for project services
+- **Configuration Paths**: Use `/etc/media-bridge/`, `/var/run/media-bridge/`, etc.
+- **C++ Namespace**: Keep as `ndi_bridge` (internal code structure, not user-facing)
+
+### Why This Naming Strategy
+- Helper scripts are project utilities → use project name (`media-bridge-*`)
+- Application binaries describe their function → `ndi-capture` captures to NDI, `ndi-display` displays from NDI
+- This creates clear distinction between project utilities and functional applications
+
 ## WEB INTERFACE ARCHITECTURE (2025 Standard)
 
 ### Technology Stack

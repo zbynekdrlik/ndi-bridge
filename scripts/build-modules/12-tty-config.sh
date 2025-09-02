@@ -69,15 +69,15 @@ cat > /root/.profile << 'EOFPROFILE'
 export TERM=linux
 
 # Run welcome in auto-refresh mode
-/usr/local/bin/ndi-bridge-welcome-loop
+/usr/local/bin/media-bridge-welcome-loop
 EOFPROFILE
 
 # All helper scripts (welcome, show-logs, welcome-loop) are installed from
 # helper-scripts directory - don't create them inline here!
 # Just ensure they're executable
-chmod +x /usr/local/bin/ndi-bridge-show-logs 2>/dev/null || true
-chmod +x /usr/local/bin/ndi-bridge-welcome 2>/dev/null || true
-chmod +x /usr/local/bin/ndi-bridge-welcome-loop 2>/dev/null || true
+chmod +x /usr/local/bin/media-bridge-show-logs 2>/dev/null || true
+chmod +x /usr/local/bin/media-bridge-welcome 2>/dev/null || true
+chmod +x /usr/local/bin/media-bridge-welcome-loop 2>/dev/null || true
 
 # Old inline scripts have been completely removed.
 # All scripts are now maintained in scripts/helper-scripts/ directory

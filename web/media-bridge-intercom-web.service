@@ -1,7 +1,7 @@
 [Unit]
 Description=Media Bridge Intercom Web Interface
-After=network.target ndi-bridge-intercom.service
-Wants=ndi-bridge-intercom.service
+After=network.target media-bridge-intercom.service
+Wants=media-bridge-intercom.service
 
 [Service]
 Type=exec

@@ -98,7 +98,7 @@ fi
 
 # Deploy helper scripts
 log_info "Deploying helper scripts..."
-for script in $MOUNT_DIR/usr/local/bin/ndi-bridge-*; do
+for script in $MOUNT_DIR/usr/local/bin/media-bridge-*; do
     if [ -f "$script" ]; then
         script_name=$(basename "$script")
         sshpass -p "$BOX_PASS" scp -o StrictHostKeyChecking=no \

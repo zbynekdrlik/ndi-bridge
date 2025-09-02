@@ -12,31 +12,31 @@ install_helper_scripts() {
         cp -r "$HELPER_DIR"/* /mnt/usb/usr/local/bin/
         
         # Make executable
-        chmod +x /mnt/usb/usr/local/bin/ndi-bridge-*
+        chmod +x /mnt/usb/usr/local/bin/media-bridge-*
         chmod +x /mnt/usb/usr/local/bin/ndi-display-*
         
         # Copy Media Bridge intercom scripts and service (PipeWire only)
-        if [ -f "$HELPER_DIR/ndi-bridge-intercom-pipewire" ]; then
-            cp "$HELPER_DIR/ndi-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/
-            chmod +x /mnt/usb/usr/local/bin/ndi-bridge-intercom-pipewire
+        if [ -f "$HELPER_DIR/media-bridge-intercom-pipewire" ]; then
+            cp "$HELPER_DIR/media-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom-pipewire
         fi
         
         # Copy launcher (PipeWire only, no fallback)
-        if [ -f "$HELPER_DIR/ndi-bridge-intercom-launcher" ]; then
-            cp "$HELPER_DIR/ndi-bridge-intercom-launcher" /mnt/usb/usr/local/bin/
-            chmod +x /mnt/usb/usr/local/bin/ndi-bridge-intercom-launcher
+        if [ -f "$HELPER_DIR/media-bridge-intercom-launcher" ]; then
+            cp "$HELPER_DIR/media-bridge-intercom-launcher" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom-launcher
         fi
         
         # Copy intercom control and config scripts (no API script anymore)
-        for script in ndi-bridge-intercom-control ndi-bridge-intercom-config ndi-bridge-intercom-status ndi-bridge-intercom-logs ndi-bridge-intercom-restart ndi-bridge-intercom-monitor; do
+        for script in media-bridge-intercom-control media-bridge-intercom-config media-bridge-intercom-status media-bridge-intercom-logs media-bridge-intercom-restart media-bridge-intercom-monitor; do
             if [ -f "$HELPER_DIR/$script" ]; then
                 cp "$HELPER_DIR/$script" /mnt/usb/usr/local/bin/
                 chmod +x /mnt/usb/usr/local/bin/$script
             fi
         done
         
-        if [ -f "$HELPER_DIR/ndi-bridge-intercom.service" ]; then
-            cp "$HELPER_DIR/ndi-bridge-intercom.service" /mnt/usb/etc/systemd/system/
+        if [ -f "$HELPER_DIR/media-bridge-intercom.service" ]; then
+            cp "$HELPER_DIR/media-bridge-intercom.service" /mnt/usb/etc/systemd/system/
         fi
         
         
@@ -102,22 +102,22 @@ create_inline_helper_scripts() {
     # For backward compatibility with the original monolithic script
     
     # We'll include minimal versions here
-    cat > /mnt/usb/usr/local/bin/ndi-bridge-help << 'EOF'
+    cat > /mnt/usb/usr/local/bin/media-bridge-help << 'EOF'
 #!/bin/bash
 echo "Media Bridge Commands:"
-echo "  ndi-bridge-info      - Display system status"
-echo "  ndi-bridge-set-name  - Set device name"
-echo "  ndi-bridge-logs      - View logs"
-echo "  ndi-bridge-update    - Update binary"
-echo "  ndi-bridge-netstat   - Network status"
-echo "  ndi-bridge-netmon    - Network monitor"
-echo "  ndi-bridge-timesync  - Time synchronization status"
-echo "  ndi-bridge-web       - Web interface control"
+echo "  media-bridge-info      - Display system status"
+echo "  media-bridge-set-name  - Set device name"
+echo "  media-bridge-logs      - View logs"
+echo "  media-bridge-update    - Update binary"
+echo "  media-bridge-netstat   - Network status"
+echo "  media-bridge-netmon    - Network monitor"
+echo "  media-bridge-timesync  - Time synchronization status"
+echo "  media-bridge-web       - Web interface control"
 EOF
-    chmod +x /mnt/usb/usr/local/bin/ndi-bridge-help
+    chmod +x /mnt/usb/usr/local/bin/media-bridge-help
 
     # Create comprehensive time synchronization status script
-    cat > /mnt/usb/usr/local/bin/ndi-bridge-timesync << 'EOFTIMESYNC'
+    cat > /mnt/usb/usr/local/bin/media-bridge-timesync << 'EOFTIMESYNC'
 #!/bin/bash
 # Media Bridge Time Synchronization Status
 
@@ -286,7 +286,7 @@ echo "  • Current mode: PTP client-only with NTP fallback"
 echo ""
 echo "Commands: journalctl -u ptp4l, journalctl -u chrony, chronyc sources"
 EOFTIMESYNC
-    chmod +x /mnt/usb/usr/local/bin/ndi-bridge-timesync
+    chmod +x /mnt/usb/usr/local/bin/media-bridge-timesync
 }
 
 export -f install_helper_scripts create_inline_helper_scripts
