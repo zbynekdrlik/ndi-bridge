@@ -22,10 +22,10 @@ configure_filesystem() {
     
     cat >> /mnt/usb/tmp/configure-system.sh << EOFFS
 
-# Configure fstab for F2FS root filesystem
+# Configure fstab with ext4 optimized for flash media
 cat > /etc/fstab << EOFFSTAB
 # /etc/fstab: static file system information
-UUID=$UUID_ROOT / f2fs defaults,noatime 0 1
+UUID=$UUID_ROOT / ext4 defaults,noatime,discard 0 1
 UUID=$UUID_EFI /boot/efi vfat umask=0077 0 1
 EOFFSTAB
 
