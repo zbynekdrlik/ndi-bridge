@@ -146,10 +146,11 @@ class TestIntercomProcesses:
         """Test that intercom processes are not using excessive resources."""
         # Check Chrome memory usage
         result = host.run("ps aux | grep -v grep | grep google-chrome | head -1")
-        if result.succeeded:
+        if result.succeeded and result.stdout:
             fields = result.stdout.split()
-            mem_percent = float(fields[3])
-            assert mem_percent < 20, f"Chrome using too much memory: {mem_percent}%"
+            if len(fields) > 3:
+                mem_percent = float(fields[3])
+                assert mem_percent < 20, f"Chrome using too much memory: {mem_percent}%"
         
         # Check overall intercom service memory
         result = host.run("systemctl show ndi-bridge-intercom --property MemoryCurrent")

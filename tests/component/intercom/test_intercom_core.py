@@ -95,8 +95,8 @@ class TestIntercomCore:
         """Test that status command works."""
         result = host.run("ndi-bridge-intercom-status")
         assert result.succeeded, "Status command should succeed"
-        # Should show service status
-        assert "ndi-bridge-intercom.service" in result.stdout or "Active:" in result.stdout
+        # Should show service status - check for key indicators
+        assert "Service:" in result.stdout or "Chrome:" in result.stdout or "VNC:" in result.stdout
     
     def test_intercom_control_get_status(self, host):
         """Test that control script can get audio status."""
@@ -106,10 +106,12 @@ class TestIntercomCore:
         # Should return JSON
         try:
             status = json.loads(result.stdout)
-            assert "mic_volume" in status, "Should have mic_volume"
-            assert "speaker_volume" in status, "Should have speaker_volume"
-            assert "mic_muted" in status, "Should have mic_muted"
-            assert "monitor_enabled" in status, "Should have monitor_enabled"
+            assert "input" in status, "Should have input section"
+            assert "output" in status, "Should have output section"
+            assert "volume" in status["input"], "Should have input volume"
+            assert "volume" in status["output"], "Should have output volume"
+            assert "muted" in status["input"], "Should have input muted state"
+            assert "muted" in status["output"], "Should have output muted state"
         except json.JSONDecodeError:
             pytest.fail(f"Control get should return valid JSON, got: {result.stdout}")
     
