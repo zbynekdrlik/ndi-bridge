@@ -261,12 +261,6 @@ v4l2-ctl --list-devices
 
 ## Advanced Topics
 
-### Read-Only Root
-To make the system more resilient:
-1. Edit `/etc/fstab` to mount root as read-only
-2. Move logs to tmpfs
-3. Disable unnecessary writes
-
 ### Custom Packages
 Add packages in `06-system-config.sh`:
 ```bash

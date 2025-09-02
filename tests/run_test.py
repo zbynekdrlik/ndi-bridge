@@ -55,8 +55,7 @@ sshpass -e ssh -o StrictHostKeyChecking=no "$@"
     cmd = [
         "python3", "-m", "pytest",
         "--host", f"ssh://root@{host}",
-        "-v",
-        "--skip-readonly-check"  # Skip RO check for now
+        "-v"
     ] + sys.argv[1:]
     
     # Filter out our custom --host argument

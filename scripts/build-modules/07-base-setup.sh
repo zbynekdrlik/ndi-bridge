@@ -48,7 +48,7 @@ if [ -f /etc/ssh/sshd_config ]; then
     fi
 fi
 
-# Disable services that try to write to read-only filesystems
+# Disable unnecessary grub update services
 if command -v systemctl >/dev/null 2>&1; then
     systemctl disable grub-common.service 2>/dev/null || true
     systemctl disable grub-initrd-fallback.service 2>/dev/null || true
