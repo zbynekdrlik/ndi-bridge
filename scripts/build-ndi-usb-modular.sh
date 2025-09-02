@@ -139,8 +139,8 @@ main() {
     
     check_prerequisites
     
-    # Perform pre-build cleanup to ensure clean state
-    perform_build_cleanup
+    # Note: Cleanup is now performed in build-image-for-rufus.sh before loop device creation
+    # to avoid interfering with the current build's loop device
     
     # Warning about data erasure
     warn "This will ERASE ALL DATA on $USB_DEVICE"

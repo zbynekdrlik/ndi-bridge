@@ -70,6 +70,19 @@ fi
 echo "✓ ndi-capture binary found"
 echo "✓ ndi-display binary found"
 
+# Clean up any stuck resources from previous builds
+echo "Cleaning up stuck resources from previous builds..."
+# Kill stuck build processes
+pkill -f "build-ndi-usb-modular" 2>/dev/null || true
+# Unmount any leftover mounts
+umount /mnt/usb/* 2>/dev/null || true
+umount /mnt/usb 2>/dev/null || true
+# Clean up stale loop devices
+for loop in $(losetup -a | grep "ndi-bridge.img" | cut -d: -f1); do
+    kpartx -d "$loop" 2>/dev/null || true
+    losetup -d "$loop" 2>/dev/null || true
+done
+
 # Create image file (8GB for Chrome and dependencies)
 IMAGE_FILE="${1:-ndi-bridge.img}"
 IMAGE_SIZE="8G"
