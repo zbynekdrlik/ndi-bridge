@@ -1,0 +1,391 @@
+#!/bin/bash
+# Dante Audio Bridge - Production Implementation with PipeWire
+# Handles clock drift between Dante PTPv1 and USB audio using adaptive resampling
+# Primary function: Dante → Arturia USB playback at 96kHz
+
+set -e
+
+# Configuration
+SCRIPT_NAME="dante-bridge-production"
+LOG_TAG="[Dante-Bridge]"
+SAMPLE_RATE=96000
+CHANNELS=2
+QUANTUM=512  # 5.33ms @ 96kHz - good balance of latency/stability
+RESAMPLE_QUALITY=10  # 1-15, higher = better quality, more CPU
+
+# Environment for Inferno
+export INFERNO_NAME=${HOSTNAME:-ndi-bridge}
+export INFERNO_INTERFACE=br0
+export INFERNO_SAMPLE_RATE=$SAMPLE_RATE
+
+# PID file for service management
+PID_FILE="/var/run/dante-bridge.pid"
+STATE_DIR="/var/run/dante-bridge"
+
+# Colors for logging
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Logging functions
+log() {
+    echo -e "${GREEN}${LOG_TAG}${NC} $(date '+%H:%M:%S') - $1"
+    logger -t "$SCRIPT_NAME" "$1"
+}
+
+error() {
+    echo -e "${RED}${LOG_TAG} ERROR${NC} $(date '+%H:%M:%S') - $1" >&2
+    logger -t "$SCRIPT_NAME" -p user.err "ERROR: $1"
+}
+
+warn() {
+    echo -e "${YELLOW}${LOG_TAG} WARN${NC} $(date '+%H:%M:%S') - $1"
+    logger -t "$SCRIPT_NAME" -p user.warning "WARNING: $1"
+}
+
+info() {
+    echo -e "${BLUE}${LOG_TAG}${NC} $(date '+%H:%M:%S') - $1"
+    logger -t "$SCRIPT_NAME" -p user.info "$1"
+}
+
+# Create state directory
+mkdir -p "$STATE_DIR"
+
+# Write PID file
+echo $$ > "$PID_FILE"
+
+# Cleanup on exit
+cleanup() {
+    log "Shutting down Dante bridge..."
+    
+    # Stop all audio streams
+    killall -q pw-record pw-play pw-link 2>/dev/null || true
+    killall -q arecord aplay 2>/dev/null || true
+    
+    # Remove PID file
+    rm -f "$PID_FILE"
+    
+    # Clear state
+    rm -f "$STATE_DIR"/*
+    
+    log "Dante bridge stopped"
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT EXIT
+
+# Check prerequisites
+check_prerequisites() {
+    log "Checking prerequisites..."
+    
+    # Check if Statime is running (PTPv1 for Dante)
+    if ! systemctl is-active --quiet statime.service; then
+        error "Statime service not running! Starting it..."
+        systemctl start statime.service || {
+            error "Failed to start Statime PTP daemon"
+            exit 1
+        }
+        sleep 3
+    fi
+    
+    # Check if Statime is follower (not master)
+    if journalctl -u statime -n 50 | grep -q "becoming master"; then
+        warn "Statime appears to be PTP master - should be follower!"
+        warn "Check for real Dante devices on network"
+    fi
+    
+    # Check if PipeWire is running
+    if ! pgrep -x pipewire >/dev/null; then
+        error "PipeWire not running! This is required for clock drift compensation"
+        exit 1
+    fi
+    
+    # Check if WirePlumber is running (PipeWire session manager)
+    if ! pgrep -x wireplumber >/dev/null; then
+        warn "WirePlumber not running, starting it..."
+        wireplumber &
+        sleep 2
+    fi
+    
+    # Check Inferno ALSA plugin
+    if ! aplay -L 2>/dev/null | grep -q "^dante$"; then
+        error "Dante ALSA device not found! Check Inferno installation"
+        exit 1
+    fi
+    
+    log "Prerequisites check passed"
+}
+
+# Find USB audio device (Arturia or similar)
+find_usb_audio() {
+    local usb_card=""
+    local usb_name=""
+    
+    log "Searching for USB audio device..."
+    
+    # Priority order: Arturia first, then other professional cards
+    for pattern in "Arturia" "Focusrite" "Scarlett" "PreSonus" "Behringer" "USB Audio"; do
+        local card_info=$(aplay -l 2>/dev/null | grep "$pattern" | head -1)
+        if [ -n "$card_info" ]; then
+            usb_card=$(echo "$card_info" | sed 's/card \([0-9]\).*/\1/')
+            usb_name=$(echo "$card_info" | sed 's/.*: \(.*\) \[.*/\1/')
+            log "Found USB audio device: $usb_name (card $usb_card)"
+            echo "$usb_card"
+            return 0
+        fi
+    done
+    
+    error "No USB audio device found!"
+    return 1
+}
+
+# Configure PipeWire for optimal Dante bridging
+configure_pipewire() {
+    log "Configuring PipeWire for Dante bridge..."
+    
+    # Set global sample rate and quantum
+    pw-metadata -n settings 0 clock.rate $SAMPLE_RATE
+    pw-metadata -n settings 0 clock.force-rate $SAMPLE_RATE
+    pw-metadata -n settings 0 clock.quantum $QUANTUM
+    pw-metadata -n settings 0 clock.force-quantum $QUANTUM
+    
+    # Set resampling quality
+    pw-metadata -n settings 0 resample.quality $RESAMPLE_QUALITY
+    
+    # Ensure adaptive resampling is enabled
+    pw-metadata -n settings 0 resample.disable false
+    
+    # Set latency for streams (in samples)
+    pw-metadata -n settings 0 api.alsa.period-size $QUANTUM
+    pw-metadata -n settings 0 api.alsa.headroom $((QUANTUM * 2))
+    
+    log "PipeWire configured: ${SAMPLE_RATE}Hz, quantum=${QUANTUM} (~$(echo "scale=2; $QUANTUM*1000/$SAMPLE_RATE" | bc)ms)"
+    
+    # Write configuration to state file
+    cat > "$STATE_DIR/config" << EOF
+SAMPLE_RATE=$SAMPLE_RATE
+QUANTUM=$QUANTUM
+LATENCY_MS=$(echo "scale=2; $QUANTUM*1000/$SAMPLE_RATE" | bc)
+RESAMPLE_QUALITY=$RESAMPLE_QUALITY
+EOF
+}
+
+# Create ALSA loopback devices for Dante in PipeWire
+create_alsa_loopbacks() {
+    log "Creating ALSA loopback devices in PipeWire..."
+    
+    # Create a virtual ALSA device that PipeWire can manage
+    # This allows us to use ALSA Dante device with PipeWire's clock management
+    
+    # Load ALSA plugin for PipeWire if not already loaded
+    if ! pw-cli list-objects | grep -q "alsa_input.dante"; then
+        # Create ALSA source for Dante input (receiving from network)
+        pw-cli create-node adapter '{
+            factory.name=api.alsa.pcm.source
+            node.name=alsa_input.dante
+            node.description="Dante Network Input"
+            api.alsa.path=dante
+            audio.channels=2
+            audio.rate='$SAMPLE_RATE'
+            audio.format=S32LE
+            node.pause-on-idle=false
+            node.suspend-on-idle=false
+            resample.disable=false
+            clock.name=dante-clock
+        }' &
+        DANTE_INPUT_PID=$!
+    fi
+    
+    # Create ALSA sink for Dante output (sending to network)
+    if ! pw-cli list-objects | grep -q "alsa_output.dante"; then
+        pw-cli create-node adapter '{
+            factory.name=api.alsa.pcm.sink
+            node.name=alsa_output.dante
+            node.description="Dante Network Output"
+            api.alsa.path=dante
+            audio.channels=2
+            audio.rate='$SAMPLE_RATE'
+            audio.format=S32LE
+            node.pause-on-idle=false
+            node.suspend-on-idle=false
+            resample.disable=false
+            clock.name=dante-clock
+        }' &
+        DANTE_OUTPUT_PID=$!
+    fi
+    
+    sleep 2
+    log "ALSA loopback devices created"
+}
+
+# Start the audio bridge with PipeWire managing clock drift
+start_audio_bridge() {
+    local usb_card="$1"
+    
+    log "Starting audio bridge with adaptive resampling..."
+    
+    # Get PipeWire node names for USB device
+    local usb_sink=$(pw-cli list-objects | grep -A5 "alsa_output.*$usb_card" | grep node.name | head -1 | cut -d'"' -f2)
+    local usb_source=$(pw-cli list-objects | grep -A5 "alsa_input.*$usb_card" | grep node.name | head -1 | cut -d'"' -f2)
+    
+    if [ -z "$usb_sink" ]; then
+        error "USB output device not found in PipeWire"
+        return 1
+    fi
+    
+    # Method 1: Direct PipeWire routing (lowest latency)
+    log "Establishing audio routes..."
+    
+    # Dante → USB (RECEIVE PATH - PRIMARY)
+    # This is the main use case: receiving audio from Dante network
+    log "Routing: Dante Network → USB Output (Arturia)"
+    pw-link alsa_input.dante:capture_FL ${usb_sink}:playback_FL
+    pw-link alsa_input.dante:capture_FR ${usb_sink}:playback_FR
+    
+    # USB → Dante (TRANSMIT PATH - SECONDARY)
+    # Required for full Dante visibility
+    if [ -n "$usb_source" ]; then
+        log "Routing: USB Input → Dante Network"
+        pw-link ${usb_source}:capture_FL alsa_output.dante:playback_FL
+        pw-link ${usb_source}:capture_FR alsa_output.dante:playback_FR
+    else
+        warn "USB input not found - transmit path disabled"
+    fi
+    
+    # Alternative Method 2: Using pw-record/pw-play for more control
+    # Uncomment if Method 1 has issues
+    #log "Starting stream processors..."
+    #pw-record --target=alsa_input.dante --rate=$SAMPLE_RATE --channels=2 --format=s32 - | \
+    #    pw-play --target=${usb_sink} --rate=$SAMPLE_RATE --channels=2 --format=s32 - &
+    #DANTE_TO_USB_PID=$!
+    
+    log "Audio bridge established with adaptive resampling"
+    
+    # Write status
+    cat > "$STATE_DIR/status" << EOF
+STATUS=running
+USB_DEVICE=$usb_sink
+DANTE_INPUT=alsa_input.dante
+DANTE_OUTPUT=alsa_output.dante
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+EOF
+}
+
+# Monitor bridge health and report statistics
+monitor_bridge() {
+    local error_count=0
+    local last_xrun_count=0
+    
+    while true; do
+        sleep 10
+        
+        # Check if Statime is still running and synced
+        if ! systemctl is-active --quiet statime.service; then
+            error "Statime service stopped!"
+            return 1
+        fi
+        
+        # Check PTP sync status
+        local ptp_offset=$(journalctl -u statime -n 1 | grep -oP 'offset=\K[-0-9]+' || echo "unknown")
+        if [ "$ptp_offset" != "unknown" ] && [ "$ptp_offset" -gt 1000 ] 2>/dev/null; then
+            warn "PTP offset high: ${ptp_offset}μs"
+        fi
+        
+        # Monitor for xruns (buffer under/overruns)
+        local xrun_info=$(pw-top -b 2>/dev/null | grep -E "dante|$usb_card" || true)
+        local current_xruns=$(echo "$xrun_info" | awk '{sum+=$7} END {print sum+0}')
+        
+        if [ "$current_xruns" -gt "$last_xrun_count" ]; then
+            local new_xruns=$((current_xruns - last_xrun_count))
+            warn "Detected $new_xruns new xruns (total: $current_xruns)"
+            error_count=$((error_count + 1))
+            
+            if [ $error_count -gt 10 ]; then
+                error "Too many xruns - bridge may be unstable"
+                return 1
+            fi
+        fi
+        last_xrun_count=$current_xruns
+        
+        # Check link status
+        local link_count=$(pw-link -l 2>/dev/null | grep -c dante || echo 0)
+        if [ "$link_count" -lt 2 ]; then
+            error "Audio links broken!"
+            return 1
+        fi
+        
+        # Report statistics every minute
+        if [ $(($(date +%s) % 60)) -lt 10 ]; then
+            info "Bridge healthy - PTP offset: ${ptp_offset}μs, Total xruns: $current_xruns"
+            
+            # Write stats
+            cat > "$STATE_DIR/stats" << EOF
+PTP_OFFSET_US=$ptp_offset
+TOTAL_XRUNS=$current_xruns
+ERROR_COUNT=$error_count
+UPTIME_SECONDS=$SECONDS
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+EOF
+        fi
+    done
+}
+
+# Main execution
+main() {
+    log "Dante Audio Bridge starting (Production version with PipeWire)"
+    log "Configuration: ${INFERNO_NAME} on ${INFERNO_INTERFACE} at ${SAMPLE_RATE}Hz"
+    
+    # Check prerequisites
+    check_prerequisites
+    
+    # Find USB audio device
+    USB_CARD=$(find_usb_audio)
+    if [ -z "$USB_CARD" ]; then
+        error "Cannot proceed without USB audio device"
+        exit 1
+    fi
+    
+    # Configure PipeWire
+    configure_pipewire
+    
+    # Create ALSA loopback devices
+    create_alsa_loopbacks
+    
+    # Give Inferno time to open discovery ports
+    log "Waiting for Dante discovery ports..."
+    sleep 3
+    
+    # Check if discovery ports are open
+    if netstat -tuln 2>/dev/null | grep -E ":(8700|8800) " | grep -q "0.0.0.0"; then
+        log "✓ Dante discovery ports opened (device visible in Controller)"
+    else
+        warn "Discovery ports not detected - device may not be visible"
+    fi
+    
+    # Start the audio bridge
+    start_audio_bridge "$USB_CARD"
+    
+    # Monitor bridge health
+    log "Entering monitoring loop..."
+    while true; do
+        if ! monitor_bridge; then
+            error "Bridge monitoring detected failure - restarting..."
+            
+            # Clean up links
+            pw-link -d alsa_input.dante:capture_FL 2>/dev/null || true
+            pw-link -d alsa_input.dante:capture_FR 2>/dev/null || true
+            pw-link -d alsa_output.dante:playback_FL 2>/dev/null || true
+            pw-link -d alsa_output.dante:playback_FR 2>/dev/null || true
+            
+            sleep 5
+            
+            # Restart bridge
+            start_audio_bridge "$USB_CARD"
+        fi
+    done
+}
+
+# Run main function
+main "$@"

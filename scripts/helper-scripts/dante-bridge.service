@@ -1,24 +1,42 @@
 [Unit]
-Description=Dante Audio Bridge
-After=network-online.target sound.target statime.service
-Wants=network-online.target statime.service
-Requires=statime.service
+Description=Dante Audio Bridge with PipeWire Adaptive Resampling
+After=network-online.target sound.target statime.service pipewire.service wireplumber.service
+Wants=network-online.target statime.service pipewire.service wireplumber.service
+Requires=statime.service pipewire.service
 
 [Service]
 Type=simple
 Environment="INFERNO_NAME=ndi-bridge"
 Environment="INFERNO_INTERFACE=br0"
 Environment="INFERNO_SAMPLE_RATE=96000"
+
+# Ensure PipeWire and Statime are ready
 ExecStartPre=/bin/bash -c 'until systemctl is-active statime.service; do sleep 1; done'
-ExecStart=/usr/local/bin/dante-bridge
-Restart=always
+ExecStartPre=/bin/bash -c 'until systemctl is-active pipewire.service; do sleep 1; done'
+ExecStartPre=/bin/bash -c 'until pgrep -x wireplumber; do sleep 1; done'
+
+# Use production script with PipeWire
+ExecStart=/usr/local/bin/dante-bridge-production
+
+# Restart on failure but not too aggressively
+Restart=on-failure
 RestartSec=10
+StartLimitBurst=3
+StartLimitInterval=60
+
+# Logging
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=dante-bridge
 
-# Give time for cleanup
+# Process management
+TimeoutStartSec=30
 TimeoutStopSec=15
 KillMode=mixed
+
+# Run as audio group for device access
+User=root
+Group=audio
 
 [Install]
 WantedBy=multi-user.target

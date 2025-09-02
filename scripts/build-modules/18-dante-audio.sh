@@ -162,9 +162,30 @@ cp /root/.asoundrc /etc/asound.conf
 cp /tmp/helper-scripts/statime.service /etc/systemd/system/
 cp /tmp/helper-scripts/dante-bridge.service /etc/systemd/system/
 
-# Copy the main bridge script
-cp /tmp/helper-scripts/dante-bridge /usr/local/bin/
-chmod +x /usr/local/bin/dante-bridge
+# Copy the main bridge scripts
+cp /tmp/helper-scripts/dante-bridge-production /usr/local/bin/
+chmod +x /usr/local/bin/dante-bridge-production
+
+# Legacy script for fallback
+if [ -f /tmp/helper-scripts/dante-bridge ]; then
+    cp /tmp/helper-scripts/dante-bridge /usr/local/bin/
+    chmod +x /usr/local/bin/dante-bridge
+fi
+
+# Copy PipeWire configuration for Dante
+mkdir -p /etc/pipewire/pipewire.conf.d
+cp /tmp/helper-scripts/pipewire-dante.conf /etc/pipewire/pipewire.conf.d/90-dante-bridge.conf
+
+# Ensure PipeWire is installed and configured
+if ! command -v pipewire >/dev/null 2>&1; then
+    echo "Installing PipeWire for clock drift compensation..."
+    apt-get update -qq
+    apt-get install -y -qq pipewire pipewire-alsa pipewire-audio wireplumber 2>&1 | tail -5
+fi
+
+# Ensure PipeWire services are enabled
+systemctl enable pipewire.service 2>/dev/null || true
+systemctl enable wireplumber.service 2>/dev/null || true
 
 # Copy helper scripts for status and configuration
 for script in ndi-bridge-dante-status ndi-bridge-dante-config ndi-bridge-dante-logs; do

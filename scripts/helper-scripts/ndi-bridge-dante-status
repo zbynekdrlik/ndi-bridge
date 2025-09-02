@@ -1,97 +1,215 @@
 #!/bin/bash
-# Show Dante audio bridge status
+# Dante Bridge Status Monitor
+# Shows real-time status of Dante audio bridge with PipeWire
 
-echo "================================"
-echo "    Dante Audio Bridge Status   "
-echo "================================"
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# Configuration
+STATE_DIR="/var/run/dante-bridge"
+PID_FILE="/var/run/dante-bridge.pid"
+
+# Header
+echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║           Dante Audio Bridge Status Monitor                 ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
 echo
 
-# Check if Statime PTP daemon is running
-STATIME_STATUS=$(systemctl is-active statime.service 2>/dev/null)
-if [ "$STATIME_STATUS" = "active" ]; then
-    echo -e "PTP Daemon: \033[32mRUNNING\033[0m"
-else
-    echo -e "PTP Daemon: \033[31mSTOPPED\033[0m"
-fi
-
-# Check if Inferno ALSA service is running
-INFERNO_STATUS=$(systemctl is-active inferno-alsa.service 2>/dev/null)
-if [ "$INFERNO_STATUS" = "active" ]; then
-    echo -e "Inferno ALSA: \033[32mRUNNING\033[0m"
+# Function to check service status
+check_service() {
+    local service=$1
+    local display_name=$2
     
-    # Check if listening on Dante ports
-    DANTE_PORTS=$(netstat -ulnp 2>/dev/null | grep -E '8700|8800' | wc -l)
-    if [ "$DANTE_PORTS" -gt 0 ]; then
-        echo "  Dante ports: Active (8700, 8800)"
-    fi
-else
-    echo -e "Inferno ALSA: \033[31mSTOPPED\033[0m"
-fi
-
-# Check USB to Dante bridge
-USB_BRIDGE_STATUS=$(systemctl is-active usb-dante-bridge.service 2>/dev/null)
-if [ "$USB_BRIDGE_STATUS" = "active" ]; then
-    echo -e "USB Bridge: \033[32mRUNNING\033[0m"
-    # Find which USB card is being used
-    USB_CARD=$(ps aux | grep -E "arecord.*plughw:" | grep -v grep | sed 's/.*plughw:\([0-9]\).*/\1/' | head -1)
-    if [ -n "$USB_CARD" ]; then
-        USB_NAME=$(aplay -l | grep "^card $USB_CARD:" | sed 's/card [0-9]: //' | cut -d',' -f1)
-        echo "  USB Device: $USB_NAME"
-    fi
-else
-    echo -e "USB Bridge: \033[33mNOT ACTIVE\033[0m"
-fi
-
-echo
-
-# Show configuration
-if [ -f /etc/ndi-bridge/dante.conf ]; then
-    echo "Configuration:"
-    echo "--------------"
-    source /etc/ndi-bridge/dante.conf
-    DEVICE_NAME=${DANTE_DEVICE_NAME:-${HOSTNAME:-ndi-bridge}}
-    echo "  Device Name: $DEVICE_NAME"
-    echo "  Interface: ${DANTE_INTERFACE:-br0}"
-    echo "  Channels: ${DANTE_CHANNELS:-2}"
-    echo "  Sample Rate: ${DANTE_SAMPLE_RATE:-96000} Hz"
-    echo "  Mode: ${DANTE_MODE:-bidirectional}"
-else
-    echo "Configuration file not found"
-fi
-
-echo
-
-# Check network interface
-INTERFACE=${DANTE_INTERFACE:-br0}
-if ip link show $INTERFACE &>/dev/null; then
-    echo "Network Interface ($INTERFACE):"
-    echo "----------------------------"
-    IP_ADDR=$(ip -4 addr show $INTERFACE | grep inet | awk '{print $2}')
-    echo "  IP Address: ${IP_ADDR:-Not configured}"
-    
-    # Check multicast support (required for Dante)
-    MULTICAST=$(ip link show $INTERFACE | grep -o "MULTICAST")
-    if [ -n "$MULTICAST" ]; then
-        echo -e "  Multicast: \033[32mEnabled\033[0m"
+    if systemctl is-active --quiet "$service"; then
+        echo -e "${GREEN}✓${NC} $display_name: ${GREEN}Running${NC}"
+        return 0
     else
-        echo -e "  Multicast: \033[31mDisabled\033[0m (Required for Dante)"
+        echo -e "${RED}✗${NC} $display_name: ${RED}Stopped${NC}"
+        return 1
     fi
-fi
+}
 
+# Check core services
+echo -e "${BLUE}▶ Core Services:${NC}"
+check_service "statime.service" "Statime PTP (Dante clock sync)"
+check_service "pipewire.service" "PipeWire (adaptive resampling)"
+check_service "wireplumber.service" "WirePlumber (session manager)"
+check_service "dante-bridge.service" "Dante Bridge"
 echo
 
-# Check for USB audio devices
-echo "USB Audio Devices:"
-echo "-----------------"
-USB_DEVICES=$(aplay -l | grep -E "USB Audio|Arturia|Behringer|Focusrite|Scarlett" | wc -l)
-if [ "$USB_DEVICES" -gt 0 ]; then
-    aplay -l | grep -E "USB Audio|Arturia|Behringer|Focusrite|Scarlett" | while read line; do
-        echo "  $line"
+# Check PTP sync status
+echo -e "${BLUE}▶ PTP Clock Sync (Dante):${NC}"
+if systemctl is-active --quiet statime.service; then
+    # Get PTP offset from journal
+    PTP_INFO=$(journalctl -u statime -n 20 --no-pager 2>/dev/null | grep -E "offset|sync" | tail -1)
+    if [ -n "$PTP_INFO" ]; then
+        if echo "$PTP_INFO" | grep -q "offset"; then
+            OFFSET=$(echo "$PTP_INFO" | grep -oP 'offset=\K[-0-9]+' || echo "unknown")
+            if [ "$OFFSET" != "unknown" ]; then
+                if [ "$OFFSET" -lt 100 ] && [ "$OFFSET" -gt -100 ]; then
+                    echo -e "  PTP Offset: ${GREEN}${OFFSET}μs${NC} (excellent)"
+                elif [ "$OFFSET" -lt 1000 ] && [ "$OFFSET" -gt -1000 ]; then
+                    echo -e "  PTP Offset: ${YELLOW}${OFFSET}μs${NC} (good)"
+                else
+                    echo -e "  PTP Offset: ${RED}${OFFSET}μs${NC} (poor sync)"
+                fi
+            fi
+        fi
+        
+        # Check if we're master or slave
+        if journalctl -u statime -n 50 | grep -q "becoming master"; then
+            echo -e "  PTP Role: ${RED}MASTER${NC} (should be FOLLOWER!)"
+            echo -e "  ${YELLOW}Warning: No other Dante devices detected on network${NC}"
+        else
+            echo -e "  PTP Role: ${GREEN}FOLLOWER${NC} (correct)"
+        fi
+    else
+        echo -e "  ${YELLOW}No PTP sync information available${NC}"
+    fi
+else
+    echo -e "  ${RED}Statime not running - no PTP sync${NC}"
+fi
+echo
+
+# Check Dante discovery ports
+echo -e "${BLUE}▶ Dante Network Discovery:${NC}"
+DISCOVERY_PORTS=$(netstat -tuln 2>/dev/null | grep -E ":(8700|8800|8900|4321) ")
+if [ -n "$DISCOVERY_PORTS" ]; then
+    echo -e "  ${GREEN}✓${NC} Discovery ports open (device visible in Dante Controller)"
+    echo "$DISCOVERY_PORTS" | while read line; do
+        PORT=$(echo "$line" | grep -oP ':\K[0-9]+(?= )')
+        case $PORT in
+            8700) echo -e "    Port $PORT: mDNS/Discovery" ;;
+            8800) echo -e "    Port $PORT: Control/Configuration" ;;
+            8900) echo -e "    Port $PORT: Audio Routing" ;;
+            4321) echo -e "    Port $PORT: Audio Data" ;;
+        esac
     done
 else
-    echo "  No USB audio devices found"
+    echo -e "  ${RED}✗${NC} Discovery ports not open (device NOT visible)"
 fi
-
 echo
-echo "Use 'ndi-bridge-dante-config' to modify settings"
-echo "Use 'ndi-bridge-dante-logs' to view logs"
+
+# Check USB audio device
+echo -e "${BLUE}▶ USB Audio Device:${NC}"
+USB_DEVICE=$(aplay -l 2>/dev/null | grep -E "Arturia|Focusrite|Scarlett|USB Audio" | head -1)
+if [ -n "$USB_DEVICE" ]; then
+    USB_NAME=$(echo "$USB_DEVICE" | sed 's/.*: \(.*\) \[.*/\1/')
+    USB_CARD=$(echo "$USB_DEVICE" | sed 's/card \([0-9]\).*/\1/')
+    echo -e "  ${GREEN}✓${NC} Found: $USB_NAME (card $USB_CARD)"
+    
+    # Check if it's configured for 96kHz
+    if cat /proc/asound/card${USB_CARD}/pcm*/sub0/hw_params 2>/dev/null | grep -q "rate: 96000"; then
+        echo -e "  Sample Rate: ${GREEN}96000 Hz${NC} (correct for Dante)"
+    else
+        CURRENT_RATE=$(cat /proc/asound/card${USB_CARD}/pcm*/sub0/hw_params 2>/dev/null | grep -oP 'rate: \K[0-9]+' | head -1)
+        if [ -n "$CURRENT_RATE" ]; then
+            echo -e "  Sample Rate: ${YELLOW}${CURRENT_RATE} Hz${NC} (will be resampled to 96kHz)"
+        fi
+    fi
+else
+    echo -e "  ${RED}✗${NC} No USB audio device found"
+fi
+echo
+
+# Check PipeWire configuration
+echo -e "${BLUE}▶ PipeWire Audio Pipeline:${NC}"
+if command -v pw-cli >/dev/null 2>&1; then
+    # Check if Dante nodes exist
+    DANTE_INPUT=$(pw-cli list-objects 2>/dev/null | grep -c "alsa_input.dante")
+    DANTE_OUTPUT=$(pw-cli list-objects 2>/dev/null | grep -c "alsa_output.dante")
+    
+    if [ "$DANTE_INPUT" -gt 0 ]; then
+        echo -e "  ${GREEN}✓${NC} Dante input node active"
+    else
+        echo -e "  ${RED}✗${NC} Dante input node not found"
+    fi
+    
+    if [ "$DANTE_OUTPUT" -gt 0 ]; then
+        echo -e "  ${GREEN}✓${NC} Dante output node active"
+    else
+        echo -e "  ${RED}✗${NC} Dante output node not found"
+    fi
+    
+    # Check audio links
+    LINK_COUNT=$(pw-link -l 2>/dev/null | grep -c dante || echo 0)
+    if [ "$LINK_COUNT" -gt 0 ]; then
+        echo -e "  ${GREEN}✓${NC} Audio routing active ($LINK_COUNT links)"
+    else
+        echo -e "  ${YELLOW}⚠${NC} No audio routes established"
+    fi
+    
+    # Check for xruns (buffer under/overruns)
+    if [ -f "$STATE_DIR/stats" ]; then
+        XRUNS=$(grep "TOTAL_XRUNS" "$STATE_DIR/stats" 2>/dev/null | cut -d'=' -f2)
+        if [ -n "$XRUNS" ]; then
+            if [ "$XRUNS" -eq 0 ]; then
+                echo -e "  Xruns: ${GREEN}0${NC} (perfect)"
+            elif [ "$XRUNS" -lt 10 ]; then
+                echo -e "  Xruns: ${YELLOW}$XRUNS${NC} (acceptable)"
+            else
+                echo -e "  Xruns: ${RED}$XRUNS${NC} (audio dropouts likely)"
+            fi
+        fi
+    fi
+else
+    echo -e "  ${RED}PipeWire CLI tools not available${NC}"
+fi
+echo
+
+# Check Dante bridge status
+echo -e "${BLUE}▶ Bridge Status:${NC}"
+if [ -f "$PID_FILE" ] && kill -0 $(cat "$PID_FILE") 2>/dev/null; then
+    echo -e "  ${GREEN}✓${NC} Bridge process running (PID: $(cat $PID_FILE))"
+    
+    if [ -f "$STATE_DIR/status" ]; then
+        source "$STATE_DIR/status"
+        echo -e "  Status: ${GREEN}$STATUS${NC}"
+        echo -e "  Started: $TIMESTAMP"
+    fi
+    
+    if [ -f "$STATE_DIR/config" ]; then
+        source "$STATE_DIR/config"
+        echo -e "  Configuration: ${SAMPLE_RATE}Hz, ${LATENCY_MS}ms latency"
+    fi
+else
+    echo -e "  ${RED}✗${NC} Bridge not running"
+fi
+echo
+
+# Show recent errors
+echo -e "${BLUE}▶ Recent Issues:${NC}"
+ERRORS=$(journalctl -u dante-bridge -p err -n 5 --no-pager 2>/dev/null)
+if [ -n "$ERRORS" ] && [ "$ERRORS" != "-- No entries --" ]; then
+    echo "$ERRORS" | tail -5 | while IFS= read -r line; do
+        echo -e "  ${RED}!${NC} $line"
+    done
+else
+    echo -e "  ${GREEN}✓${NC} No recent errors"
+fi
+echo
+
+# Network information
+echo -e "${BLUE}▶ Network Configuration:${NC}"
+BRIDGE_IP=$(ip addr show br0 2>/dev/null | grep -oP 'inet \K[\d.]+' | head -1)
+if [ -n "$BRIDGE_IP" ]; then
+    echo -e "  Bridge IP: ${GREEN}$BRIDGE_IP${NC}"
+    echo -e "  Dante Interface: br0"
+    echo -e "  Device Name: ${HOSTNAME:-ndi-bridge}"
+else
+    echo -e "  ${RED}Bridge interface not configured${NC}"
+fi
+echo
+
+# Footer with commands
+echo -e "${CYAN}╔══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║ Commands:                                                    ║${NC}"
+echo -e "${CYAN}║   ndi-bridge-dante-config  - Configure Dante settings       ║${NC}"
+echo -e "${CYAN}║   ndi-bridge-dante-logs    - View detailed logs             ║${NC}"
+echo -e "${CYAN}║   systemctl restart dante-bridge - Restart bridge           ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════════════════╝${NC}"
