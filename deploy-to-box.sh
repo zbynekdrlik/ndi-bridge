@@ -52,10 +52,7 @@ if ! sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 
     exit 1
 fi
 
-# Make filesystem read-write on box
-log_info "Making box filesystem read-write..."
-sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP \
-    "mount -o remount,rw /"
+# No filesystem remount needed with F2FS
 
 # Function to deploy files
 deploy_files() {
@@ -171,10 +168,9 @@ done
 systemctl restart ndi-welcome@tty2 2>/dev/null || true
 EOF
 
-# Make filesystem read-only again
-log_info "Making filesystem read-only..."
-sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP \
-    "sync && mount -o remount,ro / 2>/dev/null || true"
+# Sync filesystem
+log_info "Syncing filesystem..."
+sshpass -p "$BOX_PASS" ssh -o StrictHostKeyChecking=no $BOX_USER@$BOX_IP "sync"
 
 # Check status
 log_info "Checking deployment status..."

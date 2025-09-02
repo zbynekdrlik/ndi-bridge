@@ -157,8 +157,8 @@ NDI_NAME=""            # Empty = use hostname
 - Service restart on failures
 
 ### Power Failure Resistance
-- Journaled ext4 filesystem
-- Read-write root (can be made read-only)
+- F2FS filesystem (optimized for flash media)
+- Atomic write operations
 - Minimal writes to USB
 - Logs in tmpfs (RAM)
 

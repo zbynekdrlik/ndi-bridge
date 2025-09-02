@@ -343,10 +343,7 @@ assign_stream() {
     # Create config directory if needed
     sudo mkdir -p "$CONFIG_DIR"
     
-    # Write configuration (handle read-only filesystem)
-    # Make filesystem read-write temporarily
-    /usr/local/bin/ndi-bridge-rw
-    
+    # Write configuration
     sudo tee "$config_file" > /dev/null << EOF
 # NDI Display Configuration for HDMI-$((display_id + 1))
 STREAM_NAME="${stream_name}"
@@ -360,12 +357,8 @@ EOF
     # Stop any manually running instance first
     stop_display_process ${display_id}
     
-    # Enable service while filesystem is still RW
+    # Enable service
     sudo systemctl enable ndi-display@${display_id}
-    sync  # Ensure filesystem writes are completed
-    
-    # Return to read-only
-    /usr/local/bin/ndi-bridge-ro
     
     # Restart the service (services are always enabled)
     if ! sudo systemctl restart ndi-display@${display_id}; then
@@ -417,10 +410,8 @@ remove_stream() {
         sudo systemctl stop ndi-display@${display_id}
     fi
     
-    # Remove config file (needs RW)
-    /usr/local/bin/ndi-bridge-rw
+    # Remove config file
     sudo rm -f "$config_file"
-    /usr/local/bin/ndi-bridge-ro
     
     echo ""
     echo -e "${GREEN}✓ Configuration removed${NC}"
