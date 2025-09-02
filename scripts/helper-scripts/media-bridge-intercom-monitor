@@ -1,5 +1,5 @@
 #!/bin/bash
-# NDI Bridge Intercom Self-Monitoring Control
+# Media Bridge Intercom Self-Monitoring Control
 # Manages low-latency mic monitoring through PipeWire loopback
 
 # Configuration
@@ -65,7 +65,7 @@ enable_monitoring() {
         adjust_time=0 \
         source_dont_move=true \
         sink_dont_move=true \
-        sink_input_properties="media.name='Self-Monitor' application.name='NDI-Bridge-Monitor'")
+        sink_input_properties="media.name='Self-Monitor' application.name='Media-Bridge-Monitor'")
     
     if [ $? -eq 0 ]; then
         echo "$module_id" > "$MONITOR_MODULE_FILE"
@@ -211,7 +211,7 @@ case "${1:-status}" in
         enable_monitoring "$volume"
         ;;
     *)
-        echo "NDI Bridge Intercom Self-Monitoring Control"
+        echo "Media Bridge Intercom Self-Monitoring Control"
         echo ""
         echo "Usage: $0 {enable|disable|volume|status|restart} [options]"
         echo ""

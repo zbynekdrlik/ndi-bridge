@@ -1,5 +1,5 @@
 #!/bin/bash
-# Display comprehensive NDI Bridge system information
+# Display comprehensive Media Bridge system information
 
 # Colors
 GREEN='\033[0;32m'
@@ -9,7 +9,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${GREEN}║                   NDI Bridge System Status                    ║${NC}"
+echo -e "${GREEN}║                   Media Bridge System Status                    ║${NC}"
 echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 

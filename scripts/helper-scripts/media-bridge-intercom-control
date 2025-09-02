@@ -1,5 +1,5 @@
 #!/bin/bash
-# NDI Bridge Intercom Audio Control Script
+# Media Bridge Intercom Audio Control Script
 # Controls audio settings for VDO.Ninja intercom
 
 set -e

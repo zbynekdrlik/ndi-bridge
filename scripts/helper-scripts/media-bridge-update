@@ -28,7 +28,7 @@ if [ "$EUID" -ne 0 ]; then
     error "This script must be run as root"
 fi
 
-echo "NDI Bridge Update Tool"
+echo "Media Bridge Update Tool"
 echo "====================="
 echo ""
 echo "Update source:"

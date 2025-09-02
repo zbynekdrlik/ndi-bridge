@@ -1,15 +1,15 @@
 @echo off
-REM NDI SDK Setup Helper for NDI Bridge
+REM NDI SDK Setup Helper for Media Bridge
 REM This script helps set up the NDI SDK in the deps/ndi directory
 
 echo ========================================
-echo NDI SDK Setup Helper for NDI Bridge
+echo NDI SDK Setup Helper for Media Bridge
 echo ========================================
 echo.
 
 REM Check if we're in the right directory
 if not exist "CMakeLists.txt" (
-    echo ERROR: Please run this script from the ndi-bridge project root directory
+    echo ERROR: Please run this script from the media-bridge project root directory
     echo        The directory containing CMakeLists.txt
     pause
     exit /b 1

@@ -1,12 +1,12 @@
 #!/bin/bash
-# Show NDI Bridge intercom status
+# Show Media Bridge intercom status
 
-echo "NDI Bridge Intercom Status"
+echo "Media Bridge Intercom Status"
 echo "=========================="
 echo ""
 
 # Check service status
-if systemctl is-active ndi-bridge-intercom.service --quiet; then
+if systemctl is-active media-bridge-intercom.service --quiet; then
     echo "Service: Running"
     
     # Show Chrome process
@@ -38,9 +38,9 @@ if systemctl is-active ndi-bridge-intercom.service --quiet; then
     echo "Device ID: $(hostname)"
     echo ""
     echo "Recent logs:"
-    journalctl -u ndi-bridge-intercom.service -n 5 --no-pager
+    journalctl -u media-bridge-intercom.service -n 5 --no-pager
 else
     echo "Service: Stopped"
     echo ""
-    echo "Start with: systemctl start ndi-bridge-intercom"
+    echo "Start with: systemctl start media-bridge-intercom"
 fi

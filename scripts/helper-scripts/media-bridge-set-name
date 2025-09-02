@@ -1,7 +1,7 @@
 #!/bin/bash
-# NDI Bridge Device Name Setter
+# Media Bridge Device Name Setter
 # Sets hostname, NDI name, and mDNS aliases
-# Usage: ndi-bridge-set-name <simple-name>
+# Usage: media-bridge-set-name <simple-name>
 
 set -e
 
@@ -37,7 +37,7 @@ if [ $# -ne 1 ]; then
     echo "Example: $0 cam1"
     echo ""
     echo "This will set:"
-    echo "  - Hostname to: ndi-bridge-cam1"
+    echo "  - Hostname to: media-bridge-cam1"
     echo "  - Short alias: cam1.local"
     echo "  - NDI name to: cam1"
     exit 1
@@ -53,7 +53,7 @@ fi
 NEW_NAME=$(echo "$NEW_NAME" | tr '[:upper:]' '[:lower:]')
 
 # Build full hostname
-FULL_HOSTNAME="ndi-bridge-${NEW_NAME}"
+FULL_HOSTNAME="media-bridge-${NEW_NAME}"
 
 log "Setting device name to: $NEW_NAME"
 log "Full hostname will be: $FULL_HOSTNAME"
@@ -73,7 +73,7 @@ fi
 
 # Create Avahi alias service for short name
 mkdir -p /etc/avahi/services
-cat > /etc/avahi/services/ndi-bridge-alias.service << EOFALIAS
+cat > /etc/avahi/services/media-bridge-alias.service << EOFALIAS
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <service-group>
@@ -82,18 +82,18 @@ cat > /etc/avahi/services/ndi-bridge-alias.service << EOFALIAS
     <type>_device-info._tcp</type>
     <subtype>_ndi._sub._device-info._tcp</subtype>
     <port>0</port>
-    <txt-record>model=NDI Bridge</txt-record>
+    <txt-record>model=Media Bridge</txt-record>
     <txt-record>hostname=${FULL_HOSTNAME}</txt-record>
   </service>
 </service-group>
 EOFALIAS
 
-# NOTE: NDI service advertisement is handled by the NDI Bridge application itself
+# NOTE: NDI service advertisement is handled by the Media Bridge application itself
 # Remove any old NDI service file that might exist
 rm -f /etc/avahi/services/media-bridge.service 2>/dev/null || true
 
 # Update HTTP service advertisement with device name
-cat > /etc/avahi/services/ndi-bridge-http.service << EOFHTTPSERVICE
+cat > /etc/avahi/services/media-bridge-http.service << EOFHTTPSERVICE
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <service-group>
@@ -102,7 +102,7 @@ cat > /etc/avahi/services/ndi-bridge-http.service << EOFHTTPSERVICE
     <type>_http._tcp</type>
     <port>80</port>
     <txt-record>path=/</txt-record>
-    <txt-record>product=NDI Bridge</txt-record>
+    <txt-record>product=Media Bridge</txt-record>
     <txt-record>name=${NEW_NAME}</txt-record>
   </service>
 </service-group>
@@ -111,14 +111,14 @@ EOFHTTPSERVICE
 # Apply hostname immediately
 hostname "$FULL_HOSTNAME"
 
-# Restart NDI Bridge service to apply new name
+# Restart Media Bridge service to apply new name
 log "Restarting NDI Capture service..."
 systemctl restart ndi-capture
 
 # Restart Intercom service to use new name in VDO.Ninja
-if systemctl is-enabled --quiet ndi-bridge-intercom 2>/dev/null; then
+if systemctl is-enabled --quiet media-bridge-intercom 2>/dev/null; then
     log "Restarting Intercom service with new name..."
-    systemctl restart ndi-bridge-intercom
+    systemctl restart media-bridge-intercom
 fi
 
 # Restart Avahi to advertise new name and services

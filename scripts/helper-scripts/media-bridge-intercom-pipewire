@@ -1,5 +1,5 @@
 #!/bin/bash
-# NDI Bridge Intercom with PipeWire
+# Media Bridge Intercom with PipeWire
 # Connects to VDO.Ninja room with real USB audio using PipeWire
 
 # Don't exit on error - some commands may fail but we continue
@@ -47,12 +47,12 @@ trap cleanup INT TERM
 
 # Configuration
 FULL_HOSTNAME=$(hostname)
-HOSTNAME=${FULL_HOSTNAME#ndi-bridge-}  # Remove prefix if exists
+HOSTNAME=${FULL_HOSTNAME#media-bridge-}  # Remove prefix if exists
 ROOM="${VDO_ROOM:-nl_interkom}"
 PROFILE_DIR="/tmp/chrome-vdo-profile"
 DISPLAY_NUM=99
 
-echo "=== NDI Bridge Intercom Starting (PipeWire) ==="
+echo "=== Media Bridge Intercom Starting (PipeWire) ==="
 echo "Device: $HOSTNAME"
 echo "Room: $ROOM"
 
@@ -359,7 +359,7 @@ else
     
     # Enable self-monitoring at 100% volume
     echo "  Enabling self-monitoring at 100% volume"
-    /usr/local/bin/ndi-bridge-intercom-monitor enable 100 >/dev/null 2>&1 || true
+    /usr/local/bin/media-bridge-intercom-monitor enable 100 >/dev/null 2>&1 || true
 fi
 
 # Wait a bit more for Chrome to fully establish audio

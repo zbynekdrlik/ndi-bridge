@@ -1,4 +1,4 @@
 #!/bin/bash
-# View NDI Bridge intercom service logs
+# View Media Bridge intercom service logs
 
-journalctl -u ndi-bridge-intercom.service -f --no-pager
+journalctl -u media-bridge-intercom.service -f --no-pager

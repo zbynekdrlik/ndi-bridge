@@ -1,5 +1,5 @@
 #!/bin/bash
-# NDI Bridge Status Collector
+# Media Bridge Status Collector
 # Runs as a service to collect metrics for the welcome screen
 
 # Create runtime directory

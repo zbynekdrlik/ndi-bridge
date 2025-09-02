@@ -2,7 +2,7 @@
 # Auto-refreshing welcome screen with quick actions
 
 while true; do
-    /usr/local/bin/ndi-bridge-welcome
+    /usr/local/bin/media-bridge-welcome
     # Wait for key press or timeout after 5 seconds
     read -t 5 -n 1 -s -r -p "" key
     if [[ $? -eq 0 ]]; then
@@ -10,7 +10,7 @@ while true; do
         case "${key,,}" in  # Convert to lowercase
             l)
                 clear
-                echo "=== NDI Bridge Logs (Recent 100 lines) ==="
+                echo "=== Media Bridge Logs (Recent 100 lines) ==="
                 echo ""
                 journalctl -u ndi-capture -n 100 --no-pager | less
                 echo ""
@@ -24,7 +24,7 @@ while true; do
                 echo ""
                 read -p "Enter new NDI name: " new_name
                 if [ -n "$new_name" ]; then
-                    /usr/local/bin/ndi-bridge-set-name "$new_name"
+                    /usr/local/bin/media-bridge-set-name "$new_name"
                     echo "Name updated. Restarting service..."
                     systemctl restart ndi-capture
                     sleep 2
@@ -75,10 +75,10 @@ while true; do
                 ;;
             h)
                 clear
-                echo "=== NDI Bridge Help ==="
+                echo "=== Media Bridge Help ==="
                 echo ""
                 echo "Quick Actions:"
-                echo "  L - View NDI Bridge logs"
+                echo "  L - View Media Bridge logs"
                 echo "  S - Set NDI stream name"
                 echo "  N - Network status details"
                 echo "  T - Time synchronization status"
@@ -87,16 +87,16 @@ while true; do
                 echo "  Q - Exit to shell"
                 echo ""
                 echo "Helper Commands:"
-                echo "  ndi-bridge-info     - System information"
-                echo "  ndi-bridge-logs     - View service logs"
-                echo "  ndi-bridge-set-name - Change NDI name"
+                echo "  media-bridge-info   - System information"
+                echo "  media-bridge-logs   - View service logs"
+                echo "  media-bridge-set-name - Change NDI name"
                 echo ""
                 echo "Press any key to continue..."
                 read -n 1 -s -r
                 ;;
             q)
                 clear
-                echo "Type 'ndi-bridge-welcome-loop' to return to dashboard"
+                echo "Type 'media-bridge-welcome-loop' to return to dashboard"
                 echo ""
                 break
                 ;;

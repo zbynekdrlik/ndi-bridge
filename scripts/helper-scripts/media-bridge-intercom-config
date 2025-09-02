@@ -1,12 +1,12 @@
 #!/bin/bash
-# NDI Bridge Intercom Configuration Management
+# Media Bridge Intercom Configuration Management
 # Handles persistent audio configuration across reboots
 
 set -e
 
 CONFIG_FILE="/etc/media-bridge/intercom.conf"
 CONFIG_DIR=$(dirname "$CONFIG_FILE")
-CONTROL_SCRIPT="/usr/local/bin/ndi-bridge-intercom-control"
+CONTROL_SCRIPT="/usr/local/bin/media-bridge-intercom-control"
 
 # Ensure control script exists
 if [ ! -x "$CONTROL_SCRIPT" ]; then
@@ -30,7 +30,7 @@ save_config() {
     
     # Save to config file
     cat > "$CONFIG_FILE" <<EOF
-# NDI Bridge Intercom Audio Configuration
+# Media Bridge Intercom Audio Configuration
 # Auto-generated on $(date)
 
 OUTPUT_VOLUME=${output_volume:-75}
