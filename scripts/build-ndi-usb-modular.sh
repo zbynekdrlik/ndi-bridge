@@ -86,7 +86,9 @@ assemble_configuration() {
     
     # Replace the version and timestamp placeholders
     sed -i "s/BUILD_SCRIPT_VERSION_PLACEHOLDER/$BUILD_SCRIPT_VERSION/" /mnt/usb/tmp/configure-system.sh
+    sed -i "s/BUILD_SCRIPT_DATE_PLACEHOLDER/$BUILD_SCRIPT_DATE/" /mnt/usb/tmp/configure-system.sh
     sed -i "s/BUILD_TIMESTAMP_PLACEHOLDER/$BUILD_TIMESTAMP/" /mnt/usb/tmp/configure-system.sh
+    sed -i "s/GIT_COMMIT_PLACEHOLDER/$GIT_COMMIT/" /mnt/usb/tmp/configure-system.sh
 }
 
 # Run setup in chroot

@@ -3,11 +3,14 @@
 # This module defines all global variables used throughout the build process
 
 # Build Script Version - Auto-incremented with each build
-BUILD_SCRIPT_VERSION="1.9.11"
+BUILD_SCRIPT_VERSION="1.9.12"
 BUILD_SCRIPT_DATE="2025-09-02"
 
 # Build timestamp - Generated at build time (local timezone)
 BUILD_TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+# Git commit hash - Get current commit for version tracking
+GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
 
 # Configuration
 USB_DEVICE="${1:-/dev/sdb}"
@@ -36,7 +39,7 @@ ROOT_PASSWORD="newlevel"
 DEFAULT_HOSTNAME="ndi-bridge"
 
 # Export all variables
-export BUILD_SCRIPT_VERSION BUILD_SCRIPT_DATE BUILD_TIMESTAMP
+export BUILD_SCRIPT_VERSION BUILD_SCRIPT_DATE BUILD_TIMESTAMP GIT_COMMIT
 export USB_DEVICE NDI_BINARY_PATH NDI_DISPLAY_BINARY_PATH NDI_SDK_PATH
 export MOUNT_POINT
 export RED GREEN YELLOW NC
