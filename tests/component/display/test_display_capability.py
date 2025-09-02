@@ -9,15 +9,24 @@ import pytest
 
 def test_drm_device_exists(host):
     """Test that DRM device exists for display output."""
-    drm = host.file("/dev/dri/card0")
-    assert drm.exists, "DRM device /dev/dri/card0 not found"
+    # Check for any card device (card0, card1, etc.)
+    drm_dir = host.file("/dev/dri")
+    assert drm_dir.exists, "/dev/dri directory not found"
+    
+    # Look for any card* device
+    cards = host.run("ls /dev/dri/card* 2>/dev/null | head -1")
+    assert cards.succeeded and cards.stdout.strip(), "No DRM card devices found in /dev/dri/"
 
 
 def test_drm_device_is_character(host):
     """Test that DRM device is a character device."""
-    drm = host.file("/dev/dri/card0")
-    if drm.exists:
-        assert drm.is_character, "DRM device is not a character device"
+    # Find first available card device
+    cards = host.run("ls /dev/dri/card* 2>/dev/null | head -1")
+    if cards.succeeded and cards.stdout.strip():
+        card_path = cards.stdout.strip()
+        # Check if it's a character device using stat
+        result = host.run(f"stat -c '%F' {card_path}")
+        assert "character" in result.stdout.lower(), f"DRM device {card_path} is not a character device"
 
 
 def test_ndi_display_binary_exists(host):
