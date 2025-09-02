@@ -1,5 +1,5 @@
 """
-Tests for NDI Bridge Intercom configuration persistence.
+Tests for Media Bridge Intercom configuration persistence.
 
 Verifies that intercom settings can be saved and restored.
 """

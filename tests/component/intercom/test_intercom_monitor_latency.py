@@ -1,5 +1,5 @@
 """
-Tests for NDI Bridge Intercom ultra-low latency monitor configuration.
+Tests for Media Bridge Intercom ultra-low latency monitor configuration.
 
 Verifies the self-monitoring feature with <1ms latency claims.
 """

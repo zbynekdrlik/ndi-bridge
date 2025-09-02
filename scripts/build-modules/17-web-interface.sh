@@ -66,7 +66,7 @@ fi
 # Disable default nginx site
 rm -f /etc/nginx/sites-enabled/default
 
-# Create nginx configuration for NDI Bridge
+# Create nginx configuration for Media Bridge
 cat > /etc/nginx/sites-available/media-bridge << 'EOFNGINX'
 server {
     listen 80 default_server;
@@ -107,7 +107,7 @@ server {
     
     # Terminal interface (with authentication)
     location /terminal/ {
-        auth_basic "NDI Bridge Terminal";
+        auth_basic "Media Bridge Terminal";
         auth_basic_user_file /etc/nginx/.htpasswd;
         
         proxy_pass http://127.0.0.1:7681/;
@@ -203,7 +203,7 @@ systemctl start wetty
 # Create helper script for web interface management
 cat > /usr/local/bin/ndi-bridge-web << 'EOFWEBHELPER'
 #!/bin/bash
-# NDI Bridge Web Interface Management
+# Media Bridge Web Interface Management
 
 set -e
 

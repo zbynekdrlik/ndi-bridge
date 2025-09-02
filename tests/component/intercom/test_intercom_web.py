@@ -1,5 +1,5 @@
 """
-Tests for NDI Bridge Intercom web interface.
+Tests for Media Bridge Intercom web interface.
 
 Verifies that the web interface and API endpoints work correctly.
 """

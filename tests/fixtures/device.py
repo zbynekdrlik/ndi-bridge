@@ -1,5 +1,5 @@
 """
-Shared fixtures for NDI Bridge device operations.
+Shared fixtures for Media Bridge device operations.
 
 Provides reusable fixtures for common device interactions.
 """

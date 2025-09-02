@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple test runner for NDI Bridge tests using sshpass for authentication.
+Simple test runner for Media Bridge tests using sshpass for authentication.
 
 Usage:
     python3 run_test.py --host=10.77.9.188

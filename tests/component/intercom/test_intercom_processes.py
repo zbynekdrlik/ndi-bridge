@@ -1,5 +1,5 @@
 """
-Tests for NDI Bridge Intercom process management and runtime behavior.
+Tests for Media Bridge Intercom process management and runtime behavior.
 
 Verifies that all intercom processes are running correctly.
 """

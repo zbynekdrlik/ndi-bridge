@@ -15,7 +15,7 @@ install_helper_scripts() {
         chmod +x /mnt/usb/usr/local/bin/ndi-bridge-*
         chmod +x /mnt/usb/usr/local/bin/ndi-display-*
         
-        # Copy NDI Bridge intercom scripts and service (PipeWire only)
+        # Copy Media Bridge intercom scripts and service (PipeWire only)
         if [ -f "$HELPER_DIR/ndi-bridge-intercom-pipewire" ]; then
             cp "$HELPER_DIR/ndi-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/
             chmod +x /mnt/usb/usr/local/bin/ndi-bridge-intercom-pipewire
@@ -104,7 +104,7 @@ create_inline_helper_scripts() {
     # We'll include minimal versions here
     cat > /mnt/usb/usr/local/bin/ndi-bridge-help << 'EOF'
 #!/bin/bash
-echo "NDI Bridge Commands:"
+echo "Media Bridge Commands:"
 echo "  ndi-bridge-info      - Display system status"
 echo "  ndi-bridge-set-name  - Set device name"
 echo "  ndi-bridge-logs      - View logs"
@@ -119,11 +119,11 @@ EOF
     # Create comprehensive time synchronization status script
     cat > /mnt/usb/usr/local/bin/ndi-bridge-timesync << 'EOFTIMESYNC'
 #!/bin/bash
-# NDI Bridge Time Synchronization Status
+# Media Bridge Time Synchronization Status
 
 clear
 echo -e "\033[1;36m╔═════════════════════════════════════════════════════════════════════════╗\033[0m"
-echo -e "\033[1;36m║                    NDI Bridge Time Synchronization Status               ║\033[0m"
+echo -e "\033[1;36m║                   Media Bridge Time Synchronization Status              ║\033[0m"
 echo -e "\033[1;36m╚═════════════════════════════════════════════════════════════════════════╝\033[0m"
 echo ""
 

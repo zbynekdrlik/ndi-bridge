@@ -1,7 +1,7 @@
 """
 Atomic tests for helper scripts functionality.
 
-Tests the NDI Bridge helper scripts and utilities.
+Tests the Media Bridge helper scripts and utilities.
 """
 
 import pytest

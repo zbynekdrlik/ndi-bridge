@@ -1,5 +1,5 @@
 """
-Comprehensive tests for NDI Bridge Intercom core functionality.
+Comprehensive tests for Media Bridge Intercom core functionality.
 
 Tests the complete intercom system including service, scripts, and basic operation.
 """

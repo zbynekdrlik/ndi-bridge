@@ -1,5 +1,5 @@
 [Unit]
-Description=NDI Bridge Intercom Web Interface
+Description=Media Bridge Intercom Web Interface
 After=network.target ndi-bridge-intercom.service
 Wants=ndi-bridge-intercom.service
 

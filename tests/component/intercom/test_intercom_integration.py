@@ -1,5 +1,5 @@
 """
-Integration tests for NDI Bridge Intercom.
+Integration tests for Media Bridge Intercom.
 
 Tests complete workflows and feature interactions.
 """

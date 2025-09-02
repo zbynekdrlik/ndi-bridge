@@ -1,5 +1,5 @@
 """
-Tests for NDI Bridge Intercom audio functionality.
+Tests for Media Bridge Intercom audio functionality.
 
 Verifies audio device detection, control, and configuration.
 """

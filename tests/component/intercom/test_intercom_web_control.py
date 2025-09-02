@@ -1,5 +1,5 @@
 """
-Comprehensive tests for NDI Bridge Intercom web control functionality.
+Comprehensive tests for Media Bridge Intercom web control functionality.
 
 Tests actual control operations through the web interface.
 """

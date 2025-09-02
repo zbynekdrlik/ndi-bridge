@@ -1,5 +1,5 @@
 """
-Pytest configuration and fixtures for NDI Bridge testing.
+Pytest configuration and fixtures for Media Bridge testing.
 
 This module provides shared fixtures and configuration for all tests.
 Following the principle of atomic testing, fixtures are designed to be
@@ -28,7 +28,7 @@ from fixtures.device import *  # noqa: F401, F403
 
 
 def pytest_addoption(parser):
-    """Add custom command line options for NDI Bridge testing."""
+    """Add custom command line options for Media Bridge testing."""
     # Priority: 1. Command line, 2. test_config.yaml, 3. Environment, 4. Default
     default_host = "10.77.9.143"
     default_ssh_user = "root"
@@ -62,7 +62,7 @@ def pytest_addoption(parser):
         "--host",
         action="store",
         default=default_host,
-        help="NDI Bridge device IP address or hostname (default: from test_config.yaml, $NDI_TEST_HOST, or 10.77.9.143)",
+        help="Media Bridge device IP address or hostname (default: from test_config.yaml, $NDI_TEST_HOST, or 10.77.9.143)",
     )
     parser.addoption(
         "--multi-hosts",
@@ -120,7 +120,7 @@ def device_config(request) -> Dict:
 @pytest.fixture(scope="session")
 def host(device_config):
     """
-    Primary fixture for accessing the NDI Bridge device via SSH.
+    Primary fixture for accessing the Media Bridge device via SSH.
     
     This fixture establishes SSH connection to the device
     and returns a testinfra Host object for test execution.
@@ -145,7 +145,7 @@ def host(device_config):
 
 @pytest.fixture
 def ndi_version(host) -> str:
-    """Get the NDI Bridge version from the device."""
+    """Get the Media Bridge version from the device."""
     cmd = host.run("cat /etc/media-bridge-version 2>/dev/null || echo 'unknown'")
     return cmd.stdout.strip()
 

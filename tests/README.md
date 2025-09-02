@@ -1,7 +1,7 @@
-# NDI Bridge Test Suite
+# Media Bridge Test Suite
 
 ## Overview
-Modern pytest-based testing framework for NDI Bridge USB appliance using testinfra for agentless infrastructure testing.
+Modern pytest-based testing framework for Media Bridge USB appliance using testinfra for agentless infrastructure testing.
 
 ## Quick Start
 
