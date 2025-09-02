@@ -125,75 +125,324 @@ async def endpoint_name(request: RequestModel):
 - Partial success = Complete failure
 - All tests must pass before declaring feature operational
 
-## Test Suite Design Requirements
+## Modern Test Suite Architecture (2025)
 
-### MANDATORY: Read-Only Filesystem Check
-**EVERY test script MUST start with read-only filesystem verification!**
+### Testing Framework: pytest + testinfra
+**Industry-standard framework for embedded/hardware testing with SSH-based remote execution**
 
-**Use the existing module `tests/lib/ro_check.sh`:**
-```bash
-#!/bin/bash
-# Get script directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+### Core Testing Principles
 
-# Source the RO check module
-source "${SCRIPT_DIR}/lib/ro_check.sh" || {
-    echo "ERROR: Could not load ro_check.sh module"
-    exit 1
-}
+#### 1. Atomic Tests - One Test, One Assertion
+**CRITICAL: Each test must validate exactly ONE thing**
+```python
+# BAD: Multiple assertions in one test
+def test_capture():
+    assert device_exists()
+    assert service_active()
+    assert fps == 30
+    
+# GOOD: Atomic tests
+def test_capture_device_exists():
+    """Test that /dev/video0 exists."""
+    assert host.file("/dev/video0").exists
 
-# Set up variables for the module
-TEST_BOX_IP="${1:-}"  # Device IP from first argument
-SSH_USER="root"
-SSH_PASS="newlevel"
+def test_capture_service_active():
+    """Test that ndi-capture service is running."""
+    assert host.service("ndi-capture").is_running
 
-# CRITICAL: Verify filesystem is read-only
-echo -e "\n${YELLOW}CRITICAL CHECK: Filesystem Status${NC}"
-if ! verify_readonly_filesystem "$TEST_BOX_IP"; then
-    exit 1
-fi
+def test_capture_fps_stable():
+    """Test that capture maintains 30fps."""
+    metrics = host.file("/var/run/ndi-bridge/fps").content_string
+    assert float(metrics) >= 29.0
 ```
 
-**Why this is CRITICAL:**
-- The appliance runs with read-only root filesystem in production
-- Features that work in read-write mode OFTEN FAIL in read-only mode
-- This has caused COUNTLESS false positives where features appear to work but fail in production
-- Every implementation MUST work with read-only filesystem or it's BROKEN
+#### 2. AAA Pattern (Arrange-Act-Assert)
+**Every test follows this structure:**
+```python
+def test_stabilization_duration():
+    # Arrange: Set up test conditions
+    host.run("systemctl restart ndi-capture")
+    
+    # Act: Perform the action
+    time.sleep(30)
+    
+    # Assert: Verify the outcome
+    state = host.file("/var/run/ndi-bridge/capture_state").content_string
+    assert state == "RUNNING"
+```
 
-### Test Script Structure
-Every test script must follow this structure:
-1. **Read-only filesystem check** (FIRST, ALWAYS)
-2. Service enabled/active checks
-3. Process running checks
-4. Configuration file checks (in tmpfs paths)
-5. Functionality tests
-6. Error pattern checks in logs
-7. Resilience tests (restart, reconnect, etc.)
+#### 3. Test Organization by Category
+```
+tests/
+├── unit/                    # Pure logic tests (no device needed)
+├── component/               # Single component tests
+│   ├── capture/            # One directory per component
+│   │   ├── test_device_detection.py
+│   │   ├── test_service_active.py
+│   │   └── test_fps_stability.py
+│   ├── display/
+│   ├── audio/
+│   └── network/
+├── integration/            # Multi-component interaction tests
+├── system/                 # End-to-end tests
+├── performance/            # Benchmarks and metrics
+└── fixtures/               # Shared test utilities
+```
 
-### Test Naming Convention
-- `test_<feature>.sh` - Feature-specific tests
-- Tests must be executable (`chmod +x`)
-- Must accept device IP as first argument
-- Must return exit code 0 for success, 1 for failure
+### Test Execution
 
-### Common Test Patterns
+#### IMPORTANT: Instructions for Claude (AI Assistant)
+
+**When running tests, ALWAYS check and update the test configuration first:**
+
+1. **Check current test device IP**:
+   ```bash
+   cat tests/test_config.yaml | grep "host:"
+   ```
+
+2. **Update if needed** (when user provides new IP):
+   ```bash
+   # Edit tests/test_config.yaml and update the host line
+   # Example: change "host: 10.77.9.143" to "host: 10.77.9.188"
+   ```
+
+3. **Run tests** (no need to specify IP, it uses config file):
+   ```bash
+   pytest tests/ --ssh-key ~/.ssh/ndi_test_key -v
+   # or
+   ./tests/run_all_tests.sh
+   ```
+
+**Why this approach**: The config file persists across shell sessions, so Claude won't forget the IP when running multiple commands.
+
+#### Configuring Device IP Address (for humans)
+
+The test suite supports multiple ways to specify the target device IP:
+
+1. **Configuration File** (RECOMMENDED - persists across sessions):
+   ```bash
+   # Edit tests/test_config.yaml - set host: YOUR_IP
+   vim tests/test_config.yaml
+   # Then run tests without specifying IP:
+   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
+   ```
+
+2. **Command Line Argument** (for one-off tests):
+   ```bash
+   pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
+   ```
+
+3. **Environment Variable** (for current session):
+   ```bash
+   export NDI_TEST_HOST=10.77.9.188
+   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
+   ```
+
+4. **Default Fallback** (10.77.9.143 if nothing specified)
+
+**Priority Order**: Command line > test_config.yaml > Environment variable > Default
+
+#### Prerequisites
 ```bash
-# SSH command wrapper
-ssh_cmd() {
-    sshpass -p newlevel ssh -o StrictHostKeyChecking=no -o LogLevel=ERROR root@${DEVICE_IP} "$1"
-}
+# Install test dependencies (one time setup)
+pip3 install -r tests/requirements.txt --break-system-packages
 
-# Test result printer
-print_test_result() {
-    if [ "$2" = "PASS" ]; then
-        echo -e "${GREEN}✓${NC} $1"
-        ((TESTS_PASSED++))
-    else
-        echo -e "${RED}✗${NC} $1"
-        ((TESTS_FAILED++))
-    fi
+# Set up SSH key authentication (recommended)
+ssh-keygen -t ed25519 -f ~/.ssh/ndi_test_key -N ""
+sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@DEVICE_IP
+```
+
+#### Running Tests - Primary Method
+
+**IMPORTANT**: Replace `DEVICE_IP` with your actual device IP address (e.g., 10.77.9.188)
+
+```bash
+# Set device IP as environment variable (RECOMMENDED for session)
+export NDI_TEST_HOST=10.77.9.188  # Change to your device IP
+
+# Run all tests with SSH key auth (RECOMMENDED)
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -v
+
+# Or specify IP directly each time
+pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -v
+
+# Run specific category
+pytest tests/component/capture/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
+
+# Run with parallel execution (faster)
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -n auto
+
+# Run only critical tests
+pytest tests/ -m critical --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
+
+# Quick summary without details
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+```
+
+#### Helper Scripts (Alternative Methods)
+
+**Why shell scripts exist**: For convenience and special use cases
+
+1. **tests/run_all_tests.sh** - Runs tests by category with summary
+   ```bash
+   # Usage: ./tests/run_all_tests.sh [IP_ADDRESS] [SSH_KEY_PATH]
+   ./tests/run_all_tests.sh 10.77.9.188              # Uses default SSH key
+   ./tests/run_all_tests.sh 10.77.9.188 ~/.ssh/id_rsa  # Custom SSH key
+   
+   # Or using environment variable
+   export NDI_TEST_HOST=10.77.9.188
+   ./tests/run_all_tests.sh  # Will use $NDI_TEST_HOST if no IP provided
+   ```
+   Purpose: Shows category-by-category progress, useful for debugging
+
+2. **tests/run_test.py** - Wrapper for password authentication
+   ```bash
+   python3 tests/run_test.py --host=10.77.9.188
+   # Or
+   export NDI_TEST_HOST=10.77.9.188
+   python3 tests/run_test.py  # Will use $NDI_TEST_HOST
+   ```
+   Purpose: For environments where SSH keys can't be used
+
+3. **Legacy bash tests** (tests/integration/*.sh) - Being phased out
+   ```bash
+   ./tests/integration/test_basic.sh  # OLD METHOD - DO NOT USE
+   ```
+   Purpose: Kept for reference during migration, will be removed
+
+#### Test Markers
+- `@pytest.mark.critical` - Must pass for release
+- `@pytest.mark.slow` - Takes >5 seconds
+- `@pytest.mark.requires_usb` - Needs USB device
+- `@pytest.mark.destructive` - Modifies system
+
+#### Understanding Test Results
+
+```bash
+# Typical output
+========================= 140 passed, 2 skipped in 45.2s =========================
+```
+
+- **PASSED**: Test succeeded
+- **FAILED**: Test failed - investigate issue
+- **SKIPPED**: Optional feature not present (OK)
+- **ERROR**: Test couldn't run - check connectivity
+
+**Expected Results on Clean NDI Bridge**:
+- ~140 tests should pass
+- Some skips are normal (optional features like intercom)
+- Zero failures on properly configured device
+
+#### Quick Test Commands Reference
+
+```bash
+# Just test if device is working (critical tests only, fast)
+pytest -m critical --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -q
+
+# Full validation before deployment (all tests, detailed)
+pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -v
+
+# Debug specific component issues
+pytest tests/component/capture/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -vv
+
+# Generate HTML report
+pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key --html=report.html
+```
+
+### Writing New Tests
+
+#### 1. Create Atomic Test File
+```python
+# tests/component/capture/test_new_feature.py
+import pytest
+
+def test_specific_behavior(host):
+    """Test one specific behavior."""
+    # One test, one assertion
+    result = host.run("command")
+    assert result.succeeded
+```
+
+#### 2. Use Fixtures for Common Operations
+```python
+@pytest.fixture
+def restart_service(host):
+    """Fixture to restart a service."""
+    def _restart(service_name):
+        host.run(f"systemctl restart {service_name}")
+        time.sleep(2)
+    return _restart
+
+def test_service_recovery(host, restart_service):
+    restart_service("ndi-capture")
+    assert host.service("ndi-capture").is_running
+```
+
+#### 3. Parallel Test Execution
+Tests are designed to run in parallel by default:
+- Each test is independent (no shared state)
+- Fixtures handle setup/teardown
+- Use `pytest-xdist` for auto-parallelization
+
+### Migration from Bash Tests
+
+**Current State**: 83 tests in 11 bash files (violates atomic principle)
+**Target State**: Each test as separate Python function
+
+**Migration Process**:
+1. Identify logical test units in bash scripts
+2. Create atomic pytest function for each
+3. Place in appropriate category directory
+4. Use testinfra for SSH operations
+
+**Example Migration**:
+```bash
+# OLD: bash test with multiple checks
+test_capture() {
+    check_device
+    check_service
+    check_fps
 }
 ```
+
+```python
+# NEW: Three atomic tests
+def test_capture_device_present(host):
+    assert host.file("/dev/video0").exists
+
+def test_capture_service_enabled(host):
+    assert host.service("ndi-capture").is_enabled
+
+def test_capture_fps_nominal(host):
+    fps = float(host.file("/var/run/ndi-bridge/fps").content_string)
+    assert 29.0 <= fps <= 31.0
+```
+
+### CI/CD Integration
+
+```yaml
+# .github/workflows/test.yml
+name: Test Suite
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+      - run: pip install -r tests/requirements.txt
+      - run: pytest --host ${{ secrets.TEST_DEVICE_IP }}
+```
+
+### Best Practices
+
+1. **Test Independence**: Each test must be runnable in isolation
+2. **Fast Feedback**: Component tests <1s, integration <5s
+3. **Clear Naming**: `test_<component>_<behavior>_<expected_result>`
+4. **No Test Interdependencies**: Tests never depend on execution order
+5. **Use Markers**: Tag tests appropriately for selective execution
+6. **Fixture Reuse**: Common operations in fixtures, not duplicated
+7. **Descriptive Docstrings**: Each test has clear documentation
 
 ### Known Issues That Took 10+ Builds to Find:
 - Menu `read` commands need `< /dev/tty` when called from other scripts
@@ -489,3 +738,48 @@ sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
 
 **Note**: The box's SSH may show welcome screen. Add `-o LogLevel=ERROR` to suppress it.
 - Use TDD test driven development. Working and full tests sucess are most important part.
+
+## Testing with pytest
+
+The project uses **pytest + testinfra** for atomic testing (one test = one assertion).
+
+### Running Tests
+```bash
+# Configure test IP (persistent across sessions)
+nano tests/test_config.yaml  # Set: host: 10.77.9.188
+
+# Run all tests
+python3 -m pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+
+# Run specific component tests
+python3 -m pytest tests/component/core/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q
+python3 -m pytest tests/component/capture/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q
+
+# Use helper scripts
+./tests/run_all_tests.sh        # Runs all test categories
+./tests/test-device.sh           # Auto-handles SSH key changes for reflashed devices
+```
+
+### Test Configuration Priority
+1. Command line: `--host 10.77.9.188`
+2. Config file: `tests/test_config.yaml`
+3. Environment: `export NDI_TEST_HOST=10.77.9.188`
+4. Default: `10.77.9.143`
+
+### Test Categories and Markers
+```bash
+# Run by category
+pytest -m critical       # Must-pass tests only
+pytest -m capture       # Video capture tests
+pytest -m network       # Network functionality
+pytest -m "not slow"    # Skip slow tests (>5s)
+```
+
+### SSH Key Handling for Reflashed Devices
+When testing multiple devices on same IP, add to `~/.ssh/config`:
+```bash
+Host 10.77.9.*
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+```
+Or use `./tests/test-device.sh` which handles this automatically.

@@ -1,0 +1,4 @@
+host: 10.77.9.200
+ssh_user: root
+ssh_pass: newlevel
+ssh_key: ~/.ssh/ndi_test_key
