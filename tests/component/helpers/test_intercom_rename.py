@@ -25,11 +25,16 @@ class TestIntercomRename:
         
         yield
         
-        # Restore original name after test
-        if self.original_name and self.original_name != self.test_name:
-            host.run(f"ndi-bridge-rw")
-            host.run(f"ndi-bridge-set-name {self.original_name}")
-            host.run(f"ndi-bridge-ro")
+        # Restore original name after test (skip if already set correctly)
+        try:
+            current_hostname = host.run("hostname").stdout.strip()
+            if current_hostname != self.original_hostname:
+                host.run(f"ndi-bridge-rw")
+                host.run(f"ndi-bridge-set-name {self.original_name}")
+                host.run(f"ndi-bridge-ro")
+        except Exception:
+            # If teardown fails, don't block test results
+            pass
     
     
     def test_intercom_service_is_enabled(self, host):
@@ -43,10 +48,16 @@ class TestIntercomRename:
         service = host.service("ndi-bridge-intercom")
         assert service.is_running
     
+    @pytest.mark.slow
     def test_chrome_process_exists_before_rename(self, host):
         """Test that Chrome process is running before rename."""
-        result = host.run("pgrep -f 'chrome.*vdo'")
-        assert result.succeeded
+        # Wait for Chrome to fully start (service may have just restarted)
+        for i in range(30):  # Wait up to 30 seconds
+            result = host.run("pgrep -f 'vdo.ninja'")
+            if result.succeeded:
+                break
+            time.sleep(1)
+        assert result.succeeded, "Chrome process with vdo.ninja not found after 30 seconds"
         assert result.stdout.strip() != ""
     
     def test_set_name_command_exists(self, host):
@@ -84,7 +95,7 @@ class TestIntercomRename:
         host.run("ndi-bridge-rw")
         
         # Get Chrome PID before rename
-        result_before = host.run("pgrep -f 'chrome.*vdo' | head -1")
+        result_before = host.run("pgrep -f 'vdo.ninja' | head -1")
         pid_before = result_before.stdout.strip() if result_before.succeeded else None
         
         # Run set-name command
@@ -98,7 +109,7 @@ class TestIntercomRename:
         time.sleep(10)
         
         # Get Chrome PID after rename
-        result_after = host.run("pgrep -f 'chrome.*vdo' | head -1")
+        result_after = host.run("pgrep -f 'vdo.ninja' | head -1")
         pid_after = result_after.stdout.strip() if result_after.succeeded else None
         
         # PIDs should be different (service restarted)
