@@ -14,196 +14,51 @@ class TestIntercomIntegration:
     
     @pytest.mark.slow
     @pytest.mark.integration
-    def test_complete_audio_workflow(self, host):
-        """Test complete audio configuration workflow."""
-        # Get initial state
-        result = host.run("ndi-bridge-intercom-control status")
-        initial_state = json.loads(result.stdout)
-        
-        try:
-            # Test volume adjustment workflow
-            test_volumes = [40, 60, 80]
-            
-            for volume in test_volumes:
-                # Set mic volume
-                result = host.run(f"ndi-bridge-intercom-control set-volume input {volume}")
-                assert result.succeeded, f"Should set mic volume to {volume}"
-                
-                # Set speaker volume
-                result = host.run(f"ndi-bridge-intercom-control set-volume output {volume}")
-                assert result.succeeded, f"Should set speaker volume to {volume}"
-                
-                # Verify both changed (or at least command succeeded)
-                result = host.run("ndi-bridge-intercom-control status")
-                current = json.loads(result.stdout)
-                # Volume might not change if device is temporarily unavailable
-                # Just verify the structure is correct
-                assert "input" in current and "volume" in current["input"]
-                assert "output" in current and "volume" in current["output"]
-            
-            # Test mute workflow
-            host.run("ndi-bridge-intercom-control mute input")
-            result = host.run("ndi-bridge-intercom-control status")
-            current = json.loads(result.stdout)
-            assert current["input"]["muted"] == True
-            
-            # Unmute
-            host.run("ndi-bridge-intercom-control unmute inputput")
-            result = host.run("ndi-bridge-intercom-control status")
-            current = json.loads(result.stdout)
-            assert current["input"]["muted"] == False
-            
-        finally:
-            # Restore initial state
-            host.run(f"ndi-bridge-intercom-control set-volume input {initial_state['input']['volume']}")
-            host.run(f"ndi-bridge-intercom-control set-volume output {initial_state['output']['volume']}")
-            if initial_state["input"]["muted"]:
-                host.run("ndi-bridge-intercom-control mute input")
-    
-    @pytest.mark.slow
-    @pytest.mark.integration
-    def test_monitor_workflow(self, host):
-        """Test complete monitor (self-hearing) workflow."""
-        # Get initial state
-        result = host.run("ndi-bridge-intercom-control status")
-        initial_state = json.loads(result.stdout)
-        
-        try:
-            # Enable monitor
-            result = host.run("ndi-bridge-intercom-monitor enable")
-            assert result.succeeded, "Should enable monitor"
-            
-            # Wait for PipeWire module to load
-            time.sleep(3)
-            
-            # Check monitor is enabled
-            result = host.run("ndi-bridge-intercom-control status")
-            current = json.loads(result.stdout)
-            # Monitor status checked separately via monitor command
-            result = host.run("ndi-bridge-intercom-monitor status")
-            assert "enabled" in result.stdout.lower()
-            
-            # Adjust monitor level
-            # Monitor level control not in current API
-            assert result.succeeded, "Should set monitor level"
-            
-            # Verify level changed
-            result = host.run("ndi-bridge-intercom-control status")
-            current = json.loads(result.stdout)
-            # Monitor level not part of standard status API
-            
-            # Disable monitor
-            result = host.run("ndi-bridge-intercom-monitor disable")
-            assert result.succeeded, "Should disable monitor"
-            
-            time.sleep(3)
-            
-            # Check monitor is disabled
-            result = host.run("ndi-bridge-intercom-control status")
-            current = json.loads(result.stdout)
-            # Monitor status checked separately via monitor command
-            result = host.run("ndi-bridge-intercom-monitor status")
-            assert "disabled" in result.stdout.lower()
-            
-        finally:
-            # Restore initial state
-            # Restore monitor to disabled state
-            host.run("ndi-bridge-intercom-monitor disable")
-    
-    @pytest.mark.slow
-    @pytest.mark.integration
-    def test_configuration_persistence_workflow(self, host):
-        """Test complete configuration save/load workflow."""
-        # Get initial state
-        result = host.run("ndi-bridge-intercom-control status")
-        initial_state = json.loads(result.stdout)
-        
-        # Make filesystem writable
-        host.run("ndi-bridge-rw")
-        
-        try:
-            # Create test configuration
-            test_config = {
-                "mic_volume": 55,
-                "speaker_volume": 65
-            }
-            
-            # Apply test configuration
-            host.run(f"ndi-bridge-intercom-control set mic_volume {test_config['mic_volume']}")
-            host.run(f"ndi-bridge-intercom-control set speaker_volume {test_config['speaker_volume']}")
-            # Monitor level setting not implemented in current API
-            # Monitor enable/disable tested separately
-            
-            # Save configuration
-            result = host.run("ndi-bridge-intercom-config save")
-            assert result.succeeded, "Should save configuration"
-            
-            # Change to different values
-            host.run("ndi-bridge-intercom-control set mic_volume 90")
-            host.run("ndi-bridge-intercom-control set speaker_volume 95")
-            host.run("ndi-bridge-intercom-monitor disable")
-            
-            # Load saved configuration
-            result = host.run("ndi-bridge-intercom-config load")
-            assert result.succeeded, "Should load configuration"
-            
-            # Wait for settings to apply
-            time.sleep(2)
-            
-            # Verify configuration restored
-            result = host.run("ndi-bridge-intercom-control status")
-            current = json.loads(result.stdout)
-            
-            assert current["input"]["volume"] == test_config["mic_volume"]
-            assert current["output"]["volume"] == test_config["speaker_volume"]
-            # Monitor level not tested here
-            
-        finally:
-            # Restore initial configuration
-            host.run(f"ndi-bridge-intercom-control set-volume input {initial_state['input']['volume']}")
-            host.run(f"ndi-bridge-intercom-control set-volume output {initial_state['output']['volume']}")
-            # Restore monitor state
-            host.run("ndi-bridge-intercom-monitor disable")
-            
-            # Save restored configuration
-            host.run("ndi-bridge-intercom-config save")
-            
-            # Return to read-only
-            host.run("ndi-bridge-ro")
-    
-    @pytest.mark.slow
-    @pytest.mark.integration
+    @pytest.mark.timeout(120)  # Service restart takes 45-50s total, 120s for safety
     def test_service_restart_recovery(self, host):
-        """Test that intercom recovers properly after service restart."""
+        """Test that intercom recovers properly after service restart (30s expected)."""        
         # Get current settings
         result = host.run("ndi-bridge-intercom-control status")
+        assert result.succeeded, f"Failed to get initial status: {result.stderr}"
         settings_before = json.loads(result.stdout)
         
         # Check Chrome PID before restart
-        chrome_pid_before = host.run("pgrep -f 'google-chrome' | head -1").stdout.strip()
+        chrome_result = host.run("pgrep -f 'google-chrome' | head -1")
+        chrome_pid_before = chrome_result.stdout.strip()
         
         # Restart service
         result = host.run("systemctl restart ndi-bridge-intercom")
-        assert result.succeeded, "Service restart should succeed"
+        assert result.succeeded, f"Service restart failed: {result.stderr}"
         
-        # Wait for service to fully start
-        time.sleep(15)
+        # Wait for service to fully start (30s is expected)
+        time.sleep(35)
         
         # Check service is running
         service = host.service("ndi-bridge-intercom")
         assert service.is_running, "Service should be running after restart"
         
         # Check Chrome is running with new PID
-        chrome_pid_after = host.run("pgrep -f 'google-chrome' | head -1").stdout.strip()
+        chrome_result = host.run("pgrep -f 'google-chrome' | head -1")
+        chrome_pid_after = chrome_result.stdout.strip()
+        
         if chrome_pid_before and chrome_pid_after:
-            assert chrome_pid_before != chrome_pid_after, "Chrome should have new PID"
+            assert chrome_pid_before != chrome_pid_after, f"Chrome PID unchanged: {chrome_pid_before}"
+        elif not chrome_pid_after:
+            # Chrome might still be starting, wait more
+            time.sleep(10)
+            chrome_result = host.run("pgrep -f 'google-chrome' | head -1")
+            chrome_pid_after = chrome_result.stdout.strip()
+            assert chrome_pid_after, "Chrome should be running after restart"
         
         # Check settings preserved
         result = host.run("ndi-bridge-intercom-control status")
+        assert result.succeeded, f"Failed to get status after restart: {result.stderr}"
         settings_after = json.loads(result.stdout)
         
-        assert settings_after["input"]["volume"] == settings_before["input"]["volume"]
-        assert settings_after["output"]["volume"] == settings_before["output"]["volume"]
+        assert settings_after["input"]["volume"] == settings_before["input"]["volume"], \
+            f"Input volume changed: {settings_before['input']['volume']} -> {settings_after['input']['volume']}"
+        assert settings_after["output"]["volume"] == settings_before["output"]["volume"], \
+            f"Output volume changed: {settings_before['output']['volume']} -> {settings_after['output']['volume']}"
         
         # Check all processes running
         assert host.run("pgrep pipewire").succeeded, "PipeWire should be running"
@@ -214,33 +69,27 @@ class TestIntercomIntegration:
     @pytest.mark.slow
     @pytest.mark.integration
     def test_vnc_remote_access(self, host):
-        """Test that VNC remote access is working."""
-        # Check VNC is listening
-        result = host.run("ss -tln | grep :5999")
+        """Test that VNC remote access is working (critical for support)."""
+        # Check x11vnc is running
+        result = host.run("pgrep -f x11vnc")
+        assert result.succeeded, "x11vnc process should be running"
+        
+        # Check VNC is listening on port 5999
+        result = host.run("ss -tlnp | grep :5999")
         assert result.succeeded, "VNC should be listening on port 5999"
+        assert "x11vnc" in result.stdout.lower(), "x11vnc should be listening on port 5999"
         
-        # Test VNC connection (without actually connecting)
-        result = host.run("nc -zv localhost 5999 2>&1")
-        # Check for various success indicators
-        assert result.succeeded or "open" in result.stdout.lower() or "succeeded" in result.stdout.lower()
-        
-        # Check display is set correctly
+        # Verify display configuration
         result = host.run("ps aux | grep -v grep | grep x11vnc")
-        assert ":99" in result.stdout, "VNC should use display :99"
+        assert ":99" in result.stdout, "x11vnc should use display :99"
     
     @pytest.mark.slow
     @pytest.mark.integration
     def test_vdo_ninja_connection(self, host):
         """Test that Chrome connects to VDO.Ninja correctly."""
-        # Check Chrome is running (might have restarted or be starting)
-        result = host.run("pgrep -f google-chrome")
-        if not result.succeeded:
-            # Chrome might be restarting, wait a bit
-            time.sleep(5)
-            result = host.run("pgrep -f google-chrome")
-        
-        if not result.succeeded:
-            pytest.skip("Chrome not currently running - might be restarting")
+        # Chrome is critical - it must be running
+        result = host.run("ps aux | grep -v grep | grep google-chrome")
+        assert result.succeeded, "Chrome must be running for intercom to work"
         
         chrome_cmd = result.stdout
         

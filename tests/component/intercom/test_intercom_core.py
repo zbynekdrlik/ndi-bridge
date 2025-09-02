@@ -116,6 +116,7 @@ class TestIntercomCore:
             pytest.fail(f"Control get should return valid JSON, got: {result.stdout}")
     
     @pytest.mark.slow
+    @pytest.mark.timeout(90)  # Service restart takes 30-45s
     def test_intercom_service_restart(self, host):
         """Test that intercom service can be restarted."""
         # Get initial PID
@@ -126,12 +127,18 @@ class TestIntercomCore:
         result = host.run("systemctl restart ndi-bridge-intercom")
         assert result.succeeded, "Service restart should succeed"
         
-        # Wait for service to come up
-        time.sleep(5)
+        # Wait for service to fully restart and stabilize
+        time.sleep(35)
         
         # Check service is running
         service = host.service("ndi-bridge-intercom")
         assert service.is_running, "Service should be running after restart"
+        
+        # Wait for Chrome to fully start
+        for _ in range(10):
+            if host.run("pgrep -f google-chrome").succeeded:
+                break
+            time.sleep(2)
         
         # Check PID changed
         pid_after = host.run("systemctl show ndi-bridge-intercom --property MainPID").stdout.strip()

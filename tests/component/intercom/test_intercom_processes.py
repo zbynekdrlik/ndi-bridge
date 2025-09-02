@@ -37,8 +37,7 @@ class TestIntercomProcesses:
     def test_chrome_vdo_ninja_parameters(self, host):
         """Test that Chrome is using correct VDO.Ninja parameters."""
         result = host.run("ps aux | grep -v grep | grep google-chrome")
-        if not result.succeeded:
-            pytest.skip("Chrome not running")
+        assert result.succeeded, "Chrome should be running for intercom"
         
         chrome_cmd = result.stdout
         
@@ -93,8 +92,7 @@ class TestIntercomProcesses:
     def test_chrome_using_correct_display(self, host):
         """Test that Chrome is using the virtual display."""
         result = host.run("ps aux | grep -v grep | grep google-chrome")
-        if not result.succeeded:
-            pytest.skip("Chrome not running")
+        assert result.succeeded, "Chrome should be running for intercom"
         
         # Get Chrome PID
         chrome_pid = result.stdout.split()[1]
@@ -107,8 +105,7 @@ class TestIntercomProcesses:
     def test_chrome_profile_directory(self, host):
         """Test that Chrome is using correct profile directory."""
         result = host.run("ps aux | grep -v grep | grep google-chrome")
-        if not result.succeeded:
-            pytest.skip("Chrome not running")
+        assert result.succeeded, "Chrome should be running for intercom"
         
         chrome_cmd = result.stdout
         assert "--user-data-dir=" in chrome_cmd, "Chrome should have user data dir"
@@ -166,10 +163,17 @@ class TestIntercomProcesses:
         hostname = host.run("hostname").stdout.strip()
         device_name = hostname.replace("ndi-bridge-", "")
         
-        # Get Chrome process
-        result = host.run("ps aux | grep -v grep | grep google-chrome")
-        if not result.succeeded:
-            pytest.skip("Chrome not running")
+        # Wait for Chrome to be running (especially after service restarts)
+        chrome_found = False
+        chrome_cmd = ""
         
-        chrome_cmd = result.stdout
+        for attempt in range(30):  # Up to 90 seconds total
+            result = host.run("ps aux | grep -v grep | grep google-chrome")
+            if result.succeeded and result.stdout.strip():
+                chrome_found = True
+                chrome_cmd = result.stdout
+                break
+            time.sleep(3)  # Wait 3s between attempts
+        
+        assert chrome_found, "Chrome should be running for intercom"
         assert f"push={device_name}" in chrome_cmd, f"Chrome should use device name '{device_name}' as push parameter"

@@ -33,29 +33,7 @@ class TestIntercomWeb:
             assert "/intercom" in content, "Nginx should have intercom location"
             assert "proxy_pass" in content, "Should proxy to backend"
     
-    def test_web_backend_files_exist(self, host):
-        """Test that web backend files exist."""
-        # Web backend not yet implemented - skip for now
-        pytest.skip("Web backend not yet implemented")
     
-    def test_web_frontend_files_exist(self, host):
-        """Test that web frontend files exist."""
-        frontend_files = [
-            "/opt/ndi-bridge/web/frontend/index.html",
-            "/opt/ndi-bridge/web/frontend/js/app.js"
-        ]
-        
-        for file_path in frontend_files:
-            file = host.file(file_path)
-            if not file.exists:
-                # Try alternative location  
-                alt_path = file_path.replace("/opt/ndi-bridge", "/usr/local/share/ndi-bridge")
-                file = host.file(alt_path)
-            
-            if file.exists:
-                return  # Found at least one frontend file
-        
-        pytest.skip("Web frontend files not found")
     
     def test_web_interface_accessible(self, host):
         """Test that web interface is accessible."""

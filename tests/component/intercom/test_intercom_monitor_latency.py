@@ -174,18 +174,16 @@ class TestIntercomMonitorLatency:
             assert status["enabled"] == False, f"Should be disabled in cycle {cycle}"
     
     def test_monitor_volume_control(self, host):
-        """Test that monitor level can be controlled."""
-        # Check if control script supports monitor level
-        result = host.run("ndi-bridge-intercom-control status")
+        """Test that monitor can be enabled/disabled."""
+        # Monitor is controlled via separate monitor command, not main control
+        result = host.run("ndi-bridge-intercom-monitor status")
+        assert result.succeeded, "Monitor status command should work"
         
-        if result.succeeded:
-            # If status works, check for monitor level support
-            if "monitor" in result.stdout.lower():
-                assert True, "Monitor level control available"
-            else:
-                # Monitor level might be controlled differently
-                pytest.skip("Monitor level not in status output")
+        # Check that monitor status returns valid JSON
+        status = json.loads(result.stdout)
+        assert "enabled" in status, "Monitor status should have enabled field"
     
+    @pytest.mark.timeout(90)  # Service restart takes time
     def test_monitor_survives_intercom_restart(self, host):
         """Test that monitor setting survives service restart."""
         # Enable monitor
@@ -197,7 +195,7 @@ class TestIntercomMonitorLatency:
         
         # Restart intercom service
         host.run("systemctl restart ndi-bridge-intercom")
-        time.sleep(10)
+        time.sleep(35)  # Service restart takes 30+ seconds
         
         # Check monitor status
         final_status = host.run("ndi-bridge-intercom-monitor status").stdout
