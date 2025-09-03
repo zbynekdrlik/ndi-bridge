@@ -44,16 +44,11 @@ setup_virtual_devices() {
             channel_map=front-left,front-right
     fi
     
-    if ! pactl list sources short | grep -q "intercom-microphone"; then
+    # Check if virtual microphone exists (it's created as a sink whose monitor is the source)
+    if ! pactl list sinks short | grep -q "intercom-microphone"; then
         echo "Creating virtual microphone device..."
-        pactl load-module module-null-sink \
-            sink_name=intercom-mic-sink \
-            sink_properties="device.description='Intercom Mic Sink'" \
-            rate=48000 \
-            channels=1
-        
-        # The monitor of this sink becomes our virtual source
-        pactl set-source-volume intercom-mic-sink.monitor 100%
+        # The virtual microphone is already created by the config file
+        # But if it doesn't exist, we skip - config handles it
     fi
 }
 
@@ -85,19 +80,20 @@ link_to_usb() {
     fi
     
     # Create loopback from USB input to virtual microphone sink
-    if ! pactl list modules short | grep -q "source=$USB_SOURCE sink=intercom-mic-sink"; then
+    if ! pactl list modules short | grep -q "source=$USB_SOURCE sink=intercom-microphone"; then
         echo "Creating loopback: USB Input -> Virtual Microphone"
         pactl load-module module-loopback \
             source="$USB_SOURCE" \
-            sink=intercom-mic-sink \
+            sink=intercom-microphone \
             latency_msec=5 \
             adjust_time=0 \
             rate=48000
     fi
     
     # Set virtual devices as defaults
-    pactl set-default-sink intercom-speaker
-    pactl set-default-source intercom-mic-sink.monitor
+    pactl set-default-sink intercom-speaker || true
+    # The virtual microphone monitor will be the source
+    pactl set-default-source intercom-microphone.monitor || true
     
     echo "Virtual devices linked to USB hardware successfully"
 }
@@ -135,7 +131,7 @@ configure_chrome_audio() {
         app=$(pactl list source-outputs | grep -A20 "Source Output #$stream" | grep "application.name" | cut -d'"' -f2)
         if [[ "$app" == *"chrome"* ]] || [[ "$app" == *"Chrome"* ]]; then
             echo "Moving Chrome input stream $stream to virtual microphone"
-            pactl move-source-output "$stream" intercom-mic-sink.monitor 2>/dev/null || true
+            pactl move-source-output "$stream" intercom-microphone.monitor 2>/dev/null || true
         fi
     done
 }
