@@ -152,6 +152,9 @@ pcm.dante {
     RX_CHANNELS 2
     TX_CHANNELS 2
     SAMPLE_RATE 96000
+    # Set the Dante device name - this appears in Dante Controller
+    DEVICE_NAME "media-bridge"
+    INTERFACE "br0"
 }
 EOFALSA
 
@@ -159,17 +162,43 @@ EOFALSA
 cp /root/.asoundrc /etc/asound.conf
 
 # Copy service files from helper-scripts
-cp /tmp/helper-scripts/statime.service /etc/systemd/system/
-cp /tmp/helper-scripts/dante-bridge.service /etc/systemd/system/
+if [ -f /tmp/helper-scripts/statime.service ]; then
+    cp /tmp/helper-scripts/statime.service /etc/systemd/system/
+fi
+if [ -f /tmp/helper-scripts/dante-bridge.service ]; then
+    cp /tmp/helper-scripts/dante-bridge.service /etc/systemd/system/
+else
+    # Fallback - create minimal service
+    cat > /etc/systemd/system/dante-bridge.service << 'EOFSERVICE'
+[Unit]
+Description=Dante Audio Bridge
+After=network-online.target pipewire.service statime.service
+Wants=network-online.target pipewire.service statime.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/media-bridge-dante
+Restart=on-failure
+Environment="XDG_RUNTIME_DIR=/run/user/0"
+
+[Install]
+WantedBy=multi-user.target
+EOFSERVICE
+fi
 
 # Copy the main bridge scripts
-cp /tmp/helper-scripts/dante-bridge-production /usr/local/bin/
-chmod +x /usr/local/bin/dante-bridge-production
+for script in media-bridge-dante-pipewire media-bridge-dante-production media-bridge-dante-simple; do
+    if [ -f /tmp/helper-scripts/$script ]; then
+        cp /tmp/helper-scripts/$script /usr/local/bin/
+        chmod +x /usr/local/bin/$script
+    fi
+done
 
-# Legacy script for fallback
-if [ -f /tmp/helper-scripts/dante-bridge ]; then
-    cp /tmp/helper-scripts/dante-bridge /usr/local/bin/
-    chmod +x /usr/local/bin/dante-bridge
+# Create symlink to PipeWire version as default
+if [ -f /usr/local/bin/media-bridge-dante-pipewire ]; then
+    ln -sf media-bridge-dante-pipewire /usr/local/bin/media-bridge-dante
+elif [ -f /usr/local/bin/media-bridge-dante-production ]; then
+    ln -sf media-bridge-dante-production /usr/local/bin/media-bridge-dante
 fi
 
 # Copy PipeWire configuration for Dante

@@ -1,0 +1,39 @@
+[Unit]
+Description=Dante Audio Bridge with PipeWire
+Documentation=man:pipewire(1) man:pw-link(1)
+After=network-online.target sound.target pipewire.service wireplumber.service statime.service
+Wants=network-online.target pipewire.service wireplumber.service statime.service
+Requires=pipewire.service statime.service
+
+[Service]
+Type=simple
+User=root
+Group=audio
+
+# PipeWire environment
+Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
+Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="PULSE_RUNTIME_PATH=/run/user/0/pulse"
+
+# Use the PipeWire script for proper resampling
+ExecStart=/usr/local/bin/media-bridge-dante-pipewire
+
+# Restart on failure
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=3
+StartLimitInterval=60
+
+# Resource limits for real-time audio
+LimitRTPRIO=95
+LimitMEMLOCK=infinity
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=80
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dante-bridge
+
+[Install]
+WantedBy=multi-user.target

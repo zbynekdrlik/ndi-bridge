@@ -14,9 +14,10 @@ QUANTUM=512  # 5.33ms @ 96kHz - good balance of latency/stability
 RESAMPLE_QUALITY=10  # 1-15, higher = better quality, more CPU
 
 # Environment for Inferno
-export INFERNO_NAME=${HOSTNAME:-ndi-bridge}
+export INFERNO_NAME="media-bridge"
 export INFERNO_INTERFACE=br0
 export INFERNO_SAMPLE_RATE=$SAMPLE_RATE
+export INFERNO_DEVICE_NAME="media-bridge"
 
 # PID file for service management
 PID_FILE="/var/run/dante-bridge.pid"
