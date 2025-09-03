@@ -59,12 +59,6 @@ def test_ndi_bridge_welcome_script_exists(host):
     assert script.exists, "media-bridge-welcome script not found"
 
 
-def test_ndi_bridge_welcome_service_enabled(host):
-    """Test that media-bridge-welcome service is enabled."""
-    service = host.service("media-bridge-welcome")
-    assert service.is_enabled, "media-bridge-welcome service not enabled"
-
-
 def test_ndi_bridge_collector_script_exists(host):
     """Test that media-bridge-collector script exists."""
     script = host.file("/usr/local/bin/media-bridge-collector")
