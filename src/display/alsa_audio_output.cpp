@@ -358,10 +358,5 @@ bool ALSAAudioOutput::writeAudio(const int16_t* samples, int channels,
     return true;
 }
 
-// Factory function implementation
-std::unique_ptr<AudioOutput> createAudioOutput() {
-    return std::make_unique<ALSAAudioOutput>();
-}
-
 } // namespace display
 } // namespace ndi_bridge

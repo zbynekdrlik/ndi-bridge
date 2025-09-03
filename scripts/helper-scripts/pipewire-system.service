@@ -1,0 +1,15 @@
+[Unit]
+Description=PipeWire System Service
+After=sound.target
+
+[Service]
+Type=simple
+User=root
+Environment="XDG_RUNTIME_DIR=/run/user/0"
+ExecStartPre=/bin/mkdir -p /run/user/0
+ExecStart=/usr/bin/pipewire
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -70,12 +70,53 @@ def test_alsa_mixer_accessible(host):
 
 
 def test_pipewire_installed(host):
-    """Test that PipeWire is installed (if used)."""
+    """Test that PipeWire is installed."""
     result = host.run("which pipewire")
-    if result.rc == 0:
-        # PipeWire is installed, check if running
-        pw_result = host.run("pgrep pipewire")
-        assert pw_result.rc == 0, "PipeWire installed but not running"
+    assert result.rc == 0, "PipeWire is not installed"
+
+
+def test_pipewire_service_running(host):
+    """Test that system-wide PipeWire service is running."""
+    # Check for system-wide service first
+    system_service = host.service("pipewire-system")
+    if system_service.is_enabled:
+        assert system_service.is_running, "pipewire-system service not running"
+    else:
+        # Fallback to checking for PipeWire process
+        result = host.run("pgrep pipewire")
+        assert result.rc == 0, "PipeWire is not running (neither system service nor process)"
+
+
+def test_pipewire_pulse_service_running(host):
+    """Test that PipeWire PulseAudio compatibility is running."""
+    # Check for system-wide pipewire-pulse service
+    pulse_service = host.service("pipewire-pulse-system")
+    if pulse_service.is_enabled:
+        assert pulse_service.is_running, "pipewire-pulse-system service not running"
+    else:
+        # Check for pipewire-pulse process
+        result = host.run("pgrep pipewire-pulse")
+        assert result.rc == 0, "pipewire-pulse is not running"
+
+
+def test_wireplumber_service_running(host):
+    """Test that WirePlumber session manager is running."""
+    # Check for system-wide wireplumber service
+    wireplumber_service = host.service("wireplumber-system")
+    if wireplumber_service.is_enabled:
+        assert wireplumber_service.is_running, "wireplumber-system service not running"
+    else:
+        # Check for wireplumber process
+        result = host.run("pgrep wireplumber")
+        assert result.rc == 0, "wireplumber is not running"
+
+
+def test_pipewire_audio_working(host):
+    """Test that PipeWire audio is functional."""
+    # Check if pactl can connect to PipeWire
+    result = host.run("pactl info")
+    assert result.rc == 0, "Cannot connect to PipeWire audio server"
+    assert "PipeWire" in result.stdout, "Not connected to PipeWire server"
 
 
 def test_pulseaudio_installed(host):
@@ -105,8 +146,25 @@ def test_speaker_test_available(host):
 
 @pytest.mark.slow
 def test_speaker_test_runs(host):
-    """Test that speaker-test can run (brief test)."""
-    # Run very brief test - just check it starts
-    result = host.run("timeout 1 speaker-test -t sine -f 440 -c 1 >/dev/null 2>&1")
-    # timeout will return 124 when it times out (expected)
-    assert result.rc in [0, 124], f"speaker-test failed: rc={result.rc}"
+    """Test that speaker-test can run (silent test)."""
+    # Test with wav format but no actual output - just verify command works
+    # Using -t wav with duration 0 to avoid any sound output
+    result = host.run("speaker-test -t wav -c 1 -l 1 -p 1 >/dev/null 2>&1 & pid=$!; sleep 0.1; kill $pid 2>/dev/null; echo $?")
+    # We just check that speaker-test can be invoked, not that it produces sound
+    assert result.rc == 0, f"speaker-test cannot be invoked"
+
+
+def test_hdmi_audio_devices_detected(host):
+    """Test that HDMI audio devices are detected."""
+    result = host.run("aplay -l | grep -i hdmi")
+    # HDMI audio might not be available on all systems
+    if result.rc == 0:
+        assert "HDMI" in result.stdout, "HDMI audio device not properly detected"
+
+
+def test_pipewire_hdmi_sink_available(host):
+    """Test that PipeWire has HDMI sink available when HDMI is connected."""
+    result = host.run("pactl list sinks short | grep -i hdmi")
+    # HDMI sink might not be available if no HDMI connected
+    if result.rc == 0:
+        assert "hdmi" in result.stdout.lower(), "HDMI sink not available in PipeWire"

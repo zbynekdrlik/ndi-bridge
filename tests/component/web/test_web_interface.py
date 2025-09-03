@@ -15,9 +15,10 @@ def test_web_server_responds_to_http(host):
 
 
 def test_web_interface_index_exists(host):
-    """Test that index.html exists."""
-    index_file = host.file("/var/www/html/index.html")
-    assert index_file.exists, "Web interface index.html not found"
+    """Test that web interface index.html exists."""
+    # Check the actual Media Bridge web frontend location
+    index_file = host.file("/opt/media-bridge-web/frontend/index.html")
+    assert index_file.exists, "Web interface index.html not found at /opt/media-bridge-web/frontend/"
 
 
 def test_api_endpoint_info_responds(host):

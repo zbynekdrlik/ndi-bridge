@@ -51,6 +51,17 @@ install_helper_scripts() {
             cp "$HELPER_DIR/media-bridge-intercom.service" /mnt/usb/etc/systemd/system/
         fi
         
+        # Install system-wide PipeWire services
+        if [ -f "$HELPER_DIR/pipewire-system.service" ]; then
+            cp "$HELPER_DIR/pipewire-system.service" /mnt/usb/etc/systemd/system/
+        fi
+        if [ -f "$HELPER_DIR/pipewire-pulse-system.service" ]; then
+            cp "$HELPER_DIR/pipewire-pulse-system.service" /mnt/usb/etc/systemd/system/
+        fi
+        if [ -f "$HELPER_DIR/wireplumber-system.service" ]; then
+            cp "$HELPER_DIR/wireplumber-system.service" /mnt/usb/etc/systemd/system/
+        fi
+        
         
         # Setup Chrome profile with VDO.Ninja permissions (pre-granted)
         mkdir -p /mnt/usb/opt/chrome-vdo-profile/Default

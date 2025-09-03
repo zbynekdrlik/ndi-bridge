@@ -130,6 +130,7 @@ install_build_deps() {
         "libv4l-dev"
         "v4l-utils"
         "libdrm-dev"  # For DRM/KMS display output with hardware scaling (v1.6.8+)
+        "libpipewire-0.3-dev"  # For PipeWire audio in ndi-display
     )
     
     # USB creation dependencies

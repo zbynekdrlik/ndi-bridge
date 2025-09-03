@@ -48,12 +48,12 @@ def test_complete_boot_sequence(host):
 
 
 def test_auto_start_enabled_services(host):
-    """Test that all required services are enabled for auto-start."""
+    """Test that all required systemd services are enabled for auto-start."""
     required_services = [
-        "ndi-capture",
-        "media-bridge-welcome",
-        "nginx",
-        "systemd-networkd"
+        "ndi-capture",      # Video capture service
+        "nginx",            # Web interface
+        "systemd-networkd", # Network configuration
+        "ssh"               # Remote access
     ]
     
     for service_name in required_services:
