@@ -112,46 +112,42 @@ def test_display_stream_playback_with_audio(host):
     
     # 7. Verify audio device is opened
     print("Checking audio output...")
-    log_check = host.run("grep -i audio /tmp/ndi-display-test.log | tail -5")
+    log_check = host.run("grep -i 'audio\\|pipewire' /tmp/ndi-display-test.log | tail -10")
     audio_initialized = False
-    audio_device = None
     
-    if 'Audio output initialized' in log_check.stdout or 'Opened audio device' in log_check.stdout:
+    if 'PipeWire audio output opened' in log_check.stdout or 'PipeWire audio backend' in log_check.stdout:
         audio_initialized = True
-        # Extract audio device (e.g., hw:2,3)
-        for line in log_check.stdout.split('\n'):
-            if 'hw:' in line:
-                import re
-                match = re.search(r'hw:\d+,\d+', line)
-                if match:
-                    audio_device = match.group()
-                    break
+        print("✓ PipeWire audio initialized")
     
     print(f"Audio initialized: {audio_initialized}")
-    if audio_device:
-        print(f"Audio device: {audio_device}")
     
-    # 8. Check ALSA audio status
-    if audio_device:
-        # Extract card and device numbers
-        match = re.match(r'hw:(\d+),(\d+)', audio_device)
-        if match:
-            card, device = match.groups()
-            alsa_status = host.run(f"cat /proc/asound/card{card}/pcm{device}p/sub0/status 2>/dev/null || echo 'NOT FOUND'")
+    # 8. Check PipeWire audio status
+    if audio_initialized:
+        # Check if ndi-display appears in PipeWire clients
+        pw_status = host.run("pw-cli list-objects 2>/dev/null | grep -A5 'ndi-display' || echo 'PipeWire not available'")
+        
+        if 'ndi-display' in pw_status.stdout:
+            print("✓ NDI Display registered with PipeWire")
             
-            if 'RUNNING' in alsa_status.stdout:
-                print("✓ AUDIO IS PLAYING through HDMI")
+            # Check if stream is active
+            stream_status = host.run("pw-cli dump short 2>/dev/null | grep 'ndi-display.*STREAMING' || echo ''")
+            if 'STREAMING' in stream_status.stdout:
+                print("✓ AUDIO IS PLAYING through PipeWire")
                 audio_playing = True
-            elif 'OPEN' in alsa_status.stdout:
-                print("✗ Audio device is OPEN but NOT PLAYING (no audio in stream?)")
-                audio_playing = False
             else:
-                print("✗ Audio device status unknown")
-                audio_playing = False
-                
-            print(f"ALSA status:\n{alsa_status.stdout}")
+                # Alternative check - see if ndi-display node exists
+                node_check = host.run("pactl list clients 2>/dev/null | grep -i 'ndi-display' || echo ''")
+                if 'ndi-display' in node_check.stdout:
+                    print("✓ Audio stream active (PipeWire client connected)")
+                    audio_playing = True
+                else:
+                    print("✗ Audio stream not active")
+                    audio_playing = False
+        else:
+            print("✗ NDI Display not found in PipeWire")
+            audio_playing = False
     else:
-        print("✗ No audio device detected")
+        print("✗ PipeWire audio not initialized")
         audio_playing = False
     
     # 9. Monitor for 30 seconds
@@ -299,48 +295,42 @@ def test_display_audio_diagnosis(host):
     
     issues_found = []
     
-    # 1. Check if PipeWire is running
+    # 1. Check if PipeWire is running (REQUIRED for new implementation)
     print("Checking PipeWire status...")
     result = host.run("ps aux | grep -E 'pipewire|wireplumber' | grep -v grep")
     if result.stdout:
-        print("✓ PipeWire is running")
+        print("✓ PipeWire is running (required)")
         print(result.stdout)
         
-        # Check if PipeWire is using HDMI devices
-        pw_sinks = host.run("pactl list sinks 2>/dev/null || echo 'pactl not available'")
-        if 'hdmi' in pw_sinks.stdout.lower():
-            print("⚠ PipeWire may be controlling HDMI audio devices")
-            issues_found.append("PipeWire controlling HDMI")
+        # Check available PipeWire sinks
+        pw_sinks = host.run("pactl list sinks short 2>/dev/null || echo 'pactl not available'")
+        if pw_sinks.stdout and 'pactl not available' not in pw_sinks.stdout:
+            print("✓ PipeWire sinks available:")
+            print(pw_sinks.stdout)
     else:
-        print("✓ PipeWire not running (good for ALSA direct access)")
+        print("✗ PipeWire not running (REQUIRED for audio)")
+        issues_found.append("PipeWire not running")
     
-    # 2. Check ALSA devices
-    print("\nChecking ALSA HDMI devices...")
-    result = host.run("aplay -l | grep -i hdmi")
-    if result.stdout:
-        print("✓ HDMI audio devices found:")
+    # 2. Check PipeWire nodes and streams
+    print("\nChecking PipeWire audio nodes...")
+    result = host.run("pw-cli list-objects Node 2>/dev/null | grep -E 'node.name|media.class' | head -20 || echo 'pw-cli not available'")
+    if 'pw-cli not available' not in result.stdout:
+        print("PipeWire nodes found:")
         print(result.stdout)
     else:
-        print("✗ No HDMI audio devices found")
-        issues_found.append("No HDMI audio devices")
+        print("✗ Cannot query PipeWire nodes")
+        issues_found.append("PipeWire CLI not available")
     
-    # 3. Check if any audio is already using HDMI
-    print("\nChecking HDMI audio device status...")
-    for card in range(3):  # Check first 3 cards
-        for device in range(10):  # Check first 10 devices
-            status_file = f"/proc/asound/card{card}/pcm{device}p/sub0/status"
-            result = host.run(f"[ -f {status_file} ] && cat {status_file} || echo ''")
-            if result.stdout and 'closed' not in result.stdout.lower():
-                print(f"Card {card}, Device {device}: {result.stdout.strip()}")
-                if 'RUNNING' in result.stdout:
-                    # Check which process owns it
-                    owner = host.run(f"grep owner_pid {status_file} | awk '{{print $3}}'")
-                    if owner.stdout:
-                        pid = owner.stdout.strip()
-                        process = host.run(f"ps -p {pid} -o comm= 2>/dev/null || echo 'unknown'")
-                        print(f"  Owned by PID {pid}: {process.stdout.strip()}")
-                        if 'chrome' in process.stdout.lower() or 'pipewire' in process.stdout.lower():
-                            issues_found.append(f"HDMI audio locked by {process.stdout.strip()}")
+    # 3. Check if intercom or other apps are using audio
+    print("\nChecking active audio clients...")
+    result = host.run("pactl list clients short 2>/dev/null | head -10 || echo ''")
+    if result.stdout:
+        print("Active PipeWire clients:")
+        print(result.stdout)
+        if 'chrome' in result.stdout.lower():
+            print("⚠ Chrome/Intercom is using audio")
+        if 'ndi-display' in result.stdout.lower():
+            print("✓ ndi-display already connected to PipeWire")
     
     # 4. Test with a known working stream
     print("\nTesting with known stream...")
@@ -359,14 +349,14 @@ def test_display_audio_diagnosis(host):
         
         # Quick test with CG stream
         host.run("echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
-        test_result = host.run(f"timeout 10 /opt/media-bridge/ndi-display 'RESOLUME-SNV (cg-obs)' {display_id} 2>&1 | grep -i audio")
+        test_result = host.run(f"timeout 10 /opt/media-bridge/ndi-display 'RESOLUME-SNV (cg-obs)' {display_id} 2>&1 | grep -i 'audio\\|pipewire'")
         
-        if 'Audio output initialized' in test_result.stdout:
-            print("✓ Audio initialization successful")
+        if 'PipeWire audio' in test_result.stdout:
+            print("✓ PipeWire audio initialization successful")
         else:
-            print("✗ Audio initialization failed")
+            print("✗ PipeWire audio initialization failed")
             print(test_result.stdout)
-            issues_found.append("Audio initialization failed")
+            issues_found.append("PipeWire audio initialization failed")
             
         # Restore console
         host.run("echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
@@ -379,14 +369,15 @@ def test_display_audio_diagnosis(host):
         for issue in issues_found:
             print(f"  ✗ {issue}")
         print("\nRecommendations:")
-        if "PipeWire" in str(issues_found):
-            print("  - Consider stopping PipeWire temporarily for testing")
-            print("  - Or configure PipeWire to release HDMI devices")
-        if "locked by" in str(issues_found):
-            print("  - Stop processes using HDMI audio before testing")
+        if "PipeWire not running" in str(issues_found):
+            print("  - Start PipeWire: systemctl start pipewire pipewire-pulse")
+            print("  - PipeWire is REQUIRED for audio in ndi-display")
+        if "PipeWire CLI not available" in str(issues_found):
+            print("  - Install pipewire-utils package")
         if "initialization failed" in str(issues_found):
             print("  - Check NDI stream has audio track")
-            print("  - Verify HDMI cable supports audio")
+            print("  - Check PipeWire is running")
+            print("  - Check XDG_RUNTIME_DIR is set")
     else:
         print("✓ No obvious audio issues detected")
     print("="*60)

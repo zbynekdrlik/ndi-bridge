@@ -155,8 +155,9 @@ if(PLATFORM_LINUX)
         src/display/display_output.cpp
         src/display/drm_display_output.cpp
         src/display/audio_output.h
-        src/display/alsa_audio_output.h
-        src/display/alsa_audio_output.cpp
+        src/display/pipewire_audio_output.h
+        src/display/pipewire_audio_output.cpp
+        src/display/audio_output_factory.cpp
         src/display/audio_processor.h
         src/display/audio_processor.cpp
         src/common/logger.cpp
@@ -187,7 +188,7 @@ if(PLATFORM_LINUX)
         ${NDI_LIBRARY}
         pthread
         drm      # For DRM/KMS display output with hardware scaling
-        asound   # For ALSA audio output to HDMI
+        pipewire-0.3   # For PipeWire audio output
     )
     
     # Set version definitions
