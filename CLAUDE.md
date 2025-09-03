@@ -1,5 +1,14 @@
 # CLAUDE.md - Media Bridge Development Guide
 
+## CRITICAL: Git and PR Workflow Rules
+
+### NEVER MERGE PRs AUTOMATICALLY
+**Claude must NEVER merge pull requests using gh pr merge or any automated method!**
+- Pull requests can ONLY be merged by the user through GitHub web interface
+- This ensures proper review and approval process
+- Claude can create PRs, push commits, but NEVER merge
+- If asked to merge, Claude should respond: "Please review and merge PR #XX through GitHub web interface"
+
 ## NAMING CONVENTIONS
 
 ### Project Name: Media Bridge
