@@ -24,9 +24,9 @@ def test_capture_to_ndi_pipeline_active(host):
     assert ndi_active.succeeded, "NDI capture process not found"
     
     # Verify frames are being captured
-    frames1 = int(host.file("/var/run/media-bridge/frames_captured").content_string.strip())
+    frames1 = int(host.file("/var/run/media-bridge/frames_total").content_string.strip())
     time.sleep(2)
-    frames2 = int(host.file("/var/run/media-bridge/frames_captured").content_string.strip())
+    frames2 = int(host.file("/var/run/media-bridge/frames_total").content_string.strip())
     
     assert frames2 > frames1, "Frames not being captured"
 
@@ -34,10 +34,19 @@ def test_capture_to_ndi_pipeline_active(host):
 @pytest.mark.integration
 def test_ndi_stream_discoverable(host):
     """Test that NDI stream is discoverable on network."""
-    # Get device NDI name
-    ndi_name_file = host.file("/etc/media-bridge-name")
-    if ndi_name_file.exists:
-        ndi_name = ndi_name_file.content_string.strip()
+    # Get device NDI name from config
+    config_file = host.file("/etc/media-bridge/config")
+    if config_file.exists:
+        config_content = config_file.content_string
+        # Extract NDI_NAME from config
+        ndi_name = None
+        for line in config_content.split('\n'):
+            if line.startswith('NDI_NAME='):
+                ndi_name = line.split('=', 1)[1].strip('"')
+                break
+        if not ndi_name:
+            # Fallback to hostname if NDI_NAME not found
+            ndi_name = host.run("hostname").stdout.strip()
     else:
         # Fallback to hostname
         ndi_name = host.run("hostname").stdout.strip()
@@ -55,7 +64,7 @@ def test_capture_metadata_in_stream(host):
     # This would require NDI monitoring tools
     
     # For now, verify that capture is generating metadata
-    fps = float(host.file("/var/run/media-bridge/fps").content_string.strip())
+    fps = float(host.file("/var/run/media-bridge/fps_current").content_string.strip())
     assert fps > 0, "No FPS metadata available"
     
     # Verify capture resolution is detected
