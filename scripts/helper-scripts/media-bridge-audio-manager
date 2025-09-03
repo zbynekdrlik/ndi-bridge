@@ -102,6 +102,22 @@ link_to_usb() {
     echo "Virtual devices linked to USB hardware successfully"
 }
 
+# Function to setup self-monitoring with ultra-low latency
+setup_self_monitoring() {
+    local enable=${1:-false}
+    local volume=${2:-50}
+    
+    if [ "$enable" = "true" ]; then
+        echo "Setting up self-monitoring with ultra-low latency..."
+        
+        # Use the existing monitor script which handles the low-latency loopback
+        /usr/local/bin/media-bridge-intercom-monitor enable "$volume"
+    else
+        echo "Self-monitoring disabled"
+        /usr/local/bin/media-bridge-intercom-monitor disable
+    fi
+}
+
 # Function to configure Chrome audio
 configure_chrome_audio() {
     echo "Configuring Chrome audio streams..."
