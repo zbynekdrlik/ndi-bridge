@@ -182,13 +182,20 @@ if(PLATFORM_LINUX)
         /usr/include/libdrm
     )
     
+    # Find PipeWire
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(PIPEWIRE REQUIRED libpipewire-0.3)
+    
+    # Include PipeWire headers
+    target_include_directories(ndi-display PRIVATE ${PIPEWIRE_INCLUDE_DIRS})
+    
     # Link libraries for ndi-display
     # Note: Requires libdrm-dev package on Ubuntu/Debian (apt-get install libdrm-dev)
     target_link_libraries(ndi-display PRIVATE
         ${NDI_LIBRARY}
         pthread
         drm      # For DRM/KMS display output with hardware scaling
-        pipewire-0.3   # For PipeWire audio output
+        ${PIPEWIRE_LIBRARIES}   # For PipeWire audio output
     )
     
     # Set version definitions

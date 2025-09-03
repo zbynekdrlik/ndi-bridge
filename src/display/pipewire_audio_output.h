@@ -47,6 +47,7 @@ private:
     // Fixed low-latency configuration for media-bridge
     static constexpr uint32_t QUANTUM = 256;  // ~5.3ms at 48kHz
     static constexpr uint32_t RATE = 48000;
+};
 
 } // namespace display
 } // namespace ndi_bridge
