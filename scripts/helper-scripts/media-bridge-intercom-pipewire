@@ -141,7 +141,7 @@ echo "Configuring virtual audio devices..."
 
 # Set virtual devices as defaults
 VIRTUAL_SINK="intercom-speaker"
-VIRTUAL_SOURCE="intercom-microphone.monitor"
+VIRTUAL_SOURCE="intercom-microphone"  # This is a source, not a monitor
 
 # Check if virtual devices exist
 if pactl list sinks short | grep -q "$VIRTUAL_SINK"; then
