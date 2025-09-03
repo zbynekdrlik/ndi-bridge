@@ -1,5 +1,26 @@
 # CLAUDE.md - Media Bridge Development Guide
 
+## CRITICAL: Dante/Inferno Repository Rule
+
+### ALWAYS USE OFFICIAL GITLAB INFERNO REPOSITORY
+**The ONLY authoritative Inferno source is: `https://gitlab.com/lumifaza/inferno`**
+- **NEVER use GitHub forks** (teodly or others) for Inferno
+- **NEVER reference GitHub as the source** for Inferno
+- **GitLab lumifaza is the OFFICIAL active repository** where development happens
+- GitHub mirrors are outdated and cause discovery failures
+- **NOTE: mrblondin repository mentioned in issue #104 doesn't exist - lumifaza is correct**
+- **This mistake has been made multiple times - DO NOT REPEAT IT!**
+
+When working with Dante:
+1. Always clone Inferno from: `https://gitlab.com/lumifaza/inferno.git` (NOT GitHub!)
+2. For Statime PTPv1 support: Use `https://github.com/teodly/statime.git` branch `inferno-dev`
+3. Verify with network-audio-controller: `https://github.com/chris-ritsen/network-audio-controller`
+
+**Repository Verification History:**
+- mrblondin/inferno on GitLab: Does NOT exist (403 error)
+- lumifaza/inferno on GitLab: EXISTS and is actively maintained
+- teodly/inferno on GitHub: Mirror only - DO NOT USE
+
 ## CRITICAL: Git and PR Workflow Rules
 
 ### NEVER MERGE PRs AUTOMATICALLY
@@ -219,153 +240,6 @@ tests/
 ├── performance/            # Benchmarks and metrics
 └── fixtures/               # Shared test utilities
 ```
-
-**Test Placement Rules:**
-- **component/**: ONLY atomic tests that check one thing (file exists, service running, etc.)
-- **integration/**: Functional tests that actually USE the system (play streams, record audio, etc.)
-- **integration/**: Tests that involve multiple components working together
-- **system/**: Full end-to-end tests of complete workflows
-
-**Functional Test Definition:**
-A functional test is one that actually exercises the feature as a user would:
-- Display functional test: Actually plays an NDI stream for 30 seconds
-- Capture functional test: Would actually capture video and verify output
-- Audio functional test: Would actually play/record audio
-These belong in `integration/` NOT in `component/`
-
-### Test Execution
-
-#### IMPORTANT: Instructions for Claude (AI Assistant)
-
-**When running tests, ALWAYS check and update the test configuration first:**
-
-1. **Check current test device IP**:
-   ```bash
-   cat tests/test_config.yaml | grep "host:"
-   ```
-
-2. **Update if needed** (when user provides new IP):
-   ```bash
-   # Edit tests/test_config.yaml and update the host line
-   # Example: change "host: 10.77.9.143" to "host: 10.77.9.188"
-   ```
-
-3. **Run tests** (no need to specify IP, it uses config file):
-   ```bash
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key -v
-   # or
-   ./tests/run_all_tests.sh
-   ```
-
-**Why this approach**: The config file persists across shell sessions, so Claude won't forget the IP when running multiple commands.
-
-#### Configuring Device IP Address (for humans)
-
-The test suite supports multiple ways to specify the target device IP:
-
-1. **Configuration File** (RECOMMENDED - persists across sessions):
-   ```bash
-   # Edit tests/test_config.yaml - set host: YOUR_IP
-   vim tests/test_config.yaml
-   # Then run tests without specifying IP:
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
-   ```
-
-2. **Command Line Argument** (for one-off tests):
-   ```bash
-   pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
-   ```
-
-3. **Environment Variable** (for current session):
-   ```bash
-   export NDI_TEST_HOST=10.77.9.188
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
-   ```
-
-4. **Default Fallback** (10.77.9.143 if nothing specified)
-
-**Priority Order**: Command line > test_config.yaml > Environment variable > Default
-
-#### Prerequisites
-```bash
-# Install test dependencies (one time setup)
-pip3 install -r tests/requirements.txt --break-system-packages
-
-# Set up SSH key authentication (recommended)
-ssh-keygen -t ed25519 -f ~/.ssh/ndi_test_key -N ""
-sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@DEVICE_IP
-```
-
-#### Running Tests - Primary Method
-
-**IMPORTANT**: Replace `DEVICE_IP` with your actual device IP address (e.g., 10.77.9.188)
-
-```bash
-# Set device IP as environment variable (RECOMMENDED for session)
-export NDI_TEST_HOST=10.77.9.188  # Change to your device IP
-
-# Run all tests with SSH key auth (RECOMMENDED)
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -v
-
-# Or specify IP directly each time
-pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -v
-
-# Run specific category
-pytest tests/component/capture/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
-
-# Run with parallel execution (faster)
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -n auto
-
-# Run only critical tests
-pytest tests/ -m critical --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
-
-# Quick summary without details
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
-```
-
-#### Helper Scripts (Alternative Methods)
-
-**Why shell scripts exist**: For convenience and special use cases
-
-1. **tests/run_all_tests.sh** - Runs tests by category with summary
-   ```bash
-   # Usage: ./tests/run_all_tests.sh [IP_ADDRESS] [SSH_KEY_PATH]
-   ./tests/run_all_tests.sh 10.77.9.188              # Uses default SSH key
-   ./tests/run_all_tests.sh 10.77.9.188 ~/.ssh/id_rsa  # Custom SSH key
-   
-   # Or using environment variable
-   export NDI_TEST_HOST=10.77.9.188
-   ./tests/run_all_tests.sh  # Will use $NDI_TEST_HOST if no IP provided
-   ```
-   Purpose: Shows category-by-category progress, useful for debugging
-
-2. **tests/run_test.py** - Wrapper for password authentication
-   ```bash
-   python3 tests/run_test.py --host=10.77.9.188
-   # Or
-   export NDI_TEST_HOST=10.77.9.188
-   python3 tests/run_test.py  # Will use $NDI_TEST_HOST
-   ```
-   Purpose: For environments where SSH keys can't be used
-
-
-#### Test Markers
-- `@pytest.mark.critical` - Must pass for release
-- `@pytest.mark.slow` - Takes >5 seconds
-- `@pytest.mark.requires_usb` - Needs USB device
-- `@pytest.mark.destructive` - Modifies system
-
-#### Understanding Test Results
-
-```bash
-# Typical output
-========================= 140 passed, 2 skipped in 45.2s =========================
-```
-
-- **PASSED**: Test succeeded
-- **FAILED**: Test failed - investigate issue
-- **SKIPPED**: Optional feature not present (OK)
-- **ERROR**: Test couldn't run - check connectivity
 
 **Expected Results on Clean Media Bridge**:
 - ~140 tests should pass

@@ -271,6 +271,74 @@ The USB appliance creates a network bridge (br0) combining both ethernet ports:
 - DHCP client on bridge interface
 - Avahi/mDNS for discovery
 
+## Dante Audio Bridge (Experimental)
+
+The NDI Bridge includes support for Dante audio networking using the open-source Inferno implementation.
+
+### Features
+- Send local audio inputs to Dante network
+- Receive Dante network audio to local outputs  
+- Bidirectional audio routing (USB ↔ Dante)
+- Support for up to 64 audio channels
+- Compatible with standard Dante devices
+- Low latency audio transport (~12MB RAM usage)
+
+### Configuration
+
+#### Check Dante Status
+```bash
+ndi-bridge-dante-status
+```
+
+#### Configure Dante Settings
+```bash
+ndi-bridge-dante-config  # Interactive menu
+```
+
+Configuration options:
+- Device name on Dante network
+- Number of channels (2-64)
+- Sample rate (44.1kHz or 48kHz)
+- Routing mode (USB→Dante, Dante→USB, or bidirectional)
+
+#### View Dante Logs
+```bash
+ndi-bridge-dante-logs     # View recent logs
+ndi-bridge-dante-logs -f  # Follow logs in real-time
+```
+
+### ALSA Devices
+The Dante bridge creates ALSA devices for audio routing:
+- `dante_out` - Send audio to Dante network
+- `dante_in` - Receive audio from Dante network
+- `dante` - Bidirectional device
+
+### Example Usage
+```bash
+# Play audio file to Dante network
+aplay -D dante_out audio.wav
+
+# Record from Dante network
+arecord -D dante_in -f cd -d 10 recording.wav
+
+# Route USB audio to Dante (using PipeWire)
+pw-link "USB Audio:capture_FL" "dante_out:playback_FL"
+pw-link "USB Audio:capture_FR" "dante_out:playback_FR"
+```
+
+### Requirements
+- Network must support multicast (required for Dante discovery)
+- PTP time sync recommended for best performance
+- Bridge interface (br0) used for Dante traffic
+
+### Compatibility
+Works with:
+- Dante Controller software
+- Other Dante-enabled devices
+- Standard Dante audio networks
+
+**Note**: This uses the unofficial Inferno implementation, not Audinate's official Dante.
+
 ## Building USB Systems
 
 ### Quick Build

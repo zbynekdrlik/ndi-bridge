@@ -1,0 +1,183 @@
+#!/bin/bash
+# Simple Dante Audio Bridge - Direct ALSA implementation
+# Uses arecord/aplay with proper Dante device naming
+# Primary function: Dante → USB playback at 96kHz
+
+set -e
+
+# Configuration
+SCRIPT_NAME="dante-bridge-simple"
+LOG_TAG="[Dante-Bridge]"
+SAMPLE_RATE=96000
+CHANNELS=2
+
+# PID file for service management
+PID_FILE="/var/run/dante-bridge.pid"
+STATE_DIR="/var/run/dante-bridge"
+
+# Colors for logging
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Logging functions
+log() {
+    echo -e "${GREEN}${LOG_TAG}${NC} $(date '+%H:%M:%S') - $1"
+    logger -t "$SCRIPT_NAME" "$1"
+}
+
+error() {
+    echo -e "${RED}${LOG_TAG} ERROR${NC} $(date '+%H:%M:%S') - $1" >&2
+    logger -t "$SCRIPT_NAME" -p user.err "ERROR: $1"
+}
+
+warn() {
+    echo -e "${YELLOW}${LOG_TAG} WARN${NC} $(date '+%H:%M:%S') - $1"
+    logger -t "$SCRIPT_NAME" -p user.warning "WARNING: $1"
+}
+
+# Create state directory
+mkdir -p "$STATE_DIR"
+
+# Write PID file
+echo $$ > "$PID_FILE"
+
+# Cleanup on exit
+cleanup() {
+    log "Shutting down Dante bridge..."
+    
+    # Stop all audio streams
+    killall -q arecord aplay 2>/dev/null || true
+    
+    # Remove PID file
+    rm -f "$PID_FILE"
+    
+    # Clear state
+    rm -f "$STATE_DIR"/*
+    
+    log "Dante bridge stopped"
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT EXIT
+
+# Find USB audio device
+find_usb_audio() {
+    local usb_card=""
+    local usb_name=""
+    
+    log "Searching for USB audio device..."
+    
+    # Priority order: Arturia first, then other professional cards
+    for pattern in "Arturia" "Focusrite" "Scarlett" "PreSonus" "Behringer" "USB Audio"; do
+        local card_info=$(aplay -l 2>/dev/null | grep "$pattern" | head -1)
+        if [ -n "$card_info" ]; then
+            usb_card=$(echo "$card_info" | sed 's/card \([0-9]\).*/\1/')
+            usb_name=$(echo "$card_info" | sed 's/.*: \(.*\) \[.*/\1/')
+            log "Found USB audio device: $usb_name (card $usb_card)"
+            echo "$usb_card"
+            return 0
+        fi
+    done
+    
+    error "No USB audio device found!"
+    return 1
+}
+
+# Start the simple bridge
+start_bridge() {
+    local usb_card="$1"
+    
+    log "Starting simple Dante bridge..."
+    log "Configuration: media-bridge at ${SAMPLE_RATE}Hz"
+    
+    # Start Dante to USB bridge with explicit program name
+    # The -q flag suppresses verbose output
+    # Using exec -a to set the process name that appears in Dante Controller
+    log "Starting Dante → USB playback..."
+    
+    # Use a wrapper to set process name
+    (
+        exec -a "media-bridge-rx" \
+        arecord -D dante -f S32_LE -r $SAMPLE_RATE -c $CHANNELS -t raw -q 2>/dev/null | \
+        aplay -D plughw:${usb_card},0 -f S32_LE -r $SAMPLE_RATE -c $CHANNELS -t raw -q 2>/dev/null
+    ) &
+    DANTE_TO_USB_PID=$!
+    
+    log "Dante → USB bridge started (PID: $DANTE_TO_USB_PID)"
+    
+    # Optional: USB to Dante bridge
+    log "Starting USB → Dante transmission..."
+    (
+        exec -a "media-bridge-tx" \
+        arecord -D plughw:${usb_card},0 -f S32_LE -r $SAMPLE_RATE -c $CHANNELS -t raw -q 2>/dev/null | \
+        aplay -D dante -f S32_LE -r $SAMPLE_RATE -c $CHANNELS -t raw -q 2>/dev/null
+    ) &
+    USB_TO_DANTE_PID=$!
+    
+    log "USB → Dante bridge started (PID: $USB_TO_DANTE_PID)"
+    
+    # Write status
+    cat > "$STATE_DIR/status" << EOF
+STATUS=running
+USB_CARD=$usb_card
+SAMPLE_RATE=$SAMPLE_RATE
+DANTE_TO_USB_PID=$DANTE_TO_USB_PID
+USB_TO_DANTE_PID=$USB_TO_DANTE_PID
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+EOF
+    
+    # Wait for processes
+    log "Bridge running. Press Ctrl+C to stop."
+    wait $DANTE_TO_USB_PID $USB_TO_DANTE_PID
+}
+
+# Main execution
+main() {
+    log "Simple Dante Audio Bridge starting..."
+    
+    # Check if Statime is running
+    if ! systemctl is-active --quiet statime.service; then
+        warn "Statime service not running! Starting it..."
+        systemctl start statime.service || {
+            error "Failed to start Statime PTP daemon"
+            exit 1
+        }
+        sleep 3
+    fi
+    
+    # Check Inferno ALSA plugin
+    if ! aplay -L 2>/dev/null | grep -q "^dante$"; then
+        error "Dante ALSA device not found! Check Inferno installation"
+        exit 1
+    fi
+    
+    # Find USB audio device
+    USB_CARD=$(find_usb_audio)
+    if [ -z "$USB_CARD" ]; then
+        error "Cannot proceed without USB audio device"
+        exit 1
+    fi
+    
+    # Give Inferno time to initialize
+    log "Initializing Dante interface..."
+    # Trigger Inferno to open its discovery ports by accessing the device
+    timeout 1 arecord -D dante -d 0.1 -f S32_LE -r $SAMPLE_RATE -c 2 2>/dev/null || true
+    sleep 2
+    
+    # Check if discovery ports are open
+    if netstat -tuln 2>/dev/null | grep -E ":(8700|8701|8800|8801) " | grep -q "0.0.0.0"; then
+        log "✓ Dante discovery ports opened"
+        log "Device should appear as 'media-bridge' in Dante Controller"
+    else
+        warn "Discovery ports not fully detected"
+    fi
+    
+    # Start the bridge
+    start_bridge "$USB_CARD"
+}
+
+# Run main function
+main "$@"

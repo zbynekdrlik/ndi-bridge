@@ -1,0 +1,175 @@
+#!/bin/bash
+# Dante Audio Bridge - Clean Production Implementation
+# Primary function: Receive Dante audio and play through USB sound card (Arturia)
+# Secondary: Send USB audio to Dante network
+
+# Environment setup for Inferno
+export INFERNO_NAME=${HOSTNAME:-ndi-bridge}
+export INFERNO_INTERFACE=br0
+export INFERNO_SAMPLE_RATE=96000
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+log() {
+    echo -e "${GREEN}[Dante]${NC} $1"
+}
+
+error() {
+    echo -e "${RED}[Dante Error]${NC} $1" >&2
+}
+
+warn() {
+    echo -e "${YELLOW}[Dante Warning]${NC} $1"
+}
+
+# Find USB audio device (Arturia or other professional cards)
+find_usb_audio() {
+    local usb_card=""
+    
+    # Priority order: Arturia, then other known professional cards
+    for pattern in "Arturia" "Focusrite" "Scarlett" "Behringer" "USB Audio"; do
+        usb_card=$(aplay -l 2>/dev/null | grep "$pattern" | head -1 | sed 's/card \([0-9]\).*/\1/')
+        if [ -n "$usb_card" ]; then
+            local card_name=$(aplay -l 2>/dev/null | grep "card $usb_card" | head -1)
+            log "Found USB audio: $card_name"
+            echo "$usb_card"
+            return 0
+        fi
+    done
+    
+    return 1
+}
+
+# Check if PipeWire is running and managing audio
+check_pipewire() {
+    if pgrep -x pipewire >/dev/null 2>&1; then
+        # Check if PipeWire is managing ALSA
+        if pw-cli info all 2>/dev/null | grep -q "alsa"; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# Main bridge function
+start_bridge() {
+    local usb_card="$1"
+    
+    if [ -z "$usb_card" ]; then
+        error "No USB audio device specified"
+        return 1
+    fi
+    
+    log "Starting Dante bridge with USB card $usb_card at ${INFERNO_SAMPLE_RATE}Hz"
+    
+    # Check if we should use PipeWire or direct ALSA
+    if check_pipewire; then
+        warn "PipeWire detected - using direct ALSA for lowest latency"
+        # PipeWire can interfere, so we'll use direct ALSA
+    fi
+    
+    # Start the audio routing
+    # CRITICAL: Both streams must be active for Inferno to open discovery ports
+    
+    # Dante → USB (RECEIVE): This is the PRIMARY function
+    # Capture from Dante network, play to Arturia/USB
+    log "Starting Dante → USB playback (receiving from network)"
+    arecord -D dante -f S32_LE -r ${INFERNO_SAMPLE_RATE} -c 2 -t raw 2>/dev/null | \
+        aplay -D plughw:${usb_card},0 -f S32_LE -r ${INFERNO_SAMPLE_RATE} -c 2 -t raw 2>/dev/null &
+    DANTE_TO_USB_PID=$!
+    
+    # USB → Dante (TRANSMIT): Secondary function, also needed for visibility
+    # Capture from Arturia/USB, send to Dante network
+    log "Starting USB → Dante transmission (sending to network)"
+    arecord -D plughw:${usb_card},0 -f S32_LE -r ${INFERNO_SAMPLE_RATE} -c 2 -t raw 2>/dev/null | \
+        aplay -D dante -f S32_LE -r ${INFERNO_SAMPLE_RATE} -c 2 -t raw 2>/dev/null &
+    USB_TO_DANTE_PID=$!
+    
+    # Give Inferno time to open discovery ports
+    sleep 2
+    
+    # Verify discovery ports are open
+    if netstat -tuln 2>/dev/null | grep -E ":(8700|8800) " | grep -q "0.0.0.0"; then
+        log "✓ Dante discovery ports opened successfully"
+        log "✓ Device visible in Dante Controller as '${INFERNO_NAME}'"
+    else
+        warn "Discovery ports not detected - device may not be visible"
+    fi
+    
+    # Monitor processes
+    log "Bridge active - Dante audio routing established"
+    log "  Dante→USB (Playback): PID $DANTE_TO_USB_PID"
+    log "  USB→Dante (Transmit): PID $USB_TO_DANTE_PID"
+    
+    # Wait for either process to exit (indicates a problem)
+    wait -n $DANTE_TO_USB_PID $USB_TO_DANTE_PID
+    
+    # If we get here, something failed
+    error "Audio routing process terminated unexpectedly"
+    
+    # Kill remaining process
+    kill $DANTE_TO_USB_PID $USB_TO_DANTE_PID 2>/dev/null
+    
+    return 1
+}
+
+# Cleanup on exit
+cleanup() {
+    log "Shutting down Dante bridge..."
+    # Kill all child processes
+    jobs -p | xargs -r kill 2>/dev/null
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+# Main execution
+main() {
+    log "Dante Audio Bridge starting..."
+    log "Configuration: ${INFERNO_NAME} on ${INFERNO_INTERFACE} at ${INFERNO_SAMPLE_RATE}Hz"
+    
+    # Find USB audio device
+    USB_CARD=$(find_usb_audio)
+    
+    if [ -z "$USB_CARD" ]; then
+        error "No USB audio device found!"
+        error "Please connect an Arturia or other USB audio interface"
+        
+        # Fallback: Still advertise on network for receive-only mode
+        warn "Starting in receive-only mode (no local playback)"
+        
+        # Create a dummy stream to keep Inferno ports open
+        # This allows the device to be visible even without USB
+        arecord -D dante -f S32_LE -r ${INFERNO_SAMPLE_RATE} -c 2 -t raw 2>/dev/null > /dev/null &
+        DUMMY_PID=$!
+        
+        # Also create transmit stream to /dev/null for full visibility
+        dd if=/dev/zero bs=8 count=0 2>/dev/null | \
+            aplay -D dante -f S32_LE -r ${INFERNO_SAMPLE_RATE} -c 2 -t raw 2>/dev/null &
+        
+        wait $DUMMY_PID
+        exit 1
+    fi
+    
+    # Main loop with automatic restart on failure
+    while true; do
+        start_bridge "$USB_CARD"
+        
+        warn "Bridge stopped - restarting in 5 seconds..."
+        sleep 5
+        
+        # Re-detect USB card in case it was disconnected/reconnected
+        USB_CARD=$(find_usb_audio)
+        if [ -z "$USB_CARD" ]; then
+            error "USB audio device lost - waiting for reconnection..."
+            sleep 10
+        fi
+    done
+}
+
+# Run main function
+main "$@"

@@ -15,6 +15,18 @@ install_helper_scripts() {
         chmod +x /mnt/usb/usr/local/bin/media-bridge-*
         chmod +x /mnt/usb/usr/local/bin/ndi-display-*
         
+        # Also make Dante scripts executable if they exist
+        if ls /mnt/usb/usr/local/bin/media-bridge-dante-* >/dev/null 2>&1; then
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-dante-*
+            # Use PipeWire version as default media-bridge-dante
+            if [ -f /mnt/usb/usr/local/bin/media-bridge-dante-pipewire ]; then
+                ln -sf media-bridge-dante-pipewire /mnt/usb/usr/local/bin/media-bridge-dante
+                log "  Dante helper scripts installed (using PipeWire resampling)"
+            else
+                log "  Dante helper scripts installed"
+            fi
+        fi
+        
         # Copy Media Bridge intercom scripts and service (PipeWire only)
         if [ -f "$HELPER_DIR/media-bridge-intercom-pipewire" ]; then
             cp "$HELPER_DIR/media-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/
