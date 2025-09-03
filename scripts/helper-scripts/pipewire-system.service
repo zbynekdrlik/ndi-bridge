@@ -7,8 +7,14 @@ Before=media-bridge-intercom.service ndi-display@0.service ndi-display@1.service
 Type=simple
 User=root
 Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
+Environment="XDG_STATE_HOME=/var/lib/pipewire"
+Environment="XDG_CACHE_HOME=/var/cache/pipewire"
+Environment="HOME=/root"
 ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /run/user/0/pulse
+ExecStartPre=/bin/mkdir -p /var/lib/pipewire
+ExecStartPre=/bin/mkdir -p /var/cache/pipewire
 ExecStart=/usr/bin/pipewire
 Restart=always
 RestartSec=5

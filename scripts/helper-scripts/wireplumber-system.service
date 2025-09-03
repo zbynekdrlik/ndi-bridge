@@ -9,8 +9,12 @@ Type=simple
 User=root
 Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="XDG_STATE_HOME=/var/lib/wireplumber"
+Environment="XDG_CACHE_HOME=/var/cache/wireplumber"
+Environment="HOME=/root"
+Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
 ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /var/lib/wireplumber
+ExecStartPre=/bin/mkdir -p /var/cache/wireplumber
 ExecStart=/usr/bin/wireplumber
 Restart=always
 RestartSec=5
