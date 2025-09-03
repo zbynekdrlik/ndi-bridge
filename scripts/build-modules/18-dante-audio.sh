@@ -207,7 +207,10 @@ fi
 
 # Copy the main bridge scripts
 for script in media-bridge-dante-pipewire media-bridge-dante-production media-bridge-dante-simple; do
-    if [ -f /tmp/helper-scripts/$script ]; then
+    if [ -f "$HELPER_DIR/$script" ]; then
+        cp "$HELPER_DIR/$script" /usr/local/bin/
+        chmod +x /usr/local/bin/$script
+    elif [ -f /tmp/helper-scripts/$script ]; then
         cp /tmp/helper-scripts/$script /usr/local/bin/
         chmod +x /usr/local/bin/$script
     fi
@@ -241,8 +244,11 @@ systemctl enable pipewire.service 2>/dev/null || true
 systemctl enable wireplumber.service 2>/dev/null || true
 
 # Copy helper scripts for status and configuration
-for script in ndi-bridge-dante-status ndi-bridge-dante-config ndi-bridge-dante-logs; do
-    if [ -f /tmp/helper-scripts/$script ]; then
+for script in media-bridge-dante-status media-bridge-dante-config media-bridge-dante-logs; do
+    if [ -f "$HELPER_DIR/$script" ]; then
+        cp "$HELPER_DIR/$script" /usr/local/bin/
+        chmod +x /usr/local/bin/$script
+    elif [ -f /tmp/helper-scripts/$script ]; then
         cp /tmp/helper-scripts/$script /usr/local/bin/
         chmod +x /usr/local/bin/$script
     fi
