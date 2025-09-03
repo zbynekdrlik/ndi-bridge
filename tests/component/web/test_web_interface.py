@@ -1,7 +1,7 @@
 """
 Atomic tests for web interface functionality.
 
-Tests the NDI Bridge web interface and API.
+Tests the Media Bridge web interface and API.
 """
 
 import pytest

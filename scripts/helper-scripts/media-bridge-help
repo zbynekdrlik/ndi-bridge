@@ -1,0 +1,61 @@
+#!/bin/bash
+# Show all available Media Bridge commands
+
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${NC}"
+echo -e "${GREEN}║                    Media Bridge Commands                        ║${NC}"
+echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${NC}"
+echo ""
+
+echo -e "${CYAN}System Information:${NC}"
+echo -e "  ${YELLOW}media-bridge-info${NC}       - Display comprehensive system status"
+echo -e "  ${YELLOW}media-bridge-logs${NC}       - View NDI Capture service logs"
+echo ""
+
+echo -e "${CYAN}Configuration:${NC}"
+echo -e "  ${YELLOW}media-bridge-set-name${NC}   - Set device name (hostname & NDI name)"
+echo -e "  ${YELLOW}media-bridge-update${NC}     - Update NDI Capture binary"
+echo ""
+
+echo -e "${CYAN}Network Monitoring:${NC}"
+echo -e "  ${YELLOW}media-bridge-netstat${NC}    - Show network bridge status"
+echo -e "  ${YELLOW}media-bridge-netmon${NC}     - Monitor network bandwidth in real-time"
+echo ""
+
+echo -e "${CYAN}NDI Display (HDMI Output):${NC}"
+echo -e "  ${YELLOW}ndi-display-status${NC}      - Show display service status"
+echo -e "  ${YELLOW}ndi-display-list${NC}        - List available NDI streams"
+echo -e "  ${YELLOW}ndi-display-show${NC}        - Display stream on HDMI output"
+echo -e "  ${YELLOW}ndi-display-stop${NC}        - Stop display on specific output"
+echo -e "  ${YELLOW}ndi-display-auto${NC}        - Auto-map streams to displays"
+echo ""
+
+echo -e "${CYAN}Dante Audio Bridge:${NC}"
+echo -e "  ${YELLOW}ndi-bridge-dante-status${NC} - Show Dante bridge status"
+echo -e "  ${YELLOW}ndi-bridge-dante-config${NC} - Configure Dante settings"
+echo -e "  ${YELLOW}ndi-bridge-dante-logs${NC}   - View Dante service logs"
+echo ""
+
+echo -e "${CYAN}Service Control:${NC}"
+echo -e "  ${YELLOW}systemctl start ndi-capture${NC}  - Start NDI Capture service"
+echo -e "  ${YELLOW}systemctl stop ndi-capture${NC}   - Stop NDI Capture service"
+echo -e "  ${YELLOW}systemctl restart ndi-capture${NC} - Restart NDI Capture service"
+echo -e "  ${YELLOW}systemctl status ndi-capture${NC} - Check service status"
+echo ""
+
+echo -e "${CYAN}Console Switching:${NC}"
+echo "  • TTY1 (Alt+F1) - Live NDI logs"
+echo "  • TTY2 (Alt+F2) - System menu"
+echo "  • TTY3-6 (Alt+F3-F6) - Additional terminals"
+echo ""
+
+echo -e "${CYAN}System Commands:${NC}"
+echo -e "  ${YELLOW}ip addr${NC}                 - Show network interfaces"
+echo -e "  ${YELLOW}htop${NC}                    - System resource monitor"
+echo -e "  ${YELLOW}v4l2-ctl --list-devices${NC} - List video devices"
+echo ""

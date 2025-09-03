@@ -1,6 +1,6 @@
 # Feature Comparison: Evolution from v1.0.0 to v1.1.3
 
-This document tracks the evolution of NDI Bridge features across all versions.
+This document tracks the evolution of Media Bridge features across all versions.
 
 ## Version 1.1.3 (Current) - Production Ready
 
@@ -110,7 +110,7 @@ This document tracks the evolution of NDI Bridge features across all versions.
 
 ## Summary
 
-NDI Bridge v1.1.3 represents a mature, production-ready application with:
+Media Bridge v1.1.3 represents a mature, production-ready application with:
 - ✅ Complete Media Foundation support
 - ✅ Complete DeckLink support
 - ✅ Professional broadcast features

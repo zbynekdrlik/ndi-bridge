@@ -1,5 +1,5 @@
 /**
- * NDI Bridge Intercom Control App
+ * Media Bridge Intercom Control App
  * Vue 3 application with Vuetify
  */
 

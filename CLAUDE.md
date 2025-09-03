@@ -1,4 +1,30 @@
-# CLAUDE.md - NDI Bridge Development Guide
+# CLAUDE.md - Media Bridge Development Guide
+
+## CRITICAL: Git and PR Workflow Rules
+
+### NEVER MERGE PRs AUTOMATICALLY
+**Claude must NEVER merge pull requests using gh pr merge or any automated method!**
+- Pull requests can ONLY be merged by the user through GitHub web interface
+- This ensures proper review and approval process
+- Claude can create PRs, push commits, but NEVER merge
+- If asked to merge, Claude should respond: "Please review and merge PR #XX through GitHub web interface"
+
+## NAMING CONVENTIONS
+
+### Project Name: Media Bridge
+The project has been renamed from "NDI Bridge" to "Media Bridge" to better reflect its multi-purpose media handling capabilities.
+
+### File Naming Guidelines
+- **Helper Scripts**: Use `media-bridge-*` prefix (e.g., `media-bridge-info`, `media-bridge-logs`)
+- **Application Binaries**: Keep descriptive names (`ndi-capture`, `ndi-display`) - these describe what they do, not the project name
+- **Service Files**: Use `media-bridge-*` prefix for project services
+- **Configuration Paths**: Use `/etc/media-bridge/`, `/var/run/media-bridge/`, etc.
+- **C++ Namespace**: Keep as `ndi_bridge` (internal code structure, not user-facing)
+
+### Why This Naming Strategy
+- Helper scripts are project utilities → use project name (`media-bridge-*`)
+- Application binaries describe their function → `ndi-capture` captures to NDI, `ndi-display` displays from NDI
+- This creates clear distinction between project utilities and functional applications
 
 ## WEB INTERFACE ARCHITECTURE (2025 Standard)
 
@@ -152,7 +178,7 @@ def test_capture_service_active():
 
 def test_capture_fps_stable():
     """Test that capture maintains 30fps."""
-    metrics = host.file("/var/run/ndi-bridge/fps").content_string
+    metrics = host.file("/var/run/media-bridge/fps").content_string
     assert float(metrics) >= 29.0
 ```
 
@@ -167,7 +193,7 @@ def test_stabilization_duration():
     time.sleep(30)
     
     # Assert: Verify the outcome
-    state = host.file("/var/run/ndi-bridge/capture_state").content_string
+    state = host.file("/var/run/media-bridge/capture_state").content_string
     assert state == "RUNNING"
 ```
 
@@ -175,155 +201,26 @@ def test_stabilization_duration():
 ```
 tests/
 ├── unit/                    # Pure logic tests (no device needed)
-├── component/               # Single component tests
-│   ├── capture/            # One directory per component
-│   │   ├── test_device_detection.py
-│   │   ├── test_service_active.py
-│   │   └── test_fps_stability.py
-│   ├── display/
-│   ├── audio/
-│   └── network/
-├── integration/            # Multi-component interaction tests
-├── system/                 # End-to-end tests
+├── component/               # Single component atomic tests (checking existence/state)
+│   ├── capture/            # Atomic capture tests
+│   │   ├── test_device_detection.py    # Device exists, permissions
+│   │   ├── test_service_status.py      # Service running/enabled
+│   │   └── test_fps_monitoring.py      # Metrics files exist
+│   ├── display/            # Atomic display tests
+│   │   ├── test_display_capability.py  # DRM devices, binaries exist
+│   │   └── test_ndi_display_service.py # Service template valid
+│   ├── audio/              # Atomic audio tests
+│   ├── network/            # Atomic network tests
+│   └── [component]/        # Each component gets atomic tests
+├── integration/            # Multi-component interaction & functional tests
+│   ├── test_capture_to_ndi.py         # Capture + NDI interaction
+│   └── test_display_functional.py     # FUNCTIONAL: Actually plays streams
+├── system/                 # End-to-end system tests
 ├── performance/            # Benchmarks and metrics
 └── fixtures/               # Shared test utilities
 ```
 
-### Test Execution
-
-#### IMPORTANT: Instructions for Claude (AI Assistant)
-
-**When running tests, ALWAYS check and update the test configuration first:**
-
-1. **Check current test device IP**:
-   ```bash
-   cat tests/test_config.yaml | grep "host:"
-   ```
-
-2. **Update if needed** (when user provides new IP):
-   ```bash
-   # Edit tests/test_config.yaml and update the host line
-   # Example: change "host: 10.77.9.143" to "host: 10.77.9.188"
-   ```
-
-3. **Run tests** (no need to specify IP, it uses config file):
-   ```bash
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key -v
-   # or
-   ./tests/run_all_tests.sh
-   ```
-
-**Why this approach**: The config file persists across shell sessions, so Claude won't forget the IP when running multiple commands.
-
-#### Configuring Device IP Address (for humans)
-
-The test suite supports multiple ways to specify the target device IP:
-
-1. **Configuration File** (RECOMMENDED - persists across sessions):
-   ```bash
-   # Edit tests/test_config.yaml - set host: YOUR_IP
-   vim tests/test_config.yaml
-   # Then run tests without specifying IP:
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
-   ```
-
-2. **Command Line Argument** (for one-off tests):
-   ```bash
-   pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
-   ```
-
-3. **Environment Variable** (for current session):
-   ```bash
-   export NDI_TEST_HOST=10.77.9.188
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
-   ```
-
-4. **Default Fallback** (10.77.9.143 if nothing specified)
-
-**Priority Order**: Command line > test_config.yaml > Environment variable > Default
-
-#### Prerequisites
-```bash
-# Install test dependencies (one time setup)
-pip3 install -r tests/requirements.txt --break-system-packages
-
-# Set up SSH key authentication (recommended)
-ssh-keygen -t ed25519 -f ~/.ssh/ndi_test_key -N ""
-sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@DEVICE_IP
-```
-
-#### Running Tests - Primary Method
-
-**IMPORTANT**: Replace `DEVICE_IP` with your actual device IP address (e.g., 10.77.9.188)
-
-```bash
-# Set device IP as environment variable (RECOMMENDED for session)
-export NDI_TEST_HOST=10.77.9.188  # Change to your device IP
-
-# Run all tests with SSH key auth (RECOMMENDED)
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -v
-
-# Or specify IP directly each time
-pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -v
-
-# Run specific category
-pytest tests/component/capture/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
-
-# Run with parallel execution (faster)
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -n auto
-
-# Run only critical tests
-pytest tests/ -m critical --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
-
-# Quick summary without details
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
-```
-
-#### Helper Scripts (Alternative Methods)
-
-**Why shell scripts exist**: For convenience and special use cases
-
-1. **tests/run_all_tests.sh** - Runs tests by category with summary
-   ```bash
-   # Usage: ./tests/run_all_tests.sh [IP_ADDRESS] [SSH_KEY_PATH]
-   ./tests/run_all_tests.sh 10.77.9.188              # Uses default SSH key
-   ./tests/run_all_tests.sh 10.77.9.188 ~/.ssh/id_rsa  # Custom SSH key
-   
-   # Or using environment variable
-   export NDI_TEST_HOST=10.77.9.188
-   ./tests/run_all_tests.sh  # Will use $NDI_TEST_HOST if no IP provided
-   ```
-   Purpose: Shows category-by-category progress, useful for debugging
-
-2. **tests/run_test.py** - Wrapper for password authentication
-   ```bash
-   python3 tests/run_test.py --host=10.77.9.188
-   # Or
-   export NDI_TEST_HOST=10.77.9.188
-   python3 tests/run_test.py  # Will use $NDI_TEST_HOST
-   ```
-   Purpose: For environments where SSH keys can't be used
-
-
-#### Test Markers
-- `@pytest.mark.critical` - Must pass for release
-- `@pytest.mark.slow` - Takes >5 seconds
-- `@pytest.mark.requires_usb` - Needs USB device
-- `@pytest.mark.destructive` - Modifies system
-
-#### Understanding Test Results
-
-```bash
-# Typical output
-========================= 140 passed, 2 skipped in 45.2s =========================
-```
-
-- **PASSED**: Test succeeded
-- **FAILED**: Test failed - investigate issue
-- **SKIPPED**: Optional feature not present (OK)
-- **ERROR**: Test couldn't run - check connectivity
-
-**Expected Results on Clean NDI Bridge**:
+**Expected Results on Clean Media Bridge**:
 - ~140 tests should pass
 - Some skips are normal (optional features like intercom)
 - Zero failures on properly configured device
@@ -400,7 +297,7 @@ def test_capture_service_enabled(host):
     assert host.service("ndi-capture").is_enabled
 
 def test_capture_fps_nominal(host):
-    fps = float(host.file("/var/run/ndi-bridge/fps").content_string)
+    fps = float(host.file("/var/run/media-bridge/fps").content_string)
     assert 29.0 <= fps <= 31.0
 ```
 
@@ -434,7 +331,7 @@ jobs:
 - Menu `read` commands need `< /dev/tty` when called from other scripts
 - Services must be enabled AND started
 - kbd package required for chvt but was missing
-- Stream names must match exactly (e.g., "NDI-BRIDGE (USB Capture)")
+- Stream names must match exactly (e.g., "MEDIA-BRIDGE (USB Capture)")
 
 ## CRITICAL: Modular Architecture Rules
 
@@ -512,7 +409,7 @@ Fixes #25"
 ## CRITICAL: USB Image Build Rules
 
 **ALWAYS DO:**
-1. Run from repository ROOT: `cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge`
+1. Run from repository ROOT: `cd /mnt/c/Users/newlevel/Documents/GitHub/media-bridge`
 2. Increment version: Edit `scripts/build-modules/00-variables.sh` → `BUILD_SCRIPT_VERSION`
 3. Run build: `sudo ./build-image-for-rufus.sh > build.log 2>&1 &` (MUST redirect ALL output to prevent Claude crashes)
 4. Monitor logs: `tail -f build.log` or check build-logs directory
@@ -521,7 +418,7 @@ Fixes #25"
 - Run build from `build/` directory (causes "file not found" errors)
 - Forget to increment version (can't identify deployed devices)
 
-**Build takes 10-15 minutes. Image output: `ndi-bridge.img` (8GB)**
+**Build takes 10-15 minutes. Image output: `media-bridge.img` (8GB)**
 
 ## Clean Repository Build Process
 
@@ -529,8 +426,8 @@ Fixes #25"
 
 1. **Clone and enter repository:**
 ```bash
-git clone https://github.com/yourusername/ndi-bridge.git
-cd ndi-bridge
+git clone https://github.com/yourusername/media-bridge.git
+cd media-bridge
 ```
 
 2. **Setup build environment (installs dependencies and NDI SDK):**
@@ -559,7 +456,7 @@ This creates ndi-capture and ndi-display binaries in `build/bin/`
 sudo ./build-image-for-rufus.sh > build.log 2>&1 &
 tail -f build.log  # Monitor progress
 ```
-Build takes 10-15 minutes. Output: `ndi-bridge.img` (8GB)
+Build takes 10-15 minutes. Output: `media-bridge.img` (8GB)
 
 **Common Issues & Solutions:**
 - `losetup package not found` → Fixed: use util-linux package instead
@@ -584,7 +481,7 @@ Build takes 10-15 minutes. Output: `ndi-bridge.img` (8GB)
 **Manual build (if needed):**
 ```bash
 # CRITICAL: Must be in build/ directory!
-cd /mnt/c/Users/newlevel/Documents/GitHub/ndi-bridge/build
+cd /mnt/c/Users/newlevel/Documents/GitHub/media-bridge/build
 make ndi-display -j$(nproc)    # Display component
 make ndi-capture -j$(nproc)    # Capture component
 make -j$(nproc)                # Everything
@@ -607,11 +504,9 @@ npm run typecheck  # If exists
 
 ### USB Appliance Commands
 ```bash
-ndi-bridge-info         # System status
-ndi-bridge-logs         # View logs
-ndi-bridge-set-name     # Change NDI name
-ndi-bridge-rw           # Mount filesystem read-write
-ndi-bridge-ro           # Return to read-only
+media-bridge-info         # System status
+media-bridge-logs         # View logs
+media-bridge-set-name     # Change NDI name
 ```
 
 ## Project Structure
@@ -632,7 +527,7 @@ ndi-bridge-ro           # Return to read-only
 ### Web Interface
 - URL: `http://device.local/` (admin/newlevel)
 - Terminal: Persistent tmux session via wetty
-- Config: `/etc/nginx/sites-available/ndi-bridge`
+- Config: `/etc/nginx/sites-available/media-bridge`
 
 ## Known Issues & Solutions
 
@@ -643,7 +538,7 @@ ndi-bridge-ro           # Return to read-only
 | mDNS fails in WSL | Use IP address or test from Windows |
 | --version hangs | Fixed in main.cpp - exits before init |
 | Scripts not updating | Removed inline scripts from 10-tty-config.sh |
-| Chrome shows no audio devices | Reboot device, make filesystem writable (`ndi-bridge-rw`), select USB device in Chrome |
+| Chrome shows no audio devices | Reboot device, select USB device in Chrome |
 | Audio device locked after testing | Stale PipeWire modules can lock devices - reboot clears state |
 
 ## NDI Display System (v1.6.8+)
@@ -680,15 +575,15 @@ The display system automatically handles resolution mismatches:
 
 ### Metrics Collection Pipeline
 1. `v4l2_capture.cpp` emits: `METRICS|FPS:30|FRAMES:1234|DROPPED:0`
-2. `ndi-bridge-collector` service parses journalctl
-3. Writes to `/var/run/ndi-bridge/` tmpfs files
-4. `ndi-bridge-welcome` reads and displays on TTY2
+2. `media-bridge-collector` service parses journalctl
+3. Writes to `/var/run/media-bridge/` tmpfs files
+4. `media-bridge-welcome` reads and displays on TTY2
 
-### Read-Only Filesystem
-- Root filesystem is read-only for power failure protection
-- `/tmp`, `/var/log`, `/run` are tmpfs (RAM)
-- Use `ndi-bridge-rw` to make changes
-- Always return to read-only with `ndi-bridge-ro`
+### Btrfs Filesystem
+- Root filesystem uses Btrfs for power failure resistance
+- Copy-on-Write (CoW) for data integrity
+- Optimized for flash media with SSD mode
+- Fast boot with space_cache=v2 and no compression
 
 ### Time Sync (Critical for Quality)
 - PTP primary (microsecond precision)
@@ -712,7 +607,7 @@ For quick iteration during development, you can deploy directly to a running box
 ```bash
 # Option 1: Deploy specific binaries only (fastest)
 sshpass -p newlevel ssh root@10.77.9.143 "systemctl stop ndi-display@1"
-sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.143:/opt/ndi-bridge/
+sshpass -p newlevel scp build/bin/ndi-display root@10.77.9.143:/opt/media-bridge/
 sshpass -p newlevel ssh root@10.77.9.143 "systemctl start ndi-display@1"
 
 # Option 2: Use quick-deploy.sh script (if created)

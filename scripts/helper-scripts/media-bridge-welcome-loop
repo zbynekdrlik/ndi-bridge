@@ -1,0 +1,109 @@
+#!/bin/bash
+# Auto-refreshing welcome screen with quick actions
+
+while true; do
+    /usr/local/bin/media-bridge-welcome
+    # Wait for key press or timeout after 5 seconds
+    read -t 5 -n 1 -s -r -p "" key
+    if [[ $? -eq 0 ]]; then
+        # Handle quick actions
+        case "${key,,}" in  # Convert to lowercase
+            l)
+                clear
+                echo "=== Media Bridge Logs (Recent 100 lines) ==="
+                echo ""
+                journalctl -u ndi-capture -n 100 --no-pager | less
+                echo ""
+                echo "Press any key to return to dashboard..."
+                read -n 1 -s -r
+                ;;
+            s)
+                clear
+                echo "=== Set NDI Stream Name ==="
+                echo "Current name: $(cat /etc/media-bridge/config 2>/dev/null | grep NDI_NAME | cut -d'=' -f2 | tr -d '"' || echo 'Not set')"
+                echo ""
+                read -p "Enter new NDI name: " new_name
+                if [ -n "$new_name" ]; then
+                    /usr/local/bin/media-bridge-set-name "$new_name"
+                    echo "Name updated. Restarting service..."
+                    systemctl restart ndi-capture
+                    sleep 2
+                fi
+                ;;
+            n)
+                clear
+                echo "=== Network Status ==="
+                echo ""
+                ip addr show br0
+                echo ""
+                echo "Bridge members:"
+                bridge link show
+                echo ""
+                echo "Press any key to continue..."
+                read -n 1 -s -r
+                ;;
+            t)
+                clear
+                echo "=== Time Synchronization Status ==="
+                echo ""
+                if systemctl is-active ptp4l >/dev/null 2>&1; then
+                    echo "PTP Status:"
+                    journalctl -u ptp4l -n 20 --no-pager
+                fi
+                echo ""
+                if systemctl is-active chrony >/dev/null 2>&1; then
+                    echo "NTP Status:"
+                    chronyc tracking
+                fi
+                echo ""
+                echo "Press any key to continue..."
+                read -n 1 -s -r
+                ;;
+            d)
+                if [ -x /opt/media-bridge/ndi-display ]; then
+                    # Launch the new clean display configuration menu directly
+                    # Set TERM if not already set (needed for tput in the script)
+                    [ -z "$TERM" ] && export TERM=xterm
+                    /usr/local/bin/ndi-display-config
+                else
+                    clear
+                    echo "Display support not installed"
+                    echo ""
+                    echo "Press any key to continue..."
+                    read -n 1 -s -r
+                fi
+                ;;
+            h)
+                clear
+                echo "=== Media Bridge Help ==="
+                echo ""
+                echo "Quick Actions:"
+                echo "  L - View Media Bridge logs"
+                echo "  S - Set NDI stream name"
+                echo "  N - Network status details"
+                echo "  T - Time synchronization status"
+                echo "  D - Display configuration (NDI → HDMI)"
+                echo "  H - This help menu"
+                echo "  Q - Exit to shell"
+                echo ""
+                echo "Helper Commands:"
+                echo "  media-bridge-info   - System information"
+                echo "  media-bridge-logs   - View service logs"
+                echo "  media-bridge-set-name - Change NDI name"
+                echo ""
+                echo "Press any key to continue..."
+                read -n 1 -s -r
+                ;;
+            q)
+                clear
+                echo "Type 'media-bridge-welcome-loop' to return to dashboard"
+                echo ""
+                break
+                ;;
+            *)
+                # Any other key, just refresh
+                ;;
+        esac
+    fi
+    # No key pressed or after action, loop continues
+done

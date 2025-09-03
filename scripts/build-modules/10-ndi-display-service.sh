@@ -6,9 +6,9 @@ configure_ndi_display_service() {
     
     # Copy NDI Display binary BEFORE chroot (so it's accessible)
     if [ -f build/bin/ndi-display ]; then
-        mkdir -p /mnt/usb/opt/ndi-bridge
-        cp build/bin/ndi-display /mnt/usb/opt/ndi-bridge/
-        chmod +x /mnt/usb/opt/ndi-bridge/ndi-display
+        mkdir -p /mnt/usb/opt/media-bridge
+        cp build/bin/ndi-display /mnt/usb/opt/media-bridge/
+        chmod +x /mnt/usb/opt/media-bridge/ndi-display
         log "  Copied ndi-display binary"
     else
         warn "  ndi-display binary not found at build/bin/ndi-display"
@@ -18,8 +18,8 @@ configure_ndi_display_service() {
     
     # Copy display policy configuration
     if [ -f scripts/config/display-policy.conf ]; then
-        mkdir -p /mnt/usb/etc/ndi-bridge
-        cp scripts/config/display-policy.conf /mnt/usb/etc/ndi-bridge/
+        mkdir -p /mnt/usb/etc/media-bridge
+        cp scripts/config/display-policy.conf /mnt/usb/etc/media-bridge/
         log "  Copied display-policy.conf"
     fi
     
@@ -39,14 +39,14 @@ configure_ndi_display_service() {
 set -e
 
 # Display-related Directories
-mkdir -p /etc/ndi-bridge
+mkdir -p /etc/media-bridge
 mkdir -p /var/run/ndi-display
 
 # Systemd service files were copied before chroot
 # ndi-display@.service and ndi-display-monitor.service are now in /etc/systemd/system/
 
 # Create symlink for convenience
-ln -sf /opt/ndi-bridge/ndi-display /usr/local/bin/ndi-display 2>/dev/null || true
+ln -sf /opt/media-bridge/ndi-display /usr/local/bin/ndi-display 2>/dev/null || true
 
 # Helper Scripts Installation
 # ============================

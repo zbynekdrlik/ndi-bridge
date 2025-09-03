@@ -15,7 +15,7 @@ def test_initial_state_is_stabilizing(host):
     time.sleep(2)  # Brief pause for service to start
     
     # Act: Read the capture state
-    state_file = host.file("/var/run/ndi-bridge/capture_state")
+    state_file = host.file("/var/run/media-bridge/capture_state")
     
     # Assert: Should be in STABILIZING state
     assert state_file.exists, "Capture state file not found"
@@ -26,14 +26,14 @@ def test_stabilization_complete_file_created(host):
     """Test that stabilization_complete file is created after 30 seconds."""
     # Arrange: Clean up and restart
     host.run("systemctl stop ndi-capture")
-    host.run("rm -f /var/run/ndi-bridge/stabilization_complete")
+    host.run("rm -f /var/run/media-bridge/stabilization_complete")
     host.run("systemctl start ndi-capture")
     
     # Act: Wait for stabilization period
     time.sleep(32)  # 30 seconds + buffer
     
     # Assert: Stabilization complete file should exist
-    complete_file = host.file("/var/run/ndi-bridge/stabilization_complete")
+    complete_file = host.file("/var/run/media-bridge/stabilization_complete")
     assert complete_file.exists, "Stabilization complete marker not found"
 
 
@@ -48,7 +48,7 @@ def test_state_transitions_to_running(host):
     time.sleep(31)
     
     # Assert: State should now be RUNNING
-    state = host.file("/var/run/ndi-bridge/capture_state").content_string.strip()
+    state = host.file("/var/run/media-bridge/capture_state").content_string.strip()
     assert state == "RUNNING", f"Expected RUNNING, got {state}"
 
 
@@ -61,7 +61,7 @@ def test_dropped_baseline_recorded(host):
     time.sleep(5)
     
     # Assert: Dropped baseline file should exist
-    baseline_file = host.file("/var/run/ndi-bridge/dropped_baseline")
+    baseline_file = host.file("/var/run/media-bridge/dropped_baseline")
     assert baseline_file.exists, "Dropped frame baseline not recorded"
 
 
@@ -72,6 +72,6 @@ def test_capture_start_time_recorded(host):
     time.sleep(2)
     
     # Assert: Start time file should exist and contain timestamp
-    start_file = host.file("/var/run/ndi-bridge/capture_start_time")
+    start_file = host.file("/var/run/media-bridge/capture_start_time")
     assert start_file.exists, "Capture start time not recorded"
     assert start_file.content_string.strip().isdigit(), "Invalid timestamp format"

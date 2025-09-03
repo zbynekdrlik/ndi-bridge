@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-NDI Bridge Intercom Control API
+Media Bridge Intercom Control API
 FastAPI backend for web-based intercom control
 """
 
@@ -19,9 +19,9 @@ from services.audio_monitor import AudioMonitor
 
 # Create FastAPI app
 app = FastAPI(
-    title="NDI Bridge Intercom API",
+    title="Media Bridge Intercom API",
     version="2.0.0",
-    description="Web control interface for NDI Bridge intercom system"
+    description="Web control interface for Media Bridge intercom system"
 )
 
 # CORS middleware for development
@@ -52,7 +52,7 @@ async def startup_event():
     # Delay loading defaults to let PipeWire stabilize
     asyncio.create_task(load_defaults_after_delay())
     
-    print("NDI Bridge Intercom API started on port 8000")
+    print("Media Bridge Intercom API started on port 8000")
 
 async def load_defaults_after_delay():
     """Load default settings after a delay to let audio system stabilize"""

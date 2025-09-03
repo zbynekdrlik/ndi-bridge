@@ -1,5 +1,5 @@
 """
-Fixtures package for NDI Bridge testing.
+Fixtures package for Media Bridge testing.
 
 This package contains reusable fixtures and utilities for tests.
 """

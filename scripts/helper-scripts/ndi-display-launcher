@@ -7,7 +7,7 @@
 #
 
 DISPLAY_ID=$1
-CONFIG_FILE="/etc/ndi-bridge/display-${DISPLAY_ID}.conf"
+CONFIG_FILE="/etc/media-bridge/display-${DISPLAY_ID}.conf"
 VTCON_PATH="/sys/class/vtconsole/vtcon${DISPLAY_ID}/bind"
 
 if [ -z "$DISPLAY_ID" ]; then
@@ -59,4 +59,4 @@ fi
 
 # Launch ndi-display with proper quoting to handle spaces
 echo "Starting NDI display $DISPLAY_ID with stream: $STREAM_NAME"
-exec /opt/ndi-bridge/ndi-display "$STREAM_NAME" $DISPLAY_ID
+exec /opt/media-bridge/ndi-display "$STREAM_NAME" $DISPLAY_ID

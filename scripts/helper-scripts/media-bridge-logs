@@ -1,0 +1,6 @@
+#!/bin/bash
+# View Media Bridge logs
+
+echo "Media Bridge Logs (press 'q' to quit):"
+echo "===================================="
+journalctl -u ndi-capture --no-pager | less

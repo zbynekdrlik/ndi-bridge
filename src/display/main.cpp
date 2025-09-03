@@ -124,7 +124,7 @@ int showStatus() {
     }
     
     // Check console policy
-    std::string policy_file = "/etc/ndi-bridge/display-policy.conf";
+    std::string policy_file = "/etc/media-bridge/display-policy.conf";
     int console_display = 0;
     if (std::filesystem::exists(policy_file)) {
         std::ifstream f(policy_file);

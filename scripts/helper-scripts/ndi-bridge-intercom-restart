@@ -1,7 +1,0 @@
-#!/bin/bash
-# Restart NDI Bridge intercom service
-
-echo "Restarting NDI Bridge intercom service..."
-systemctl restart ndi-bridge-intercom.service
-echo "NDI Bridge intercom has been restarted"
-systemctl status ndi-bridge-intercom.service --no-pager | head -5

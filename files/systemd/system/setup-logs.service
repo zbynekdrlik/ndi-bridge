@@ -1,11 +1,11 @@
 [Unit]
-Description=Setup log directories in tmpfs
+Description=Setup log directories
 Before=ndi-capture.service
 After=local-fs.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/mkdir -p /var/log/ndi-bridge
+ExecStart=/bin/mkdir -p /var/log/media-bridge
 RemainAfterExit=yes
 
 [Install]

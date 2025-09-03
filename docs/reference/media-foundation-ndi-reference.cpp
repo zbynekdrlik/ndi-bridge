@@ -1,4 +1,4 @@
-// Original single-file NDI Bridge implementation
+// Original single-file Media Bridge implementation
 // This file is preserved for reference to show the original interactive menu functionality
 // and other features that may have been modified during refactoring.
 

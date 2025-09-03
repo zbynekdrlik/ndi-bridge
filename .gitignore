@@ -58,7 +58,8 @@ Thumbs.db
 
 # Configuration files (local)
 *.conf.local
-ndi-bridge.conf
+media-bridge.conf
+media-bridge.conf
 
 # NDI SDK and related files
 NDI SDK for Linux/
@@ -67,7 +68,8 @@ Install_NDI_SDK_v6_Linux.sh
 
 # USB images (large binary files)
 *.img
-ndi-bridge*.img
+media-bridge*.img
+media-bridge*.img
 
 # Downloaded tools
 rufus.exe

@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=simple
 Restart=always
 RestartSec=5
-ExecStart=/opt/ndi-bridge/run.sh
+ExecStart=/opt/media-bridge/run.sh
 StandardOutput=journal
 StandardError=journal
 

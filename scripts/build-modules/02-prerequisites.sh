@@ -21,7 +21,7 @@ check_prerequisites() {
     fi
     
     # Check for required tools
-    local required_tools=("debootstrap" "parted" "mkfs.fat" "mkfs.ext4" "grub-install")
+    local required_tools=("debootstrap" "parted" "mkfs.fat" "mkfs.btrfs" "grub-install")
     for tool in "${required_tools[@]}"; do
         if ! command_exists "$tool"; then
             error "Required tool '$tool' is not installed"

@@ -1,6 +1,6 @@
 # Dependencies
 
-This directory contains external dependencies for the NDI Bridge project.
+This directory contains external dependencies for the Media Bridge project.
 
 ## Required SDKs
 

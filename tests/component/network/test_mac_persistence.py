@@ -10,7 +10,7 @@ import re
 
 def test_mac_address_file_exists(host):
     """Test that MAC address file exists."""
-    mac_file = host.file("/etc/ndi-bridge-mac")
+    mac_file = host.file("/etc/media-bridge-mac")
     # File might be generated on first boot
     if not mac_file.exists:
         # Check if MAC is set differently

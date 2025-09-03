@@ -34,7 +34,7 @@ def test_ndi_find_command_exists(host):
     result = host.run("which ndi-find")
     if result.rc != 0:
         # Alternative: ndi-display might have built-in discovery
-        display_result = host.run("/opt/ndi-bridge/ndi-display --list 2>/dev/null")
+        display_result = host.run("/opt/media-bridge/ndi-display --list 2>/dev/null")
         assert display_result.rc == 0 or True, "No NDI discovery capability"
 
 
@@ -101,7 +101,9 @@ def test_framebuffer_device_exists(host):
     fb = host.file("/dev/fb0")
     # Framebuffer might not exist with pure DRM/KMS
     if fb.exists:
-        assert fb.is_character, "Framebuffer is not character device"
+        # Check if it's a character device using stat
+        result = host.run("stat -c '%F' /dev/fb0")
+        assert "character" in result.stdout.lower(), "Framebuffer is not character device"
 
 
 def test_tty_allocation_for_display(host):
@@ -113,18 +115,23 @@ def test_tty_allocation_for_display(host):
 @pytest.mark.display
 def test_display_service_cleanup_on_stop(host):
     """Test that display service cleans up properly on stop."""
-    # Start service
+    # This test verifies the ExecStopPost cleanup works
+    # The service may exit quickly if no config, but cleanup should still run
+    
+    # Ensure clean state
+    host.run("rm -f /var/run/ndi-display/display-1.status")
+    
+    # Create a test status file that the service should clean up
+    host.run("mkdir -p /var/run/ndi-display")
+    host.run("echo 'TEST' > /var/run/ndi-display/display-1.status")
+    
+    # Start and stop service (it may exit quickly if no config)
     host.run("systemctl start ndi-display@1")
-    time.sleep(2)
-    
-    # Create a status file
-    host.run("echo 'TEST' > /var/run/ndi-display/display1_status")
-    
-    # Stop service
+    time.sleep(1)
     host.run("systemctl stop ndi-display@1")
     time.sleep(1)
     
-    # Check if status was cleaned up
-    status_file = host.file("/var/run/ndi-display/display1_status")
-    # File should be removed or empty after stop
-    assert not status_file.exists or status_file.size == 0, "Display status not cleaned up"
+    # Check if status was cleaned up by ExecStopPost
+    status_file = host.file("/var/run/ndi-display/display-1.status")
+    # File should be removed by ExecStopPost
+    assert not status_file.exists, "Display status not cleaned up by ExecStopPost"

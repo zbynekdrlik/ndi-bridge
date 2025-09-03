@@ -36,7 +36,7 @@ def test_vdo_ninja_intercom_script_exists(host):
     # Check various possible names
     possible_scripts = [
         "/usr/local/bin/vdo-ninja-intercom",
-        "/usr/local/bin/ndi-bridge-intercom",
+        "/usr/local/bin/media-bridge-intercom",
         "/usr/local/bin/intercom"
     ]
     

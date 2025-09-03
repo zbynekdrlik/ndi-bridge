@@ -1,4 +1,4 @@
-# Testing dependencies for NDI Bridge
+# Testing dependencies for Media Bridge
 # Install with: pip install -r tests/requirements.txt
 
 # Core testing framework

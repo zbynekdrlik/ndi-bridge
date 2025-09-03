@@ -39,11 +39,11 @@ def test_complete_boot_sequence(host):
     assert ip_result.stdout.strip(), "No IP address after boot"
     
     # Check capture has started
-    capture_state_file = host.file("/var/run/ndi-bridge/capture_state")
+    capture_state_file = host.file("/var/run/media-bridge/capture_state")
     assert capture_state_file.exists, "Capture state not initialized"
     
     # Verify welcome screen is displayed (TTY2)
-    tty2_result = host.run("ps aux | grep -E 'ndi-bridge-welcome.*tty2'")
+    tty2_result = host.run("ps aux | grep -E 'media-bridge-welcome.*tty2'")
     assert tty2_result.succeeded, "Welcome screen not running on TTY2"
 
 
@@ -51,7 +51,7 @@ def test_auto_start_enabled_services(host):
     """Test that all required services are enabled for auto-start."""
     required_services = [
         "ndi-capture",
-        "ndi-bridge-welcome",
+        "media-bridge-welcome",
         "nginx",
         "systemd-networkd"
     ]
@@ -64,8 +64,8 @@ def test_auto_start_enabled_services(host):
 def test_runtime_directories_created(host):
     """Test that runtime directories are created during boot."""
     runtime_dirs = [
-        "/var/run/ndi-bridge",
-        "/var/log/ndi-bridge",
+        "/var/run/media-bridge",
+        "/var/log/media-bridge",
         "/tmp"
     ]
     

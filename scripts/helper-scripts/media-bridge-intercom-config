@@ -1,0 +1,140 @@
+#!/bin/bash
+# Media Bridge Intercom Configuration Management
+# Handles persistent audio configuration across reboots
+
+set -e
+
+CONFIG_FILE="/etc/media-bridge/intercom.conf"
+CONFIG_DIR=$(dirname "$CONFIG_FILE")
+CONTROL_SCRIPT="/usr/local/bin/media-bridge-intercom-control"
+
+# Ensure control script exists
+if [ ! -x "$CONTROL_SCRIPT" ]; then
+    echo "Error: Control script not found at $CONTROL_SCRIPT"
+    exit 1
+fi
+
+# Function to save current settings
+save_config() {
+    # Get current status
+    local status=$($CONTROL_SCRIPT status)
+    
+    # Extract values using Python for reliable JSON parsing
+    local output_volume=$(echo "$status" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["output"]["volume"])' 2>/dev/null)
+    local input_volume=$(echo "$status" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["input"]["volume"])' 2>/dev/null)
+    local output_muted=$(echo "$status" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(str(d["output"]["muted"]).lower())' 2>/dev/null)
+    local input_muted=$(echo "$status" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(str(d["input"]["muted"]).lower())' 2>/dev/null)
+    
+    # Create config directory if it doesn't exist
+    mkdir -p "$CONFIG_DIR"
+    
+    # Save to config file
+    cat > "$CONFIG_FILE" <<EOF
+# Media Bridge Intercom Audio Configuration
+# Auto-generated on $(date)
+
+OUTPUT_VOLUME=${output_volume:-75}
+INPUT_VOLUME=${input_volume:-75}
+OUTPUT_MUTED=${output_muted:-false}
+INPUT_MUTED=${input_muted:-false}
+EOF
+    
+    echo "Configuration saved to $CONFIG_FILE"
+    echo "  Output Volume: ${output_volume}%"
+    echo "  Input Volume: ${input_volume}%"
+    echo "  Output Muted: ${output_muted}"
+    echo "  Input Muted: ${input_muted}"
+}
+
+# Function to load saved settings
+load_config() {
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "No saved configuration found at $CONFIG_FILE"
+        echo "Using defaults: Output 75%, Input 75%, both unmuted"
+        return
+    fi
+    
+    # Source the config file
+    source "$CONFIG_FILE"
+    
+    echo "Loading configuration from $CONFIG_FILE"
+    
+    # Apply volume settings
+    if [ -n "$OUTPUT_VOLUME" ]; then
+        $CONTROL_SCRIPT set-volume output "$OUTPUT_VOLUME" >/dev/null 2>&1
+        echo "  Output volume set to ${OUTPUT_VOLUME}%"
+    fi
+    
+    if [ -n "$INPUT_VOLUME" ]; then
+        $CONTROL_SCRIPT set-volume input "$INPUT_VOLUME" >/dev/null 2>&1
+        echo "  Input volume set to ${INPUT_VOLUME}%"
+    fi
+    
+    # Apply mute settings
+    if [ "$OUTPUT_MUTED" = "true" ]; then
+        $CONTROL_SCRIPT mute output >/dev/null 2>&1
+        echo "  Output muted"
+    else
+        $CONTROL_SCRIPT unmute output >/dev/null 2>&1
+        echo "  Output unmuted"
+    fi
+    
+    if [ "$INPUT_MUTED" = "true" ]; then
+        $CONTROL_SCRIPT mute input >/dev/null 2>&1
+        echo "  Input muted"
+    else
+        $CONTROL_SCRIPT unmute input >/dev/null 2>&1
+        echo "  Input unmuted"
+    fi
+}
+
+# Function to reset to defaults
+reset_config() {
+    echo "Resetting to default configuration..."
+    
+    # Set defaults
+    $CONTROL_SCRIPT set-volume output 75 >/dev/null 2>&1
+    $CONTROL_SCRIPT set-volume input 75 >/dev/null 2>&1
+    $CONTROL_SCRIPT unmute both >/dev/null 2>&1
+    
+    # Remove config file
+    rm -f "$CONFIG_FILE"
+    
+    echo "Reset complete: Output 75%, Input 75%, both unmuted"
+}
+
+# Main command processing
+case "$1" in
+    save)
+        save_config
+        ;;
+        
+    load)
+        load_config
+        ;;
+        
+    reset)
+        reset_config
+        ;;
+        
+    show)
+        if [ -f "$CONFIG_FILE" ]; then
+            echo "Current saved configuration:"
+            cat "$CONFIG_FILE"
+        else
+            echo "No saved configuration found"
+        fi
+        ;;
+        
+    *)
+        echo "Usage: $0 {save|load|reset|show}"
+        echo ""
+        echo "Commands:"
+        echo "  save  - Save current audio settings to persistent config"
+        echo "  load  - Load and apply saved audio settings"
+        echo "  reset - Reset to default settings and remove config"
+        echo "  show  - Display saved configuration"
+        echo ""
+        exit 1
+        ;;
+esac

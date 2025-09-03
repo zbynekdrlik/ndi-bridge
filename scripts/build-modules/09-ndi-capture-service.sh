@@ -2,13 +2,13 @@
 # NDI Capture service configuration module
 
 configure_ndi_service() {
-    log "Configuring NDI Bridge service..."
+    log "Configuring Media Bridge service..."
     
     # Copy NDI Capture binary BEFORE chroot (so it's accessible)
     if [ -f build/bin/ndi-capture ]; then
-        mkdir -p /mnt/usb/opt/ndi-bridge
-        cp build/bin/ndi-capture /mnt/usb/opt/ndi-bridge/
-        chmod +x /mnt/usb/opt/ndi-bridge/ndi-capture
+        mkdir -p /mnt/usb/opt/media-bridge
+        cp build/bin/ndi-capture /mnt/usb/opt/media-bridge/
+        chmod +x /mnt/usb/opt/media-bridge/ndi-capture
         log "NDI Capture binary copied"
     else
         log "ERROR: ndi-capture binary not found at build/bin/ndi-capture"
@@ -17,7 +17,7 @@ configure_ndi_service() {
     
     # Copy systemd service files BEFORE chroot
     mkdir -p /mnt/usb/etc/systemd/system
-    for service in ndi-capture.service setup-logs.service ndi-bridge-collector.service; do
+    for service in ndi-capture.service setup-logs.service media-bridge-collector.service; do
         if [ -f files/systemd/system/$service ]; then
             cp files/systemd/system/$service /mnt/usb/etc/systemd/system/
             log "  Copied $service"
@@ -29,26 +29,26 @@ configure_ndi_service() {
     cat >> /mnt/usb/tmp/configure-system.sh << 'EOFNDI'
 
 # Create NDI directories
-mkdir -p /opt/ndi-bridge /etc/ndi-bridge
+mkdir -p /opt/media-bridge /etc/media-bridge
 
 # Save build information
-echo "BUILD_TIMESTAMP_PLACEHOLDER" > /etc/ndi-bridge/build-timestamp
-echo "BUILD_SCRIPT_VERSION_PLACEHOLDER" > /etc/ndi-bridge/build-script-version
+echo "BUILD_TIMESTAMP_PLACEHOLDER" > /etc/media-bridge/build-timestamp
+echo "BUILD_SCRIPT_VERSION_PLACEHOLDER" > /etc/media-bridge/build-script-version
 
 # NDI configuration - default to "USB Capture"
-cat > /etc/ndi-bridge/config << EOFCONFIG
+cat > /etc/media-bridge/config << EOFCONFIG
 DEVICE="/dev/video0"
 NDI_NAME="USB Capture"
 EOFCONFIG
 
 # NDI runner script
-cat > /opt/ndi-bridge/run.sh << 'EOFRUN'
+cat > /opt/media-bridge/run.sh << 'EOFRUN'
 #!/bin/bash
-source /etc/ndi-bridge/config
+source /etc/media-bridge/config
 [ -z "$NDI_NAME" ] && NDI_NAME=$(hostname)
 
-# Create log directory if it doesn't exist (tmpfs)
-mkdir -p /var/log/ndi-bridge 2>/dev/null || true
+# Create log directory if it doesn't exist
+mkdir -p /var/log/media-bridge 2>/dev/null || true
 
 # Wait for network
 while ! ping -c 1 -W 1 8.8.8.8 &> /dev/null; do
@@ -89,20 +89,20 @@ check_time_sync() {
 
 check_time_sync
 
-# Main loop with restart and logging to tmpfs
+# Main loop with restart and logging
 while true; do
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting NDI Capture: $DEVICE -> $NDI_NAME"
-    if [ -w /var/log/ndi-bridge ]; then
-        LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-capture "$DEVICE" "$NDI_NAME" 2>&1 | tee -a /var/log/ndi-bridge/ndi-capture.log
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] NDI Capture exited, restarting in 5 seconds..." | tee -a /var/log/ndi-bridge/ndi-capture.log
+    if [ -w /var/log/media-bridge ]; then
+        LD_LIBRARY_PATH=/usr/local/lib /opt/media-bridge/ndi-capture "$DEVICE" "$NDI_NAME" 2>&1 | tee -a /var/log/media-bridge/ndi-capture.log
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] NDI Capture exited, restarting in 5 seconds..." | tee -a /var/log/media-bridge/ndi-capture.log
     else
-        LD_LIBRARY_PATH=/usr/local/lib /opt/ndi-bridge/ndi-capture "$DEVICE" "$NDI_NAME" 2>&1
+        LD_LIBRARY_PATH=/usr/local/lib /opt/media-bridge/ndi-capture "$DEVICE" "$NDI_NAME" 2>&1
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] NDI Capture exited, restarting in 5 seconds..."
     fi
     sleep 5
 done
 EOFRUN
-chmod +x /opt/ndi-bridge/run.sh
+chmod +x /opt/media-bridge/run.sh
 
 # Systemd service files were copied before chroot
 # ndi-capture.service is now in /etc/systemd/system/
@@ -121,12 +121,12 @@ else
     update-rc.d setup-logs enable 2>/dev/null || true
 fi
 
-# ndi-bridge-collector.service was copied before chroot
+# media-bridge-collector.service was copied before chroot
 
 if command -v systemctl >/dev/null 2>&1; then
-    systemctl enable ndi-bridge-collector
+    systemctl enable media-bridge-collector
 else
-    update-rc.d ndi-bridge-collector enable 2>/dev/null || true
+    update-rc.d media-bridge-collector enable 2>/dev/null || true
 fi
 
 EOFNDI

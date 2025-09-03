@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start NDI Bridge Intercom Web Interface
+# Start Media Bridge Intercom Web Interface
 # This replaces the old Python API server
 
 set -e
@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "Starting NDI Bridge Intercom Web Interface..."
+echo "Starting Media Bridge Intercom Web Interface..."
 
 # Check if FastAPI is installed
 if ! python3 -c "import fastapi" 2>/dev/null; then
@@ -25,7 +25,7 @@ python3 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
 
 echo ""
 echo "========================================="
-echo "NDI Bridge Intercom Web Interface Started"
+echo "Media Bridge Intercom Web Interface Started"
 echo "========================================="
 echo ""
 echo "Access the interface at:"

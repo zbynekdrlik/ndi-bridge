@@ -1,0 +1,8 @@
+#!/bin/bash
+# Show Media Bridge logs on TTY1
+clear
+echo "=== Media Bridge Live Logs ==="
+echo "Switch to TTY2 (Alt+F2) for system menu"
+echo "Press Ctrl+C to stop following logs"
+echo ""
+journalctl -u ndi-capture -f --no-pager

@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 BOX_IP="${1:-10.77.9.143}"
-IMAGE_FILE="ndi-bridge.img"
+IMAGE_FILE="media-bridge.img"
 
 # Colors
 GREEN='\033[0;32m'
@@ -33,13 +33,13 @@ sshpass -p newlevel ssh root@$BOX_IP "systemctl stop ndi-capture ndi-display@1 2
 sleep 1
 
 # Copy binaries
-sshpass -p newlevel scp $MOUNT_DIR/opt/ndi-bridge/ndi-capture root@$BOX_IP:/opt/ndi-bridge/ 2>/dev/null || echo "ndi-capture not updated"
-sshpass -p newlevel scp $MOUNT_DIR/opt/ndi-bridge/ndi-display root@$BOX_IP:/opt/ndi-bridge/ 2>/dev/null || echo "ndi-display not updated"
+sshpass -p newlevel scp $MOUNT_DIR/opt/media-bridge/ndi-capture root@$BOX_IP:/opt/media-bridge/ 2>/dev/null || echo "ndi-capture not updated"
+sshpass -p newlevel scp $MOUNT_DIR/opt/media-bridge/ndi-display root@$BOX_IP:/opt/media-bridge/ 2>/dev/null || echo "ndi-display not updated"
 
 # Copy critical scripts
 echo "Deploying scripts..."
-sshpass -p newlevel scp $MOUNT_DIR/usr/local/bin/ndi-bridge-welcome root@$BOX_IP:/usr/local/bin/ 2>/dev/null || true
-sshpass -p newlevel scp $MOUNT_DIR/usr/local/bin/ndi-bridge-info root@$BOX_IP:/usr/local/bin/ 2>/dev/null || true
+sshpass -p newlevel scp $MOUNT_DIR/usr/local/bin/media-bridge-welcome root@$BOX_IP:/usr/local/bin/ 2>/dev/null || true
+sshpass -p newlevel scp $MOUNT_DIR/usr/local/bin/media-bridge-info root@$BOX_IP:/usr/local/bin/ 2>/dev/null || true
 
 # Restart services
 echo "Restarting services..."
@@ -47,9 +47,9 @@ sshpass -p newlevel ssh root@$BOX_IP "systemctl start ndi-capture ndi-display@1 
 
 # Quick status check
 echo -e "\n${GREEN}Deployment Status:${NC}"
-sshpass -p newlevel ssh root@$BOX_IP << 'EOF' 2>/dev/null | grep -v "NDI Bridge Status"
-echo "ndi-capture version: $(/opt/ndi-bridge/ndi-capture --version 2>/dev/null || echo 'error')"
-echo "ndi-display version: $(/opt/ndi-bridge/ndi-display --version 2>&1 | head -1 || echo 'error')"
+sshpass -p newlevel ssh root@$BOX_IP << 'EOF' 2>/dev/null | grep -v "Media Bridge Status"
+echo "ndi-capture version: $(/opt/media-bridge/ndi-capture --version 2>/dev/null || echo 'error')"
+echo "ndi-display version: $(/opt/media-bridge/ndi-display --version 2>&1 | head -1 || echo 'error')"
 echo "Services:"
 systemctl is-active ndi-capture 2>/dev/null || echo "ndi-capture: stopped"
 systemctl is-active ndi-display@1 2>/dev/null || echo "ndi-display@1: stopped"

@@ -1,0 +1,201 @@
+#!/bin/bash
+# Media Bridge Intercom Audio Control Script
+# Controls audio settings for VDO.Ninja intercom
+
+set -e
+
+# PipeWire/PulseAudio environment
+export XDG_RUNTIME_DIR=/run/user/0
+export PULSE_RUNTIME_PATH=/run/user/0/pulse
+
+# Suppress PulseAudio cookie warnings
+export PULSE_COOKIE=/tmp/.pulse-cookie
+
+# Function to get USB audio devices - FIXED to CSCTEK USB HID
+get_usb_audio_devices() {
+    # HARDCODED for CSCTEK USB Audio and HID device
+    # This ensures intercom always uses the correct device
+    local usb_sink=$(pactl list sinks short 2>&1 | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    local usb_source=$(pactl list sources short 2>&1 | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    
+    # No fallback - only use CSCTEK device
+    if [ -z "$usb_sink" ]; then
+        echo "ERROR: CSCTEK USB Audio HID device not found (output)" >&2
+    fi
+    
+    if [ -z "$usb_source" ]; then
+        echo "ERROR: CSCTEK USB Audio HID device not found (input)" >&2
+    fi
+    
+    echo "$usb_sink $usb_source"
+}
+
+# Main command processing
+case "$1" in
+    status)
+        devices=($(get_usb_audio_devices))
+        usb_sink="${devices[0]}"
+        usb_source="${devices[1]}"
+        
+        if [ -n "$usb_sink" ]; then
+            output_vol=$(pactl get-sink-volume "$usb_sink" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%')
+            output_muted=$(pactl get-sink-mute "$usb_sink" 2>/dev/null | grep -o 'yes\|no')
+        else
+            output_vol=50
+            output_muted="no"
+        fi
+        
+        if [ -n "$usb_source" ]; then
+            input_vol=$(pactl get-source-volume "$usb_source" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%')
+            input_muted=$(pactl get-source-mute "$usb_source" 2>/dev/null | grep -o 'yes\|no')
+        else
+            input_vol=50
+            input_muted="no"
+        fi
+        
+        cat <<EOF
+{
+  "output": {
+    "device": "$usb_sink",
+    "volume": $output_vol,
+    "muted": $([ "$output_muted" = "yes" ] && echo "true" || echo "false")
+  },
+  "input": {
+    "device": "$usb_source",
+    "volume": $input_vol,
+    "muted": $([ "$input_muted" = "yes" ] && echo "true" || echo "false")
+  }
+}
+EOF
+        ;;
+        
+    set-volume)
+        if [ $# -ne 3 ]; then
+            echo "Usage: $0 set-volume <output|input> <0-100>"
+            exit 1
+        fi
+        
+        devices=($(get_usb_audio_devices))
+        volume=$3
+        
+        if [ "$2" = "output" ]; then
+            device="${devices[0]}"
+            [ -n "$device" ] && pactl set-sink-volume "$device" "${volume}%" 2>/dev/null
+        elif [ "$2" = "input" ]; then
+            device="${devices[1]}"
+            [ -n "$device" ] && pactl set-source-volume "$device" "${volume}%" 2>/dev/null
+        else
+            echo "Invalid target: $2"
+            exit 1
+        fi
+        
+        echo "Volume set to ${volume}%"
+        ;;
+        
+    mute)
+        if [ $# -ne 2 ]; then
+            echo "Usage: $0 mute <output|input|both>"
+            exit 1
+        fi
+        
+        devices=($(get_usb_audio_devices))
+        
+        case "$2" in
+            output)
+                [ -n "${devices[0]}" ] && pactl set-sink-mute "${devices[0]}" 1 2>/dev/null
+                echo "Output muted"
+                ;;
+            input)
+                [ -n "${devices[1]}" ] && pactl set-source-mute "${devices[1]}" 1 2>/dev/null
+                echo "Input muted"
+                ;;
+            both)
+                [ -n "${devices[0]}" ] && pactl set-sink-mute "${devices[0]}" 1 2>/dev/null
+                [ -n "${devices[1]}" ] && pactl set-source-mute "${devices[1]}" 1 2>/dev/null
+                echo "Both muted"
+                ;;
+            *)
+                echo "Invalid target: $2"
+                exit 1
+                ;;
+        esac
+        ;;
+        
+    unmute)
+        if [ $# -ne 2 ]; then
+            echo "Usage: $0 unmute <output|input|both>"
+            exit 1
+        fi
+        
+        devices=($(get_usb_audio_devices))
+        
+        case "$2" in
+            output)
+                [ -n "${devices[0]}" ] && pactl set-sink-mute "${devices[0]}" 0 2>/dev/null
+                echo "Output unmuted"
+                ;;
+            input)
+                [ -n "${devices[1]}" ] && pactl set-source-mute "${devices[1]}" 0 2>/dev/null
+                echo "Input unmuted"
+                ;;
+            both)
+                [ -n "${devices[0]}" ] && pactl set-sink-mute "${devices[0]}" 0 2>/dev/null
+                [ -n "${devices[1]}" ] && pactl set-source-mute "${devices[1]}" 0 2>/dev/null
+                echo "Both unmuted"
+                ;;
+            *)
+                echo "Invalid target: $2"
+                exit 1
+                ;;
+        esac
+        ;;
+        
+    toggle)
+        if [ $# -ne 2 ]; then
+            echo "Usage: $0 toggle <output|input|both>"
+            exit 1
+        fi
+        
+        devices=($(get_usb_audio_devices))
+        
+        case "$2" in
+            output)
+                if [ -n "${devices[0]}" ]; then
+                    pactl set-sink-mute "${devices[0]}" toggle 2>/dev/null
+                    echo "Output toggled"
+                fi
+                ;;
+            input)
+                if [ -n "${devices[1]}" ]; then
+                    pactl set-source-mute "${devices[1]}" toggle 2>/dev/null
+                    echo "Input toggled"
+                fi
+                ;;
+            both)
+                if [ -n "${devices[0]}" ]; then
+                    pactl set-sink-mute "${devices[0]}" toggle 2>/dev/null
+                fi
+                if [ -n "${devices[1]}" ]; then
+                    pactl set-source-mute "${devices[1]}" toggle 2>/dev/null
+                fi
+                echo "Both toggled"
+                ;;
+            *)
+                echo "Invalid target: $2"
+                exit 1
+                ;;
+        esac
+        ;;
+        
+    *)
+        echo "Usage: $0 {status|set-volume|mute|unmute|toggle} [args]"
+        echo ""
+        echo "Commands:"
+        echo "  status                    - Show current audio status (JSON)"
+        echo "  set-volume <out|in> <0-100> - Set volume percentage"
+        echo "  mute <out|in|both>        - Mute audio"
+        echo "  unmute <out|in|both>      - Unmute audio"
+        echo "  toggle <out|in|both>      - Toggle mute state"
+        exit 1
+        ;;
+esac

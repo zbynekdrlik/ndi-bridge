@@ -1,8 +1,8 @@
-# NDI Bridge Architecture
+# Media Bridge Architecture
 
 ## Overview
 
-NDI Bridge is designed as a modular, cross-platform application with platform-specific implementations for optimal performance.
+Media Bridge is designed as a modular, cross-platform application with platform-specific implementations for optimal performance.
 
 ## Core Components
 

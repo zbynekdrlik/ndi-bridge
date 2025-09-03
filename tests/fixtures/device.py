@@ -1,5 +1,5 @@
 """
-Shared fixtures for NDI Bridge device operations.
+Shared fixtures for Media Bridge device operations.
 
 Provides reusable fixtures for common device interactions.
 """
@@ -44,7 +44,7 @@ def service_status(host):
 @pytest.fixture
 def clean_runtime_files(host):
     """Fixture to clean runtime files before test."""
-    def _clean(pattern="/var/run/ndi-bridge/*"):
+    def _clean(pattern="/var/run/media-bridge/*"):
         """Remove runtime files matching pattern."""
         host.run(f"rm -f {pattern}")
     return _clean
@@ -79,7 +79,7 @@ def capture_metrics(host):
     def _metrics():
         """Read all capture metrics as dictionary."""
         metrics = {}
-        metrics_dir = "/var/run/ndi-bridge"
+        metrics_dir = "/var/run/media-bridge"
         
         # Read numeric metrics
         for metric in ["fps", "frames_captured", "frames_dropped"]:

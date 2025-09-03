@@ -1,6 +1,0 @@
-#!/bin/bash
-# View NDI Bridge logs
-
-echo "NDI Bridge Logs (press 'q' to quit):"
-echo "===================================="
-journalctl -u ndi-capture --no-pager | less
