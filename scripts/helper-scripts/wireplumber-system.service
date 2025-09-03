@@ -2,6 +2,7 @@
 Description=WirePlumber System Session Manager
 After=pipewire-system.service
 Requires=pipewire-system.service
+BindsTo=pipewire-system.service
 
 [Service]
 Type=simple
@@ -11,8 +12,12 @@ Environment="XDG_STATE_HOME=/var/lib/wireplumber"
 ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /var/lib/wireplumber
 ExecStart=/usr/bin/wireplumber
-Restart=on-failure
+Restart=always
 RestartSec=5
+# High priority for audio processing
+Nice=-11
+LimitRTPRIO=95
+LimitNICE=-11
 
 [Install]
 WantedBy=multi-user.target

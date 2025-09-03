@@ -2,6 +2,7 @@
 Description=PipeWire PulseAudio System Service
 After=pipewire-system.service
 Requires=pipewire-system.service
+BindsTo=pipewire-system.service
 
 [Service]
 Type=simple
@@ -10,8 +11,12 @@ Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="PULSE_RUNTIME_PATH=/run/user/0/pulse"
 ExecStartPre=/bin/mkdir -p /run/user/0/pulse
 ExecStart=/usr/bin/pipewire-pulse
-Restart=on-failure
+Restart=always
 RestartSec=5
+# High priority for audio processing
+Nice=-11
+LimitRTPRIO=95
+LimitNICE=-11
 
 [Install]
 WantedBy=multi-user.target

@@ -7,15 +7,13 @@ set +e
 
 # Function to cleanup everything
 cleanup() {
-    echo "Cleaning up Chrome, PipeWire, VNC and Xvfb..."
+    echo "Cleaning up Chrome, VNC and Xvfb..."
     
     # Kill ALL Chrome processes forcefully
     pkill -9 -f "chrome" 2>/dev/null || true
     pkill -9 -f "google-chrome" 2>/dev/null || true
     
-    # Kill PipeWire and WirePlumber
-    pkill -9 pipewire 2>/dev/null || true
-    pkill -9 wireplumber 2>/dev/null || true
+    # Don't kill system PipeWire - it's shared with other services!
     
     # Kill VNC server
     pkill -9 -f "x11vnc" 2>/dev/null || true
@@ -88,13 +86,8 @@ export XDG_DATA_HOME=/tmp/.local/share
 export XDG_CONFIG_HOME=/tmp/.config
 mkdir -p $XDG_CONFIG_HOME
 
-# Start PipeWire and WirePlumber
-echo "Starting PipeWire audio system..."
-
-# Kill any existing PipeWire/WirePlumber
-pkill -9 pipewire 2>/dev/null || true
-pkill -9 wireplumber 2>/dev/null || true
-sleep 1
+# Ensure PipeWire system services are available
+echo "Checking PipeWire audio system..."
 
 # Remove any custom configs that might cause issues
 rm -f /etc/pipewire/pipewire.conf.d/10-usb-audio.conf 2>/dev/null
@@ -139,32 +132,25 @@ alsa_monitor.rules = {
 }
 EOFWP
 
-# Check if system PipeWire is running, if not start locally
-if systemctl is-active --quiet pipewire-system.service; then
-    echo "Using system-wide PipeWire service"
-    PIPEWIRE_PID=""
-    PULSE_PID=""
-    WIREPLUMBER_PID=""
-else
-    echo "System PipeWire not running, starting local instance..."
-    # Start PipeWire as user daemon with proper environment
-    echo "Starting PipeWire..."
-    pipewire &
-    PIPEWIRE_PID=$!
+# Check if system PipeWire is running (REQUIRED)
+if ! systemctl is-active --quiet pipewire-system.service; then
+    echo "ERROR: System-wide PipeWire service is not running!"
+    echo "Starting system PipeWire services..."
+    systemctl start pipewire-system.service pipewire-pulse-system.service wireplumber-system.service
     sleep 3
-
-    # Start pipewire-pulse for PulseAudio compatibility FIRST
-    echo "Starting PipeWire PulseAudio bridge..."
-    pipewire-pulse &
-    PULSE_PID=$!
-    sleep 2
-
-    # Start WirePlumber session manager AFTER pipewire-pulse (matching working config)
-    echo "Starting WirePlumber..."
-    wireplumber &
-    WIREPLUMBER_PID=$!
-    sleep 3
+    
+    # Check again
+    if ! systemctl is-active --quiet pipewire-system.service; then
+        echo "ERROR: Failed to start system PipeWire services"
+        echo "Please check: systemctl status pipewire-system.service"
+        exit 1
+    fi
 fi
+
+echo "Using system-wide PipeWire service"
+PIPEWIRE_PID=""
+PULSE_PID=""
+WIREPLUMBER_PID=""
 
 # Wait for PipeWire to be ready and socket to exist  
 for i in {1..10}; do
@@ -180,17 +166,12 @@ done
 # Verify socket really exists
 if [ ! -S "$XDG_RUNTIME_DIR/pulse/native" ]; then
     echo "ERROR: PulseAudio socket not created at $XDG_RUNTIME_DIR/pulse/native"
-    echo "Creating pulse directory..."
-    mkdir -p $XDG_RUNTIME_DIR/pulse
-    echo "Restarting pipewire-pulse..."
-    pkill pipewire-pulse
-    sleep 1
-    PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse pipewire-pulse &
-    PULSE_PID=$!
-    sleep 3
+    echo "System PipeWire may not be configured correctly"
+    echo "Please check: systemctl status pipewire-pulse-system.service"
+    exit 1
 fi
 
-echo "PipeWire started"
+echo "PipeWire audio system ready"
 
 # Set USB audio as default devices (simple approach like working box)
 echo "Configuring USB audio devices..."
@@ -334,6 +315,10 @@ echo "Chrome started with PID $CHROME_PID"
 # Give Chrome time to create audio streams
 sleep 10
 
+# Configure Chrome to use virtual devices
+echo "Configuring Chrome audio to use virtual devices..."
+/usr/local/bin/media-bridge-audio-manager chrome
+
 # Set default audio configuration
 echo "Setting default audio configuration..."
 
@@ -414,9 +399,6 @@ fi
 
 echo "Audio routing verified"
 
-# Keep the script running to maintain PipeWire
-while kill -0 $CHROME_PID 2>/dev/null; do
-    sleep 30
-done
-
+# Keep the script running (Chrome is the main process now)
+wait $CHROME_PID
 echo "Chrome has exited"

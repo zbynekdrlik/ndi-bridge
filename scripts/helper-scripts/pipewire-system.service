@@ -1,15 +1,22 @@
 [Unit]
 Description=PipeWire System Service
 After=sound.target
+Before=media-bridge-intercom.service ndi-display@0.service ndi-display@1.service ndi-display@2.service
 
 [Service]
 Type=simple
 User=root
 Environment="XDG_RUNTIME_DIR=/run/user/0"
 ExecStartPre=/bin/mkdir -p /run/user/0
+ExecStartPre=/bin/mkdir -p /run/user/0/pulse
 ExecStart=/usr/bin/pipewire
-Restart=on-failure
+Restart=always
 RestartSec=5
+# High priority for audio processing
+Nice=-11
+LimitRTPRIO=95
+LimitNICE=-11
+LimitMEMLOCK=256M
 
 [Install]
 WantedBy=multi-user.target

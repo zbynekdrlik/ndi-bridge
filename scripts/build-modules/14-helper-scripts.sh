@@ -50,6 +50,24 @@ install_helper_scripts() {
             cp "$HELPER_DIR/wireplumber-system.service" /mnt/usb/etc/systemd/system/
         fi
         
+        # Install PipeWire configuration
+        if [ -d "$HELPER_DIR/pipewire-conf.d" ]; then
+            mkdir -p /mnt/usb/etc/pipewire/pipewire.conf.d
+            cp "$HELPER_DIR/pipewire-conf.d"/*.conf /mnt/usb/etc/pipewire/pipewire.conf.d/
+        fi
+        
+        # Install WirePlumber configuration
+        if [ -d "$HELPER_DIR/wireplumber-conf.d" ]; then
+            mkdir -p /mnt/usb/etc/wireplumber/main.lua.d
+            cp "$HELPER_DIR/wireplumber-conf.d"/*.lua /mnt/usb/etc/wireplumber/main.lua.d/
+        fi
+        
+        # Install audio manager
+        if [ -f "$HELPER_DIR/media-bridge-audio-manager" ]; then
+            cp "$HELPER_DIR/media-bridge-audio-manager" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-manager
+        fi
+        
         
         # Setup Chrome profile with VDO.Ninja permissions (pre-granted)
         mkdir -p /mnt/usb/opt/chrome-vdo-profile/Default
