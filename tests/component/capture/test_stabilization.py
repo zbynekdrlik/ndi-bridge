@@ -8,20 +8,22 @@ import pytest
 import time
 
 
-def test_initial_state_is_stabilizing(host):
-    """Test that capture starts in STABILIZING state after restart."""
-    # Arrange: Restart service to trigger fresh stabilization
+def test_initial_state_is_starting(host):
+    """Test that capture starts in STARTING state after restart."""
+    # Arrange: Restart service to trigger fresh start
     host.run("systemctl restart ndi-capture")
     time.sleep(2)  # Brief pause for service to start
     
     # Act: Read the capture state
     state_file = host.file("/var/run/media-bridge/capture_state")
     
-    # Assert: Should be in STABILIZING state
+    # Assert: Should be in STARTING or STABILIZING state (both are valid during init)
     assert state_file.exists, "Capture state file not found"
-    assert state_file.content_string.strip() == "STABILIZING"
+    state = state_file.content_string.strip()
+    assert state in ["STARTING", "STABILIZING"], f"Expected STARTING or STABILIZING, got {state}"
 
 
+@pytest.mark.timeout(60)  # Stabilization takes 30+ seconds
 def test_stabilization_complete_file_created(host):
     """Test that stabilization_complete file is created after 30 seconds."""
     # Arrange: Clean up and restart
@@ -38,8 +40,9 @@ def test_stabilization_complete_file_created(host):
 
 
 @pytest.mark.slow
-def test_state_transitions_to_running(host):
-    """Test that state transitions from STABILIZING to RUNNING."""
+@pytest.mark.timeout(60)  # Stabilization takes 30+ seconds
+def test_state_transitions_to_capturing(host):
+    """Test that state transitions to CAPTURING after stabilization."""
     # Arrange: Restart for fresh stabilization
     host.run("systemctl restart ndi-capture")
     time.sleep(2)
@@ -47,22 +50,24 @@ def test_state_transitions_to_running(host):
     # Act: Wait for stabilization to complete
     time.sleep(31)
     
-    # Assert: State should now be RUNNING
+    # Assert: State should now be CAPTURING (after stabilization)
     state = host.file("/var/run/media-bridge/capture_state").content_string.strip()
-    assert state == "RUNNING", f"Expected RUNNING, got {state}"
+    assert state == "CAPTURING", f"Expected CAPTURING, got {state}"
 
 
-def test_dropped_baseline_recorded(host):
-    """Test that dropped frame baseline is recorded during stabilization."""
+def test_dropped_frames_tracked(host):
+    """Test that dropped frames are tracked during capture."""
     # Arrange: Restart service
     host.run("systemctl restart ndi-capture")
     
-    # Act: Wait for stabilization to begin
+    # Act: Wait for service to start tracking
     time.sleep(5)
     
-    # Assert: Dropped baseline file should exist
-    baseline_file = host.file("/var/run/media-bridge/dropped_baseline")
-    assert baseline_file.exists, "Dropped frame baseline not recorded"
+    # Assert: Dropped frames file should exist
+    dropped_file = host.file("/var/run/media-bridge/frames_dropped")
+    assert dropped_file.exists, "Dropped frames tracking file not found"
+    # Content should be a number (could be 0)
+    assert dropped_file.content_string.strip().isdigit(), "Invalid dropped frame count"
 
 
 def test_capture_start_time_recorded(host):
