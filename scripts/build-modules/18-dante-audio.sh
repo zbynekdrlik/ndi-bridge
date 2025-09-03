@@ -5,6 +5,9 @@
 configure_dante_audio() {
     log "Configuring Dante audio bridge with Inferno..."
     
+    # Set helper directory path
+    HELPER_DIR="$(dirname "$0")/helper-scripts"
+    
     # Create Dante configuration directory
     mkdir -p /mnt/usb/etc/ndi-bridge
     mkdir -p /mnt/usb/opt/inferno
@@ -119,7 +122,10 @@ fi
 
 # Copy Statime configuration - FOLLOWER MODE
 # CRITICAL: ndi-bridge must be PTP follower, not master
-if [ -f /tmp/helper-scripts/statime-follower.toml ]; then
+if [ -f "$HELPER_DIR/statime-follower.toml" ]; then
+    cp "$HELPER_DIR/statime-follower.toml" /etc/statime.toml
+    log "  Copied statime configuration"
+elif [ -f /tmp/helper-scripts/statime-follower.toml ]; then
     cp /tmp/helper-scripts/statime-follower.toml /etc/statime.toml
 elif [ -f /tmp/helper-scripts/statime-follower.conf ]; then
     # Legacy conf format - convert to TOML
@@ -169,10 +175,16 @@ EOFALSA
 cp /root/.asoundrc /etc/asound.conf
 
 # Copy service files from helper-scripts
-if [ -f /tmp/helper-scripts/statime.service ]; then
+if [ -f "$HELPER_DIR/statime.service" ]; then
+    cp "$HELPER_DIR/statime.service" /etc/systemd/system/
+    log "  Copied statime.service"
+elif [ -f /tmp/helper-scripts/statime.service ]; then
     cp /tmp/helper-scripts/statime.service /etc/systemd/system/
 fi
-if [ -f /tmp/helper-scripts/dante-bridge.service ]; then
+if [ -f "$HELPER_DIR/dante-bridge.service" ]; then
+    cp "$HELPER_DIR/dante-bridge.service" /etc/systemd/system/
+    log "  Copied dante-bridge.service"
+elif [ -f /tmp/helper-scripts/dante-bridge.service ]; then
     cp /tmp/helper-scripts/dante-bridge.service /etc/systemd/system/
 else
     # Fallback - create minimal service
