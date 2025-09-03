@@ -1,6 +1,6 @@
 # NDI SDK Setup Guide
 
-This guide explains how to set up the NDI SDK for the NDI Bridge project.
+This guide explains how to set up the NDI SDK for the Media Bridge project.
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ This approach keeps the NDI SDK with your project, making it portable.
 
 1. Create the directory structure:
    ```
-   ndi-bridge/
+   media-bridge/
    └── deps/
        └── ndi/
            ├── include/

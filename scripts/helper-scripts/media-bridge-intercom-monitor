@@ -1,0 +1,234 @@
+#!/bin/bash
+# Media Bridge Intercom Self-Monitoring Control
+# Manages low-latency mic monitoring through PipeWire loopback
+
+# Configuration
+MONITOR_STATE_FILE="/var/run/media-bridge/monitor.state"
+MONITOR_MODULE_FILE="/var/run/media-bridge/monitor.module"
+DEFAULT_VOLUME=50
+DEFAULT_ENABLED=false
+
+# Ensure runtime directory exists
+mkdir -p /var/run/media-bridge
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to get CSCTEK devices
+get_csctek_devices() {
+    # HARDCODED for CSCTEK USB Audio and HID device
+    USB_SINK=$(pactl list sinks short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    USB_SOURCE=$(pactl list sources short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    
+    if [ -z "$USB_SINK" ] || [ -z "$USB_SOURCE" ]; then
+        echo -e "${RED}Error: CSCTEK USB Audio HID device not found${NC}" >&2
+        return 1
+    fi
+    
+    echo "$USB_SOURCE $USB_SINK"
+}
+
+# Function to enable monitoring
+enable_monitoring() {
+    local volume=${1:-$DEFAULT_VOLUME}
+    
+    # Get devices
+    read -r source sink <<< $(get_csctek_devices)
+    if [ $? -ne 0 ]; then
+        return 1
+    fi
+    
+    # Check if already enabled
+    if [ -f "$MONITOR_MODULE_FILE" ]; then
+        module_id=$(cat "$MONITOR_MODULE_FILE")
+        if pactl list modules short | grep -q "^$module_id"; then
+            echo -e "${YELLOW}Monitoring already enabled${NC}"
+            set_monitor_volume "$volume"
+            return 0
+        fi
+    fi
+    
+    # Set PipeWire to ultra-low latency mode (32 samples @ 48kHz = ~0.67ms)
+    # This is the absolute minimum for stable operation
+    pw-metadata -n settings 0 clock.quantum 32 >/dev/null 2>&1
+    
+    # Load loopback module with minimal latency
+    # latency_msec=0 requests lowest possible latency
+    # adjust_time=0 disables dynamic latency adjustment for stability
+    module_id=$(pactl load-module module-loopback \
+        source="$source" \
+        sink="$sink" \
+        latency_msec=0 \
+        adjust_time=0 \
+        source_dont_move=true \
+        sink_dont_move=true \
+        sink_input_properties="media.name='Self-Monitor' application.name='Media-Bridge-Monitor'")
+    
+    if [ $? -eq 0 ]; then
+        echo "$module_id" > "$MONITOR_MODULE_FILE"
+        echo "true" > "$MONITOR_STATE_FILE"
+        echo -e "${GREEN}Monitoring enabled${NC} (module: $module_id)"
+        
+        # Wait a moment for PipeWire to create the sink input
+        sleep 0.5
+        
+        # Set initial volume
+        set_monitor_volume "$volume"
+        
+        # Report latency
+        latency=$(echo "scale=2; 32 / 48" | bc 2>/dev/null || echo "0.67")
+        echo "Target latency: ${latency}ms @ 48kHz (Ultra-low latency mode)"
+        
+        return 0
+    else
+        echo -e "${RED}Failed to enable monitoring${NC}" >&2
+        return 1
+    fi
+}
+
+# Function to disable monitoring
+disable_monitoring() {
+    if [ ! -f "$MONITOR_MODULE_FILE" ]; then
+        echo -e "${YELLOW}Monitoring not enabled${NC}"
+        return 0
+    fi
+    
+    module_id=$(cat "$MONITOR_MODULE_FILE")
+    
+    # Unload the module
+    pactl unload-module "$module_id" 2>/dev/null
+    
+    # Clean up state files
+    rm -f "$MONITOR_MODULE_FILE"
+    echo "false" > "$MONITOR_STATE_FILE"
+    
+    # Restore normal quantum for better stability when not monitoring
+    pw-metadata -n settings 0 clock.quantum 1024 >/dev/null 2>&1
+    
+    echo -e "${GREEN}Monitoring disabled${NC}"
+    return 0
+}
+
+# Function to set monitor volume
+set_monitor_volume() {
+    local volume=${1:-50}
+    
+    if [ ! -f "$MONITOR_MODULE_FILE" ]; then
+        echo -e "${RED}Monitoring not enabled${NC}" >&2
+        return 1
+    fi
+    
+    # Find the sink input created by our loopback module
+    # Look for the module ID in the owner module field
+    module_id=$(cat "$MONITOR_MODULE_FILE")
+    sink_input=$(pactl list sink-inputs | grep -B 3 "Owner Module: $module_id" | grep "Sink Input #" | sed 's/Sink Input #//')
+    
+    if [ -n "$sink_input" ]; then
+        # Convert percentage to PulseAudio volume (0-65536)
+        pa_volume=$((volume * 655))
+        pactl set-sink-input-volume "$sink_input" "$pa_volume"
+        echo -e "${GREEN}Monitor volume set to ${volume}%${NC}"
+        
+        # Save volume to state ONLY if not muting (volume > 0)
+        # This preserves the actual volume when muting/unmuting
+        if [ "$volume" -gt 0 ]; then
+            echo "$volume" > "/var/run/media-bridge/monitor.volume"
+        fi
+        return 0
+    else
+        echo -e "${RED}Monitor sink input not found${NC}" >&2
+        return 1
+    fi
+}
+
+# Function to get monitoring status
+get_status() {
+    local enabled="false"
+    local volume=0
+    local module_id=""
+    local latency=""
+    
+    if [ -f "$MONITOR_MODULE_FILE" ]; then
+        module_id=$(cat "$MONITOR_MODULE_FILE")
+        if pactl list modules short | grep -q "^$module_id"; then
+            enabled="true"
+            
+            # Get volume
+            if [ -f "/var/run/media-bridge/monitor.volume" ]; then
+                volume=$(cat "/var/run/media-bridge/monitor.volume")
+            fi
+            
+            # Calculate latency
+            quantum=$(pw-metadata -n settings 0 clock.quantum 2>/dev/null | grep "value:" | cut -d"'" -f2)
+            rate=$(pw-metadata -n settings 0 clock.rate 2>/dev/null | grep "value:" | cut -d"'" -f2)
+            if [ -n "$quantum" ] && [ -n "$rate" ]; then
+                latency=$(echo "scale=2; ($quantum * 1000) / $rate" | bc 2>/dev/null || echo "0.67")
+            fi
+        fi
+    fi
+    
+    # Output JSON status
+    cat <<EOF
+{
+    "enabled": $enabled,
+    "volume": $volume,
+    "module_id": "$module_id",
+    "latency_ms": "$latency"
+}
+EOF
+}
+
+# Main command processing
+case "${1:-status}" in
+    enable)
+        enable_monitoring "${2:-$DEFAULT_VOLUME}"
+        ;;
+    disable)
+        disable_monitoring
+        ;;
+    volume)
+        if [ -z "$2" ]; then
+            echo "Usage: $0 volume <0-100>"
+            exit 1
+        fi
+        set_monitor_volume "$2"
+        ;;
+    status)
+        get_status
+        ;;
+    restart)
+        # Get current volume if enabled
+        volume=$DEFAULT_VOLUME
+        if [ -f "/var/run/media-bridge/monitor.volume" ]; then
+            volume=$(cat "/var/run/media-bridge/monitor.volume")
+        fi
+        
+        disable_monitoring >/dev/null 2>&1
+        sleep 1
+        enable_monitoring "$volume"
+        ;;
+    *)
+        echo "Media Bridge Intercom Self-Monitoring Control"
+        echo ""
+        echo "Usage: $0 {enable|disable|volume|status|restart} [options]"
+        echo ""
+        echo "Commands:"
+        echo "  enable [volume]  - Enable monitoring (volume: 0-100, default: 50)"
+        echo "  disable          - Disable monitoring"
+        echo "  volume <0-100>   - Set monitor volume"
+        echo "  status           - Show current status (JSON)"
+        echo "  restart          - Restart monitoring with current settings"
+        echo ""
+        echo "Examples:"
+        echo "  $0 enable        - Enable with default 50% volume"
+        echo "  $0 enable 30     - Enable with 30% volume"
+        echo "  $0 volume 75     - Set volume to 75%"
+        echo ""
+        echo "Note: Monitoring provides ~0.67ms latency at 48kHz (32-sample quantum)"
+        echo "      This is the lowest achievable latency without hardware monitoring"
+        exit 1
+        ;;
+esac

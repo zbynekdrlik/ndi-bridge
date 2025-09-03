@@ -8,21 +8,11 @@
 #include <thread>
 #include <chrono>
 
-#ifdef _WIN32
-#define NOMINMAX  // Prevent Windows.h from defining min/max macros
-#include <windows.h>
-#include <conio.h>
-#include "windows/media_foundation/media_foundation_capture.h"
-#include "windows/decklink/decklink_capture.h"
-#include "capture/DeckLinkDeviceEnumerator.h"
-#else
+// Linux-only includes
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
-#ifdef __linux__
 #include "linux/v4l2/v4l2_capture.h"
-#endif
-#endif
 
 #include "common/app_controller.h"
 #include "common/version.h"
@@ -51,7 +41,7 @@ void printUsage(const char* program_name) {
     std::cout << std::endl;
     std::cout << "Arguments:" << std::endl;
     std::cout << "  device_name   V4L2 device (default: /dev/video0)" << std::endl;
-    std::cout << "  ndi_name      NDI stream name (default: 'NDI Bridge')" << std::endl;
+    std::cout << "  ndi_name      NDI stream name (default: 'Media Bridge')" << std::endl;
     std::cout << std::endl;
     std::cout << "Example:" << std::endl;
     std::cout << "  " << program_name << " /dev/video0 \"HDMI Input\"" << std::endl;
@@ -62,17 +52,17 @@ void printUsage(const char* program_name) {
 int main(int argc, char* argv[]) {
     // Check for --version BEFORE any initialization (no latency impact)
     if (argc == 2 && std::string(argv[1]) == "--version") {
-        std::cout << "NDI Bridge v" << NDI_BRIDGE_VERSION << std::endl;
+        std::cout << "Media Bridge v" << NDI_BRIDGE_VERSION << std::endl;
         return 0;
     }
     
     // Log version on startup
     ndi_bridge::Logger::logVersion(NDI_BRIDGE_VERSION);
-    ndi_bridge::Logger::info("Ultra-Low Latency NDI Bridge starting...");
+    ndi_bridge::Logger::info("Ultra-Low Latency Media Bridge starting...");
     
     // Simple argument parsing - NO OPTIONS
     std::string device_name = "/dev/video0";
-    std::string ndi_name = "NDI Bridge";
+    std::string ndi_name = "Media Bridge";
     
     if (argc > 1) {
         device_name = argv[1];

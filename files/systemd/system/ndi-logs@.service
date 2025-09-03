@@ -7,7 +7,7 @@ IgnoreOnIsolate=yes
 
 [Service]
 Type=idle
-ExecStart=/usr/local/bin/ndi-bridge-show-logs
+ExecStart=/usr/local/bin/media-bridge-show-logs
 Restart=always
 User=root
 StandardInput=tty

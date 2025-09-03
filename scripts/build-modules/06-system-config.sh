@@ -113,11 +113,11 @@ apt-get install -y -qq --no-install-recommends \
 pip3 install --break-system-packages pytest pytest-xdist pytest-timeout testinfra pyyaml python-dotenv 2>/dev/null || \
     echo "  Warning: Python test packages installation failed (may not be needed on appliance)"
 
-# Disable WiFi completely (NDI Bridge needs Ethernet only)
+# Disable WiFi completely (Media Bridge needs Ethernet only)
 echo "Disabling WiFi and wireless modules..."
 # Blacklist iwlwifi and related modules to prevent boot hangs
 cat > /etc/modprobe.d/blacklist-wifi.conf << EOFWIFI
-# Disable all WiFi modules for NDI Bridge appliance
+# Disable all WiFi modules for Media Bridge appliance
 # This prevents boot hangs with iwlwifi on Intel systems
 blacklist iwlwifi
 blacklist iwldvm
@@ -160,13 +160,13 @@ echo "Timezone configured: $(timedatectl show --property=Timezone --value 2>/dev
 
 # Create version file for system identification
 echo "Creating version file..."
-cat > /etc/ndi-bridge-version << EOFVERSION
+cat > /etc/media-bridge-version << EOFVERSION
 VERSION=BUILD_SCRIPT_VERSION_PLACEHOLDER
 DATE=BUILD_SCRIPT_DATE_PLACEHOLDER
 TIMESTAMP=BUILD_TIMESTAMP_PLACEHOLDER
 COMMIT=GIT_COMMIT_PLACEHOLDER
 EOFVERSION
-echo "Version file created at /etc/ndi-bridge-version"
+echo "Version file created at /etc/media-bridge-version"
 
 # Clean up
 apt-get clean

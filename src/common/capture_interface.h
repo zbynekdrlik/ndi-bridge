@@ -13,7 +13,7 @@ namespace ndi_bridge {
  * @brief Interface for video capture implementations
  * 
  * This abstract interface defines the contract for video capture devices
- * used in the NDI Bridge application.
+ * used in the Media Bridge application.
  * 
  * Version: 1.0.1
  */

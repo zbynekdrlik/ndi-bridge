@@ -1,5 +1,5 @@
 #!/bin/bash
-# Helper script for building NDI Bridge components
+# Helper script for building Media Bridge components
 # This ensures builds are always done from the correct directory
 
 set -e

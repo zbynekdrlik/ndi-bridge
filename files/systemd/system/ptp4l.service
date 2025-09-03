@@ -1,7 +1,7 @@
 [Unit]
 Description=PTPv2 port in slave mode
 After=network.target
-After=ndi-bridge-network-setup.service
+After=media-bridge-network-setup.service
 
 [Service]
 Type=simple

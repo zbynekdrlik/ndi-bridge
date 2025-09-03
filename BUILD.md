@@ -1,14 +1,11 @@
-# Building NDI Bridge
+# Building Media Bridge
 
-This guide covers building NDI Bridge from source on various platforms.
+This guide covers building Media Bridge from source on various platforms.
 
 ## Table of Contents
 - [Prerequisites](#prerequisites)
 - [Quick Build](#quick-build)
-- [Platform-Specific Instructions](#platform-specific-instructions)
-  - [Windows](#windows)
-  - [Linux](#linux)
-  - [macOS](#macos-not-supported)
+- [Linux Build Instructions](#linux-build-instructions)
 - [Build Options](#build-options)
 - [Troubleshooting](#troubleshooting)
 - [USB Appliance Build](#usb-appliance-build)
@@ -20,13 +17,7 @@ This guide covers building NDI Bridge from source on various platforms.
 - Git
 - [NDI SDK](https://ndi.tv/sdk/) (5.0+ recommended, NDI 6 supported)
 
-### Platform-Specific
-**Windows:**
-- Visual Studio 2019 or newer (with C++ workload)
-- Windows 10/11 SDK
-- [Optional] Blackmagic DeckLink SDK
-
-**Linux:**
+### Linux Requirements
 - GCC 9+ or Clang 10+
 - V4L2 development headers
 - Build essentials
@@ -36,8 +27,8 @@ This guide covers building NDI Bridge from source on various platforms.
 ### Clone and Build
 ```bash
 # Clone repository
-git clone https://github.com/zbynekdrlik/ndi-bridge.git
-cd ndi-bridge
+git clone https://github.com/zbynekdrlik/media-bridge.git
+cd media-bridge
 
 # Create build directory
 mkdir build && cd build
@@ -46,49 +37,10 @@ mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 
 # Build
-cmake --build . --config Release   # Windows
-make -j$(nproc)                    # Linux
+make -j$(nproc)
 ```
 
-## Platform-Specific Instructions
-
-### Windows
-
-#### 1. Install Prerequisites
-- Install [Visual Studio 2019+](https://visualstudio.microsoft.com/) with:
-  - Desktop development with C++
-  - Windows 10/11 SDK
-  - CMake tools (optional)
-
-#### 2. Install NDI SDK
-1. Download [NDI SDK](https://ndi.tv/sdk/)
-2. Install to default location: `C:\Program Files\NDI\NDI 5 SDK`
-3. SDK will be auto-detected by CMake
-
-#### 3. Optional: DeckLink SDK
-1. Download from [Blackmagic Support](https://www.blackmagicdesign.com/support)
-2. Copy SDK files to `external/decklink/`
-3. See [DeckLink Setup Guide](docs/decklink-sdk-setup.md)
-
-#### 4. Build
-Using Visual Studio:
-```bash
-# Generate Visual Studio solution
-cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release ..
-
-# Open NDIBridge.sln in Visual Studio
-# Build -> Build Solution
-```
-
-Using Command Line:
-```bash
-cmake -DCMAKE_BUILD_TYPE=Release ..
-cmake --build . --config Release
-```
-
-The executable will be in `build/Release/ndi-capture.exe`
-
-### Linux
+## Linux Build Instructions
 
 #### 1. Install Prerequisites
 
@@ -141,9 +93,6 @@ sudo make install
 
 The executable will be in `build/ndi-capture`
 
-### macOS (Not Supported)
-NDI Bridge currently does not support macOS. Windows and Linux are the supported platforms.
-
 ## Build Options
 
 ### CMake Options
@@ -151,7 +100,6 @@ NDI Bridge currently does not support macOS. Windows and Linux are the supported
 |--------|-------------|---------|
 | `CMAKE_BUILD_TYPE` | Build type (Debug/Release/RelWithDebInfo) | Release |
 | `BUILD_TESTS` | Build unit tests | OFF |
-| `USE_DECKLINK` | Enable DeckLink support (Windows) | AUTO |
 | `NDI_SDK_DIR` | Custom NDI SDK location | AUTO |
 
 ### Example with Options
@@ -186,8 +134,7 @@ CMake Error: Could not find NDI SDK
 ```
 
 **Solution:**
-- Windows: Install to `C:\Program Files\NDI\NDI 5 SDK`
-- Linux: Run the official installer or set `NDI_SDK_DIR`
+- Run the official installer or set `NDI_SDK_DIR`
 - Manual: `-DNDI_SDK_DIR=/path/to/ndi/sdk`
 
 ### V4L2 Headers Missing (Linux)
@@ -203,18 +150,6 @@ sudo apt-get install libv4l-dev
 # Fedora
 sudo dnf install v4l-utils-devel
 ```
-
-### DeckLink Not Detected (Windows)
-```
-DeckLink SDK not found, DeckLink support disabled
-```
-
-**Solution:**
-1. Download DeckLink SDK
-2. Extract to `external/decklink/`
-3. Ensure these files exist:
-   - `external/decklink/DeckLinkAPI.h`
-   - `external/decklink/DeckLinkAPI_i.c`
 
 ### Permission Denied (Linux)
 ```
@@ -253,8 +188,7 @@ After building, test with:
 ./ndi-capture
 
 # Test with specific device
-./ndi-capture /dev/video0          # Linux
-ndi-capture.exe "USB Video Device" # Windows
+./ndi-capture /dev/video0
 ```
 
 ## Creating a Release Build
@@ -276,7 +210,7 @@ cmake --build . --config Release
 
 ## USB Appliance Build
 
-To create a bootable USB appliance that runs NDI Bridge automatically:
+To create a bootable USB appliance that runs Media Bridge automatically:
 
 ```bash
 # Build the binary first

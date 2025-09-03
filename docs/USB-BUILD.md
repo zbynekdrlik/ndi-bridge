@@ -1,11 +1,11 @@
-# NDI Bridge USB Build Guide
+# Media Bridge USB Build Guide
 
-This guide explains how to create bootable USB systems running NDI Bridge as a dedicated appliance.
+This guide explains how to create bootable USB systems running Media Bridge as a dedicated appliance.
 
 ## Overview
 
 The USB build system creates a complete Ubuntu 24.04 LTS system that:
-- Boots directly into NDI Bridge
+- Boots directly into Media Bridge
 - Automatically detects and uses video capture devices
 - Provides network connectivity with dual ethernet bridging
 - Runs without user intervention
@@ -42,7 +42,7 @@ sudo apt-get install -y \
 
 1. **Build NDI Capture Binary**
 ```bash
-cd ndi-bridge
+cd media-bridge
 mkdir -p build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j$(nproc)
@@ -92,13 +92,13 @@ The build system is organized into modules in `scripts/build-modules/`:
 
 ### Helper Scripts
 Management scripts in `scripts/helper-scripts/`:
-- `ndi-bridge-info` - System status display
-- `ndi-bridge-set-name` - Set device/stream name
-- `ndi-bridge-logs` - View service logs
-- `ndi-bridge-update` - Update NDI binary
-- `ndi-bridge-netstat` - Network status
-- `ndi-bridge-netmon` - Bandwidth monitor
-- `ndi-bridge-help` - Command help
+- `media-bridge-info` - System status display
+- `media-bridge-set-name` - Set device/stream name
+- `media-bridge-logs` - View service logs
+- `media-bridge-update` - Update NDI binary
+- `media-bridge-netstat` - Network status
+- `media-bridge-netmon` - Bandwidth monitor
+- `media-bridge-help` - Command help
 
 ## Customization
 
@@ -110,7 +110,7 @@ Edit `scripts/build-modules/00-variables.sh`:
 ROOT_PASSWORD="newlevel"
 
 # Network settings
-DEFAULT_HOSTNAME="ndi-bridge"
+DEFAULT_HOSTNAME="media-bridge"
 
 # Ubuntu version
 UBUNTU_VERSION="noble"  # 24.04 LTS
@@ -125,7 +125,7 @@ The system creates a bridge (br0) combining all ethernet interfaces:
 To use static IP, modify the network configuration in module `08-network.sh`.
 
 ### NDI Settings
-Default configuration in `/etc/ndi-bridge/config`:
+Default configuration in `/etc/media-bridge/config`:
 ```bash
 DEVICE="/dev/video0"    # First video device
 NDI_NAME=""            # Empty = use hostname
@@ -134,7 +134,7 @@ NDI_NAME=""            # Empty = use hostname
 ## Console Layout
 
 ### TTY1 - Live Logs
-- Shows real-time NDI Bridge logs
+- Shows real-time Media Bridge logs
 - Auto-starts on boot
 - Press Ctrl+C to stop following
 
@@ -252,7 +252,7 @@ v4l2-ctl --list-devices
 - v1.1.0 - Helper scripts
 - v1.0.0 - Initial USB build
 
-### NDI Bridge Versions
+### Media Bridge Versions
 - v2.1.6 - Fixed TTY2 display and boot issues
 - v2.1.5 - USB hot-plug recovery
 - v2.1.4 - Frame monitoring
@@ -271,7 +271,7 @@ apt-get install -y your-package
 Instead of bridging, configure bonding for redundancy in `08-network.sh`.
 
 ### Multiple Cameras
-Modify `/etc/ndi-bridge/config` to specify different devices or create multiple service instances.
+Modify `/etc/media-bridge/config` to specify different devices or create multiple service instances.
 
 ## Support
 

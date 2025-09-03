@@ -34,7 +34,7 @@ def test_ndi_find_command_exists(host):
     result = host.run("which ndi-find")
     if result.rc != 0:
         # Alternative: ndi-display might have built-in discovery
-        display_result = host.run("/opt/ndi-bridge/ndi-display --list 2>/dev/null")
+        display_result = host.run("/opt/media-bridge/ndi-display --list 2>/dev/null")
         assert display_result.rc == 0 or True, "No NDI discovery capability"
 
 

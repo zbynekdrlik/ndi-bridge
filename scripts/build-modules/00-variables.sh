@@ -36,7 +36,7 @@ UBUNTU_ARCH="amd64"
 ROOT_PASSWORD="newlevel"
 
 # Network configuration
-DEFAULT_HOSTNAME="ndi-bridge"
+DEFAULT_HOSTNAME="media-bridge"
 
 # Export all variables
 export BUILD_SCRIPT_VERSION BUILD_SCRIPT_DATE BUILD_TIMESTAMP GIT_COMMIT

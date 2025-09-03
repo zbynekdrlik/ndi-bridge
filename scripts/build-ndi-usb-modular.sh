@@ -1,5 +1,5 @@
 #!/bin/bash
-# NDI-Bridge USB Linux Builder - Modular Version
+# Media Bridge USB Linux Builder - Modular Version
 # This is the main script that sources all modules
 
 set -e
@@ -33,16 +33,16 @@ copy_ndi_files() {
     log "Copying NDI files..."
     
     # Create directories first
-    mkdir -p /mnt/usb/opt/ndi-bridge
+    mkdir -p /mnt/usb/opt/media-bridge
     
     # Copy NDI binary
-    cp "$NDI_BINARY_PATH" /mnt/usb/opt/ndi-bridge/
-    chmod +x /mnt/usb/opt/ndi-bridge/ndi-capture
+    cp "$NDI_BINARY_PATH" /mnt/usb/opt/media-bridge/
+    chmod +x /mnt/usb/opt/media-bridge/ndi-capture
     
     # Copy NDI Display binary if it exists
     if [ -f "$NDI_DISPLAY_BINARY_PATH" ]; then
-        cp "$NDI_DISPLAY_BINARY_PATH" /mnt/usb/opt/ndi-bridge/
-        chmod +x /mnt/usb/opt/ndi-bridge/ndi-display
+        cp "$NDI_DISPLAY_BINARY_PATH" /mnt/usb/opt/media-bridge/
+        chmod +x /mnt/usb/opt/media-bridge/ndi-display
         log "NDI Display binary copied"
     else
         log "NDI Display binary not found, skipping"
@@ -132,7 +132,7 @@ cleanup() {
 
 # Main execution
 main() {
-    log "Starting NDI-Bridge USB Linux Builder (Modular Version $BUILD_SCRIPT_VERSION)"
+    log "Starting Media Bridge USB Linux Builder (Modular Version $BUILD_SCRIPT_VERSION)"
     log "Target device: $USB_DEVICE"
     
     check_prerequisites
@@ -160,12 +160,12 @@ main() {
     log "The system will:"
     log "  - Boot automatically (0s GRUB timeout)"
     log "  - Get IP via DHCP"
-    log "  - Start NDI-Bridge automatically"
+    log "  - Start Media Bridge automatically"
     log "  - Show live logs on TTY1"
     log "  - Show system menu on TTY2"
     log ""
     log "SSH access: ssh root@<IP>"
-    log "Run 'ndi-bridge-help' for available commands"
+    log "Run 'media-bridge-help' for available commands"
 }
 
 # Run main function

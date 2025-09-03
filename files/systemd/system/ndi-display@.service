@@ -16,7 +16,7 @@ Environment="DISPLAY_ID=%i"
 Environment="LD_LIBRARY_PATH=/usr/local/lib"
 
 # Read stream configuration from file
-EnvironmentFile=-/etc/ndi-bridge/display-%i.conf
+EnvironmentFile=-/etc/media-bridge/display-%i.conf
 
 # Start NDI display using launcher script (handles spaces in stream names)
 # Console management is now handled by the launcher itself

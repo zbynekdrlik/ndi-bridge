@@ -1,7 +1,7 @@
 """
 Atomic tests for core system services.
 
-Tests fundamental services required for NDI Bridge operation.
+Tests fundamental services required for Media Bridge operation.
 """
 
 import pytest

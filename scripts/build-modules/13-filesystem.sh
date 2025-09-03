@@ -49,7 +49,7 @@ cat > /etc/default/grub << EOFGRUB
 GRUB_DEFAULT=0
 GRUB_TIMEOUT=0
 GRUB_TIMEOUT_STYLE=menu
-GRUB_DISTRIBUTOR="NDI Bridge"
+GRUB_DISTRIBUTOR="Media Bridge"
 GRUB_CMDLINE_LINUX_DEFAULT="modprobe.blacklist=iwlwifi,iwldvm,iwlmvm,mac80211,cfg80211 net.ifnames=0"
 GRUB_CMDLINE_LINUX=""
 GRUB_TERMINAL_OUTPUT="console"

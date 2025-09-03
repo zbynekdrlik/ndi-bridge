@@ -12,8 +12,8 @@ class StateManager:
     """Manage intercom state"""
     
     def __init__(self):
-        self.runtime_state_file = "/var/run/ndi-bridge/intercom.state"
-        self.config_file = "/etc/ndi-bridge/intercom.conf"
+        self.runtime_state_file = "/var/run/media-bridge/intercom.state"
+        self.config_file = "/etc/media-bridge/intercom.conf"
         self.state = {
             "mic_muted": False,
             "speaker_volume": 75,
@@ -91,7 +91,7 @@ class StateManager:
         
         # Get monitor enabled status
         success, output = await ShellExecutor.run_command(
-            "/usr/local/bin/ndi-bridge-intercom-monitor", ["status"]
+            "/usr/local/bin/media-bridge-intercom-monitor", ["status"]
         )
         if success:
             try:
@@ -104,7 +104,7 @@ class StateManager:
         
         # Read saved monitor volume from file if available
         try:
-            with open("/var/run/ndi-bridge/monitor.volume", "r") as f:
+            with open("/var/run/media-bridge/monitor.volume", "r") as f:
                 saved_volume = int(f.read().strip())
                 self.state["monitor_volume"] = saved_volume
         except (FileNotFoundError, ValueError):
@@ -133,14 +133,14 @@ class StateManager:
                 if muted:
                     # Mute monitor by setting actual volume to 0 (but keep state)
                     await ShellExecutor.run_command(
-                        "/usr/local/bin/ndi-bridge-intercom-monitor",
+                        "/usr/local/bin/media-bridge-intercom-monitor",
                         ["volume", "0"]
                     )
                 else:
                     # Restore monitor to the user's chosen volume
                     monitor_vol = self.state.get("monitor_volume", 50)
                     await ShellExecutor.run_command(
-                        "/usr/local/bin/ndi-bridge-intercom-monitor",
+                        "/usr/local/bin/media-bridge-intercom-monitor",
                         ["volume", str(monitor_vol)]
                     )
                 return True
@@ -289,7 +289,7 @@ class StateManager:
             args.append(str(volume))
         
         success, _ = await ShellExecutor.run_command(
-            "/usr/local/bin/ndi-bridge-intercom-monitor", args
+            "/usr/local/bin/media-bridge-intercom-monitor", args
         )
         
         if success:
@@ -302,7 +302,7 @@ class StateManager:
     async def set_monitor_volume(self, volume: int) -> bool:
         """Set monitor volume (0-100)"""
         success, _ = await ShellExecutor.run_command(
-            "/usr/local/bin/ndi-bridge-intercom-monitor", 
+            "/usr/local/bin/media-bridge-intercom-monitor", 
             ["volume", str(volume)]
         )
         
@@ -310,8 +310,8 @@ class StateManager:
             self.state["monitor_volume"] = volume
             # Also save to the monitor.volume file for persistence
             try:
-                os.makedirs("/var/run/ndi-bridge", exist_ok=True)
-                with open("/var/run/ndi-bridge/monitor.volume", "w") as f:
+                os.makedirs("/var/run/media-bridge", exist_ok=True)
+                with open("/var/run/media-bridge/monitor.volume", "w") as f:
                     f.write(str(volume))
             except Exception as e:
                 print(f"Failed to save monitor volume: {e}")

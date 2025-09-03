@@ -1,0 +1,46 @@
+#!/bin/bash
+# Show Media Bridge intercom status
+
+echo "Media Bridge Intercom Status"
+echo "=========================="
+echo ""
+
+# Check service status
+if systemctl is-active media-bridge-intercom.service --quiet; then
+    echo "Service: Running"
+    
+    # Show Chrome process
+    if pgrep -f "chrome.*vdo.ninja" > /dev/null; then
+        echo "Chrome: Active"
+    else
+        echo "Chrome: Not running"
+    fi
+    
+    # Show VNC status
+    if pgrep -f "x11vnc" > /dev/null; then
+        echo "VNC: Available on port 5999"
+    else
+        echo "VNC: Not running"
+    fi
+    
+    # Show audio status
+    if pgrep -f "pipewire" > /dev/null; then
+        echo "Audio: PipeWire active"
+    elif pgrep -f "pulseaudio" > /dev/null; then
+        echo "Audio: PulseAudio active"
+    else
+        echo "Audio: No audio server running"
+    fi
+    
+    # Show room info
+    echo ""
+    echo "Room: nl_interkom"
+    echo "Device ID: $(hostname)"
+    echo ""
+    echo "Recent logs:"
+    journalctl -u media-bridge-intercom.service -n 5 --no-pager
+else
+    echo "Service: Stopped"
+    echo ""
+    echo "Start with: systemctl start media-bridge-intercom"
+fi

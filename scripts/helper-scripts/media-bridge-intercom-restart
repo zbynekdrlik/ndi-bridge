@@ -1,0 +1,7 @@
+#!/bin/bash
+# Restart Media Bridge intercom service
+
+echo "Restarting Media Bridge intercom service..."
+systemctl restart media-bridge-intercom.service
+echo "Media Bridge intercom has been restarted"
+systemctl status media-bridge-intercom.service --no-pager | head -5

@@ -31,13 +31,13 @@ def test_drm_device_is_character(host):
 
 def test_ndi_display_binary_exists(host):
     """Test that ndi-display binary exists."""
-    binary = host.file("/opt/ndi-bridge/ndi-display")
+    binary = host.file("/opt/media-bridge/ndi-display")
     assert binary.exists, "ndi-display binary not found"
 
 
 def test_ndi_display_binary_executable(host):
     """Test that ndi-display binary is executable."""
-    binary = host.file("/opt/ndi-bridge/ndi-display")
+    binary = host.file("/opt/media-bridge/ndi-display")
     if binary.exists:
         assert binary.mode & 0o111, "ndi-display is not executable"
 

@@ -45,7 +45,7 @@ partition_usb() {
     log "Formatting partitions..."
     mkfs.fat -F32 $PART1  # EFI partition
     # Btrfs with optimizations for flash media and power failure resistance
-    mkfs.btrfs -f -L "NDI-BRIDGE" \
+    mkfs.btrfs -f -L "MEDIA-BRIDGE" \
         --nodesize 16384 \
         $PART2
     

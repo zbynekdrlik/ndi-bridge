@@ -1,5 +1,5 @@
 """
-Tests for NDI Bridge Intercom web interface.
+Tests for Media Bridge Intercom web interface.
 
 Verifies that the web interface and API endpoints work correctly.
 """
@@ -16,7 +16,7 @@ class TestIntercomWeb:
     
     def test_web_service_exists(self, host):
         """Test that web service file exists."""
-        service_file = host.file("/etc/systemd/system/ndi-bridge-intercom-web.service")
+        service_file = host.file("/etc/systemd/system/media-bridge-intercom-web.service")
         if not service_file.exists:
             # Web interface might be integrated into main nginx
             pytest.skip("Web service not installed as separate service")
@@ -27,7 +27,7 @@ class TestIntercomWeb:
     def test_nginx_intercom_config_exists(self, host):
         """Test that nginx config for intercom exists."""
         # Check main nginx config
-        nginx_config = host.file("/etc/nginx/sites-available/ndi-bridge")
+        nginx_config = host.file("/etc/nginx/sites-available/media-bridge")
         if nginx_config.exists:
             content = nginx_config.content_string
             assert "/intercom" in content, "Nginx should have intercom location"
@@ -85,7 +85,7 @@ class TestIntercomWeb:
     def test_websocket_endpoint_exists(self, host):
         """Test that WebSocket endpoint is configured."""
         # Check nginx config for WebSocket
-        nginx_config = host.file("/etc/nginx/sites-available/ndi-bridge")
+        nginx_config = host.file("/etc/nginx/sites-available/media-bridge")
         if nginx_config.exists:
             content = nginx_config.content_string
             if "/ws" in content or "websocket" in content.lower():
@@ -95,8 +95,8 @@ class TestIntercomWeb:
         """Test that web interface has responsive design elements."""
         # Check if index.html has viewport meta tag
         index_file = None
-        for path in ["/opt/ndi-bridge/web/frontend/index.html",
-                    "/usr/local/share/ndi-bridge/web/frontend/index.html",
+        for path in ["/opt/media-bridge/web/frontend/index.html",
+                    "/usr/local/share/media-bridge/web/frontend/index.html",
                     "/var/www/html/intercom/index.html"]:
             file = host.file(path)
             if file.exists:

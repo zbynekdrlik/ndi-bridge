@@ -1,5 +1,5 @@
 """
-Comprehensive tests for NDI Bridge Intercom web control functionality.
+Comprehensive tests for Media Bridge Intercom web control functionality.
 
 Tests actual control operations through the web interface.
 """
@@ -176,7 +176,7 @@ class TestIntercomWebControl:
     def test_web_control_device_state_sync(self, host):
         """Test that web control syncs with actual device state."""
         # Get status via direct control script
-        direct_result = host.run("ndi-bridge-intercom-control status")
+        direct_result = host.run("media-bridge-intercom-control status")
         if direct_result.succeeded:
             direct_status = json.loads(direct_result.stdout)
             

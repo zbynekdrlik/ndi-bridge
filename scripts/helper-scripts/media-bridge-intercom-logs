@@ -1,0 +1,4 @@
+#!/bin/bash
+# View Media Bridge intercom service logs
+
+journalctl -u media-bridge-intercom.service -f --no-pager

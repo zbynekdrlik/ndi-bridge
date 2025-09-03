@@ -1,0 +1,15 @@
+[Unit]
+Description=Media Bridge Metrics Collector
+After=ndi-capture.service
+Wants=ndi-capture.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/media-bridge-collector
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

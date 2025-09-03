@@ -21,24 +21,24 @@ setup_web_interface() {
         log "Copying FastAPI/Vue intercom interface..."
         
         # Create directory structure
-        mkdir -p /mnt/usb/opt/ndi-bridge-web/backend
-        mkdir -p /mnt/usb/opt/ndi-bridge-web/frontend
+        mkdir -p /mnt/usb/opt/media-bridge-web/backend
+        mkdir -p /mnt/usb/opt/media-bridge-web/frontend
         
         # Copy backend files
-        cp -r "$WEB_DIR/backend"/* /mnt/usb/opt/ndi-bridge-web/backend/
+        cp -r "$WEB_DIR/backend"/* /mnt/usb/opt/media-bridge-web/backend/
         
         # Copy frontend files  
-        cp -r "$WEB_DIR/frontend"/* /mnt/usb/opt/ndi-bridge-web/frontend/
+        cp -r "$WEB_DIR/frontend"/* /mnt/usb/opt/media-bridge-web/frontend/
         
         # Copy systemd service if available
-        if [ -f "$WEB_DIR/ndi-bridge-intercom-web.service" ]; then
-            cp "$WEB_DIR/ndi-bridge-intercom-web.service" /mnt/usb/etc/systemd/system/
+        if [ -f "$WEB_DIR/media-bridge-intercom-web.service" ]; then
+            cp "$WEB_DIR/media-bridge-intercom-web.service" /mnt/usb/etc/systemd/system/
         fi
         
         # Copy default intercom configuration
-        mkdir -p /mnt/usb/etc/ndi-bridge
+        mkdir -p /mnt/usb/etc/media-bridge
         if [ -f "$WEB_DIR/intercom-defaults.conf" ]; then
-            cp "$WEB_DIR/intercom-defaults.conf" /mnt/usb/etc/ndi-bridge/intercom.conf
+            cp "$WEB_DIR/intercom-defaults.conf" /mnt/usb/etc/media-bridge/intercom.conf
             log "  Default intercom configuration installed"
         fi
         
@@ -53,21 +53,21 @@ apt-get install -y -qq nginx nodejs npm apache2-utils python3-pip 2>&1 | grep -v
 npm install -g wetty@2.0.2 2>&1 | grep -v "^npm notice\|^npm WARN" || true
 
 # Install FastAPI dependencies for new intercom interface
-if [ -f /opt/ndi-bridge-web/backend/requirements.txt ]; then
+if [ -f /opt/media-bridge-web/backend/requirements.txt ]; then
     echo "Installing FastAPI dependencies..."
-    pip3 install -r /opt/ndi-bridge-web/backend/requirements.txt --break-system-packages 2>&1 | grep -v "Requirement already satisfied" || true
+    pip3 install -r /opt/media-bridge-web/backend/requirements.txt --break-system-packages 2>&1 | grep -v "Requirement already satisfied" || true
     
     # Enable the new intercom web service
-    if [ -f /etc/systemd/system/ndi-bridge-intercom-web.service ]; then
-        systemctl enable ndi-bridge-intercom-web.service || true
+    if [ -f /etc/systemd/system/media-bridge-intercom-web.service ]; then
+        systemctl enable media-bridge-intercom-web.service || true
     fi
 fi
 
 # Disable default nginx site
 rm -f /etc/nginx/sites-enabled/default
 
-# Create nginx configuration for NDI Bridge
-cat > /etc/nginx/sites-available/ndi-bridge << 'EOFNGINX'
+# Create nginx configuration for Media Bridge
+cat > /etc/nginx/sites-available/media-bridge << 'EOFNGINX'
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -75,7 +75,7 @@ server {
     server_name _;
     
     # Root directory for intercom frontend (no auth for intercom)
-    root /opt/ndi-bridge-web/frontend;
+    root /opt/media-bridge-web/frontend;
     index index.html;
     
     # Serve intercom interface at root
@@ -107,7 +107,7 @@ server {
     
     # Terminal interface (with authentication)
     location /terminal/ {
-        auth_basic "NDI Bridge Terminal";
+        auth_basic "Media Bridge Terminal";
         auth_basic_user_file /etc/nginx/.htpasswd;
         
         proxy_pass http://127.0.0.1:7681/;
@@ -145,7 +145,7 @@ server {
 EOFNGINX
 
 # Enable the site
-ln -s /etc/nginx/sites-available/ndi-bridge /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/media-bridge /etc/nginx/sites-enabled/
 
 # Create password file for nginx (user: admin, password: newlevel)
 # Using htpasswd to generate the password file
@@ -153,14 +153,14 @@ htpasswd -b -c /etc/nginx/.htpasswd admin newlevel
 chmod 644 /etc/nginx/.htpasswd
 
 # Note: Web interface files are already copied before chroot in setup_web_interface()
-# The intercom frontend is served directly from /opt/ndi-bridge-web/frontend/
+# The intercom frontend is served directly from /opt/media-bridge-web/frontend/
 
 # Create tmux session wrapper for shared persistent sessions
-cat > /usr/local/bin/ndi-bridge-tmux-session << 'EOFTMUX'
+cat > /usr/local/bin/media-bridge-tmux-session << 'EOFTMUX'
 #!/bin/bash
 # Persistent tmux session - shared across all connections
 
-SESSION="ndi-bridge"
+SESSION="media-bridge"
 
 # Check if tmux session exists
 if ! tmux has-session -t $SESSION 2>/dev/null; then
@@ -168,14 +168,14 @@ if ! tmux has-session -t $SESSION 2>/dev/null; then
     tmux new-session -d -s $SESSION
     
     # Start with welcome loop
-    tmux send-keys -t $SESSION "/usr/local/bin/ndi-bridge-welcome-loop" C-m
+    tmux send-keys -t $SESSION "/usr/local/bin/media-bridge-welcome-loop" C-m
 fi
 
 # Attach to the existing session (multiple connections share the same view)
 exec tmux attach-session -t $SESSION
 EOFTMUX
 
-chmod +x /usr/local/bin/ndi-bridge-tmux-session
+chmod +x /usr/local/bin/media-bridge-tmux-session
 
 # wetty.service was copied before chroot
 
@@ -201,9 +201,9 @@ systemctl start nginx
 systemctl start wetty
 
 # Create helper script for web interface management
-cat > /usr/local/bin/ndi-bridge-web << 'EOFWEBHELPER'
+cat > /usr/local/bin/media-bridge-web << 'EOFWEBHELPER'
 #!/bin/bash
-# NDI Bridge Web Interface Management
+# Media Bridge Web Interface Management
 
 set -e
 
@@ -322,14 +322,14 @@ case "$1" in
 esac
 EOFWEBHELPER
 
-chmod +x /usr/local/bin/ndi-bridge-web
+chmod +x /usr/local/bin/media-bridge-web
 
 # Add web interface info to the welcome script
 sed -i '/Web Interface (future)/c\
 echo -e "${CYAN}Web Interface:${NC}"\
 echo "  - http://${FULL_HOSTNAME}.local/"\
 echo "  - http://${NEW_NAME}.local/"\
-echo "  Username: admin, Password: newlevel"' /usr/local/bin/ndi-bridge-set-name
+echo "  Username: admin, Password: newlevel"' /usr/local/bin/media-bridge-set-name
 
 EOFWEB
 }

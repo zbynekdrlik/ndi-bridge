@@ -1,5 +1,5 @@
 """
-Comprehensive tests for NDI Bridge Intercom core functionality.
+Comprehensive tests for Media Bridge Intercom core functionality.
 
 Tests the complete intercom system including service, scripts, and basic operation.
 """
@@ -14,24 +14,24 @@ class TestIntercomCore:
     
     def test_intercom_service_exists(self, host):
         """Test that intercom service file exists."""
-        service_file = host.file("/etc/systemd/system/ndi-bridge-intercom.service")
+        service_file = host.file("/etc/systemd/system/media-bridge-intercom.service")
         assert service_file.exists, "Intercom service file should exist"
         assert service_file.user == "root"
         assert service_file.group == "root"
     
     def test_intercom_service_enabled(self, host):
         """Test that intercom service is enabled."""
-        result = host.run("systemctl is-enabled ndi-bridge-intercom")
+        result = host.run("systemctl is-enabled media-bridge-intercom")
         assert result.stdout.strip() == "enabled", "Intercom service should be enabled"
     
     def test_intercom_service_running(self, host):
         """Test that intercom service is running."""
-        service = host.service("ndi-bridge-intercom")
+        service = host.service("media-bridge-intercom")
         assert service.is_running, "Intercom service should be running"
     
     def test_intercom_service_configuration(self, host):
         """Test that intercom service has correct configuration."""
-        service_file = host.file("/etc/systemd/system/ndi-bridge-intercom.service")
+        service_file = host.file("/etc/systemd/system/media-bridge-intercom.service")
         content = service_file.content_string
         
         # Check critical service settings
@@ -43,14 +43,14 @@ class TestIntercomCore:
     
     def test_intercom_launcher_script_exists(self, host):
         """Test that intercom launcher script exists and is executable."""
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-launcher")
+        script = host.file("/usr/local/bin/media-bridge-intercom-launcher")
         assert script.exists, "Launcher script should exist"
         assert script.mode & 0o111, "Launcher script should be executable"
         assert script.user == "root"
     
     def test_intercom_pipewire_script_exists(self, host):
         """Test that PipeWire implementation script exists."""
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-pipewire")
+        script = host.file("/usr/local/bin/media-bridge-intercom-pipewire")
         assert script.exists, "PipeWire script should exist"
         assert script.mode & 0o111, "PipeWire script should be executable"
         
@@ -62,28 +62,28 @@ class TestIntercomCore:
     
     def test_intercom_control_script_exists(self, host):
         """Test that control script exists and is executable."""
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-control")
+        script = host.file("/usr/local/bin/media-bridge-intercom-control")
         assert script.exists, "Control script should exist"
         assert script.mode & 0o111, "Control script should be executable"
     
     def test_intercom_config_script_exists(self, host):
         """Test that config script exists and is executable."""
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-config")
+        script = host.file("/usr/local/bin/media-bridge-intercom-config")
         assert script.exists, "Config script should exist"
         assert script.mode & 0o111, "Config script should be executable"
     
     def test_intercom_monitor_script_exists(self, host):
         """Test that monitor script exists and is executable."""
-        script = host.file("/usr/local/bin/ndi-bridge-intercom-monitor")
+        script = host.file("/usr/local/bin/media-bridge-intercom-monitor")
         assert script.exists, "Monitor script should exist"
         assert script.mode & 0o111, "Monitor script should be executable"
     
     def test_intercom_helper_scripts_exist(self, host):
         """Test that all helper scripts exist."""
         helper_scripts = [
-            "ndi-bridge-intercom-status",
-            "ndi-bridge-intercom-logs",
-            "ndi-bridge-intercom-restart"
+            "media-bridge-intercom-status",
+            "media-bridge-intercom-logs",
+            "media-bridge-intercom-restart"
         ]
         
         for script_name in helper_scripts:
@@ -93,14 +93,14 @@ class TestIntercomCore:
     
     def test_intercom_status_command(self, host):
         """Test that status command works."""
-        result = host.run("ndi-bridge-intercom-status")
+        result = host.run("media-bridge-intercom-status")
         assert result.succeeded, "Status command should succeed"
         # Should show service status - check for key indicators
         assert "Service:" in result.stdout or "Chrome:" in result.stdout or "VNC:" in result.stdout
     
     def test_intercom_control_get_status(self, host):
         """Test that control script can get audio status."""
-        result = host.run("ndi-bridge-intercom-control status")
+        result = host.run("media-bridge-intercom-control status")
         assert result.succeeded, "Control get command should succeed"
         
         # Should return JSON
@@ -120,18 +120,18 @@ class TestIntercomCore:
     def test_intercom_service_restart(self, host):
         """Test that intercom service can be restarted."""
         # Get initial PID
-        pid_before = host.run("systemctl show ndi-bridge-intercom --property MainPID").stdout.strip()
+        pid_before = host.run("systemctl show media-bridge-intercom --property MainPID").stdout.strip()
         pid_before = pid_before.split("=")[1] if "=" in pid_before else None
         
         # Restart service
-        result = host.run("systemctl restart ndi-bridge-intercom")
+        result = host.run("systemctl restart media-bridge-intercom")
         assert result.succeeded, "Service restart should succeed"
         
         # Wait for service to fully restart and stabilize
         time.sleep(35)
         
         # Check service is running
-        service = host.service("ndi-bridge-intercom")
+        service = host.service("media-bridge-intercom")
         assert service.is_running, "Service should be running after restart"
         
         # Wait for Chrome to fully start
@@ -141,7 +141,7 @@ class TestIntercomCore:
             time.sleep(2)
         
         # Check PID changed
-        pid_after = host.run("systemctl show ndi-bridge-intercom --property MainPID").stdout.strip()
+        pid_after = host.run("systemctl show media-bridge-intercom --property MainPID").stdout.strip()
         pid_after = pid_after.split("=")[1] if "=" in pid_after else None
         
         if pid_before and pid_after and pid_before != "0":
