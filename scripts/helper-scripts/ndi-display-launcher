@@ -66,13 +66,33 @@ if ! systemctl is-active --quiet pipewire-system.service; then
     echo "Warning: System PipeWire service not running"
     echo "Audio output may not work. Start with: systemctl start pipewire-system.service"
 else
-    # Set HDMI as default audio output for this display
+    # Intelligently select HDMI audio output based on display ID
     sleep 1  # Give PipeWire time to enumerate devices
-    HDMI_SINK=$(pactl list sinks short 2>/dev/null | grep -E "hdmi|HDMI" | awk '{print $2}' | head -1)
-    if [ -n "$HDMI_SINK" ]; then
-        echo "Setting default audio output to HDMI: $HDMI_SINK"
-        pactl set-default-sink "$HDMI_SINK" 2>/dev/null || true
+    
+    # Try to find the HDMI audio sink that corresponds to this display
+    # Display IDs map to HDMI-A-N+1 (display 0 = HDMI-A-1, display 1 = HDMI-A-2, etc.)
+    HDMI_NUM=$((DISPLAY_ID + 1))
+    
+    # First try to find a sink specifically for this HDMI port
+    HDMI_SINK=$(pactl list sinks 2>/dev/null | grep -B2 "HDMI.*${HDMI_NUM}" | grep "Name:" | awk '{print $2}')
+    
+    # If not found, try any HDMI sink (fallback for single HDMI audio device systems)
+    if [ -z "$HDMI_SINK" ]; then
+        HDMI_SINK=$(pactl list sinks short 2>/dev/null | grep -E "hdmi|HDMI" | awk '{print $2}' | head -1)
     fi
+    
+    if [ -n "$HDMI_SINK" ]; then
+        echo "Setting audio output for display $DISPLAY_ID to: $HDMI_SINK"
+        pactl set-default-sink "$HDMI_SINK" 2>/dev/null || true
+    else
+        echo "Warning: No HDMI audio sink found for display $DISPLAY_ID"
+    fi
+fi
+
+# Detect which connector this display uses for better audio routing
+CONNECTOR=$(/opt/media-bridge/ndi-display displays 2>/dev/null | grep "Display $DISPLAY_ID:" | awk '{print $2}' | head -1)
+if [ -n "$CONNECTOR" ] && [ -x /usr/local/bin/ndi-display-audio-setup ]; then
+    /usr/local/bin/ndi-display-audio-setup $DISPLAY_ID "$CONNECTOR" || true
 fi
 
 # Launch ndi-display with proper quoting to handle spaces
