@@ -17,8 +17,8 @@ install_helper_scripts() {
         
         # Copy Media Bridge intercom scripts and service (PipeWire only)
         if [ -f "$HELPER_DIR/media-bridge-intercom-pipewire" ]; then
-            cp "$HELPER_DIR/media-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/
-            chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom-pipewire
+            cp "$HELPER_DIR/media-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/media-bridge-intercom
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom
         fi
         
         # Copy launcher (PipeWire only, no fallback)
