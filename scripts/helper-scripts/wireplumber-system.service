@@ -1,10 +1,8 @@
 [Unit]
 Description=WirePlumber System Session Manager
-After=pipewire-system.service pipewire-pulse-system.service
+After=pipewire-system.service
 Requires=pipewire-system.service
 BindsTo=pipewire-system.service
-# Ensure PipeWire is fully started before WirePlumber
-Wants=pipewire-pulse-system.service
 
 [Service]
 Type=simple
@@ -17,8 +15,7 @@ Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
 ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /var/lib/wireplumber
 ExecStartPre=/bin/mkdir -p /var/cache/wireplumber
-# Wait a moment for PipeWire to stabilize
-ExecStartPre=/bin/sleep 2
+# Wait for PipeWire to be ready
 ExecStart=/usr/bin/wireplumber
 Restart=always
 RestartSec=5

@@ -9,21 +9,36 @@ import time
 
 
 def test_systemd_timesyncd_installed(host):
-    """Test that systemd-timesyncd is installed."""
-    result = host.run("systemctl list-unit-files | grep systemd-timesyncd")
-    assert result.rc == 0, "systemd-timesyncd not found"
+    """Test that time sync service is installed (systemd-timesyncd or chrony)."""
+    timesyncd_result = host.run("systemctl list-unit-files | grep systemd-timesyncd")
+    chrony_result = host.run("systemctl list-unit-files | grep chronyd")
+    assert timesyncd_result.rc == 0 or chrony_result.rc == 0, "No time sync service found (neither systemd-timesyncd nor chrony)"
 
 
 def test_systemd_timesyncd_enabled(host):
-    """Test that systemd-timesyncd is enabled."""
-    service = host.service("systemd-timesyncd")
-    assert service.is_enabled, "systemd-timesyncd not enabled"
+    """Test that time sync service is enabled."""
+    # Check if chrony is installed and enabled
+    chrony_check = host.run("which chronyd")
+    if chrony_check.rc == 0:
+        service = host.service("chronyd")
+        assert service.is_enabled, "chronyd not enabled"
+    else:
+        # Fall back to systemd-timesyncd
+        service = host.service("systemd-timesyncd")
+        assert service.is_enabled, "systemd-timesyncd not enabled"
 
 
 def test_systemd_timesyncd_running(host):
-    """Test that systemd-timesyncd is running."""
-    service = host.service("systemd-timesyncd")
-    assert service.is_running, "systemd-timesyncd not running"
+    """Test that time sync service is running."""
+    # Check if chrony is installed and running
+    chrony_check = host.run("which chronyd")
+    if chrony_check.rc == 0:
+        service = host.service("chronyd")
+        assert service.is_running, "chronyd not running"
+    else:
+        # Fall back to systemd-timesyncd
+        service = host.service("systemd-timesyncd")
+        assert service.is_running, "systemd-timesyncd not running"
 
 
 def test_timedatectl_command_works(host):

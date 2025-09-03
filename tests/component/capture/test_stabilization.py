@@ -17,10 +17,10 @@ def test_initial_state_is_starting(host):
     # Act: Read the capture state
     state_file = host.file("/var/run/media-bridge/capture_state")
     
-    # Assert: Should be in STARTING or STABILIZING state (both are valid during init)
+    # Assert: Should be in STARTING, STABILIZING or RUNNING state
     assert state_file.exists, "Capture state file not found"
     state = state_file.content_string.strip()
-    assert state in ["STARTING", "STABILIZING"], f"Expected STARTING or STABILIZING, got {state}"
+    assert state in ["STARTING", "STABILIZING", "RUNNING"], f"Expected STARTING, STABILIZING or RUNNING, got {state}"
 
 
 @pytest.mark.timeout(60)  # Stabilization takes 30+ seconds

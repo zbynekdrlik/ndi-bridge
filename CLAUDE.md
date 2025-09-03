@@ -237,27 +237,24 @@ These belong in `integration/` NOT in `component/`
 
 #### IMPORTANT: Instructions for Claude (AI Assistant)
 
-**When running tests, ALWAYS check and update the test configuration first:**
+**When user says "run all tests", ALWAYS do this:**
 
-1. **Check current test device IP**:
+1. **FIRST run test-device.sh to setup SSH**:
    ```bash
-   cat tests/test_config.yaml | grep "host:"
+   cd /home/newlevel/devel/ndi-bridge
+   ./tests/test-device.sh <DEVICE_IP>
    ```
 
-2. **Update if needed** (when user provides new IP):
+2. **THEN run the full test suite**:
    ```bash
-   # Edit tests/test_config.yaml and update the host line
-   # Example: change "host: 10.77.9.143" to "host: 10.77.9.188"
+   python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v
    ```
 
-3. **Run tests** (no need to specify IP, it uses config file):
-   ```bash
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key -v
-   # or
-   ./tests/run_all_tests.sh
-   ```
-
-**Why this approach**: The config file persists across shell sessions, so Claude won't forget the IP when running multiple commands.
+**Why test-device.sh MUST be run first**: 
+- Handles SSH host key changes (critical for reflashed devices)
+- Sets up authentication (key or password)
+- Without it, tests will timeout or hang
+- This is MANDATORY, not optional
 
 #### Configuring Device IP Address (for humans)
 
@@ -298,28 +295,31 @@ sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@DEVICE_IP
 
 #### Running Tests - Primary Method
 
-**IMPORTANT**: Replace `DEVICE_IP` with your actual device IP address (e.g., 10.77.9.188)
+**CRITICAL: ALWAYS run test-device.sh FIRST before any pytest commands!**
 
 ```bash
-# Set device IP as environment variable (RECOMMENDED for session)
-export NDI_TEST_HOST=10.77.9.188  # Change to your device IP
+# STEP 1: Setup SSH (MANDATORY FIRST STEP!)
+cd /home/newlevel/devel/ndi-bridge
+./tests/test-device.sh 10.77.9.188  # Replace with your device IP
 
-# Run all tests with SSH key auth (RECOMMENDED)
+# STEP 2: Run all tests with SSH key auth
+pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -v
+
+# Alternative: Set device IP as environment variable
+export NDI_TEST_HOST=10.77.9.188
+./tests/test-device.sh $NDI_TEST_HOST
 pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -v
 
-# Or specify IP directly each time
-pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -v
-
-# Run specific category
+# Run specific category (AFTER test-device.sh)
 pytest tests/component/capture/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
 
-# Run with parallel execution (faster)
+# Run with parallel execution (AFTER test-device.sh)
 pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -n auto
 
-# Run only critical tests
+# Run only critical tests (AFTER test-device.sh)
 pytest tests/ -m critical --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
 
-# Quick summary without details
+# Quick summary without details (AFTER test-device.sh)
 pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
 ```
 
@@ -771,21 +771,70 @@ sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
 
 The project uses **pytest + testinfra** for atomic testing (one test = one assertion).
 
-### Running Tests
+### CRITICAL: How to Run ALL Tests (MUST FOLLOW THIS EXACT PROCESS)
+
+**Step 1: ALWAYS run test-device.sh FIRST to setup SSH**
 ```bash
-# Configure test IP (persistent across sessions)
-nano tests/test_config.yaml  # Set: host: 10.77.9.188
+cd /home/newlevel/devel/ndi-bridge
+./tests/test-device.sh <DEVICE_IP>
+```
 
-# Run all tests
-python3 -m pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+This script:
+- Removes old SSH host keys (important for reflashed devices)
+- Sets up proper SSH authentication (key or password)
+- Handles all SSH configuration issues automatically
 
-# Run specific component tests
-python3 -m pytest tests/component/core/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q
-python3 -m pytest tests/component/capture/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -q
+**Step 2: Run ALL 373 tests (IMPORTANT: Use --maxfail=0 to run complete suite)**
+```bash
+cd /home/newlevel/devel/ndi-bridge
+python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v --maxfail=0
+```
 
-# Use helper scripts
-./tests/run_all_tests.sh        # Runs all test categories
-./tests/test-device.sh           # Auto-handles SSH key changes for reflashed devices
+**CRITICAL: About --maxfail=0**
+- Without `--maxfail=0`: pytest stops after first failure (default behavior)
+- With `--maxfail=0`: ALL 373 tests run regardless of failures
+- This ensures complete test coverage and full failure report
+
+### Complete Example: Running ALL Tests
+```bash
+# STEP 1: Setup SSH (MANDATORY - DO THIS FIRST!)
+cd /home/newlevel/devel/ndi-bridge
+./tests/test-device.sh 10.77.8.124
+
+# STEP 2: Run ALL 373 tests (won't stop on failures)
+python3 -m pytest tests/ --host 10.77.8.124 --ssh-key ~/.ssh/ndi_test_key -v --maxfail=0
+
+# After completion, get failure summary:
+grep "FAILED\|ERROR" test-run-complete.log | sort -u
+```
+
+### Understanding Test Results
+After running all tests, check the summary at the end:
+- Total tests: 373
+- Look for line like: "350 passed, 23 failed in 5m 30s"
+- Failed tests will be listed with details
+- Common expected failures: HDMI tests (if no display connected)
+
+### Why test-device.sh is REQUIRED:
+- Reflashed devices have new SSH host keys
+- SSH key authentication may not be configured
+- test-device.sh automatically handles both issues
+- Without it, tests will timeout or hang
+
+### Alternative Test Commands (AFTER running test-device.sh)
+```bash
+# Quick summary without verbose output
+python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+
+# Run specific component tests only
+python3 -m pytest tests/component/core/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v
+python3 -m pytest tests/component/capture/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v
+```
+
+### If SSH Key Fails:
+If tests timeout even after running test-device.sh, manually copy SSH key:
+```bash
+sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@<DEVICE_IP>
 ```
 
 ### Test Configuration Priority
@@ -811,3 +860,4 @@ Host 10.77.9.*
     UserKnownHostsFile /dev/null
 ```
 Or use `./tests/test-device.sh` which handles this automatically.
+- always when anything is fixed on testing device, fix has to be incorporated to repository, it is forbiden starting not run services on desting box without verify and fix in repository reason why it has not been started!!!!

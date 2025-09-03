@@ -16,8 +16,6 @@ ExecStartPre=/bin/mkdir -p /run/user/0/pulse
 ExecStartPre=/bin/mkdir -p /var/lib/pipewire
 ExecStartPre=/bin/mkdir -p /var/cache/pipewire
 ExecStart=/usr/bin/pipewire
-# Add post-start check to ensure socket is created
-ExecStartPost=/bin/bash -c 'for i in {1..30}; do if [ -e /run/user/0/pipewire-0 ]; then exit 0; fi; sleep 1; done; exit 1'
 Restart=always
 RestartSec=5
 # High priority for audio processing

@@ -5,19 +5,36 @@ Modern pytest-based testing framework for Media Bridge USB appliance using testi
 
 ## Quick Start
 
+### CRITICAL: ALWAYS run test-device.sh FIRST!
+
 ```bash
-# Install test dependencies
+# STEP 1: MANDATORY - Setup SSH and handle key issues
+cd /home/newlevel/devel/ndi-bridge
+./tests/test-device.sh <DEVICE_IP>  # e.g., ./tests/test-device.sh 10.77.8.124
+
+# STEP 2: Run the test suite (AFTER test-device.sh succeeds)
+pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v
+
+# Complete example:
+./tests/test-device.sh 10.77.8.124
+pytest tests/ --host 10.77.8.124 --ssh-key ~/.ssh/ndi_test_key -v
+```
+
+### Why test-device.sh is REQUIRED:
+- Removes old SSH host keys (critical for reflashed devices)
+- Sets up proper authentication (SSH key or password)
+- Tests will timeout or hang without this step
+- This is MANDATORY, not optional
+
+### Additional Test Commands (AFTER running test-device.sh):
+```bash
+# Install test dependencies (one-time setup)
 pip3 install -r requirements.txt
 
-# Configure test target
-cp test_config.yaml.example test_config.yaml
-nano test_config.yaml  # Update with your device IP
-
-# Run tests
-pytest tests/ -v                           # All tests with verbose output
-pytest tests/component/core/ -q            # Core tests, quiet mode
-pytest tests/ -m critical                  # Only critical tests
-pytest tests/ --tb=no --co                # List all tests without running
+# Run specific test categories
+pytest tests/component/core/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -q
+pytest tests/ -m critical --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key
+pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key --tb=no --co  # List tests
 ```
 
 ## Test Organization
