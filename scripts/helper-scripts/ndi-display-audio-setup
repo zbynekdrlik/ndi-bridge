@@ -1,0 +1,72 @@
+#!/bin/bash
+# Setup audio for ndi-display based on display connector
+# This script ensures audio is routed to the correct HDMI output
+# Optimized for Intel N100 with 3 HDMI ports
+
+DISPLAY_ID=$1
+CONNECTOR=$2  # e.g., HDMI-A-1, HDMI-A-2, HDMI-A-3
+
+if [ -z "$DISPLAY_ID" ]; then
+    echo "Usage: $0 <display_id> [connector]"
+    exit 1
+fi
+
+# If connector not provided, try to detect it
+if [ -z "$CONNECTOR" ]; then
+    CONNECTOR=$(/opt/media-bridge/ndi-display displays 2>/dev/null | grep "Display $DISPLAY_ID:" | awk '{print $2}')
+fi
+
+# Wait for PipeWire to be ready
+for i in {1..10}; do
+    if pactl info >/dev/null 2>&1; then
+        break
+    fi
+    sleep 0.5
+done
+
+# Extract HDMI port number from connector (HDMI-A-N)
+HDMI_NUM=$(echo "$CONNECTOR" | sed 's/HDMI-A-//')
+
+# Find the appropriate audio sink
+# Some systems have separate sinks per HDMI port, others have a single sink
+HDMI_SINK=""
+
+# Strategy 1: Look for HDMI sink with port number in name
+HDMI_SINK=$(pactl list sinks 2>/dev/null | grep -B2 -E "hdmi.*${HDMI_NUM}|HDMI.*${HDMI_NUM}" | grep "Name:" | awk '{print $2}')
+
+# Strategy 2: Look for HDMI sink with matching description
+if [ -z "$HDMI_SINK" ]; then
+    HDMI_SINK=$(pactl list sinks 2>/dev/null | grep -B2 "HDMI ${HDMI_NUM}" | grep "Name:" | awk '{print $2}')
+fi
+
+# Strategy 3: Use any HDMI sink (single audio device for all HDMI ports)
+if [ -z "$HDMI_SINK" ]; then
+    HDMI_SINK=$(pactl list sinks short 2>/dev/null | grep -iE "hdmi" | awk '{print $2}' | head -1)
+fi
+
+# Strategy 4: Use the built-in audio if it supports HDMI
+if [ -z "$HDMI_SINK" ]; then
+    HDMI_SINK=$(pactl list sinks short 2>/dev/null | grep -E "pci.*hdmi|pci.*HDMI" | awk '{print $2}' | head -1)
+fi
+
+if [ -n "$HDMI_SINK" ]; then
+    echo "Display $DISPLAY_ID ($CONNECTOR) audio routed to: $HDMI_SINK"
+    
+    # Set as default sink for new streams
+    pactl set-default-sink "$HDMI_SINK" 2>/dev/null
+    
+    # Move any existing ndi-display streams to this sink
+    for INPUT in $(pactl list sink-inputs short 2>/dev/null | grep "ndi-display" | awk '{print $1}'); do
+        pactl move-sink-input "$INPUT" "$HDMI_SINK" 2>/dev/null
+        echo "Moved stream $INPUT to $HDMI_SINK"
+    done
+    
+    # Set volume to 100%
+    pactl set-sink-volume "$HDMI_SINK" 100% 2>/dev/null
+    
+    exit 0
+else
+    echo "Warning: No HDMI audio sink found for display $DISPLAY_ID ($CONNECTOR)"
+    echo "Audio may not work correctly"
+    exit 1
+fi

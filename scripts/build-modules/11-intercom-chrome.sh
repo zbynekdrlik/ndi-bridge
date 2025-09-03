@@ -41,6 +41,12 @@ apt-get install -y -qq python3 python3-minimal 2>&1 | head -10
 echo "Enabling Media Bridge intercom services..."
 systemctl enable media-bridge-intercom.service 2>/dev/null || true
 
+# Enable system-wide PipeWire services
+echo "Enabling system-wide PipeWire services..."
+systemctl enable pipewire-system.service 2>/dev/null || true
+systemctl enable pipewire-pulse-system.service 2>/dev/null || true
+systemctl enable wireplumber-system.service 2>/dev/null || true
+
 echo "Chrome and Media Bridge intercom installation complete"
 
 CHROME_EOF

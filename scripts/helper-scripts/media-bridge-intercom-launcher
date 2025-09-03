@@ -8,5 +8,16 @@ if ! command -v pipewire &> /dev/null || ! command -v wireplumber &> /dev/null; 
     exit 1
 fi
 
+# Wait for system PipeWire to be ready
+for i in {1..10}; do
+    if systemctl is-active --quiet pipewire-system.service && \
+       systemctl is-active --quiet pipewire-pulse-system.service; then
+        echo "System PipeWire is ready"
+        break
+    fi
+    echo "Waiting for system PipeWire... (attempt $i)"
+    sleep 1
+done
+
 echo "Starting Media Bridge Intercom with PipeWire..."
 exec /usr/local/bin/media-bridge-intercom-pipewire "$@"
