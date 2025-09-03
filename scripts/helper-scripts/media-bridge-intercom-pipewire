@@ -89,48 +89,8 @@ mkdir -p $XDG_CONFIG_HOME
 # Ensure PipeWire system services are available
 echo "Checking PipeWire audio system..."
 
-# Remove any custom configs that might cause issues
-rm -f /etc/pipewire/pipewire.conf.d/10-usb-audio.conf 2>/dev/null
-rm -f /etc/wireplumber/main.lua.d/50-usb-audio.lua 2>/dev/null
-
-# Create simple WirePlumber config directory
-mkdir -p /etc/wireplumber/main.lua.d
-
-# Create WirePlumber configuration to not ignore USB Audio HID
-cat > /etc/wireplumber/main.lua.d/50-usb-audio.lua << 'EOFWP'
--- Enable USB Audio devices
-alsa_monitor.enabled = true
-
-alsa_monitor.rules = {
-  {
-    matches = {
-      {
-        { "device.name", "matches", "alsa_card.*" },
-      },
-    },
-    apply_properties = {
-      ["api.alsa.use-acp"] = true,
-      ["device.disabled"] = false,
-    },
-  },
-  -- Specific rule for USB Audio HID
-  {
-    matches = {
-      {
-        { "alsa.card_name", "matches", "*USB Audio*" },
-      },
-    },
-    apply_properties = {
-      ["device.nick"] = "USB Audio 3.5mm",
-      ["device.description"] = "USB Audio (3.5mm Jack)",
-      ["priority.driver"] = 3000,
-      ["priority.session"] = 3000,
-      ["api.alsa.use-acp"] = true,
-      ["device.disabled"] = false,
-    },
-  },
-}
-EOFWP
+# With unified PipeWire, configuration is done at build time
+# No dynamic configuration changes needed here
 
 # Check if system PipeWire is running (REQUIRED)
 if ! systemctl is-active --quiet pipewire-system.service; then
@@ -173,31 +133,34 @@ fi
 
 echo "PipeWire audio system ready"
 
-# Set USB audio as default devices (simple approach like working box)
-echo "Configuring USB audio devices..."
+# With unified PipeWire, use virtual devices set up by audio manager
+echo "Configuring virtual audio devices..."
 
-# Find USB devices
-# HARDCODED for CSCTEK USB Audio and HID device
+# Virtual devices should already be created by audio manager in service startup
+# Chrome will use these virtual devices, which are linked to USB hardware
+
+# Set virtual devices as defaults
+VIRTUAL_SINK="intercom-speaker"
+VIRTUAL_SOURCE="intercom-microphone.monitor"
+
+# Check if virtual devices exist
+if pactl list sinks short | grep -q "$VIRTUAL_SINK"; then
+    echo "Setting default output to: $VIRTUAL_SINK"
+    pactl set-default-sink "$VIRTUAL_SINK"
+else
+    echo "WARNING: Virtual speaker device not found"
+fi
+
+if pactl list sources short | grep -q "$VIRTUAL_SOURCE"; then
+    echo "Setting default input to: $VIRTUAL_SOURCE"
+    pactl set-default-source "$VIRTUAL_SOURCE"
+else
+    echo "WARNING: Virtual microphone monitor not found"
+fi
+
+# Find actual USB devices for hardware volume control
 USB_SINK=$(pactl list sinks short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
 USB_SOURCE=$(pactl list sources short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
-
-if [ -n "$USB_SINK" ]; then
-    echo "Setting default output to: $USB_SINK"
-    pactl set-default-sink "$USB_SINK"
-    # Don't set volume here - let web interface manage defaults
-    # The web service will load saved defaults after startup
-else
-    echo "ERROR: CSCTEK USB Audio HID output not found"
-fi
-
-if [ -n "$USB_SOURCE" ]; then
-    echo "Setting default input to: $USB_SOURCE"
-    pactl set-default-source "$USB_SOURCE"
-    # Don't set volume here - let web interface manage defaults
-    # The web service will load saved defaults after startup
-else
-    echo "ERROR: CSCTEK USB Audio HID input not found"
-fi
 
 # Verify defaults are set
 sleep 1
@@ -359,43 +322,41 @@ fi
 # Wait a bit more for Chrome to fully establish audio
 sleep 5
 
-# Force any Chrome audio streams to use USB devices and set volume
-echo "Configuring Chrome audio..."
-if [ -n "$USB_SINK" ]; then
-    # Determine Chrome/Others volume to use
-    CHROME_VOLUME="90"  # Default
-    if [ -f "/etc/media-bridge/intercom.conf" ]; then
-        # Read saved speaker_volume from config
-        SAVED_VOLUME=$(python3 -c "import json; conf=json.load(open('/etc/media-bridge/intercom.conf')); print(conf.get('speaker_volume', 90))" 2>/dev/null)
-        if [ -n "$SAVED_VOLUME" ]; then
-            CHROME_VOLUME="$SAVED_VOLUME"
-            echo "  Using saved Others volume: ${CHROME_VOLUME}%"
-        fi
-    else
-        echo "  Using default Others volume: ${CHROME_VOLUME}%"
+# With unified PipeWire, Chrome should use virtual devices
+# The audio manager handles routing virtual devices to USB hardware
+echo "Verifying Chrome audio routing..."
+
+# Determine Chrome/Others volume to use
+CHROME_VOLUME="90"  # Default
+if [ -f "/etc/media-bridge/intercom.conf" ]; then
+    # Read saved speaker_volume from config
+    SAVED_VOLUME=$(python3 -c "import json; conf=json.load(open('/etc/media-bridge/intercom.conf')); print(conf.get('speaker_volume', 90))" 2>/dev/null)
+    if [ -n "$SAVED_VOLUME" ]; then
+        CHROME_VOLUME="$SAVED_VOLUME"
+        echo "  Using saved Others volume: ${CHROME_VOLUME}%"
     fi
-    
-    for stream in $(pactl list sink-inputs short | awk '{print $1}'); do
-        current_sink=$(pactl list sink-inputs short | grep "^$stream" | awk '{print $2}')
-        if [ "$current_sink" != "$(pactl list sinks short | grep "$USB_SINK" | awk '{print $1}')" ]; then
-            echo "  Moving output stream $stream to USB audio"
-            pactl move-sink-input "$stream" "$USB_SINK" 2>/dev/null || true
-        fi
-        # Always set the determined volume
-        echo "  Setting Others volume to ${CHROME_VOLUME}% for stream $stream"
-        pactl set-sink-input-volume "$stream" "${CHROME_VOLUME}%" 2>/dev/null || true
-    done
+else
+    echo "  Using default Others volume: ${CHROME_VOLUME}%"
 fi
 
-if [ -n "$USB_SOURCE" ]; then
-    for stream in $(pactl list source-outputs short | awk '{print $1}'); do
-        current_source=$(pactl list source-outputs short | grep "^$stream" | awk '{print $2}')
-        if [ "$current_source" != "$(pactl list sources short | grep "$USB_SOURCE" | awk '{print $1}')" ]; then
-            echo "Moving input stream $stream to USB audio"
-            pactl move-source-output "$stream" "$USB_SOURCE" 2>/dev/null || true
-        fi
-    done
-fi
+# Move Chrome streams to virtual devices and set volume
+for stream in $(pactl list sink-inputs short | awk '{print $1}'); do
+    app=$(pactl list sink-inputs | grep -A20 "Sink Input #$stream" | grep "application.name" | cut -d'"' -f2)
+    if [[ "$app" == *"chrome"* ]] || [[ "$app" == *"Chrome"* ]]; then
+        echo "  Moving Chrome output stream $stream to virtual speaker"
+        pactl move-sink-input "$stream" "$VIRTUAL_SINK" 2>/dev/null || true
+        echo "  Setting Others volume to ${CHROME_VOLUME}% for stream $stream"
+        pactl set-sink-input-volume "$stream" "${CHROME_VOLUME}%" 2>/dev/null || true
+    fi
+done
+
+for stream in $(pactl list source-outputs short | awk '{print $1}'); do
+    app=$(pactl list source-outputs | grep -A20 "Source Output #$stream" | grep "application.name" | cut -d'"' -f2)
+    if [[ "$app" == *"chrome"* ]] || [[ "$app" == *"Chrome"* ]]; then
+        echo "  Moving Chrome input stream $stream to virtual microphone"
+        pactl move-source-output "$stream" "$VIRTUAL_SOURCE" 2>/dev/null || true
+    fi
+done
 
 echo "Audio routing verified"
 

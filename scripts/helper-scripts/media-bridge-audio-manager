@@ -13,11 +13,13 @@ export PULSE_RUNTIME_PATH=/run/user/0/pulse
 
 # Function to wait for PipeWire
 wait_for_pipewire() {
-    local max_attempts=10
+    local max_attempts=30
     local attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
         if pactl info >/dev/null 2>&1; then
+            # Also wait for WirePlumber to be ready
+            sleep 2
             return 0
         fi
         echo "Waiting for PipeWire... (attempt $((attempt+1))/$max_attempts)"
@@ -184,11 +186,14 @@ monitor_connections() {
 case "${1:-setup}" in
     setup)
         echo "=== Media Bridge Audio Manager ==="
-        wait_for_pipewire
+        if ! wait_for_pipewire; then
+            echo "WARNING: PipeWire not ready, but continuing..."
+        fi
         setup_virtual_devices
-        link_to_usb
-        setup_hdmi_audio
+        link_to_usb || true
+        setup_hdmi_audio || true
         echo "Audio setup complete"
+        exit 0  # Always exit successfully to not block service startup
         ;;
         
     monitor)
