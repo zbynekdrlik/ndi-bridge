@@ -222,7 +222,12 @@ fi
 
 # Copy PipeWire configuration for Dante
 mkdir -p /etc/pipewire/pipewire.conf.d
-cp /tmp/helper-scripts/pipewire-dante.conf /etc/pipewire/pipewire.conf.d/90-dante-bridge.conf
+if [ -f "$HELPER_DIR/pipewire-dante.conf" ]; then
+    cp "$HELPER_DIR/pipewire-dante.conf" /etc/pipewire/pipewire.conf.d/90-dante-bridge.conf
+    log "  Copied PipeWire Dante configuration"
+elif [ -f /tmp/helper-scripts/pipewire-dante.conf ]; then
+    cp /tmp/helper-scripts/pipewire-dante.conf /etc/pipewire/pipewire.conf.d/90-dante-bridge.conf
+fi
 
 # Ensure PipeWire is installed and configured
 if ! command -v pipewire >/dev/null 2>&1; then
