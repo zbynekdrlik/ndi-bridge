@@ -97,121 +97,136 @@ def test_display_stream_playback_with_audio(host):
     pid = result.stdout.strip()
     print(f"NDI display started with PID: {pid}")
     
-    # 5. Wait for stream to establish
-    print("Waiting for stream to establish...")
-    time.sleep(5)
-    
-    # 6. Verify video is being displayed (check for running process and frames)
-    result = host.run(f"ps -p {pid} > /dev/null && echo 'RUNNING' || echo 'STOPPED'")
-    assert 'RUNNING' in result.stdout, "NDI display process died"
-    
-    # Check log for successful connection
-    result = host.run("tail -20 /tmp/ndi-display-test.log")
-    assert 'Connected to NDI source' in result.stdout or 'Displaying on' in result.stdout, \
-        "NDI display did not connect to stream"
-    
-    # 7. Verify audio device is opened
-    print("Checking audio output...")
-    log_check = host.run("grep -i 'audio\\|pipewire' /tmp/ndi-display-test.log | tail -10")
-    audio_initialized = False
-    
-    if 'PipeWire audio output opened' in log_check.stdout or 'PipeWire audio backend' in log_check.stdout:
-        audio_initialized = True
-        print("✓ PipeWire audio initialized")
-    
-    print(f"Audio initialized: {audio_initialized}")
-    
-    # 8. Check PipeWire audio status
-    if audio_initialized:
-        # Check if ndi-display appears in PipeWire clients
-        pw_status = host.run("pw-cli list-objects 2>/dev/null | grep -A5 'ndi-display' || echo 'PipeWire not available'")
+    # Ensure cleanup happens even if test fails
+    try:
+        # 5. Wait for stream to establish
+        print("Waiting for stream to establish...")
+        time.sleep(5)
         
-        if 'ndi-display' in pw_status.stdout:
-            print("✓ NDI Display registered with PipeWire")
+        # 6. Verify video is being displayed (check for running process and frames)
+        result = host.run(f"ps -p {pid} > /dev/null && echo 'RUNNING' || echo 'STOPPED'")
+        assert 'RUNNING' in result.stdout, "NDI display process died"
+        
+        # Check log for successful connection
+        result = host.run("tail -20 /tmp/ndi-display-test.log")
+        assert 'Connected to NDI source' in result.stdout or 'Displaying on' in result.stdout, \
+            "NDI display did not connect to stream"
+        
+        # 7. Verify audio device is opened
+        print("Checking audio output...")
+        log_check = host.run("grep -i 'audio' /tmp/ndi-display-test.log | tail -10")
+        audio_initialized = False
+        
+        # Check for generic audio initialization message (works with both ALSA and PipeWire)
+        if 'Audio output initialized' in log_check.stdout:
+            audio_initialized = True
+            print("✓ Audio output initialized")
+        elif 'PipeWire audio' in log_check.stdout:
+            audio_initialized = True
+            print("✓ PipeWire audio initialized")
+        
+        print(f"Audio initialized: {audio_initialized}")
+        
+        # 8. Check PipeWire audio status
+        audio_playing = False
+        if audio_initialized:
+            # Check if ndi-display appears in PipeWire clients
+            pw_status = host.run("pw-cli list-objects 2>/dev/null | grep -A5 'ndi-display' || echo 'PipeWire not available'")
             
-            # Check if stream is active
-            stream_status = host.run("pw-cli dump short 2>/dev/null | grep 'ndi-display.*STREAMING' || echo ''")
-            if 'STREAMING' in stream_status.stdout:
-                print("✓ AUDIO IS PLAYING through PipeWire")
-                audio_playing = True
-            else:
-                # Alternative check - see if ndi-display node exists
-                node_check = host.run("pactl list clients 2>/dev/null | grep -i 'ndi-display' || echo ''")
-                if 'ndi-display' in node_check.stdout:
-                    print("✓ Audio stream active (PipeWire client connected)")
+            if 'ndi-display' in pw_status.stdout:
+                print("✓ NDI Display registered with PipeWire")
+                
+                # Check if stream is active
+                stream_status = host.run("pw-cli dump short 2>/dev/null | grep 'ndi-display.*STREAMING' || echo ''")
+                if 'STREAMING' in stream_status.stdout:
+                    print("✓ AUDIO IS PLAYING through PipeWire")
                     audio_playing = True
                 else:
-                    print("✗ Audio stream not active")
-                    audio_playing = False
+                    # Alternative check - see if ndi-display node exists
+                    node_check = host.run("pactl list clients 2>/dev/null | grep -i 'ndi-display' || echo ''")
+                    if 'ndi-display' in node_check.stdout:
+                        print("✓ Audio stream active (PipeWire client connected)")
+                        audio_playing = True
+                    else:
+                        print("✗ Audio stream not active")
+                        audio_playing = False
+            else:
+                print("✗ NDI Display not found in PipeWire")
+                audio_playing = False
         else:
-            print("✗ NDI Display not found in PipeWire")
+            print("✗ PipeWire audio not initialized")
             audio_playing = False
-    else:
-        print("✗ PipeWire audio not initialized")
-        audio_playing = False
-    
-    # 9. Monitor for 30 seconds
-    print("\n" + "="*60)
-    print("MONITORING STREAM FOR 30 SECONDS")
-    print("YOU SHOULD SEE VIDEO ON HDMI MONITOR")
-    if audio_playing:
-        print("YOU SHOULD HEAR AUDIO FROM MONITOR SPEAKERS")
-    else:
-        print("WARNING: AUDIO NOT PLAYING - CHECK STREAM HAS AUDIO")
-    print("="*60)
-    
-    # Get initial frame count
-    initial_log = host.run("tail -5 /tmp/ndi-display-test.log | grep -i frames || echo 'No frame info'")
-    print(f"Initial status: {initial_log.stdout.strip()}")
-    
-    # Wait 30 seconds
-    for i in range(6):
-        time.sleep(5)
-        print(f"Elapsed: {(i+1)*5} seconds...")
-        if (i+1) % 2 == 0:
-            # Check frame count every 10 seconds
-            status = host.run("tail -1 /tmp/ndi-display-test.log | grep -i frames || echo 'No update'")
-            print(f"  Status: {status.stdout.strip()}")
-    
-    # Get final frame count
-    final_log = host.run("tail -5 /tmp/ndi-display-test.log | grep -i frames || echo 'No frame info'")
-    print(f"Final status: {final_log.stdout.strip()}")
-    
-    # 10. Stop the display
-    print("\nStopping NDI display...")
-    host.run(f"kill {pid} 2>/dev/null || true")
-    time.sleep(2)
-    
-    # 11. Verify console returns
-    print("Verifying console returns to display...")
-    host.run("echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
-    host.run("chvt 2 && sleep 0.5 && chvt 1")  # Switch TTY to refresh
-    
-    # Check console is bound
-    result = host.run("cat /sys/class/vtconsole/vtcon1/bind")
-    console_restored = '1' in result.stdout
-    
-    print(f"Console restored: {console_restored}")
-    assert console_restored, "Console was not restored after display stopped"
-    
-    # Final summary
-    print("\n" + "="*60)
-    print("FUNCTIONAL TEST COMPLETE")
-    print(f"✓ Stream displayed: {cg_stream}")
-    print(f"✓ Display used: {connected_display}")
-    if audio_initialized:
+        
+        # 9. Monitor for 30 seconds
+        print("\n" + "="*60)
+        print("MONITORING STREAM FOR 30 SECONDS")
+        print("YOU SHOULD SEE VIDEO ON HDMI MONITOR")
         if audio_playing:
-            print("✓ Audio was PLAYING")
+            print("YOU SHOULD HEAR AUDIO FROM MONITOR SPEAKERS")
         else:
-            print("✗ Audio device opened but NOT PLAYING (no audio in stream?)")
-    else:
-        print("✗ Audio was NOT initialized")
-    print(f"✓ Console restored: {console_restored}")
-    print("="*60)
-    
-    # Assert audio should be playing if device was initialized
-    if audio_initialized and not audio_playing:
-        pytest.fail("Audio device initialized but not playing - possible audio issue")
+            print("WARNING: AUDIO NOT PLAYING - CHECK STREAM HAS AUDIO")
+        print("="*60)
+        
+        # Get initial frame count
+        initial_log = host.run("tail -5 /tmp/ndi-display-test.log | grep -i frames || echo 'No frame info'")
+        print(f"Initial status: {initial_log.stdout.strip()}")
+        
+        # Wait 30 seconds
+        for i in range(6):
+            time.sleep(5)
+            print(f"Elapsed: {(i+1)*5} seconds...")
+            if (i+1) % 2 == 0:
+                # Check frame count every 10 seconds
+                status = host.run("tail -1 /tmp/ndi-display-test.log | grep -i frames || echo 'No update'")
+                print(f"  Status: {status.stdout.strip()}")
+        
+        # Get final frame count
+        final_log = host.run("tail -5 /tmp/ndi-display-test.log | grep -i frames || echo 'No frame info'")
+        print(f"Final status: {final_log.stdout.strip()}")
+        
+        # Final summary (before cleanup)
+        print("\n" + "="*60)
+        print("FUNCTIONAL TEST COMPLETE")
+        print(f"✓ Stream displayed: {cg_stream}")
+        print(f"✓ Display used: {connected_display}")
+        if audio_initialized:
+            if audio_playing:
+                print("✓ Audio was PLAYING")
+            else:
+                print("✗ Audio device opened but NOT PLAYING (no audio in stream?)")
+        else:
+            print("✗ Audio was NOT initialized")
+        
+        # Assert audio should be playing if device was initialized
+        if audio_initialized and not audio_playing:
+            pytest.fail("Audio device initialized but not playing - possible audio issue")
+            
+    finally:
+        # ALWAYS cleanup, even if test fails
+        print("\nCLEANUP: Stopping NDI display...")
+        host.run(f"kill {pid} 2>/dev/null || true")
+        time.sleep(2)
+        
+        # Clear any display configuration
+        host.run(f"rm -f /var/run/ndi-display/display-{display_id}.status 2>/dev/null || true")
+        host.run(f"rm -f /etc/ndi-display/display-{display_id}.conf 2>/dev/null || true")
+        
+        # Restore console
+        print("CLEANUP: Restoring console...")
+        host.run("echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
+        host.run(f"chvt {display_id + 1} && sleep 0.5 && chvt 1")  # Switch TTY to refresh
+        
+        # Verify console is restored
+        result = host.run("cat /sys/class/vtconsole/vtcon1/bind")
+        console_restored = '1' in result.stdout
+        print(f"CLEANUP: Console restored: {console_restored}")
+        
+        if not console_restored:
+            # Force console restoration
+            host.run("echo 1 > /sys/class/vtconsole/vtcon1/bind")
+            host.run("setterm -blank poke > /dev/tty2 2>/dev/null || true")
+        
+        print("="*60)
 
 
 @pytest.mark.integration
@@ -252,18 +267,24 @@ def test_display_console_recovery(host):
     initial_bind = host.run("cat /sys/class/vtconsole/vtcon1/bind").stdout.strip()
     print(f"Initial console bind state: {initial_bind}")
     
-    # 2. Start a quick display test (5 seconds)
-    print("Starting NDI display briefly...")
-    host.run("echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
-    
-    # Use the capture stream as it's always available
-    cmd = f"timeout 5 /opt/media-bridge/ndi-display 'MEDIA-BRIDGE (USB Capture)' {display_id} > /dev/null 2>&1 || true"
-    host.run(cmd)
-    
-    # 3. Restore console
-    print("Restoring console...")
-    host.run("echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
-    host.run("chvt 1; sleep 0.5; chvt 2")  # Force console refresh
+    try:
+        # 2. Start a quick display test (5 seconds)
+        print("Starting NDI display briefly...")
+        host.run("echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
+        
+        # Use the capture stream as it's always available
+        cmd = f"timeout 5 /opt/media-bridge/ndi-display 'MEDIA-BRIDGE (USB Capture)' {display_id} > /dev/null 2>&1 || true"
+        host.run(cmd)
+        
+    finally:
+        # 3. Always restore console
+        print("Restoring console...")
+        host.run("echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
+        host.run("chvt 1; sleep 0.5; chvt 2")  # Force console refresh
+        
+        # Clear any leftover display configuration
+        host.run(f"rm -f /var/run/ndi-display/display-{display_id}.status 2>/dev/null || true")
+        host.run(f"rm -f /etc/ndi-display/display-{display_id}.conf 2>/dev/null || true")
     
     # 4. Verify console is bound
     final_bind = host.run("cat /sys/class/vtconsole/vtcon1/bind").stdout.strip()
@@ -347,19 +368,21 @@ def test_display_audio_diagnosis(host):
             
         print(f"Testing audio with display {display_id}...")
         
-        # Quick test with CG stream
-        host.run("echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
-        test_result = host.run(f"timeout 10 /opt/media-bridge/ndi-display 'RESOLUME-SNV (cg-obs)' {display_id} 2>&1 | grep -i 'audio\\|pipewire'")
-        
-        if 'PipeWire audio' in test_result.stdout:
-            print("✓ PipeWire audio initialization successful")
-        else:
-            print("✗ PipeWire audio initialization failed")
-            print(test_result.stdout)
-            issues_found.append("PipeWire audio initialization failed")
+        try:
+            # Quick test with CG stream
+            host.run("echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
+            test_result = host.run(f"timeout 10 /opt/media-bridge/ndi-display 'RESOLUME-SNV (cg-obs)' {display_id} 2>&1 | grep -i 'audio\\|pipewire'")
             
-        # Restore console
-        host.run("echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
+            if 'PipeWire audio' in test_result.stdout:
+                print("✓ PipeWire audio initialization successful")
+            else:
+                print("✗ PipeWire audio initialization failed")
+                print(test_result.stdout)
+                issues_found.append("PipeWire audio initialization failed")
+        finally:
+            # Always restore console
+            host.run("echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true")
+            host.run(f"rm -f /var/run/ndi-display/display-{display_id}.status 2>/dev/null || true")
     
     # Summary
     print("\n" + "="*60)
