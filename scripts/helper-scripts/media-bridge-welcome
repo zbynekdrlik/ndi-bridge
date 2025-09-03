@@ -393,8 +393,8 @@ else
 fi
 echo ""
 
-# NDI BRIDGE INTERCOM
-echo -e "${CYAN}▶ NDI BRIDGE INTERCOM${NC}"
+# MEDIA BRIDGE INTERCOM
+echo -e "${CYAN}▶ MEDIA BRIDGE INTERCOM${NC}"
 if systemctl is-active media-bridge-intercom --quiet 2>/dev/null; then
     echo -e "  Status:      ${GREEN}● Running${NC}"
     echo "  Room:        nl_interkom"
