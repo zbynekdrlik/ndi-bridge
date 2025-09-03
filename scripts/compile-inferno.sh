@@ -37,10 +37,12 @@ cd "$BUILD_DIR"
 # Compile Inferno
 echo -e "${YELLOW}Compiling Inferno (this will take 5-10 minutes)...${NC}"
 if [ ! -d "$INFERNO_DIR" ]; then
+    # CRITICAL: Must use OFFICIAL GitLab repository (lumifaza), NOT GitHub forks!
+    # Note: mrblondin repository doesn't exist - lumifaza is the active GitLab repo
     git clone --recurse-submodules https://gitlab.com/lumifaza/inferno.git
 fi
 
-cd "$INFERNO_DIR" || { echo "Failed to enter Inferno directory"; exit 1; }
+cd "$INFERNO_DIR" || { echo "Failed to enter Inferno directory at $INFERNO_DIR"; exit 1; }
 git pull
 git submodule update --init --recursive
 

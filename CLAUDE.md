@@ -1,5 +1,26 @@
 # CLAUDE.md - Media Bridge Development Guide
 
+## CRITICAL: Dante/Inferno Repository Rule
+
+### ALWAYS USE OFFICIAL GITLAB INFERNO REPOSITORY
+**The ONLY authoritative Inferno source is: `https://gitlab.com/lumifaza/inferno`**
+- **NEVER use GitHub forks** (teodly or others) for Inferno
+- **NEVER reference GitHub as the source** for Inferno
+- **GitLab lumifaza is the OFFICIAL active repository** where development happens
+- GitHub mirrors are outdated and cause discovery failures
+- **NOTE: mrblondin repository mentioned in issue #104 doesn't exist - lumifaza is correct**
+- **This mistake has been made multiple times - DO NOT REPEAT IT!**
+
+When working with Dante:
+1. Always clone Inferno from: `https://gitlab.com/lumifaza/inferno.git` (NOT GitHub!)
+2. For Statime PTPv1 support: Use `https://github.com/teodly/statime.git` branch `inferno-dev`
+3. Verify with network-audio-controller: `https://github.com/chris-ritsen/network-audio-controller`
+
+**Repository Verification History:**
+- mrblondin/inferno on GitLab: Does NOT exist (403 error)
+- lumifaza/inferno on GitLab: EXISTS and is actively maintained
+- teodly/inferno on GitHub: Mirror only - DO NOT USE
+
 ## CRITICAL: Git and PR Workflow Rules
 
 ### NEVER MERGE PRs AUTOMATICALLY

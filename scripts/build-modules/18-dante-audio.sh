@@ -77,7 +77,9 @@ rustc --version
 # Clone and build Inferno
 echo "Building Inferno Dante implementation (this will take 5-10 minutes)..."
 cd /opt
-git clone --recurse-submodules https://github.com/teodly/inferno.git 2>&1 | head -5
+# CRITICAL: Must use OFFICIAL GitLab repository (lumifaza), NOT GitHub forks!
+# Note: mrblondin repository doesn't exist - lumifaza is the active GitLab repo
+git clone --recurse-submodules https://gitlab.com/lumifaza/inferno.git 2>&1 | head -5
 cd inferno
 
 # Remove lock file to avoid version conflicts
@@ -117,12 +119,15 @@ fi
 
 # Copy Statime configuration - FOLLOWER MODE
 # CRITICAL: ndi-bridge must be PTP follower, not master
-if [ -f /tmp/helper-scripts/statime-follower.conf ]; then
+if [ -f /tmp/helper-scripts/statime-follower.toml ]; then
+    cp /tmp/helper-scripts/statime-follower.toml /etc/statime.toml
+elif [ -f /tmp/helper-scripts/statime-follower.conf ]; then
+    # Legacy conf format - convert to TOML
     cp /tmp/helper-scripts/statime-follower.conf /etc/statime.conf
 elif [ -f inferno-ptpv1.toml ]; then
-    cp inferno-ptpv1.toml /etc/statime.conf
+    cp inferno-ptpv1.toml /etc/statime.toml
     # Modify to ensure we're never PTP master
-    cat >> /etc/statime.conf << 'EOFOLLOWER'
+    cat >> /etc/statime.toml << 'EOFOLLOWER'
 
 # OVERRIDE: Ensure ndi-bridge is always PTP follower
 [ptp]
@@ -155,6 +160,8 @@ pcm.dante {
     # Set the Dante device name - this appears in Dante Controller
     DEVICE_NAME "media-bridge"
     INTERFACE "br0"
+    # Critical: Path to PTP clock from Statime
+    CLOCK_PATH "/tmp/ptp-usrvclock"
 }
 EOFALSA
 

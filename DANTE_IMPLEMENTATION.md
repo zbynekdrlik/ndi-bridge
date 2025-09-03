@@ -41,7 +41,7 @@ The Dante audio bridge is automatically installed during the USB image build pro
 ### Build Process
 
 1. **Inferno Compilation**
-   - Cloned from: https://github.com/teodly/inferno.git
+   - Cloned from: https://gitlab.com/lumifaza/inferno.git (GitLab - OFFICIAL)
    - Builds ALSA plugin: `libasound_module_pcm_inferno.so`
    - Installed to: `/usr/lib/x86_64-linux-gnu/alsa-lib/`
 
