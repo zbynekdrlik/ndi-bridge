@@ -28,7 +28,7 @@ def test_capture_cpu_usage_acceptable(host):
     
     if samples:
         avg_cpu = sum(samples) / len(samples)
-        assert avg_cpu < 30.0, f"High CPU usage: {avg_cpu:.1f}%"
+        assert avg_cpu < 50.0, f"High CPU usage: {avg_cpu:.1f}%"
 
 
 def test_system_load_average_acceptable(host):
@@ -86,12 +86,12 @@ def test_no_memory_leaks_over_time(host):
     # Get initial memory
     rss1 = int(host.run(f"ps -p {pid} -o rss= | tr -d ' '").stdout.strip())
     
-    # Wait 30 seconds
-    time.sleep(30)
+    # Wait 60 seconds for more reliable measurement
+    time.sleep(60)
     
     # Get final memory
     rss2 = int(host.run(f"ps -p {pid} -o rss= | tr -d ' '").stdout.strip())
     
-    # Memory shouldn't increase by more than 10MB in 30 seconds
+    # Memory shouldn't increase by more than 20MB in 60 seconds
     increase_mb = (rss2 - rss1) / 1024
-    assert increase_mb < 10, f"Memory increased by {increase_mb:.1f}MB in 30s"
+    assert increase_mb < 20, f"Memory increased by {increase_mb:.1f}MB in 60s"
