@@ -13,6 +13,13 @@ configure_dante_audio() {
     mkdir -p /mnt/usb/opt/inferno
     mkdir -p /mnt/usb/opt/statime
     
+    # Copy helper scripts to chroot for later use
+    mkdir -p /mnt/usb/tmp/helper-scripts
+    if [ -d "$HELPER_DIR" ]; then
+        cp -r "$HELPER_DIR"/* /mnt/usb/tmp/helper-scripts/
+        log "Copied helper scripts to chroot"
+    fi
+    
     # Create default Dante configuration
     cat > /mnt/usb/etc/ndi-bridge/dante.conf << 'EOFDANTE'
 # Dante Audio Bridge Configuration
@@ -122,13 +129,11 @@ fi
 
 # Copy Statime configuration - FOLLOWER MODE
 # CRITICAL: ndi-bridge must be PTP follower, not master
-if [ -f "$HELPER_DIR/statime-follower.toml" ]; then
-    cp "$HELPER_DIR/statime-follower.toml" /etc/statime.toml
-    log "  Copied statime configuration"
-elif [ -f /tmp/helper-scripts/statime-follower.toml ]; then
+if [ -f /tmp/helper-scripts/statime-follower.toml ]; then
     cp /tmp/helper-scripts/statime-follower.toml /etc/statime.toml
+    echo "  Copied statime configuration"
 elif [ -f /tmp/helper-scripts/statime-follower.conf ]; then
-    # Legacy conf format - convert to TOML
+    # Legacy conf format
     cp /tmp/helper-scripts/statime-follower.conf /etc/statime.conf
 elif [ -f inferno-ptpv1.toml ]; then
     cp inferno-ptpv1.toml /etc/statime.toml
@@ -174,18 +179,14 @@ EOFALSA
 # Also create system-wide configuration
 cp /root/.asoundrc /etc/asound.conf
 
-# Copy service files from helper-scripts
-if [ -f "$HELPER_DIR/statime.service" ]; then
-    cp "$HELPER_DIR/statime.service" /etc/systemd/system/
-    log "  Copied statime.service"
-elif [ -f /tmp/helper-scripts/statime.service ]; then
+# Copy service files from helper-scripts (in chroot context)
+if [ -f /tmp/helper-scripts/statime.service ]; then
     cp /tmp/helper-scripts/statime.service /etc/systemd/system/
+    echo "  Copied statime.service"
 fi
-if [ -f "$HELPER_DIR/dante-bridge.service" ]; then
-    cp "$HELPER_DIR/dante-bridge.service" /etc/systemd/system/
-    log "  Copied dante-bridge.service"
-elif [ -f /tmp/helper-scripts/dante-bridge.service ]; then
+if [ -f /tmp/helper-scripts/dante-bridge.service ]; then
     cp /tmp/helper-scripts/dante-bridge.service /etc/systemd/system/
+    echo "  Copied dante-bridge.service"
 else
     # Fallback - create minimal service
     cat > /etc/systemd/system/dante-bridge.service << 'EOFSERVICE'
@@ -205,12 +206,9 @@ WantedBy=multi-user.target
 EOFSERVICE
 fi
 
-# Copy the main bridge scripts
+# Copy the main bridge scripts (in chroot context)
 for script in media-bridge-dante-pipewire media-bridge-dante-production media-bridge-dante-simple; do
-    if [ -f "$HELPER_DIR/$script" ]; then
-        cp "$HELPER_DIR/$script" /usr/local/bin/
-        chmod +x /usr/local/bin/$script
-    elif [ -f /tmp/helper-scripts/$script ]; then
+    if [ -f /tmp/helper-scripts/$script ]; then
         cp /tmp/helper-scripts/$script /usr/local/bin/
         chmod +x /usr/local/bin/$script
     fi
@@ -223,13 +221,11 @@ elif [ -f /usr/local/bin/media-bridge-dante-production ]; then
     ln -sf media-bridge-dante-production /usr/local/bin/media-bridge-dante
 fi
 
-# Copy PipeWire configuration for Dante
+# Copy PipeWire configuration for Dante (in chroot context)
 mkdir -p /etc/pipewire/pipewire.conf.d
-if [ -f "$HELPER_DIR/pipewire-dante.conf" ]; then
-    cp "$HELPER_DIR/pipewire-dante.conf" /etc/pipewire/pipewire.conf.d/90-dante-bridge.conf
-    log "  Copied PipeWire Dante configuration"
-elif [ -f /tmp/helper-scripts/pipewire-dante.conf ]; then
+if [ -f /tmp/helper-scripts/pipewire-dante.conf ]; then
     cp /tmp/helper-scripts/pipewire-dante.conf /etc/pipewire/pipewire.conf.d/90-dante-bridge.conf
+    echo "  Copied PipeWire Dante configuration"
 fi
 
 # Ensure PipeWire is installed and configured
@@ -243,12 +239,9 @@ fi
 systemctl enable pipewire.service 2>/dev/null || true
 systemctl enable wireplumber.service 2>/dev/null || true
 
-# Copy helper scripts for status and configuration
+# Copy helper scripts for status and configuration (in chroot context)
 for script in media-bridge-dante-status media-bridge-dante-config media-bridge-dante-logs; do
-    if [ -f "$HELPER_DIR/$script" ]; then
-        cp "$HELPER_DIR/$script" /usr/local/bin/
-        chmod +x /usr/local/bin/$script
-    elif [ -f /tmp/helper-scripts/$script ]; then
+    if [ -f /tmp/helper-scripts/$script ]; then
         cp /tmp/helper-scripts/$script /usr/local/bin/
         chmod +x /usr/local/bin/$script
     fi
