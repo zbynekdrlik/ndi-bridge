@@ -139,23 +139,32 @@ alsa_monitor.rules = {
 }
 EOFWP
 
-# Start PipeWire as user daemon with proper environment
-echo "Starting PipeWire..."
-pipewire &
-PIPEWIRE_PID=$!
-sleep 3
+# Check if system PipeWire is running, if not start locally
+if systemctl is-active --quiet pipewire-system.service; then
+    echo "Using system-wide PipeWire service"
+    PIPEWIRE_PID=""
+    PULSE_PID=""
+    WIREPLUMBER_PID=""
+else
+    echo "System PipeWire not running, starting local instance..."
+    # Start PipeWire as user daemon with proper environment
+    echo "Starting PipeWire..."
+    pipewire &
+    PIPEWIRE_PID=$!
+    sleep 3
 
-# Start pipewire-pulse for PulseAudio compatibility FIRST
-echo "Starting PipeWire PulseAudio bridge..."
-pipewire-pulse &
-PULSE_PID=$!
-sleep 2
+    # Start pipewire-pulse for PulseAudio compatibility FIRST
+    echo "Starting PipeWire PulseAudio bridge..."
+    pipewire-pulse &
+    PULSE_PID=$!
+    sleep 2
 
-# Start WirePlumber session manager AFTER pipewire-pulse (matching working config)
-echo "Starting WirePlumber..."
-wireplumber &
-WIREPLUMBER_PID=$!
-sleep 3
+    # Start WirePlumber session manager AFTER pipewire-pulse (matching working config)
+    echo "Starting WirePlumber..."
+    wireplumber &
+    WIREPLUMBER_PID=$!
+    sleep 3
+fi
 
 # Wait for PipeWire to be ready and socket to exist  
 for i in {1..10}; do

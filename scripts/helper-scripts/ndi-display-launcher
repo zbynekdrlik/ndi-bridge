@@ -57,6 +57,24 @@ if [ -f "$VTCON_PATH" ] && [ "$(cat $VTCON_PATH)" = "1" ]; then
     /usr/local/bin/ndi-display-console-manager disable ${DISPLAY_ID} 2>&1 || true
 fi
 
+# Set up PipeWire environment
+export XDG_RUNTIME_DIR="/run/user/0"
+mkdir -p $XDG_RUNTIME_DIR
+
+# Wait for system PipeWire if it's starting
+if ! systemctl is-active --quiet pipewire-system.service; then
+    echo "Warning: System PipeWire service not running"
+    echo "Audio output may not work. Start with: systemctl start pipewire-system.service"
+else
+    # Set HDMI as default audio output for this display
+    sleep 1  # Give PipeWire time to enumerate devices
+    HDMI_SINK=$(pactl list sinks short 2>/dev/null | grep -E "hdmi|HDMI" | awk '{print $2}' | head -1)
+    if [ -n "$HDMI_SINK" ]; then
+        echo "Setting default audio output to HDMI: $HDMI_SINK"
+        pactl set-default-sink "$HDMI_SINK" 2>/dev/null || true
+    fi
+fi
+
 # Launch ndi-display with proper quoting to handle spaces
 echo "Starting NDI display $DISPLAY_ID with stream: $STREAM_NAME"
 exec /opt/media-bridge/ndi-display "$STREAM_NAME" $DISPLAY_ID

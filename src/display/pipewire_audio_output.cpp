@@ -83,12 +83,15 @@ bool PipeWireAudioOutput::openDevice(int display_id) {
     pw_thread_loop_start(loop_);
     pw_thread_loop_lock(loop_);
     
+    // Try to use HDMI output - don't hardcode, let PipeWire route to HDMI
     struct pw_properties* props = pw_properties_new(
         PW_KEY_MEDIA_TYPE, "Audio",
         PW_KEY_MEDIA_CATEGORY, "Playback",
         PW_KEY_MEDIA_ROLE, "Movie",
         PW_KEY_NODE_NAME, "ndi-display",
         PW_KEY_NODE_LATENCY, "256/48000",
+        PW_KEY_NODE_AUTOCONNECT, "true",
+        PW_KEY_STREAM_DONT_REMIX, "true",
         nullptr
     );
     

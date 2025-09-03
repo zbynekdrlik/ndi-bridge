@@ -1,0 +1,17 @@
+[Unit]
+Description=PipeWire PulseAudio System Service
+After=pipewire-system.service
+Requires=pipewire-system.service
+
+[Service]
+Type=simple
+User=root
+Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="PULSE_RUNTIME_PATH=/run/user/0/pulse"
+ExecStartPre=/bin/mkdir -p /run/user/0/pulse
+ExecStart=/usr/bin/pipewire-pulse
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
