@@ -9,6 +9,7 @@ Type=simple
 User=root
 Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
+Environment="PIPEWIRE_CONFIG_DIR=/etc/pipewire"
 Environment="XDG_STATE_HOME=/var/lib/pipewire"
 Environment="XDG_CACHE_HOME=/var/cache/pipewire"
 Environment="HOME=/root"
@@ -16,7 +17,7 @@ ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /run/user/0/pulse
 ExecStartPre=/bin/mkdir -p /var/lib/pipewire
 ExecStartPre=/bin/mkdir -p /var/cache/pipewire
-ExecStart=/usr/bin/pipewire
+ExecStart=/usr/bin/pipewire -c pipewire.conf
 # Wait for PipeWire to create its socket (up to 10 seconds - needed on cold boot)
 ExecStartPost=/bin/bash -c 'for i in {1..100}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.1; done; exit 1'
 Restart=always
