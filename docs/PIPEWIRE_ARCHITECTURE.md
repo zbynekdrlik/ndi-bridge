@@ -1,7 +1,9 @@
 # Unified PipeWire Architecture
 
 ## Executive Summary
-The unified PipeWire architecture (v2.2.3) implements a system-wide audio solution for Media Bridge. This is necessary because Ubuntu/Debian do NOT provide system-wide PipeWire services - only user session services that refuse to run as root (`ConditionUser=!root`). This document describes our custom implementation for embedded/headless systems.
+The unified PipeWire architecture (v2.2.4) implements a system-wide audio solution for Media Bridge. This is necessary because Ubuntu/Debian do NOT provide system-wide PipeWire services - only user session services that refuse to run as root (`ConditionUser=!root`). This document describes our custom implementation for embedded/headless systems.
+
+**Latest Update (v2.2.4)**: Fixed critical socket activation issue - PipeWire cannot use systemd socket passing and must create its own sockets.
 
 ## Key Changes Implemented
 
@@ -22,9 +24,9 @@ The unified PipeWire architecture (v2.2.3) implements a system-wide audio soluti
 - Designed for desktop environments with user login sessions
 - Not suitable for headless/embedded systems
 
-**Our Solution**: Custom system-wide services with socket activation:
-- `pipewire-system.socket` - Socket activation (starts first)
-- `pipewire-system.service` - Core audio server (activated by socket)
+**Our Solution**: Custom system-wide services with trigger socket:
+- `pipewire-system.socket` - Trigger socket only (NOT for socket passing!)
+- `pipewire-system.service` - Core audio server (creates its own sockets)
 - `pipewire-pulse-system.service` - PulseAudio compatibility
 - `wireplumber-system.service` - Session/policy management
 
@@ -46,9 +48,10 @@ Created persistent virtual devices for Chrome isolation:
 - `50-usb-audio.lua` - USB audio device enablement
 
 ### 5. Runtime Management
-- All sockets/state in `/var/run/pipewire/`
-- PulseAudio socket at `/var/run/pipewire/pulse/native`
-- XDG_RUNTIME_DIR set to `/var/run` for all services
+- PipeWire creates its own sockets at `/run/user/0/pipewire-0` and `/run/user/0/pipewire-0-manager`
+- PulseAudio socket at `/run/user/0/pulse/native`
+- XDG_RUNTIME_DIR set to `/run/user/0` for all services
+- **CRITICAL**: Never let systemd create PipeWire's actual sockets!
 
 ## Testing Results
 
@@ -150,20 +153,43 @@ pipewire-system.service
 
 ## Known Issues and Solutions
 
-### PipeWire Startup Race Condition (Fixed in v2.2.3)
+### PipeWire Socket Activation Issues (Fixed in v2.2.4)
+
+**Critical Discovery**: PipeWire socket activation doesn't work like traditional systemd socket activation!
+
 **Problem**: WirePlumber fails to connect on cold boot with "Failed to connect to PipeWire"
 
-**Root Cause**: 
-- PipeWire doesn't create its socket immediately on startup
-- WirePlumber tries to connect before socket exists
-- Ubuntu's PipeWire uses socket activation but only for user sessions
+**Root Cause Analysis**: 
+- PipeWire is NOT designed to use systemd's socket passing mechanism (sd_listen_fds)
+- When systemd creates sockets via ListenStream, PipeWire cannot accept connections on them
+- PipeWire MUST create its own sockets at `$XDG_RUNTIME_DIR/pipewire-0`
+- Ubuntu's user session services work because they don't actually pass sockets to PipeWire
 
-**Solution Implemented**:
-1. Added `pipewire-system.socket` for proper socket activation
-2. Socket creates listening endpoints before PipeWire starts
-3. PipeWire service triggered by socket access
-4. WirePlumber waits for socket existence in ExecStartPre
-5. Increased timeout to 10 seconds for slower systems
+**Why Socket Activation Failed**:
+1. We configured `ListenStream=/run/user/0/pipewire-0` in the socket unit
+2. systemd created and owned this socket
+3. PipeWire tried to create its own socket at the same path → conflict
+4. Even when socket existed, PipeWire couldn't accept connections (not built for socket passing)
+
+**Solution Implemented (v2.2.4)**:
+1. Use a **trigger socket** (`pipewire-trigger`) - NOT the actual PipeWire socket
+2. This trigger socket only starts the service, doesn't pass file descriptors
+3. PipeWire creates its own sockets at `/run/user/0/pipewire-0` and `/run/user/0/pipewire-0-manager`
+4. Added `ExecStartPost` to verify PipeWire created its socket successfully
+5. WirePlumber waits for the actual PipeWire socket, not the systemd trigger
+
+**Configuration**:
+```ini
+# pipewire-system.socket
+[Socket]
+# Trigger socket only - PipeWire creates its own
+ListenStream=/run/user/0/pipewire-trigger
+
+# pipewire-system.service
+[Service]
+# Verify PipeWire creates its socket
+ExecStartPost=/bin/bash -c 'for i in {1..30}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.1; done; exit 1'
+```
 
 ### Ubuntu/Debian System-Wide Limitation
 **Critical Finding**: Ubuntu/Debian do NOT support system-wide PipeWire officially
@@ -171,6 +197,57 @@ pipewire-system.service
 - Service files contain `ConditionUser=!root` blocking root execution
 - Official recommendation is using `loginctl enable-linger` with user accounts
 - System-wide operation requires custom service files (what we've implemented)
+
+## Troubleshooting Guide
+
+### Common Issues and Solutions
+
+#### WirePlumber Can't Connect to PipeWire
+**Symptoms**: `Failed to connect to PipeWire` error, tests timeout
+
+**Check**:
+```bash
+# Is PipeWire creating its socket?
+ls -la /run/user/0/pipewire-0
+
+# Is systemd trying to create the socket?
+systemctl status pipewire-system.socket
+
+# Check PipeWire logs
+journalctl -u pipewire-system -n 50
+```
+
+**Solution**: Ensure socket unit uses trigger socket, not actual PipeWire socket path
+
+#### Socket Activation Not Working
+**Symptoms**: PipeWire starts but can't accept connections
+
+**Root Cause**: PipeWire doesn't support systemd socket passing (sd_listen_fds)
+
+**Solution**: 
+- Use trigger socket (`/run/user/0/pipewire-trigger`)
+- Let PipeWire create its own sockets
+- Add ExecStartPost check to verify socket creation
+
+#### Services Start But Audio Doesn't Work
+**Check**:
+```bash
+# Are all services running?
+systemctl status pipewire-system wireplumber-system pipewire-pulse-system
+
+# Are virtual devices created?
+pactl list sinks short | grep intercom
+
+# Is Chrome connected?
+pactl list clients | grep chrome
+```
+
+#### Build Creates Wrong Configuration
+**Ensure**:
+1. Socket file uses trigger socket path
+2. Service file has `Requires=pipewire-system.socket`
+3. Service file has ExecStartPost socket check
+4. WirePlumber waits for actual PipeWire socket
 
 ## Migration Notes
 
@@ -199,6 +276,34 @@ pipewire-system.service
 3. Single quantum for all streams
 4. No per-application volume (by design)
 
+## Lessons Learned
+
+### Key Discoveries About PipeWire
+
+1. **PipeWire Socket Activation is Different**
+   - PipeWire doesn't use systemd's socket passing (sd_listen_fds)
+   - It MUST create its own sockets - systemd can't create them for it
+   - Trigger sockets work, actual socket passing doesn't
+   - This is undocumented in official PipeWire documentation
+
+2. **System-Wide PipeWire Challenges**
+   - Ubuntu/Debian packages explicitly block root operation
+   - No official support for system-wide deployment
+   - Must create custom service files from scratch
+   - Default configurations assume user sessions
+
+3. **Service Dependencies Are Critical**
+   - WirePlumber must wait for actual PipeWire socket
+   - Not the systemd socket unit, but the socket PipeWire creates
+   - Race conditions are common without proper checks
+   - ExecStartPost verification prevents cascade failures
+
+4. **Testing on Fresh Images is Essential**
+   - What works on a configured box may fail on fresh boot
+   - Socket activation issues only appear on cold boot
+   - Always test with `systemctl daemon-reload` and full reboot
+   - Build process must match manual configuration exactly
+
 ## Conclusion
 
 The unified PipeWire architecture successfully:
@@ -208,7 +313,7 @@ The unified PipeWire architecture successfully:
 4. **Enables** low-latency monitoring
 5. **Prevents** device locking issues
 
-This architecture is production-ready and provides a solid foundation for future audio features.
+This architecture is production-ready and provides a solid foundation for future audio features. The v2.2.4 fixes ensure reliable operation on fresh boot.
 
 ## Test Coverage Analysis
 
