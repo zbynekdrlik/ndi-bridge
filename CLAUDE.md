@@ -9,6 +9,44 @@
 - Claude can create PRs, push commits, but NEVER merge
 - If asked to merge, Claude should respond: "Please review and merge PR #XX through GitHub web interface"
 
+## CRITICAL: Documentation Management Rules
+
+### Documentation Structure (STRICTLY ENFORCED)
+**Root directory may ONLY contain:**
+- `README.md` - Project overview and quick start
+- `CLAUDE.md` - This development guide
+
+**ALL other documentation MUST be in `docs/` folder:**
+- Technical documentation → `docs/`
+- Architecture documents → `docs/`
+- Build/test/contribution guides → `docs/`
+- Any new .md files → `docs/`
+
+### Documentation Rules
+1. **NEVER create .md files in root directory** (except README.md and CLAUDE.md)
+2. **NEVER duplicate information** - single source of truth only
+3. **ALWAYS update existing docs** instead of creating new ones
+4. **ALWAYS link to docs/** from README.md when referencing detailed information
+5. **Architecture documents are MANDATORY** - must be updated with ANY architectural changes
+
+### PipeWire Specific Rule
+**When modifying ANY PipeWire functionality:**
+- Update `docs/PIPEWIRE_ARCHITECTURE.md` IMMEDIATELY
+- This is the ONLY authoritative source for PipeWire architecture
+- No PipeWire information should exist elsewhere
+
+### Documentation Workflow
+```bash
+# Wrong: Creating documentation in root
+touch NEW_FEATURE.md  # ❌ NEVER DO THIS
+
+# Correct: Documentation goes in docs/
+touch docs/NEW_FEATURE.md  # ✓ Always use docs/ folder
+
+# Better: Update existing relevant doc
+edit docs/EXISTING_CATEGORY.md  # ✓ Prefer updating existing docs
+```
+
 ## NAMING CONVENTIONS
 
 ### Project Name: Media Bridge
