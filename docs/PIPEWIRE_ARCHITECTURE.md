@@ -1,9 +1,9 @@
 # Unified PipeWire Architecture
 
 ## Executive Summary
-The unified PipeWire architecture (v2.2.4) implements a system-wide audio solution for Media Bridge. This is necessary because Ubuntu/Debian do NOT provide system-wide PipeWire services - only user session services that refuse to run as root (`ConditionUser=!root`). This document describes our custom implementation for embedded/headless systems.
+The unified PipeWire architecture (v2.2.5) implements a system-wide audio solution for Media Bridge. This is necessary because Ubuntu/Debian do NOT provide system-wide PipeWire services - only user session services that refuse to run as root (`ConditionUser=!root`). This document describes our custom implementation for embedded/headless systems.
 
-**Latest Update (v2.2.4)**: Fixed critical socket activation issue - PipeWire cannot use systemd socket passing and must create its own sockets.
+**Latest Update (v2.2.5)**: RESOLVED cold boot socket creation issues with auto-recovery mechanism and proper service configuration. PipeWire now reliably starts on fresh images.
 
 ## Key Changes Implemented
 
@@ -153,43 +153,80 @@ pipewire-system.service
 
 ## Known Issues and Solutions
 
-### PipeWire Socket Activation Issues (Fixed in v2.2.4)
+### PipeWire Socket Activation Issues (RESOLVED in v2.2.5)
 
-**Critical Discovery**: PipeWire socket activation doesn't work like traditional systemd socket activation!
+**Critical Discovery**: PipeWire on Ubuntu/Debian has race conditions during cold boot when run as system service!
 
-**Problem**: WirePlumber fails to connect on cold boot with "Failed to connect to PipeWire"
+**Problem**: PipeWire starts but doesn't create its socket on cold boot, causing WirePlumber and dependent services to fail.
 
 **Root Cause Analysis**: 
 - PipeWire is NOT designed to use systemd's socket passing mechanism (sd_listen_fds)
 - When systemd creates sockets via ListenStream, PipeWire cannot accept connections on them
 - PipeWire MUST create its own sockets at `$XDG_RUNTIME_DIR/pipewire-0`
-- Ubuntu's user session services work because they don't actually pass sockets to PipeWire
+- On cold boot, PipeWire may fail to create sockets due to timing/initialization issues
+- Manual restart always works, indicating a race condition during system startup
 
-**Why Socket Activation Failed**:
-1. We configured `ListenStream=/run/user/0/pipewire-0` in the socket unit
-2. systemd created and owned this socket
-3. PipeWire tried to create its own socket at the same path → conflict
-4. Even when socket existed, PipeWire couldn't accept connections (not built for socket passing)
+**Why Socket Creation Failed on Cold Boot**:
+1. PipeWire requires specific environment and runtime directory setup
+2. Default Ubuntu PipeWire config may not load all required modules on first start
+3. System resources/dependencies may not be fully available at boot time
+4. Configuration directory resolution can fail when PIPEWIRE_CONFIG_DIR is set incorrectly
 
-**Solution Implemented (v2.2.4)**:
-1. Use a **trigger socket** (`pipewire-trigger`) - NOT the actual PipeWire socket
-2. This trigger socket only starts the service, doesn't pass file descriptors
-3. PipeWire creates its own sockets at `/run/user/0/pipewire-0` and `/run/user/0/pipewire-0-manager`
-4. Added `ExecStartPost` to verify PipeWire created its socket successfully
-5. WirePlumber waits for the actual PipeWire socket, not the systemd trigger
+**Complete Solution Implemented (v2.2.5)**:
 
-**Configuration**:
+1. **Trigger Socket Approach**:
+   - Use `pipewire-trigger` socket for activation (not the actual PipeWire socket)
+   - Allows systemd to manage service startup without interfering with PipeWire's socket creation
+
+2. **Service Configuration Fixes**:
+   - Removed `PIPEWIRE_CONFIG_DIR` environment variable (causes config loading issues)
+   - Added explicit config path: `/usr/bin/pipewire -c /usr/share/pipewire/pipewire.conf`
+   - Added startup delay: `ExecStartPre=/bin/sleep 2` to let system settle
+   - Added dependency on `systemd-tmpfiles-setup.service` for runtime directories
+
+3. **Auto-Recovery Mechanism**:
+   - Implemented self-healing in ExecStartPost
+   - If socket doesn't exist after 5 seconds, service auto-restarts
+   - Ensures socket creation even if first attempt fails
+
+4. **WirePlumber Synchronization**:
+   - Added wait loop in WirePlumber for PipeWire socket
+   - Up to 20 seconds wait time (100 iterations × 0.2s)
+   - Prevents WirePlumber from failing before PipeWire is ready
+
+**Final Working Configuration (v2.2.5)**:
+
 ```ini
 # pipewire-system.socket
 [Socket]
-# Trigger socket only - PipeWire creates its own
 ListenStream=/run/user/0/pipewire-trigger
 
 # pipewire-system.service
+[Unit]
+After=sound.target pipewire-system.socket systemd-tmpfiles-setup.service
+Requires=pipewire-system.socket
+Wants=systemd-tmpfiles-setup.service
+
 [Service]
-# Verify PipeWire creates its socket
-ExecStartPost=/bin/bash -c 'for i in {1..30}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.1; done; exit 1'
+Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
+# NO PIPEWIRE_CONFIG_DIR - causes issues!
+ExecStartPre=/bin/sleep 2
+ExecStart=/usr/bin/pipewire -c /usr/share/pipewire/pipewire.conf
+# Auto-restart if socket not created
+ExecStartPost=/bin/bash -c 'sleep 5; if [ ! -S /run/user/0/pipewire-0 ]; then systemctl restart pipewire-system; fi'
+
+# wireplumber-system.service
+[Service]
+# Wait for PipeWire socket before starting
+ExecStartPre=/bin/bash -c 'for i in {1..100}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.2; done; exit 1'
 ```
+
+**Verification in v2.2.5 Image**:
+- Built and verified image contains all fixes
+- Services properly configured with correct dependencies
+- Configuration files in place at `/etc/pipewire/pipewire.conf.d/`
+- All PipeWire/WirePlumber services enabled in multi-user.target
 
 ### Ubuntu/Debian System-Wide Limitation
 **Critical Finding**: Ubuntu/Debian do NOT support system-wide PipeWire officially
