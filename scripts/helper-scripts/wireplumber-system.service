@@ -15,8 +15,8 @@ Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
 ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /var/lib/wireplumber
 ExecStartPre=/bin/mkdir -p /var/cache/wireplumber
-# Wait for PipeWire socket to be ready (up to 10 seconds)
-ExecStartPre=/bin/bash -c 'for i in {1..100}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.1; done; exit 1'
+# Wait for PipeWire socket - necessary due to race condition on cold boot
+ExecStartPre=/bin/bash -c 'for i in {1..100}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.2; done; exit 1'
 ExecStart=/usr/bin/wireplumber
 Restart=always
 RestartSec=5
