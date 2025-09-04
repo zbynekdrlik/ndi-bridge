@@ -285,7 +285,7 @@ These belong in `integration/` NOT in `component/`
 
 2. **THEN run the full test suite**:
    ```bash
-   python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v
+   python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -v
    ```
 
 **Why test-device.sh MUST be run first**: 
@@ -303,18 +303,18 @@ The test suite supports multiple ways to specify the target device IP:
    # Edit tests/test_config.yaml - set host: YOUR_IP
    vim tests/test_config.yaml
    # Then run tests without specifying IP:
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
+   pytest tests/ --ssh-key ~/.ssh/media_test_key
    ```
 
 2. **Command Line Argument** (for one-off tests):
    ```bash
-   pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key
+   pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/media_test_key
    ```
 
 3. **Environment Variable** (for current session):
    ```bash
    export NDI_TEST_HOST=10.77.9.188
-   pytest tests/ --ssh-key ~/.ssh/ndi_test_key
+   pytest tests/ --ssh-key ~/.ssh/media_test_key
    ```
 
 4. **Default Fallback** (10.77.9.143 if nothing specified)
@@ -327,8 +327,8 @@ The test suite supports multiple ways to specify the target device IP:
 pip3 install -r tests/requirements.txt --break-system-packages
 
 # Set up SSH key authentication (recommended)
-ssh-keygen -t ed25519 -f ~/.ssh/ndi_test_key -N ""
-sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@DEVICE_IP
+ssh-keygen -t ed25519 -f ~/.ssh/media_test_key -N ""
+sshpass -p newlevel ssh-copy-id -i ~/.ssh/media_test_key.pub root@DEVICE_IP
 ```
 
 #### Running Tests - Primary Method
@@ -341,24 +341,24 @@ cd /home/newlevel/devel/ndi-bridge
 ./tests/test-device.sh 10.77.9.188  # Replace with your device IP
 
 # STEP 2: Run all tests with SSH key auth
-pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/ndi_test_key -v
+pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/media_test_key -v
 
 # Alternative: Set device IP as environment variable
 export NDI_TEST_HOST=10.77.9.188
 ./tests/test-device.sh $NDI_TEST_HOST
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -v
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key -v
 
 # Run specific category (AFTER test-device.sh)
-pytest tests/component/capture/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
+pytest tests/component/capture/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key
 
 # Run with parallel execution (AFTER test-device.sh)
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -n auto
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key -n auto
 
 # Run only critical tests (AFTER test-device.sh)
-pytest tests/ -m critical --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key
+pytest tests/ -m critical --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key
 
 # Quick summary without details (AFTER test-device.sh)
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key -q --tb=no
 ```
 
 #### Helper Scripts (Alternative Methods)
@@ -414,16 +414,16 @@ pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/ndi_test_key -q --tb=no
 
 ```bash
 # Just test if device is working (critical tests only, fast)
-pytest -m critical --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -q
+pytest -m critical --host DEVICE_IP --ssh-key ~/.ssh/media_test_key -q
 
 # Full validation before deployment (all tests, detailed)
-pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -v
+pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/media_test_key -v
 
 # Debug specific component issues
-pytest tests/component/capture/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key -vv
+pytest tests/component/capture/ --host DEVICE_IP --ssh-key ~/.ssh/media_test_key -vv
 
 # Generate HTML report
-pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/ndi_test_key --html=report.html
+pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/media_test_key --html=report.html
 ```
 
 ### Writing New Tests
@@ -460,6 +460,15 @@ Tests are designed to run in parallel by default:
 - Each test is independent (no shared state)
 - Fixtures handle setup/teardown
 - Use `pytest-xdist` for auto-parallelization
+
+### Important Testing Philosophy
+
+**Test Quality Over Speed**: Tests are designed to thoroughly validate functionality, not to run fast.
+- Many tests require reboots, service restarts, or waiting for stabilization
+- Slow tests are acceptable if they catch real issues
+- Functional testing is prioritized over speed
+- Test durations of 5-10 minutes for full suite are normal and expected
+- DO NOT optimize for speed at the expense of thoroughness
 
 ### Migration from Bash Tests
 
@@ -862,7 +871,7 @@ This script:
 **Step 2: Run ALL 373 tests (IMPORTANT: Use --maxfail=0 to run complete suite)**
 ```bash
 cd /home/newlevel/devel/ndi-bridge
-python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v --maxfail=0
+python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -v --maxfail=0
 ```
 
 **CRITICAL: About --maxfail=0**
@@ -877,7 +886,7 @@ cd /home/newlevel/devel/ndi-bridge
 ./tests/test-device.sh 10.77.8.124
 
 # STEP 2: Run ALL 373 tests (won't stop on failures)
-python3 -m pytest tests/ --host 10.77.8.124 --ssh-key ~/.ssh/ndi_test_key -v --maxfail=0
+python3 -m pytest tests/ --host 10.77.8.124 --ssh-key ~/.ssh/media_test_key -v --maxfail=0
 
 # After completion, get failure summary:
 grep "FAILED\|ERROR" test-run-complete.log | sort -u
@@ -899,11 +908,11 @@ After running all tests, check the summary at the end:
 ### Alternative Test Commands (AFTER running test-device.sh)
 ```bash
 # Quick summary without verbose output
-python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -q --tb=no
+python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -q --tb=no
 
 # Run specific component tests only
-python3 -m pytest tests/component/core/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v
-python3 -m pytest tests/component/capture/ --host <DEVICE_IP> --ssh-key ~/.ssh/ndi_test_key -v
+python3 -m pytest tests/component/core/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -v
+python3 -m pytest tests/component/capture/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -v
 ```
 
 ### If SSH Key Fails:
