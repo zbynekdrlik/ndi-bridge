@@ -1,7 +1,7 @@
-# Unified PipeWire Architecture Review
+# Unified PipeWire Architecture
 
 ## Executive Summary
-The unified PipeWire architecture (v2.2.1) represents a major architectural improvement for Media Bridge, consolidating all audio management under a single system-wide PipeWire instance. This eliminates the complexity of multiple user-session audio servers and provides consistent, reliable audio routing across all services.
+The unified PipeWire architecture (v2.2.3) implements a system-wide audio solution for Media Bridge. This is necessary because Ubuntu/Debian do NOT provide system-wide PipeWire services - only user session services that refuse to run as root (`ConditionUser=!root`). This document describes our custom implementation for embedded/headless systems.
 
 ## Key Changes Implemented
 
@@ -14,9 +14,17 @@ The unified PipeWire architecture (v2.2.1) represents a major architectural impr
   - Reduced resource usage
   - No session conflicts
 
-### 2. Service Architecture
-Three core services running as system services:
-- `pipewire-system.service` - Core audio server
+### 2. Why Custom System Services Are Necessary
+
+**Ubuntu/Debian Limitation**: PipeWire packages only provide user session services:
+- Located in `/usr/lib/systemd/user/`
+- Contains `ConditionUser=!root` - refuses to run as root
+- Designed for desktop environments with user login sessions
+- Not suitable for headless/embedded systems
+
+**Our Solution**: Custom system-wide services with socket activation:
+- `pipewire-system.socket` - Socket activation (starts first)
+- `pipewire-system.service` - Core audio server (activated by socket)
 - `pipewire-pulse-system.service` - PulseAudio compatibility
 - `wireplumber-system.service` - Session/policy management
 
@@ -139,6 +147,30 @@ pipewire-system.service
 - Consistent audio after reboots
 - Chrome doesn't lock devices
 - Services auto-recover from failures
+
+## Known Issues and Solutions
+
+### PipeWire Startup Race Condition (Fixed in v2.2.3)
+**Problem**: WirePlumber fails to connect on cold boot with "Failed to connect to PipeWire"
+
+**Root Cause**: 
+- PipeWire doesn't create its socket immediately on startup
+- WirePlumber tries to connect before socket exists
+- Ubuntu's PipeWire uses socket activation but only for user sessions
+
+**Solution Implemented**:
+1. Added `pipewire-system.socket` for proper socket activation
+2. Socket creates listening endpoints before PipeWire starts
+3. PipeWire service triggered by socket access
+4. WirePlumber waits for socket existence in ExecStartPre
+5. Increased timeout to 10 seconds for slower systems
+
+### Ubuntu/Debian System-Wide Limitation
+**Critical Finding**: Ubuntu/Debian do NOT support system-wide PipeWire officially
+- All distribution packages are for user sessions only
+- Service files contain `ConditionUser=!root` blocking root execution
+- Official recommendation is using `loginctl enable-linger` with user accounts
+- System-wide operation requires custom service files (what we've implemented)
 
 ## Migration Notes
 
