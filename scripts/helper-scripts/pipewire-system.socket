@@ -1,0 +1,10 @@
+[Unit]
+Description=PipeWire System Sockets
+
+[Socket]
+Priority=6
+ListenStream=/run/user/0/pipewire-0
+ListenStream=/run/user/0/pipewire-0-manager
+
+[Install]
+WantedBy=sockets.target

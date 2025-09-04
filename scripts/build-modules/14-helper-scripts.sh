@@ -43,6 +43,9 @@ install_helper_scripts() {
         if [ -f "$HELPER_DIR/pipewire-system.service" ]; then
             cp "$HELPER_DIR/pipewire-system.service" /mnt/usb/etc/systemd/system/
         fi
+        if [ -f "$HELPER_DIR/pipewire-system.socket" ]; then
+            cp "$HELPER_DIR/pipewire-system.socket" /mnt/usb/etc/systemd/system/
+        fi
         if [ -f "$HELPER_DIR/pipewire-pulse-system.service" ]; then
             cp "$HELPER_DIR/pipewire-pulse-system.service" /mnt/usb/etc/systemd/system/
         fi
