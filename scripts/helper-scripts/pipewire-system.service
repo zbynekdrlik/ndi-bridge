@@ -1,6 +1,6 @@
 [Unit]
 Description=PipeWire System Service
-After=sound.target
+After=sound.target pipewire-system.socket
 Before=media-bridge-intercom.service ndi-display@0.service ndi-display@1.service ndi-display@2.service
 Requires=pipewire-system.socket
 
@@ -17,6 +17,8 @@ ExecStartPre=/bin/mkdir -p /run/user/0/pulse
 ExecStartPre=/bin/mkdir -p /var/lib/pipewire
 ExecStartPre=/bin/mkdir -p /var/cache/pipewire
 ExecStart=/usr/bin/pipewire
+# Wait for PipeWire to create its socket
+ExecStartPost=/bin/bash -c 'for i in {1..30}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.1; done; exit 1'
 Restart=always
 RestartSec=5
 # High priority for audio processing

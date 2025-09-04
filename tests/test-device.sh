@@ -56,12 +56,27 @@ ssh-keyscan -H "$IP" >> "$HOME/.ssh/known_hosts" 2>/dev/null || {
     exit 1
 }
 
+# Check if SSH key exists, create if needed
+if [ ! -f "$SSH_KEY" ]; then
+    echo -e "${YELLOW}SSH key not found at $SSH_KEY, creating it...${NC}"
+    ssh-keygen -t ed25519 -f "$SSH_KEY" -N "" -q
+    echo -e "${GREEN}SSH key created successfully${NC}"
+fi
+
+# Copy SSH key to the device
+echo "Setting up SSH key authentication..."
+if sshpass -p newlevel ssh-copy-id -i "${SSH_KEY}.pub" -o StrictHostKeyChecking=no "root@$IP" 2>/dev/null; then
+    echo -e "${GREEN}SSH key copied successfully${NC}"
+else
+    echo -e "${YELLOW}Warning: Could not copy SSH key, will use password authentication${NC}"
+fi
+
 # Run pytest with appropriate authentication
-if [ -f "$SSH_KEY" ]; then
+if [ -f "$SSH_KEY" ] && ssh -i "$SSH_KEY" -o ConnectTimeout=2 -o PasswordAuthentication=no "root@$IP" "exit" 2>/dev/null; then
     echo -e "${GREEN}Running tests with SSH key: $SSH_KEY${NC}"
     python3 -m pytest "$SCRIPT_DIR" --host "$IP" --ssh-key "$SSH_KEY" -q --tb=no "$@"
 else
-    echo -e "${YELLOW}SSH key not found, using password authentication${NC}"
+    echo -e "${YELLOW}SSH key authentication failed, using password authentication${NC}"
     python3 -m pytest "$SCRIPT_DIR" --host "$IP" --ssh-pass newlevel -q --tb=no "$@"
 fi
 
