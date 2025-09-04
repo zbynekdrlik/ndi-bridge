@@ -56,8 +56,15 @@ ssh-keyscan -H "$IP" >> "$HOME/.ssh/known_hosts" 2>/dev/null || {
     exit 1
 }
 
-# Run pytest with appropriate authentication
+# Deploy SSH key to device if it exists but isn't already deployed
 if [ -f "$SSH_KEY" ]; then
+    # Check if key auth already works
+    if ! ssh -i "$SSH_KEY" -o PasswordAuthentication=no -o ConnectTimeout=2 root@"$IP" "exit" 2>/dev/null; then
+        echo -e "${YELLOW}Deploying SSH key to device...${NC}"
+        if [ -f "$SSH_KEY.pub" ]; then
+            cat "$SSH_KEY.pub" | sshpass -p newlevel ssh -o StrictHostKeyChecking=no root@"$IP" "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && echo 'SSH key deployed'"
+        fi
+    fi
     echo -e "${GREEN}Running tests with SSH key: $SSH_KEY${NC}"
     python3 -m pytest "$SCRIPT_DIR" --host "$IP" --ssh-key "$SSH_KEY" -q --tb=no "$@"
 else
