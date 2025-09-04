@@ -178,7 +178,7 @@ The Media Bridge appliance includes built-in bidirectional audio intercom functi
 - **Audio Only**: Microphone-only mode with explicit video disabled (novideo parameter)
 - **USB Audio Support**: Uses USB audio device (3.5mm jack) for local audio I/O
 - **Ultra-Low Latency Monitoring**: Self-monitoring with 0.67ms latency (32-sample buffer @ 48kHz)
-- **PipeWire Audio**: Unified system-wide audio (see [Architecture](docs/PIPEWIRE_ARCHITECTURE.md))
+- **PipeWire Audio**: Unified system-wide audio (see [Architecture](docs/PIPEWIRE.md))
 - **Web Control Interface**: Control intercom settings via web browser at `http://device`
 - **VNC Monitoring**: Remote desktop access on port 5999 (no password)
 - **Auto-recovery**: Automatically restarts if connection drops
@@ -376,7 +376,7 @@ media-bridge/
 ### Documentation
 
 Key documentation files:
-- [PipeWire Architecture](docs/PIPEWIRE_ARCHITECTURE.md) - Unified system-wide audio architecture
+- [PipeWire Architecture](docs/PIPEWIRE.md) - Unified system-wide audio architecture
 - [Build Instructions](docs/BUILD.md) - Detailed build process
 - [Changelog](docs/CHANGELOG.md) - Version history
 - [Contributing Guide](docs/CONTRIBUTING.md) - Development guidelines

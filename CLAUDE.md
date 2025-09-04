@@ -31,7 +31,7 @@
 
 ### PipeWire Specific Rule
 **When modifying ANY PipeWire functionality:**
-- Update `docs/PIPEWIRE_ARCHITECTURE.md` IMMEDIATELY
+- Update `docs/PIPEWIRE.md` IMMEDIATELY
 - This is the ONLY authoritative source for PipeWire architecture
 - No PipeWire information should exist elsewhere
 
@@ -725,7 +725,7 @@ media-bridge-set-name     # Change NDI name
 
 ## Unified PipeWire Audio Architecture
 
-**CRITICAL: All PipeWire-related work MUST reference and update docs/PIPEWIRE_ARCHITECTURE.md**
+**CRITICAL: All PipeWire-related work MUST reference and update docs/PIPEWIRE.md**
 
 ### Core Architecture (v2.2+)
 Media Bridge uses a **unified system-wide PipeWire instance** for all audio management:
@@ -742,9 +742,9 @@ Media Bridge uses a **unified system-wide PipeWire instance** for all audio mana
 
 ### Documentation Requirements
 **MANDATORY: When modifying ANY PipeWire-related functionality:**
-1. First read `docs/PIPEWIRE_ARCHITECTURE.md` for current architecture
+1. First read `docs/PIPEWIRE.md` for current architecture
 2. Make changes following documented patterns
-3. Update `docs/PIPEWIRE_ARCHITECTURE.md` with ALL changes:
+3. Update `docs/PIPEWIRE.md` with ALL changes:
    - Service modifications
    - Configuration changes
    - New audio routing
@@ -757,7 +757,7 @@ Media Bridge uses a **unified system-wide PipeWire instance** for all audio mana
 - **Low latency**: 256 samples @ 48kHz (5.33ms)
 - **Testing**: See `tests/component/audio/test_unified_pipewire.py`
 
-For complete details, see **docs/PIPEWIRE_ARCHITECTURE.md** - the authoritative source for PipeWire architecture.
+For complete details, see **docs/PIPEWIRE.md** - the authoritative source for PipeWire architecture.
 
 ## Known Issues & Solutions
 
