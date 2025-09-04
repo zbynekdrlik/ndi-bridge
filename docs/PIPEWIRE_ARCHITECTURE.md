@@ -3,7 +3,7 @@
 ## Executive Summary
 The unified PipeWire architecture (v2.2.5) implements a system-wide audio solution for Media Bridge. This is necessary because Ubuntu/Debian do NOT provide system-wide PipeWire services - only user session services that refuse to run as root (`ConditionUser=!root`). This document describes our custom implementation for embedded/headless systems.
 
-**Latest Update (v2.2.5)**: RESOLVED cold boot socket creation issues with auto-recovery mechanism and proper service configuration. PipeWire now reliably starts on fresh images.
+**Latest Update (v2.2.6)**: PERMANENTLY FIXED cold boot socket creation. Root cause: user-runtime-dir@0.service was wiping sockets after creation. Solution: proper service ordering.
 
 ## Key Changes Implemented
 
@@ -153,7 +153,7 @@ pipewire-system.service
 
 ## Known Issues and Solutions
 
-### PipeWire Socket Activation Issues (RESOLVED in v2.2.5)
+### PipeWire Socket Activation Issues (PERMANENTLY FIXED in v2.2.6)
 
 **Critical Discovery**: PipeWire on Ubuntu/Debian has race conditions during cold boot when run as system service!
 
@@ -172,7 +172,12 @@ pipewire-system.service
 3. System resources/dependencies may not be fully available at boot time
 4. Configuration directory resolution can fail when PIPEWIRE_CONFIG_DIR is set incorrectly
 
-**Complete Solution Implemented (v2.2.5)**:
+**Complete Solution Implemented (v2.2.6)**:
+
+**ACTUAL ROOT CAUSE DISCOVERED**: 
+- systemd's `user-runtime-dir@0.service` starts AFTER PipeWire
+- This service recreates /run/user/0, wiping out PipeWire's sockets
+- Solution: Make PipeWire start AFTER user-runtime-dir@0.service
 
 1. **Trigger Socket Approach**:
    - Use `pipewire-trigger` socket for activation (not the actual PipeWire socket)
@@ -194,7 +199,7 @@ pipewire-system.service
    - Up to 20 seconds wait time (100 iterations × 0.2s)
    - Prevents WirePlumber from failing before PipeWire is ready
 
-**Final Working Configuration (v2.2.5)**:
+**Final Working Configuration (v2.2.6)**:
 
 ```ini
 # pipewire-system.socket
@@ -203,8 +208,8 @@ ListenStream=/run/user/0/pipewire-trigger
 
 # pipewire-system.service
 [Unit]
-After=sound.target pipewire-system.socket systemd-tmpfiles-setup.service
-Requires=pipewire-system.socket
+After=sound.target pipewire-system.socket systemd-tmpfiles-setup.service user-runtime-dir@0.service
+Requires=pipewire-system.socket user-runtime-dir@0.service
 Wants=systemd-tmpfiles-setup.service
 
 [Service]
@@ -212,7 +217,7 @@ Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
 # NO PIPEWIRE_CONFIG_DIR - causes issues!
 ExecStartPre=/bin/sleep 2
-ExecStart=/usr/bin/pipewire -c /usr/share/pipewire/pipewire.conf
+ExecStart=/usr/bin/pipewire -c /etc/pipewire/pipewire-system.conf
 # Auto-restart if socket not created
 ExecStartPost=/bin/bash -c 'sleep 5; if [ ! -S /run/user/0/pipewire-0 ]; then systemctl restart pipewire-system; fi'
 
@@ -222,7 +227,7 @@ ExecStartPost=/bin/bash -c 'sleep 5; if [ ! -S /run/user/0/pipewire-0 ]; then sy
 ExecStartPre=/bin/bash -c 'for i in {1..100}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.2; done; exit 1'
 ```
 
-**Verification in v2.2.5 Image**:
+**Verification in v2.2.6 Image**:
 - Built and verified image contains all fixes
 - Services properly configured with correct dependencies
 - Configuration files in place at `/etc/pipewire/pipewire.conf.d/`
