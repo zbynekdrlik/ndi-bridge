@@ -1,8 +1,8 @@
 [Unit]
 Description=PipeWire System Service
-After=sound.target pipewire-system.socket systemd-tmpfiles-setup.service
+After=sound.target pipewire-system.socket systemd-tmpfiles-setup.service user-runtime-dir@0.service
 Before=media-bridge-intercom.service ndi-display@0.service ndi-display@1.service ndi-display@2.service
-Requires=pipewire-system.socket
+Requires=pipewire-system.socket user-runtime-dir@0.service
 Wants=systemd-tmpfiles-setup.service
 
 [Service]
@@ -17,11 +17,11 @@ ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /run/user/0/pulse
 ExecStartPre=/bin/mkdir -p /var/lib/pipewire
 ExecStartPre=/bin/mkdir -p /var/cache/pipewire
-# Small delay to ensure system is ready
-ExecStartPre=/bin/sleep 2
-ExecStart=/usr/bin/pipewire -c /usr/share/pipewire/pipewire.conf
-# Force PipeWire restart if socket doesn't exist
-ExecStartPost=/bin/bash -c 'sleep 5; if [ ! -S /run/user/0/pipewire-0 ]; then systemctl restart pipewire-system; fi'
+# Create runtime directory and wait for system to stabilize
+ExecStartPre=/bin/bash -c 'mkdir -p /run/user/0 && chmod 700 /run/user/0 && sleep 5'
+ExecStart=/usr/bin/pipewire -c /etc/pipewire/pipewire-system.conf
+# Log socket status for debugging
+ExecStartPost=/bin/bash -c 'sleep 3; ls -la /run/user/0/pipewire* 2>&1 | logger -t pipewire-socket-check'
 Restart=always
 RestartSec=5
 # High priority for audio processing

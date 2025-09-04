@@ -54,6 +54,10 @@ install_helper_scripts() {
         fi
         
         # Install PipeWire configuration
+        if [ -f "$HELPER_DIR/pipewire-system.conf" ]; then
+            mkdir -p /mnt/usb/etc/pipewire
+            cp "$HELPER_DIR/pipewire-system.conf" /mnt/usb/etc/pipewire/
+        fi
         if [ -d "$HELPER_DIR/pipewire-conf.d" ]; then
             mkdir -p /mnt/usb/etc/pipewire/pipewire.conf.d
             cp "$HELPER_DIR/pipewire-conf.d"/*.conf /mnt/usb/etc/pipewire/pipewire.conf.d/

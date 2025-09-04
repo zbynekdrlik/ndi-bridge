@@ -2,7 +2,8 @@
 Description=WirePlumber System Session Manager
 After=pipewire-system.service
 Requires=pipewire-system.service
-BindsTo=pipewire-system.service
+# Don't use BindsTo - it causes restart loops
+Wants=pipewire-system.service
 
 [Service]
 Type=simple
@@ -15,8 +16,8 @@ Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
 ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /var/lib/wireplumber
 ExecStartPre=/bin/mkdir -p /var/cache/wireplumber
-# Wait for PipeWire socket - necessary due to race condition on cold boot
-ExecStartPre=/bin/bash -c 'for i in {1..100}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.2; done; exit 1'
+# Wait for PipeWire socket with longer timeout
+ExecStartPre=/bin/bash -c 'for i in {1..150}; do [ -S /run/user/0/pipewire-0 ] && exit 0; sleep 0.5; done; echo "PipeWire socket not found after 75 seconds" >&2; exit 1'
 ExecStart=/usr/bin/wireplumber
 Restart=always
 RestartSec=5

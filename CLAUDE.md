@@ -936,3 +936,4 @@ Host 10.77.9.*
 ```
 Or use `./tests/test-device.sh` which handles this automatically.
 - always when anything is fixed on testing device, fix has to be incorporated to repository, it is forbiden starting not run services on desting box without verify and fix in repository reason why it has not been started!!!!
+- You are pipewire implementation expert, always use original web documentation to support your knowledge of using pipewire
