@@ -676,6 +676,42 @@ media-bridge-set-name     # Change NDI name
 - Terminal: Persistent tmux session via wetty
 - Config: `/etc/nginx/sites-available/media-bridge`
 
+## Unified PipeWire Audio Architecture
+
+**CRITICAL: All PipeWire-related work MUST reference and update UNIFIED_PIPEWIRE_REVIEW.md**
+
+### Core Architecture (v2.2+)
+Media Bridge uses a **unified system-wide PipeWire instance** for all audio management:
+- Single PipeWire process running as root (no user sessions)
+- WirePlumber for session/policy management
+- PulseAudio compatibility via pipewire-pulse
+- Virtual devices isolate Chrome from hardware
+
+### Key Components
+1. **System Services**: pipewire-system, pipewire-pulse-system, wireplumber-system
+2. **Virtual Devices**: intercom-speaker, intercom-microphone (prevents device locking)
+3. **Configuration**: `/etc/pipewire/`, `/etc/wireplumber/`
+4. **Runtime**: `/var/run/pipewire/`
+
+### Documentation Requirements
+**MANDATORY: When modifying ANY PipeWire-related functionality:**
+1. First read `UNIFIED_PIPEWIRE_REVIEW.md` for current architecture
+2. Make changes following documented patterns
+3. Update `UNIFIED_PIPEWIRE_REVIEW.md` with ALL changes:
+   - Service modifications
+   - Configuration changes
+   - New audio routing
+   - Test additions
+4. Ensure consistency across all files
+
+### Quick Reference
+- **Check audio**: `pactl list sinks` (uses system PipeWire)
+- **Virtual devices**: Created by media-bridge-audio-manager
+- **Low latency**: 256 samples @ 48kHz (5.33ms)
+- **Testing**: See `tests/component/audio/test_unified_pipewire.py`
+
+For complete details, see **UNIFIED_PIPEWIRE_REVIEW.md** - the authoritative source for PipeWire architecture.
+
 ## Known Issues & Solutions
 
 | Issue | Solution |
@@ -685,8 +721,9 @@ media-bridge-set-name     # Change NDI name
 | mDNS fails in WSL | Use IP address or test from Windows |
 | --version hangs | Fixed in main.cpp - exits before init |
 | Scripts not updating | Removed inline scripts from 10-tty-config.sh |
-| Chrome shows no audio devices | Reboot device, select USB device in Chrome |
-| Audio device locked after testing | Stale PipeWire modules can lock devices - reboot clears state |
+| Chrome shows no audio devices | Check virtual devices: `pactl list sources` |
+| Audio device locked | Virtual devices prevent locking - check wireplumber logs |
+| PipeWire not starting | Check service deps: `systemctl status pipewire-system wireplumber-system` |
 
 ## NDI Display System (v1.6.8+)
 
