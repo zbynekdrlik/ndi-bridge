@@ -150,6 +150,7 @@ class TestIntercomMonitorLatency:
         assert script.exists, "Monitor script should exist"
     
     @pytest.mark.slow
+    @pytest.mark.timeout(60)  # Monitor operations can take time
     def test_monitor_enable_disable_cycle(self, host):
         """Test that monitor can be enabled and disabled repeatedly."""
         for cycle in range(3):
