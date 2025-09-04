@@ -187,6 +187,19 @@ fi
 if [ -f /tmp/helper-scripts/dante-bridge.service ]; then
     cp /tmp/helper-scripts/dante-bridge.service /etc/systemd/system/
     echo "  Copied dante-bridge.service"
+fi
+
+# Install Avahi service for Dante mDNS discovery
+if [ -f /tmp/helper-scripts/dante-avahi.service ]; then
+    mkdir -p /etc/avahi/services
+    cp /tmp/helper-scripts/dante-avahi.service /etc/avahi/services/dante.service
+    echo "  Installed Avahi service for Dante discovery"
+fi
+
+# Install inferno2pipe utility if built
+if [ -f /opt/inferno/target/release/inferno2pipe ]; then
+    cp /opt/inferno/target/release/inferno2pipe /usr/local/bin/
+    echo "  Installed inferno2pipe utility"
 else
     # Fallback - create minimal service
     cat > /etc/systemd/system/dante-bridge.service << 'EOFSERVICE'

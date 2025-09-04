@@ -1,0 +1,21 @@
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name>media-bridge</name>
+  <service>
+    <type>_netaudio-arc._udp</type>
+    <port>8700</port>
+  </service>
+  <service>
+    <type>_netaudio-cmc._udp</type>
+    <port>8701</port>
+  </service>
+  <service>
+    <type>_netaudio-dbc._udp</type>
+    <port>8800</port>
+  </service>
+  <service>
+    <type>_netaudio-acc._udp</type>
+    <port>8801</port>
+  </service>
+</service-group>

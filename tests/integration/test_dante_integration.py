@@ -51,7 +51,7 @@ class TestDanteFullStack:
         
         # Check discovery ports
         ports_result = host.run("netstat -uln | grep -E ':870[08]|:880[08]'")
-        assert ports_result.exit_code == 0
+        assert ports_result.exit_status == 0
         
         # Check at least 2 ports opened (8700, 8800 minimum)
         port_count = len(ports_result.stdout.strip().split('\n'))
