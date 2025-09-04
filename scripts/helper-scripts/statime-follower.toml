@@ -4,7 +4,7 @@
 
 loglevel = "info"
 
-# PTP network configuration (Dante domain 0)
+# PTP network configuration
 sdo-id = 0
 domain = 0
 
@@ -16,15 +16,15 @@ priority2 = 255
 # Enable virtual system clock with usrvclock export for Inferno
 virtual-system-clock = true
 virtual-system-clock-base = "monotonic_raw"
-usrvclock-export = true  # CRITICAL: Required for Inferno clock sync
+usrvclock-export = true
+usrvclock-path = "/tmp/ptp-usrvclock"
 
 # Network interface configuration
 [[port]]
-interface = "br0"  # Bridge interface for Media Bridge
-network-mode = "ipv4"  # Dante uses IPv4
-
-# Hardware timestamping (auto-detect)
+interface = "br0"
+network-mode = "ipv4"
 hardware-clock = "auto"
-
-# CRITICAL: Dante requires PTPv1 (NOT PTPv2!)
+announce-interval = 1
+sync-interval = 0
+delay-interval = 3
 protocol-version = "PTPv1"

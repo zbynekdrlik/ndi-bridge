@@ -1,9 +1,9 @@
 [Unit]
 Description=Dante Audio Bridge with PipeWire
 Documentation=man:pipewire(1) man:pw-link(1)
-After=network-online.target sound.target pipewire.service wireplumber.service statime.service
-Wants=network-online.target pipewire.service wireplumber.service statime.service
-Requires=pipewire.service statime.service
+After=network-online.target sound.target statime.service
+Wants=network-online.target statime.service
+Requires=statime.service
 
 [Service]
 Type=simple
