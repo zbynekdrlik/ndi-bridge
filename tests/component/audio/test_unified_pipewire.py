@@ -150,3 +150,70 @@ def test_hdmi_audio_separate_from_usb(host):
     result = host.run("/usr/local/bin/media-bridge-audio-manager status")
     # Should show separate sections for USB and HDMI
     assert "USB Devices:" in result.stdout or "HDMI Devices:" in result.stdout
+
+
+def test_pipewire_socket_trigger_exists(host):
+    """Test that PipeWire trigger socket unit exists."""
+    socket = host.service("pipewire-system.socket")
+    assert socket.is_enabled, "pipewire-system.socket not enabled"
+    
+    # Check socket uses trigger path
+    result = host.run("systemctl cat pipewire-system.socket")
+    assert "pipewire-trigger" in result.stdout, "Socket not using trigger path"
+
+
+def test_pipewire_starts_after_user_runtime_dir(host):
+    """Test CRITICAL dependency: PipeWire starts AFTER user-runtime-dir@0."""
+    result = host.run("systemctl show pipewire-system -p After")
+    assert "user-runtime-dir@0.service" in result.stdout, "CRITICAL: PipeWire not ordered after user-runtime-dir@0"
+    
+    result = host.run("systemctl show pipewire-system -p Requires")
+    assert "user-runtime-dir@0.service" in result.stdout, "CRITICAL: PipeWire doesn't require user-runtime-dir@0"
+
+
+def test_pipewire_custom_config_exists(host):
+    """Test that custom PipeWire config with explicit socket creation exists."""
+    config = host.file("/etc/pipewire/pipewire-system.conf")
+    assert config.exists, "Custom pipewire-system.conf not found"
+    
+    # Check for explicit socket creation
+    content = config.content_string
+    assert "pipewire-0" in content, "Socket creation not configured"
+    assert "pipewire-0-manager" in content, "Manager socket not configured"
+    assert "sockets" in content, "Socket block not present"
+
+
+def test_pipewire_sockets_created(host):
+    """Test that PipeWire creates its own sockets."""
+    socket0 = host.file("/run/user/0/pipewire-0")
+    socket_mgr = host.file("/run/user/0/pipewire-0-manager")
+    
+    assert socket0.exists, "PipeWire socket not created"
+    assert socket_mgr.exists, "PipeWire manager socket not created"
+    assert socket0.is_socket, "pipewire-0 is not a socket"
+    assert socket_mgr.is_socket, "pipewire-0-manager is not a socket"
+
+
+def test_wireplumber_waits_for_socket(host):
+    """Test that WirePlumber waits for PipeWire socket before starting."""
+    result = host.run("systemctl cat wireplumber-system.service")
+    assert "ExecStartPre=" in result.stdout, "WirePlumber missing socket wait"
+    assert "pipewire-0" in result.stdout, "WirePlumber not waiting for correct socket"
+    assert "for i in" in result.stdout, "WirePlumber missing wait loop"
+
+
+def test_no_bindsto_preventing_restarts(host):
+    """Test that BindsTo was removed to prevent restart loops."""
+    result = host.run("systemctl show wireplumber-system -p BindsTo")
+    # BindsTo should be empty or not set
+    bindsto = result.stdout.strip()
+    assert "pipewire-system.service" not in bindsto, "BindsTo still present, causes restart loops"
+
+
+def test_pipewire_socket_permissions(host):
+    """Test that PipeWire sockets have correct permissions."""
+    if host.file("/run/user/0/pipewire-0").exists:
+        result = host.run("stat -c '%a' /run/user/0/pipewire-0")
+        perms = result.stdout.strip()
+        # PipeWire creates sockets with 755 or 666
+        assert perms in ["755", "666"], f"Unexpected socket permissions: {perms}"

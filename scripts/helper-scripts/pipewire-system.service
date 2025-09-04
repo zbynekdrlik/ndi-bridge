@@ -17,8 +17,8 @@ ExecStartPre=/bin/mkdir -p /run/user/0
 ExecStartPre=/bin/mkdir -p /run/user/0/pulse
 ExecStartPre=/bin/mkdir -p /var/lib/pipewire
 ExecStartPre=/bin/mkdir -p /var/cache/pipewire
-# Create runtime directory and wait for system to stabilize
-ExecStartPre=/bin/bash -c 'mkdir -p /run/user/0 && chmod 700 /run/user/0 && sleep 5'
+# Ensure correct permissions
+ExecStartPre=/bin/chmod 700 /run/user/0
 ExecStart=/usr/bin/pipewire -c /etc/pipewire/pipewire-system.conf
 # Log socket status for debugging
 ExecStartPost=/bin/bash -c 'sleep 3; ls -la /run/user/0/pipewire* 2>&1 | logger -t pipewire-socket-check'

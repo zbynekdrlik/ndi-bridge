@@ -8,6 +8,17 @@ import pytest
 import time
 
 
+def test_display_uses_system_pipewire(host):
+    """Test that ndi-display uses the unified system-wide PipeWire."""
+    # Check that display service uses correct runtime dir
+    result = host.run("systemctl cat 'ndi-display@.service' | grep XDG_RUNTIME_DIR")
+    assert "/run/user/0" in result.stdout, "Display not using system PipeWire runtime"
+    
+    # Verify display service depends on PipeWire
+    result = host.run("systemctl cat 'ndi-display@.service' | grep After")
+    assert "pipewire-system.service" in result.stdout, "Display not ordered after PipeWire"
+
+
 @pytest.mark.integration
 @pytest.mark.display
 @pytest.mark.audio
