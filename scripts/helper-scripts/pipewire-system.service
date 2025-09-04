@@ -4,7 +4,7 @@ After=sound.target
 Before=media-bridge-intercom.service ndi-display@0.service ndi-display@1.service ndi-display@2.service
 
 [Service]
-Type=simple
+Type=notify
 User=root
 Environment="XDG_RUNTIME_DIR=/run/user/0"
 Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
