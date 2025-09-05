@@ -46,8 +46,7 @@ show_usage() {
     echo "  $0 10.77.8.124 -m critical              # Run critical tests only"
     echo "  $0 10.77.8.124 -v                       # Verbose output"
     echo "  $0 10.77.8.124 --collect-only           # Quick SSH verification"
-    echo "  $0 10.77.8.124 -m \"not slow\"           # Skip slow tests"
-    echo "  $0 10.77.8.124 --html=report.html       # Generate HTML report"
+    echo "  $0 10.77.8.124 -m slow                  # Run slow functional tests"
     echo
     echo -e "${YELLOW}Test Categories:${NC}"
     echo "  tests/component/    - Atomic component tests (312 tests)"

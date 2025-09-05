@@ -549,6 +549,34 @@ sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
 **Note**: The box's SSH may show welcome screen. Add `-o LogLevel=ERROR` to suppress it.
 - Use TDD test driven development. Working and full tests sucess are most important part.
 
+## Running Full Test Suite (CRITICAL FOR CLAUDE)
+
+**IMPORTANT**: Tests take 10-15 minutes (384 tests). Terminal commands timeout after 2 minutes!
+
+### ALWAYS Run Tests in Background to Avoid Timeouts:
+```bash
+# Step 1: Run test-device.sh in BACKGROUND
+./tests/test-device.sh <DEVICE_IP> 2>&1 | tee test-run.log &
+
+# Step 2: Monitor progress (don't wait synchronously)
+tail -f test-run.log | grep -E "passed|failed|ERROR"
+
+# Step 3: Get final summary when done
+tail -100 test-run.log | grep -E "===.*passed.*failed.*seconds ==="
+```
+
+**WHY THIS IS CRITICAL**:
+- The test suite takes 11+ minutes (as shown: 671.21s)
+- Claude's terminal commands timeout after 2 minutes
+- Running in background with `&` prevents timeout
+- Use `tee` to save output while tests run
+- Check results asynchronously with `tail -f`
+
+**Example from actual run**:
+```
+======== 10 failed, 370 passed, 4 skipped, 3 rerun in 671.21s (0:11:11) ========
+```
+
 # important-instruction-reminders
 
 **TDD Philosophy**: Use test-driven development. Working tests and full test success are the most important part.

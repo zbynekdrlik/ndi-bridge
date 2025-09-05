@@ -103,7 +103,7 @@ tests/
 ### CI/CD Testing
 ```bash
 # Full validation for release
-./tests/test-device.sh 10.77.8.124 --html=test-report.html
+./tests/test-device.sh 10.77.8.124
 
 # Component isolation
 ./tests/test-device.sh 10.77.8.124 tests/component/ -v
@@ -120,8 +120,8 @@ tests/
 # Run single failing test
 ./tests/test-device.sh 10.77.8.124 tests/component/audio/test_pipewire_system.py::test_pipewire_service_running
 
-# Skip slow tests during debugging
-./tests/test-device.sh 10.77.8.124 -m "not slow"
+# Run slow functional tests (most important tests)
+./tests/test-device.sh 10.77.8.124 -m slow
 ```
 
 ## Understanding Test Results
@@ -166,8 +166,8 @@ Tests are tagged with markers for selective execution:
 # Run only critical tests (fastest validation)
 ./tests/test-device.sh 10.77.8.124 -m critical
 
-# Skip slow tests (for faster iteration)  
-./tests/test-device.sh 10.77.8.124 -m "not slow"
+# Run slow functional tests (thorough validation)  
+./tests/test-device.sh 10.77.8.124 -m slow
 
 # Run only audio tests
 ./tests/test-device.sh 10.77.8.124 -m audio
@@ -251,18 +251,6 @@ If tests are failing due to infrastructure problems:
 
 ## Advanced Usage
 
-### Parallel Execution:
-```bash
-# Run tests in parallel (faster, but harder to debug)
-./tests/test-device.sh 10.77.8.124 -n auto
-```
-
-### Generate HTML Reports:
-```bash
-# Create detailed HTML report
-./tests/test-device.sh 10.77.8.124 --html=report.html --self-contained-html
-```
-
 ### Custom pytest Options:
 ```bash
 # Any additional pytest flags pass through
@@ -283,7 +271,7 @@ If tests are failing due to infrastructure problems:
 ### After Flashing New Image:
 ```bash
 # Full validation of new build
-./tests/test-device.sh 10.77.8.124 --html=validation-report.html
+./tests/test-device.sh 10.77.8.124
 ```
 
 ### Debugging New Features:
