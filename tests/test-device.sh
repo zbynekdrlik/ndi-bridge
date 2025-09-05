@@ -71,13 +71,24 @@ else
     echo -e "${YELLOW}Warning: Could not copy SSH key, will use password authentication${NC}"
 fi
 
-# Run pytest with appropriate authentication
+# Run pytest with appropriate authentication and retry on failures
+# --reruns 3: Retry failed tests up to 3 times
+# --reruns-delay 5: Wait 5 seconds between retries
+# --only-rerun "timeout|TimeoutError|ConnectionError": Only retry on connection issues
 if [ -f "$SSH_KEY" ] && ssh -i "$SSH_KEY" -o ConnectTimeout=2 -o PasswordAuthentication=no "root@$IP" "exit" 2>/dev/null; then
     echo -e "${GREEN}Running tests with SSH key: $SSH_KEY${NC}"
-    python3 -m pytest "$SCRIPT_DIR" --host "$IP" --ssh-key "$SSH_KEY" -q --tb=no "$@"
+    echo -e "${GREEN}Auto-retry enabled for connection issues (3 retries with 5s delay)${NC}"
+    python3 -m pytest "$SCRIPT_DIR" --host "$IP" --ssh-key "$SSH_KEY" -q --tb=no --maxfail=0 \
+        --reruns 3 --reruns-delay 5 \
+        --only-rerun "timeout|TimeoutError|ConnectionError|EOFError|Connection reset|Connection refused|No route to host" \
+        "$@"
 else
     echo -e "${YELLOW}SSH key authentication failed, using password authentication${NC}"
-    python3 -m pytest "$SCRIPT_DIR" --host "$IP" --ssh-pass newlevel -q --tb=no "$@"
+    echo -e "${GREEN}Auto-retry enabled for connection issues (3 retries with 5s delay)${NC}"
+    python3 -m pytest "$SCRIPT_DIR" --host "$IP" --ssh-pass newlevel -q --tb=no --maxfail=0 \
+        --reruns 3 --reruns-delay 5 \
+        --only-rerun "timeout|TimeoutError|ConnectionError|EOFError|Connection reset|Connection refused|No route to host" \
+        "$@"
 fi
 
 echo -e "${GREEN}Testing complete!${NC}"

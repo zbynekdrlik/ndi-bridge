@@ -108,6 +108,9 @@ class TestIntercomRenameComprehensive:
         original_hostname = host.run("hostname").stdout.strip()
         original_name = original_hostname.replace("media-bridge-", "")
         
+        # The test should always restore to a clean state
+        # We don't restore to the original because it may have been pytest99 from a previous failed test
+        
         # Get Chrome PID before rename
         pid_before = host.run("pgrep -f 'vdo.ninja' | head -1 || echo 'none'").stdout.strip()
         
@@ -160,17 +163,41 @@ class TestIntercomRenameComprehensive:
         
         assert chrome_with_new_name, f"Chrome should use new name '{new_name}' in push parameter after 30 seconds. Last ps output: {ps_after}"
         
-        # Restore original name
-        restore_result = host.run(f"media-bridge-set-name {original_name}")
-        assert restore_result.succeeded, "Restore should succeed"
+        # Verify that the rename properly updated all system files
+        # Check avahi configuration was updated
+        avahi_config = host.run("grep '^host-name=' /etc/avahi/avahi-daemon.conf").stdout.strip()
+        assert f"host-name=media-bridge-{new_name}" in avahi_config, f"Avahi config should have new hostname, got: {avahi_config}"
         
-        # Wait for hostname to update
-        time.sleep(2)
+        # Check NDI config was updated
+        ndi_config = host.run("grep 'NDI_NAME=' /etc/media-bridge/config").stdout.strip()
+        assert f'NDI_NAME="{new_name}"' in ndi_config, f"NDI config should have new name, got: {ndi_config}"
         
-        # Verify restoration
+        # Check mDNS advertisement
+        avahi_browse = host.run("avahi-browse -a -t -r -p 2>/dev/null | grep -o '[^;]*\\.local' | head -1 || echo 'none'").stdout.strip()
+        # Should see the new name in mDNS (though it might take time to propagate)
+        
+        # Now restore using the helper script itself (as it should be used in real scenarios)
+        # The helper script should handle all the system updates
+        restore_result = host.run("media-bridge-set-name USB_Capture")
+        assert restore_result.succeeded, "Restore with helper script should succeed"
+        
+        # Verify output shows intercom restart
+        assert "Restarting Intercom service" in restore_result.stdout, "Restore should show intercom restart message"
+        
+        # Wait for services to stabilize
+        time.sleep(5)
+        
+        # Verify complete restoration
         restored_hostname = host.run("hostname").stdout.strip()
-        # If the test was run on "pytest99" originally, that's OK
-        assert restored_hostname == original_hostname or restored_hostname == "media-bridge-pytest99", f"Hostname should be restored to {original_hostname}, got {restored_hostname}"
+        assert restored_hostname == "media-bridge", f"Hostname should be restored to media-bridge, got {restored_hostname}"
+        
+        # Verify avahi was restored
+        avahi_restored = host.run("grep '^host-name=' /etc/avahi/avahi-daemon.conf").stdout.strip()
+        assert "host-name=media-bridge" in avahi_restored, f"Avahi should be restored, got: {avahi_restored}"
+        
+        # Verify NDI config was restored
+        ndi_restored = host.run("grep 'NDI_NAME=' /etc/media-bridge/config").stdout.strip()
+        assert 'NDI_NAME="USB Capture"' in ndi_restored, f"NDI config should be restored, got: {ndi_restored}"
     
     def test_intercom_survives_reboot(self, host):
         """Test that intercom service is enabled and starts on boot."""

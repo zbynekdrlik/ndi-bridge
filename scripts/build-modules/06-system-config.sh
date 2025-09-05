@@ -17,10 +17,11 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "Configuring APT repositories..."
 # Enable universe repository for additional packages
+# Use German mirror for much faster downloads
 cat > /etc/apt/sources.list << EOFAPT
-deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+deb http://de.archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+deb http://de.archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+deb http://de.archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
 EOFAPT
 

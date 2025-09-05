@@ -1,6 +1,6 @@
 [Unit]
 Description=NDI Display Output %i
-After=network.target
+After=network.target pipewire-system.service
 Wants=ndi-display-monitor.service
 Before=getty@tty%i.service
 Conflicts=getty@tty%i.service
@@ -14,6 +14,7 @@ User=root
 # Environment for display selection
 Environment="DISPLAY_ID=%i"
 Environment="LD_LIBRARY_PATH=/usr/local/lib"
+Environment="XDG_RUNTIME_DIR=/run/user/0"
 
 # Read stream configuration from file
 EnvironmentFile=-/etc/media-bridge/display-%i.conf

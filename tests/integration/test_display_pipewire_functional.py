@@ -212,7 +212,7 @@ def test_display_audio_continuity(host):
         pytest.skip("Display 2 not connected")
     
     try:
-        # Start ndi-display
+        # Start ndi-display with CG OBS stream (has audio)
         host.run("pkill ndi-display 2>/dev/null || true")
         host.run("nohup /opt/media-bridge/ndi-display 'RESOLUME-SNV (cg-obs)' 2 > /tmp/ndi-continuity.log 2>&1 & echo $! > /tmp/ndi-cont.pid")
         

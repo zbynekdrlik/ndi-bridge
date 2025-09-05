@@ -29,16 +29,29 @@ def test_systemd_timesyncd_enabled(host):
 
 
 def test_systemd_timesyncd_running(host):
-    """Test that time sync service is running."""
+    """Test that time sync service is running (PTP, chrony, or timesyncd)."""
+    # Check PTP first (preferred for media bridge)
+    ptp_service = host.service("ptp4l")
+    if ptp_service.is_running:
+        assert True, "PTP4L is running for time sync"
+        return
+    
     # Check if chrony is installed and running
     chrony_check = host.run("which chronyd")
     if chrony_check.rc == 0:
         service = host.service("chronyd")
-        assert service.is_running, "chronyd not running"
-    else:
-        # Fall back to systemd-timesyncd
-        service = host.service("systemd-timesyncd")
-        assert service.is_running, "systemd-timesyncd not running"
+        if service.is_running:
+            assert True, "chronyd is running for time sync"
+            return
+    
+    # Fall back to systemd-timesyncd
+    service = host.service("systemd-timesyncd")
+    if service.is_running:
+        assert True, "systemd-timesyncd is running for time sync"
+        return
+    
+    # No time sync service running
+    assert False, "No time synchronization service is running (checked ptp4l, chronyd, systemd-timesyncd)"
 
 
 def test_timedatectl_command_works(host):
