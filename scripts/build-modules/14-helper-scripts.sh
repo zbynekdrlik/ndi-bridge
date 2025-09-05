@@ -17,8 +17,8 @@ install_helper_scripts() {
         
         # Copy Media Bridge intercom scripts and service (PipeWire only)
         if [ -f "$HELPER_DIR/media-bridge-intercom-pipewire" ]; then
-            cp "$HELPER_DIR/media-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/
-            chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom-pipewire
+            cp "$HELPER_DIR/media-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/media-bridge-intercom
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom
         fi
         
         # Copy launcher (PipeWire only, no fallback)
@@ -43,11 +43,36 @@ install_helper_scripts() {
         if [ -f "$HELPER_DIR/pipewire-system.service" ]; then
             cp "$HELPER_DIR/pipewire-system.service" /mnt/usb/etc/systemd/system/
         fi
+        if [ -f "$HELPER_DIR/pipewire-system.socket" ]; then
+            cp "$HELPER_DIR/pipewire-system.socket" /mnt/usb/etc/systemd/system/
+        fi
         if [ -f "$HELPER_DIR/pipewire-pulse-system.service" ]; then
             cp "$HELPER_DIR/pipewire-pulse-system.service" /mnt/usb/etc/systemd/system/
         fi
         if [ -f "$HELPER_DIR/wireplumber-system.service" ]; then
             cp "$HELPER_DIR/wireplumber-system.service" /mnt/usb/etc/systemd/system/
+        fi
+        
+        # Install PipeWire configuration
+        if [ -f "$HELPER_DIR/pipewire-system.conf" ]; then
+            mkdir -p /mnt/usb/etc/pipewire
+            cp "$HELPER_DIR/pipewire-system.conf" /mnt/usb/etc/pipewire/
+        fi
+        if [ -d "$HELPER_DIR/pipewire-conf.d" ]; then
+            mkdir -p /mnt/usb/etc/pipewire/pipewire.conf.d
+            cp "$HELPER_DIR/pipewire-conf.d"/*.conf /mnt/usb/etc/pipewire/pipewire.conf.d/
+        fi
+        
+        # Install WirePlumber configuration
+        if [ -d "$HELPER_DIR/wireplumber-conf.d" ]; then
+            mkdir -p /mnt/usb/etc/wireplumber/main.lua.d
+            cp "$HELPER_DIR/wireplumber-conf.d"/*.lua /mnt/usb/etc/wireplumber/main.lua.d/
+        fi
+        
+        # Install audio manager
+        if [ -f "$HELPER_DIR/media-bridge-audio-manager" ]; then
+            cp "$HELPER_DIR/media-bridge-audio-manager" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-manager
         fi
         
         

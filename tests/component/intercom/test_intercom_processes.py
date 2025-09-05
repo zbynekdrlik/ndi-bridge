@@ -157,6 +157,7 @@ class TestIntercomProcesses:
                 mem_mb = int(mem_bytes) / (1024 * 1024)
                 assert mem_mb < 512, f"Intercom service using too much memory: {mem_mb}MB"
     
+    @pytest.mark.timeout(120)  # Increase timeout for Chrome startup
     def test_chrome_push_parameter_matches_hostname(self, host):
         """Test that Chrome push parameter matches device hostname."""
         # Get hostname

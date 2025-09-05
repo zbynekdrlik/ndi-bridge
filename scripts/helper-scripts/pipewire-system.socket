@@ -1,0 +1,11 @@
+[Unit]
+Description=PipeWire System Socket Trigger
+Before=pipewire-system.service
+
+[Socket]
+# This is a trigger socket - just used to start the service
+# PipeWire will create its own actual sockets
+ListenStream=/run/user/0/pipewire-trigger
+
+[Install]
+WantedBy=sockets.target

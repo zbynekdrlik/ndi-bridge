@@ -4,6 +4,9 @@
 configure_system() {
     log "Creating system configuration script..."
     
+    # Ensure tmp directory exists (debootstrap should create it but let's be safe)
+    mkdir -p /mnt/usb/tmp
+    
     # Create the main configuration script that will run in chroot
     cat > /mnt/usb/tmp/configure-system.sh << 'EOFSCRIPT'
 #!/bin/bash
@@ -14,10 +17,11 @@ export DEBIAN_FRONTEND=noninteractive
 
 echo "Configuring APT repositories..."
 # Enable universe repository for additional packages
+# Use German mirror for much faster downloads
 cat > /etc/apt/sources.list << EOFAPT
-deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
-deb http://archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
+deb http://de.archive.ubuntu.com/ubuntu noble main restricted universe multiverse
+deb http://de.archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse
+deb http://de.archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse
 deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse
 EOFAPT
 
@@ -157,6 +161,11 @@ timedatectl set-timezone Europe/Prague || {
     echo "Europe/Prague" > /etc/timezone
 }
 echo "Timezone configured: $(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone)"
+
+# Configure global environment for system-wide PipeWire
+echo "Configuring global environment..."
+echo "XDG_RUNTIME_DIR=/run/user/0" >> /etc/environment
+echo "Global XDG_RUNTIME_DIR configured for system-wide PipeWire"
 
 # Create version file for system identification
 echo "Creating version file..."

@@ -99,13 +99,15 @@ run_chroot_setup() {
     mount --bind /dev/pts /mnt/usb/dev/pts
     mount --bind /proc /mnt/usb/proc
     mount --bind /sys /mnt/usb/sys
+    # CRITICAL: Bind mount EFI partition so grub-install can access it
+    mount --bind /mnt/usb/boot/efi /mnt/usb/boot/efi
     
     # Set up environment to reduce warnings
     export DEBIAN_FRONTEND=noninteractive
     export USB_DEVICE  # Pass USB device to chroot
     
-    # Run setup script
-    chroot /mnt/usb /tmp/configure-system.sh 2>&1 | \
+    # Run setup script with bash explicitly
+    chroot /mnt/usb /bin/bash /tmp/configure-system.sh 2>&1 | \
         while IFS= read -r line; do
             # Filter out verbose package installation output and known warnings
             if [[ ! "$line" =~ ^(Get:|Fetched|Reading|Building|Selecting|Preparing|Unpacking|Setting) ]] && \
@@ -116,6 +118,7 @@ run_chroot_setup() {
         done
     
     # Unmount
+    umount /mnt/usb/boot/efi  # Unmount bind-mounted EFI
     umount /mnt/usb/dev/pts
     umount /mnt/usb/dev
     umount /mnt/usb/proc

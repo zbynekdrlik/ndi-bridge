@@ -75,6 +75,7 @@ def test_capture_memory_footprint(host):
     assert rss_mb < 500, f"High memory usage: {rss_mb:.1f}MB"
 
 
+@pytest.mark.timeout(90)  # Increase timeout for 60s measurement period
 def test_no_memory_leaks_over_time(host):
     """Test that memory usage doesn't increase significantly over time."""
     pid_result = host.run("pgrep -x ndi-capture")

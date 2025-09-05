@@ -41,6 +41,25 @@ class TestIntercomCore:
         assert "CPUQuota=" in content, "Service should have CPU limit"
         assert "WantedBy=multi-user.target" in content, "Service should start at boot"
     
+    def test_intercom_uses_system_pipewire(self, host):
+        """Test that intercom uses unified system-wide PipeWire."""
+        # Check service dependencies
+        result = host.run("systemctl show media-bridge-intercom -p Requires")
+        assert "pipewire-system.service" in result.stdout, "Intercom doesn't require system PipeWire"
+        
+        # Check runtime directory environment
+        result = host.run("systemctl show media-bridge-intercom -p Environment")
+        if "XDG_RUNTIME_DIR" in result.stdout:
+            assert "/run/user/0" in result.stdout, "Intercom not using system PipeWire runtime"
+    
+    def test_intercom_pipewire_script_uses_system_runtime(self, host):
+        """Test that intercom PipeWire script uses system runtime."""
+        script = host.file("/usr/local/bin/media-bridge-intercom-pipewire")
+        if script.exists:
+            content = script.content_string
+            assert "XDG_RUNTIME_DIR=/run/user/0" in content, "Script not using system runtime"
+            assert "export XDG_RUNTIME_DIR" in content, "Runtime dir not exported"
+    
     def test_intercom_launcher_script_exists(self, host):
         """Test that intercom launcher script exists and is executable."""
         script = host.file("/usr/local/bin/media-bridge-intercom-launcher")
