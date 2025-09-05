@@ -10,9 +10,9 @@ import time
 
 def test_display_uses_system_pipewire(host):
     """Test that ndi-display uses the unified system-wide PipeWire."""
-    # Check that display service uses correct runtime dir
-    result = host.run("systemctl cat 'ndi-display@.service' | grep XDG_RUNTIME_DIR")
-    assert "/run/user/0" in result.stdout, "Display not using system PipeWire runtime"
+    # Check that global environment sets runtime dir
+    result = host.run("grep XDG_RUNTIME_DIR /etc/environment")
+    assert "/run/user/0" in result.stdout, "System not configured with XDG_RUNTIME_DIR"
     
     # Verify display service depends on PipeWire
     result = host.run("systemctl cat 'ndi-display@.service' | grep After")
@@ -35,7 +35,8 @@ def test_display_pipewire_audio_display_0(host):
         time.sleep(2)
         
         # Start ndi-display on display 0
-        cmd = "timeout 10 /opt/media-bridge/ndi-display 'MEDIA-BRIDGE (USB Capture)' 0 2>&1 | head -20"
+        # Use the launcher to ensure environment is set correctly
+        cmd = "STREAM_NAME='MEDIA-BRIDGE (USB Capture)' timeout 10 /usr/local/bin/ndi-display-launcher 0 2>&1 | head -20"
         result = host.run(cmd)
     finally:
         # Always restore console and clean up
@@ -84,7 +85,8 @@ def test_display_pipewire_audio_display_1(host):
         time.sleep(2)
         
         # Start ndi-display on display 1
-        cmd = "timeout 10 /opt/media-bridge/ndi-display 'MEDIA-BRIDGE (USB Capture)' 1 2>&1 | head -20"
+        # Use the launcher to ensure environment is set correctly
+        cmd = "STREAM_NAME='MEDIA-BRIDGE (USB Capture)' timeout 10 /usr/local/bin/ndi-display-launcher 1 2>&1 | head -20"
         result = host.run(cmd)
     finally:
         # Always restore console and clean up
@@ -129,7 +131,8 @@ def test_display_pipewire_audio_display_2(host):
         time.sleep(2)
         
         # Start ndi-display on display 2
-        cmd = "timeout 10 /opt/media-bridge/ndi-display 'MEDIA-BRIDGE (USB Capture)' 2 2>&1 | head -20"
+        # Use the launcher to ensure environment is set correctly
+        cmd = "STREAM_NAME='MEDIA-BRIDGE (USB Capture)' timeout 10 /usr/local/bin/ndi-display-launcher 2 2>&1 | head -20"
         result = host.run(cmd)
     finally:
         # Always restore console and clean up

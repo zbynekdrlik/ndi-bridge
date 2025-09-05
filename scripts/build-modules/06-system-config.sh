@@ -162,6 +162,11 @@ timedatectl set-timezone Europe/Prague || {
 }
 echo "Timezone configured: $(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone)"
 
+# Configure global environment for system-wide PipeWire
+echo "Configuring global environment..."
+echo "XDG_RUNTIME_DIR=/run/user/0" >> /etc/environment
+echo "Global XDG_RUNTIME_DIR configured for system-wide PipeWire"
+
 # Create version file for system identification
 echo "Creating version file..."
 cat > /etc/media-bridge-version << EOFVERSION
