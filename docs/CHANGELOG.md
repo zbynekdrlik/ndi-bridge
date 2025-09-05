@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the NDI Bridge project will be documented in this file.
+All notable changes to the Media Bridge project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -92,9 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.1.0] - 2025-07-19
 
 ### Added
-- **Bootable USB Appliance**: Complete Linux system for NDI Bridge
+- **Bootable USB Appliance**: Complete Linux system for Media Bridge
   - Ubuntu 24.04 LTS base system
-  - Auto-starting NDI Bridge service
+  - Auto-starting Media Bridge service
   - Network bridge configuration for dual ethernet
   - TTY1: Live logs display
   - TTY2: System information and menu
@@ -302,7 +302,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Eliminated unnecessary UYVY→BGRA conversion
   - Log message "TRUE ZERO-COPY: UYVY direct to NDI"
 - **Design Philosophy Document**: Created `docs/DESIGN_PHILOSOPHY.md`
-  - Documents NDI Bridge's focus on low latency as NON-NEGOTIABLE
+  - Documents Media Bridge's focus on low latency as NON-NEGOTIABLE
   - Targets modern hardware (Intel N100+)
   - No compatibility modes that compromise performance
 
