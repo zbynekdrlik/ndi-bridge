@@ -50,7 +50,7 @@ Created persistent virtual devices for Chrome isolation:
 ### 5. Runtime Management
 - PipeWire creates its own sockets at `/run/user/0/pipewire-0` and `/run/user/0/pipewire-0-manager`
 - PulseAudio socket at `/run/user/0/pulse/native`
-- XDG_RUNTIME_DIR set to `/run/user/0` for all services
+- XDG_RUNTIME_DIR set globally via `/etc/environment` (system-wide, not per-service!)
 - **CRITICAL**: Never let systemd create PipeWire's actual sockets!
 
 ## Testing Results
@@ -98,6 +98,7 @@ user-runtime-dir@0.service (MUST start first)
 - Removed all user-session PipeWire configurations
 - Consolidated to system-wide instance
 - Fixed service startup ordering
+- **Global XDG_RUNTIME_DIR**: Set in `/etc/environment` for true system-wide usage
 
 ### Service Startup Issues (RESOLVED)
 - Added proper dependency on `user-runtime-dir@0.service`
@@ -194,7 +195,7 @@ After=sound.target pipewire-system.socket systemd-tmpfiles-setup.service user-ru
 Requires=pipewire-system.socket user-runtime-dir@0.service
 
 [Service]
-Environment="XDG_RUNTIME_DIR=/run/user/0"
+# XDG_RUNTIME_DIR now set globally in /etc/environment
 Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
 ExecStart=/usr/bin/pipewire -c /etc/pipewire/pipewire-system.conf
 # Socket verification logging
