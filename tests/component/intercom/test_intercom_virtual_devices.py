@@ -43,14 +43,17 @@ class TestIntercomVirtualDevices:
         modules = host.run("pactl list modules short")
         assert modules.exit_status == 0, "Failed to list modules"
         
-        # Check if USB audio is connected (may show as CSCTEK or Zoran Co.)
+        # Check if intercom USB audio device is connected
+        # This specific device shows as either CSCTEK or Zoran Co. Personal Media Division
+        # with USB ID 0573:1573
         usb_devices = host.run("lsusb")
-        has_usb_audio = ("CSCTEK" in usb_devices.stdout or 
-                        "CSC" in usb_devices.stdout or
-                        "USB Audio" in usb_devices.stdout or
-                        "Zoran" in usb_devices.stdout)
+        has_intercom_usb = (
+            "CSCTEK" in usb_devices.stdout or 
+            "0573:1573" in usb_devices.stdout or  # Specific USB ID for this device
+            ("Zoran" in usb_devices.stdout and "Personal Media" in usb_devices.stdout)
+        )
         
-        if has_usb_audio:
+        if has_intercom_usb:
             # Should have loopback modules when USB connected
             assert "module-loopback" in modules.stdout, (
                 "No loopback modules found despite USB audio connected"
