@@ -1,14 +1,28 @@
 #!/usr/bin/env python3
 """
-Simple test runner for Media Bridge tests using sshpass for authentication.
+DEPRECATED: Use ./tests/test-device.sh instead
 
-Usage:
+This script is deprecated. The new unified test entry point is:
+    ./tests/test-device.sh IP_ADDRESS [options...]
+
+Examples:
+    ./tests/test-device.sh 10.77.8.124               # Run all tests
+    ./tests/test-device.sh 10.77.8.124 -m critical  # Critical tests only
+    
+See docs/TESTING.md for complete documentation.
+
+Legacy usage (DEPRECATED):
     python3 run_test.py --host=10.77.9.188
     
 Or using environment variable:
     export NDI_TEST_HOST=10.77.9.188
     python3 run_test.py
 """
+
+print("DEPRECATED: Use ./tests/test-device.sh instead")
+print("See docs/TESTING.md for complete testing documentation")
+print("Continuing with legacy behavior...")
+print()
 
 import sys
 import os
