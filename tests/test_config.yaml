@@ -1,4 +1,0 @@
-host: 10.77.8.123
-ssh_user: root
-ssh_pass: newlevel
-ssh_key: ~/.ssh/media_test_key

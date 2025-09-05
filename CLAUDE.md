@@ -189,343 +189,41 @@ async def endpoint_name(request: RequestModel):
 - Partial success = Complete failure
 - All tests must pass before declaring feature operational
 
-## Modern Test Suite Architecture (2025)
+## Testing
 
-### Testing Framework: pytest + testinfra
-**Industry-standard framework for embedded/hardware testing with SSH-based remote execution**
+**SINGLE SOURCE OF TRUTH: See [docs/TESTING.md](docs/TESTING.md)**
 
-### Core Testing Principles
+### Quick Commands for Claude (AI Assistant)
 
-#### 1. Atomic Tests - One Test, One Assertion
-**CRITICAL: Each test must validate exactly ONE thing**
-```python
-# BAD: Multiple assertions in one test
-def test_capture():
-    assert device_exists()
-    assert service_active()
-    assert fps == 30
-    
-# GOOD: Atomic tests
-def test_capture_device_exists():
-    """Test that /dev/video0 exists."""
-    assert host.file("/dev/video0").exists
-
-def test_capture_service_active():
-    """Test that ndi-capture service is running."""
-    assert host.service("ndi-capture").is_running
-
-def test_capture_fps_stable():
-    """Test that capture maintains 30fps."""
-    metrics = host.file("/var/run/media-bridge/fps").content_string
-    assert float(metrics) >= 29.0
-```
-
-#### 2. AAA Pattern (Arrange-Act-Assert)
-**Every test follows this structure:**
-```python
-def test_stabilization_duration():
-    # Arrange: Set up test conditions
-    host.run("systemctl restart ndi-capture")
-    
-    # Act: Perform the action
-    time.sleep(30)
-    
-    # Assert: Verify the outcome
-    state = host.file("/var/run/media-bridge/capture_state").content_string
-    assert state == "RUNNING"
-```
-
-#### 3. Test Organization by Category
-```
-tests/
-├── unit/                    # Pure logic tests (no device needed)
-├── component/               # Single component atomic tests (checking existence/state)
-│   ├── capture/            # Atomic capture tests
-│   │   ├── test_device_detection.py    # Device exists, permissions
-│   │   ├── test_service_status.py      # Service running/enabled
-│   │   └── test_fps_monitoring.py      # Metrics files exist
-│   ├── display/            # Atomic display tests
-│   │   ├── test_display_capability.py  # DRM devices, binaries exist
-│   │   └── test_ndi_display_service.py # Service template valid
-│   ├── audio/              # Atomic audio tests
-│   ├── network/            # Atomic network tests
-│   └── [component]/        # Each component gets atomic tests
-├── integration/            # Multi-component interaction & functional tests
-│   ├── test_capture_to_ndi.py         # Capture + NDI interaction
-│   └── test_display_functional.py     # FUNCTIONAL: Actually plays streams
-├── system/                 # End-to-end system tests
-├── performance/            # Benchmarks and metrics
-└── fixtures/               # Shared test utilities
-```
-
-**Test Placement Rules:**
-- **component/**: ONLY atomic tests that check one thing (file exists, service running, etc.)
-- **integration/**: Functional tests that actually USE the system (play streams, record audio, etc.)
-- **integration/**: Tests that involve multiple components working together
-- **system/**: Full end-to-end tests of complete workflows
-
-**Functional Test Definition:**
-A functional test is one that actually exercises the feature as a user would:
-- Display functional test: Actually plays an NDI stream for 30 seconds
-- Capture functional test: Would actually capture video and verify output
-- Audio functional test: Would actually play/record audio
-These belong in `integration/` NOT in `component/`
-
-### Test Execution
-
-#### IMPORTANT: Instructions for Claude (AI Assistant)
-
-**When user says "run all tests", ALWAYS do this:**
-
-1. **FIRST run test-device.sh to setup SSH**:
-   ```bash
-   cd /home/newlevel/devel/ndi-bridge
-   ./tests/test-device.sh <DEVICE_IP>
-   ```
-
-2. **THEN run the full test suite**:
-   ```bash
-   python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -v
-   ```
-
-**Why test-device.sh MUST be run first**: 
-- Handles SSH host key changes (critical for reflashed devices)
-- Sets up authentication (key or password)
-- Without it, tests will timeout or hang
-- This is MANDATORY, not optional
-
-#### Configuring Device IP Address (for humans)
-
-The test suite supports multiple ways to specify the target device IP:
-
-1. **Configuration File** (RECOMMENDED - persists across sessions):
-   ```bash
-   # Edit tests/test_config.yaml - set host: YOUR_IP
-   vim tests/test_config.yaml
-   # Then run tests without specifying IP:
-   pytest tests/ --ssh-key ~/.ssh/media_test_key
-   ```
-
-2. **Command Line Argument** (for one-off tests):
-   ```bash
-   pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/media_test_key
-   ```
-
-3. **Environment Variable** (for current session):
-   ```bash
-   export NDI_TEST_HOST=10.77.9.188
-   pytest tests/ --ssh-key ~/.ssh/media_test_key
-   ```
-
-4. **Default Fallback** (10.77.9.143 if nothing specified)
-
-**Priority Order**: Command line > test_config.yaml > Environment variable > Default
-
-#### Prerequisites
-```bash
-# Install test dependencies (one time setup)
-pip3 install -r tests/requirements.txt --break-system-packages
-
-# Set up SSH key authentication (recommended)
-ssh-keygen -t ed25519 -f ~/.ssh/media_test_key -N ""
-sshpass -p newlevel ssh-copy-id -i ~/.ssh/media_test_key.pub root@DEVICE_IP
-```
-
-#### Running Tests - Primary Method
-
-**CRITICAL: ALWAYS run test-device.sh FIRST before any pytest commands!**
+**When user says "run tests" or "run all tests", ALWAYS use test-device.sh:**
 
 ```bash
-# STEP 1: Setup SSH (MANDATORY FIRST STEP!)
 cd /home/newlevel/devel/ndi-bridge
-./tests/test-device.sh 10.77.9.188  # Replace with your device IP
 
-# STEP 2: Run all tests with SSH key auth
-pytest tests/ --host 10.77.9.188 --ssh-key ~/.ssh/media_test_key -v
+# Run ALL 433 tests (complete suite)
+./tests/test-device.sh 10.77.8.124
 
-# Alternative: Set device IP as environment variable
-export NDI_TEST_HOST=10.77.9.188
-./tests/test-device.sh $NDI_TEST_HOST
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key -v
+# Run specific test category  
+./tests/test-device.sh 10.77.8.124 tests/component/audio/
 
-# Run specific category (AFTER test-device.sh)
-pytest tests/component/capture/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key
+# Run critical tests only
+./tests/test-device.sh 10.77.8.124 -m critical
 
-# Run with parallel execution (AFTER test-device.sh)
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key -n auto
-
-# Run only critical tests (AFTER test-device.sh)
-pytest tests/ -m critical --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key
-
-# Quick summary without details (AFTER test-device.sh)
-pytest tests/ --host $NDI_TEST_HOST --ssh-key ~/.ssh/media_test_key -q --tb=no
+# Quick SSH verification
+./tests/test-device.sh 10.77.8.124 --collect-only
 ```
 
-#### Helper Scripts (Alternative Methods)
+**CRITICAL RULES:**
+- **NEVER run pytest directly** - always use `test-device.sh`
+- **IP address is REQUIRED** as first parameter
+- **test-device.sh handles ALL SSH setup** automatically
+- **Complete documentation** at [docs/TESTING.md](docs/TESTING.md)
 
-**Why shell scripts exist**: For convenience and special use cases
-
-1. **tests/run_all_tests.sh** - Runs tests by category with summary
-   ```bash
-   # Usage: ./tests/run_all_tests.sh [IP_ADDRESS] [SSH_KEY_PATH]
-   ./tests/run_all_tests.sh 10.77.9.188              # Uses default SSH key
-   ./tests/run_all_tests.sh 10.77.9.188 ~/.ssh/id_rsa  # Custom SSH key
-   
-   # Or using environment variable
-   export NDI_TEST_HOST=10.77.9.188
-   ./tests/run_all_tests.sh  # Will use $NDI_TEST_HOST if no IP provided
-   ```
-   Purpose: Shows category-by-category progress, useful for debugging
-
-2. **tests/run_test.py** - Wrapper for password authentication
-   ```bash
-   python3 tests/run_test.py --host=10.77.9.188
-   # Or
-   export NDI_TEST_HOST=10.77.9.188
-   python3 tests/run_test.py  # Will use $NDI_TEST_HOST
-   ```
-   Purpose: For environments where SSH keys can't be used
-
-
-#### Test Markers
-- `@pytest.mark.critical` - Must pass for release
-- `@pytest.mark.slow` - Takes >5 seconds
-- `@pytest.mark.requires_usb` - Needs USB device
-- `@pytest.mark.destructive` - Modifies system
-
-#### Understanding Test Results
-
-```bash
-# Typical output
-========================= 140 passed, 2 skipped in 45.2s =========================
-```
-
-- **PASSED**: Test succeeded
-- **FAILED**: Test failed - investigate issue
-- **SKIPPED**: Optional feature not present (OK)
-- **ERROR**: Test couldn't run - check connectivity
-
-**Expected Results on Clean Media Bridge**:
-- ~140 tests should pass
-- Some skips are normal (optional features like intercom)
-- Zero failures on properly configured device
-
-#### Quick Test Commands Reference
-
-```bash
-# Just test if device is working (critical tests only, fast)
-pytest -m critical --host DEVICE_IP --ssh-key ~/.ssh/media_test_key -q
-
-# Full validation before deployment (all tests, detailed)
-pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/media_test_key -v
-
-# Debug specific component issues
-pytest tests/component/capture/ --host DEVICE_IP --ssh-key ~/.ssh/media_test_key -vv
-
-# Generate HTML report
-pytest tests/ --host DEVICE_IP --ssh-key ~/.ssh/media_test_key --html=report.html
-```
-
-### Writing New Tests
-
-#### 1. Create Atomic Test File
-```python
-# tests/component/capture/test_new_feature.py
-import pytest
-
-def test_specific_behavior(host):
-    """Test one specific behavior."""
-    # One test, one assertion
-    result = host.run("command")
-    assert result.succeeded
-```
-
-#### 2. Use Fixtures for Common Operations
-```python
-@pytest.fixture
-def restart_service(host):
-    """Fixture to restart a service."""
-    def _restart(service_name):
-        host.run(f"systemctl restart {service_name}")
-        time.sleep(2)
-    return _restart
-
-def test_service_recovery(host, restart_service):
-    restart_service("ndi-capture")
-    assert host.service("ndi-capture").is_running
-```
-
-#### 3. Parallel Test Execution
-Tests are designed to run in parallel by default:
-- Each test is independent (no shared state)
-- Fixtures handle setup/teardown
-- Use `pytest-xdist` for auto-parallelization
-
-### Important Testing Philosophy
-
-**Test Quality Over Speed**: Tests are designed to thoroughly validate functionality, not to run fast.
-- Many tests require reboots, service restarts, or waiting for stabilization
-- Slow tests are acceptable if they catch real issues
-- Functional testing is prioritized over speed
-- Test durations of 5-10 minutes for full suite are normal and expected
-- DO NOT optimize for speed at the expense of thoroughness
-
-### Migration from Bash Tests
-
-**Current State**: 83 tests in 11 bash files (violates atomic principle)
-**Target State**: Each test as separate Python function
-
-**Migration Process**:
-1. Identify logical test units in bash scripts
-2. Create atomic pytest function for each
-3. Place in appropriate category directory
-4. Use testinfra for SSH operations
-
-**Atomic Test Example**:
-```python
-# Each test validates exactly one thing
-def test_capture_device_present(host):
-    assert host.file("/dev/video0").exists
-
-def test_capture_service_enabled(host):
-    assert host.service("ndi-capture").is_enabled
-
-def test_capture_fps_nominal(host):
-    fps = float(host.file("/var/run/media-bridge/fps").content_string)
-    assert 29.0 <= fps <= 31.0
-```
-
-### CI/CD Integration
-
-```yaml
-# .github/workflows/test.yml
-name: Test Suite
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-python@v4
-      - run: pip install -r tests/requirements.txt
-      - run: pytest --host ${{ secrets.TEST_DEVICE_IP }}
-```
-
-### Best Practices
-
-1. **Test Independence**: Each test must be runnable in isolation
-2. **Fast Feedback**: Component tests <1s, integration <5s
-3. **Clear Naming**: `test_<component>_<behavior>_<expected_result>`
-4. **No Test Interdependencies**: Tests never depend on execution order
-5. **Use Markers**: Tag tests appropriately for selective execution
-6. **Fixture Reuse**: Common operations in fixtures, not duplicated
-7. **Descriptive Docstrings**: Each test has clear documentation
-
-### Known Issues That Took 10+ Builds to Find:
-- Menu `read` commands need `< /dev/tty` when called from other scripts
-- Services must be enabled AND started
-- kbd package required for chvt but was missing
-- Stream names must match exactly (e.g., "MEDIA-BRIDGE (USB Capture)")
+### Test Suite Overview
+- **433 total tests** across comprehensive suite
+- **~400+ should pass** on healthy Media Bridge device  
+- **Hardware dependencies** cause expected skips
+- **Complete validation** takes 5-10 minutes
 
 ## CRITICAL: Modular Architecture Rules
 
@@ -851,98 +549,38 @@ sshpass -p newlevel ssh root@10.77.9.143 "journalctl -u ndi-display@1 -n 50"
 **Note**: The box's SSH may show welcome screen. Add `-o LogLevel=ERROR` to suppress it.
 - Use TDD test driven development. Working and full tests sucess are most important part.
 
-## Testing with pytest
+## Running Full Test Suite (CRITICAL FOR CLAUDE)
 
-The project uses **pytest + testinfra** for atomic testing (one test = one assertion).
+**IMPORTANT**: Tests take 10-15 minutes (384 tests). Terminal commands timeout after 2 minutes!
 
-### CRITICAL: How to Run ALL Tests (MUST FOLLOW THIS EXACT PROCESS)
-
-**Step 1: ALWAYS run test-device.sh FIRST to setup SSH**
+### ALWAYS Run Tests in Background to Avoid Timeouts:
 ```bash
-cd /home/newlevel/devel/ndi-bridge
-./tests/test-device.sh <DEVICE_IP>
+# Step 1: Run test-device.sh in BACKGROUND
+./tests/test-device.sh <DEVICE_IP> 2>&1 | tee test-run.log &
+
+# Step 2: Monitor progress (don't wait synchronously)
+tail -f test-run.log | grep -E "passed|failed|ERROR"
+
+# Step 3: Get final summary when done
+tail -100 test-run.log | grep -E "===.*passed.*failed.*seconds ==="
 ```
 
-This script:
-- Removes old SSH host keys (important for reflashed devices)
-- Sets up proper SSH authentication (key or password)
-- Handles all SSH configuration issues automatically
+**WHY THIS IS CRITICAL**:
+- The test suite takes 11+ minutes (as shown: 671.21s)
+- Claude's terminal commands timeout after 2 minutes
+- Running in background with `&` prevents timeout
+- Use `tee` to save output while tests run
+- Check results asynchronously with `tail -f`
 
-**Step 2: Run ALL 373 tests (IMPORTANT: Use --maxfail=0 to run complete suite)**
-```bash
-cd /home/newlevel/devel/ndi-bridge
-python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -v --maxfail=0
+**Example from actual run**:
+```
+======== 10 failed, 370 passed, 4 skipped, 3 rerun in 671.21s (0:11:11) ========
 ```
 
-**CRITICAL: About --maxfail=0**
-- Without `--maxfail=0`: pytest stops after first failure (default behavior)
-- With `--maxfail=0`: ALL 373 tests run regardless of failures
-- This ensures complete test coverage and full failure report
+# important-instruction-reminders
 
-### Complete Example: Running ALL Tests
-```bash
-# STEP 1: Setup SSH (MANDATORY - DO THIS FIRST!)
-cd /home/newlevel/devel/ndi-bridge
-./tests/test-device.sh 10.77.8.124
+**TDD Philosophy**: Use test-driven development. Working tests and full test success are the most important part.
 
-# STEP 2: Run ALL 373 tests (won't stop on failures)
-python3 -m pytest tests/ --host 10.77.8.124 --ssh-key ~/.ssh/media_test_key -v --maxfail=0
+**Repository Integration Rule**: Always when anything is fixed on testing device, fix has to be incorporated to repository. It is forbidden to start services on testing box without verifying and fixing in repository - this is why they weren't started in the first place!
 
-# After completion, get failure summary:
-grep "FAILED\|ERROR" test-run-complete.log | sort -u
-```
-
-### Understanding Test Results
-After running all tests, check the summary at the end:
-- Total tests: 373
-- Look for line like: "350 passed, 23 failed in 5m 30s"
-- Failed tests will be listed with details
-- Common expected failures: HDMI tests (if no display connected)
-
-### Why test-device.sh is REQUIRED:
-- Reflashed devices have new SSH host keys
-- SSH key authentication may not be configured
-- test-device.sh automatically handles both issues
-- Without it, tests will timeout or hang
-
-### Alternative Test Commands (AFTER running test-device.sh)
-```bash
-# Quick summary without verbose output
-python3 -m pytest tests/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -q --tb=no
-
-# Run specific component tests only
-python3 -m pytest tests/component/core/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -v
-python3 -m pytest tests/component/capture/ --host <DEVICE_IP> --ssh-key ~/.ssh/media_test_key -v
-```
-
-### If SSH Key Fails:
-If tests timeout even after running test-device.sh, manually copy SSH key:
-```bash
-sshpass -p newlevel ssh-copy-id -i ~/.ssh/ndi_test_key.pub root@<DEVICE_IP>
-```
-
-### Test Configuration Priority
-1. Command line: `--host 10.77.9.188`
-2. Config file: `tests/test_config.yaml`
-3. Environment: `export NDI_TEST_HOST=10.77.9.188`
-4. Default: `10.77.9.143`
-
-### Test Categories and Markers
-```bash
-# Run by category
-pytest -m critical       # Must-pass tests only
-pytest -m capture       # Video capture tests
-pytest -m network       # Network functionality
-pytest -m "not slow"    # Skip slow tests (>5s)
-```
-
-### SSH Key Handling for Reflashed Devices
-When testing multiple devices on same IP, add to `~/.ssh/config`:
-```bash
-Host 10.77.9.*
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
-```
-Or use `./tests/test-device.sh` which handles this automatically.
-- always when anything is fixed on testing device, fix has to be incorporated to repository, it is forbiden starting not run services on desting box without verify and fix in repository reason why it has not been started!!!!
-- You are pipewire implementation expert, always use original web documentation to support your knowledge of using pipewire
+**PipeWire Expertise**: You are a PipeWire implementation expert, always use original web documentation to support your knowledge of using PipeWire.

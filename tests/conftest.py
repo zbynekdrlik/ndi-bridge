@@ -9,16 +9,9 @@ composable and focused on single responsibilities.
 import os
 import sys
 import pytest
-import yaml
 from pathlib import Path
 from typing import Dict, List, Optional
 import testinfra
-
-# Try to load .env file if it exists
-env_file = Path(__file__).parent / ".env"
-if env_file.exists():
-    from dotenv import load_dotenv
-    load_dotenv(env_file)
 
 # Add fixtures directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent / "fixtures"))
@@ -29,40 +22,14 @@ from fixtures.device import *  # noqa: F401, F403
 
 def pytest_addoption(parser):
     """Add custom command line options for Media Bridge testing."""
-    # Priority: 1. Command line, 2. test_config.yaml, 3. Environment, 4. Default
-    default_host = "10.77.9.143"
-    default_ssh_user = "root"
-    default_ssh_pass = "newlevel"
-    default_ssh_key = None
-    
-    # First check test_config.yaml
-    config_file = Path(__file__).parent / "test_config.yaml"
-    if config_file.exists():
-        with open(config_file, "r") as f:
-            test_config = yaml.safe_load(f)
-            if test_config:
-                if "host" in test_config:
-                    default_host = test_config["host"]
-                if "ssh_user" in test_config:
-                    default_ssh_user = test_config["ssh_user"]
-                if "ssh_pass" in test_config:
-                    default_ssh_pass = test_config["ssh_pass"]
-                if "ssh_key" in test_config:
-                    # Expand ~ to home directory for SSH key path
-                    ssh_key = test_config["ssh_key"]
-                    if ssh_key and ssh_key.startswith("~"):
-                        ssh_key = os.path.expanduser(ssh_key)
-                    default_ssh_key = ssh_key
-    
-    # Then check environment variable for host
-    if os.environ.get("NDI_TEST_HOST"):
-        default_host = os.environ.get("NDI_TEST_HOST")
+    # IMPORTANT: IP address MUST be provided as command-line parameter
+    # NO config files, NO environment variables - only command line!
     
     parser.addoption(
         "--host",
         action="store",
-        default=default_host,
-        help="Media Bridge device IP address or hostname (default: from test_config.yaml, $NDI_TEST_HOST, or 10.77.9.143)",
+        required=True,
+        help="Media Bridge device IP address (REQUIRED - must be provided as command line parameter)",
     )
     parser.addoption(
         "--multi-hosts",
@@ -72,33 +39,27 @@ def pytest_addoption(parser):
     parser.addoption(
         "--ssh-user",
         action="store",
-        default=default_ssh_user,
-        help="SSH username for device access",
+        default="root",
+        help="SSH username for device access (default: root)",
     )
     parser.addoption(
         "--ssh-pass",
         action="store",
-        default=default_ssh_pass,
-        help="SSH password for device access",
+        default="newlevel",
+        help="SSH password for device access (default: newlevel)",
     )
     parser.addoption(
         "--ssh-key",
         action="store",
-        default=default_ssh_key,
+        default=None,
         help="Path to SSH key for passwordless access",
     )
 
 
 def pytest_configure(config):
     """Configure pytest with custom settings."""
-    # Load test configuration if exists
-    config_file = Path(__file__).parent / "test_config.yaml"
-    if config_file.exists():
-        with open(config_file, "r") as f:
-            test_config = yaml.safe_load(f)
-            config.test_config = test_config
-    else:
-        config.test_config = {}
+    # No config files - everything from command line only!
+    config.test_config = {}
 
 
 @pytest.fixture(scope="session")

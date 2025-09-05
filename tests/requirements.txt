@@ -8,11 +8,8 @@ pytest-testinfra==10.1.0
 # SSH and remote execution
 paramiko==3.4.0
 
-# Parallel testing
-pytest-xdist==3.6.1
 
 # Test reporting
-pytest-html==4.1.1
 pytest-json-report==1.5.0
 pytest-timeout==2.3.1
 

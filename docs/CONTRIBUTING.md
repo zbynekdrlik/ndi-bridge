@@ -49,11 +49,10 @@ We welcome contributions to the Media Bridge project! This document provides gui
 
 ### Testing
 
-- Test new features thoroughly
+- Test new features thoroughly using the procedures in [docs/TESTING.md](TESTING.md)
 - Ensure no regressions in existing functionality
 - Test on both Windows and Linux if possible
 - For USB builds, test on real hardware
-- Verify USB hot-plug recovery works
 
 ### Documentation
 
@@ -89,17 +88,8 @@ cmake --build . --config Debug  # Windows
 ```
 
 ### Running Tests
-```bash
-# Run the binary with test devices
-./ndi-capture --verbose
 
-# Test USB hot-plug recovery
-# 1. Start Media Bridge
-# 2. Disconnect USB device
-# 3. Wait for recovery attempt
-# 4. Reconnect device
-# 5. Verify stream resumes
-```
+See [docs/TESTING.md](TESTING.md) for complete test procedures and commands.
 
 ## Questions?
 
