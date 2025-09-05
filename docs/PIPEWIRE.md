@@ -30,12 +30,14 @@ The unified PipeWire architecture (v2.2.6) implements a system-wide audio soluti
 - `pipewire-pulse-system.service` - PulseAudio compatibility
 - `wireplumber-system.service` - Session/policy management
 
-### 3. Virtual Audio Devices
+### 3. Virtual Audio Devices (Security Critical)
 Created persistent virtual devices for Chrome isolation:
 - `intercom-speaker` - Virtual speaker for Chrome output
-- `intercom-microphone` - Virtual microphone for Chrome input
-- Prevents Chrome from locking physical USB devices
-- Managed by `media-bridge-audio-manager`
+- `intercom-microphone` - Virtual microphone sink (monitor used as source)
+- **SECURITY**: Prevents Chrome from accessing HDMI or USB hardware directly
+- **IMPLEMENTATION**: Both devices are null sinks (microphone monitor acts as source)
+- Managed by `media-bridge-audio-manager` with dynamic loopback routing
+- **USB Detection**: Specific to CSCTEK/Zoran device (USB ID 0573:1573)
 
 ### 4. Configuration Files
 
@@ -85,6 +87,13 @@ user-runtime-dir@0.service (MUST start first)
 2. PipeWire → Virtual Devices (intercom-speaker/microphone)
 3. Chrome ← Virtual Devices (isolated from hardware)
 4. NDI Display → PipeWire → HDMI Audio (per display)
+
+### Virtual Device Best Practices
+1. **Always create as null sinks**: Both speaker and microphone are sinks
+2. **Use monitor for input**: Microphone sink's monitor becomes the source
+3. **Set proper media.class**: Use `Audio/Sink`, not `Audio/Source/Virtual`
+4. **Configure loopback modules**: Connect virtual to hardware with low latency
+5. **Verify with pactl**: Check sinks, sources, and modules after creation
 
 ### Low Latency Configuration
 - Quantum: 256 samples (5.33ms @ 48kHz)
@@ -284,6 +293,47 @@ pactl list clients | grep chrome
 - Internal audio paths changed
 - Developer tools must use system paths
 
+## Chrome Audio Security Architecture
+
+### Critical Security Requirements (Issue #114)
+**NEVER allow Chrome audio to play on HDMI outputs** - This is a critical security requirement for the intercom system.
+
+### Implementation Details
+1. **Virtual Device Isolation**:
+   - Chrome ONLY sees `intercom-speaker` and `intercom-microphone`
+   - Hardware devices (USB, HDMI) are never exposed to Chrome
+   - WirePlumber policies can further restrict access (optional)
+
+2. **Loopback Module Routing**:
+   - Virtual speaker → USB output (CSCTEK device only)
+   - USB input → Virtual microphone sink
+   - Chrome uses microphone monitor as source
+   - Latency: 5ms for real-time communication
+
+3. **Device Detection Specificity**:
+   ```bash
+   # Intercom USB device detection (not generic USB audio)
+   CSCTEK USB Audio and HID
+   USB ID: 0573:1573
+   Alternative name: Zoran Co. Personal Media Division
+   ```
+
+4. **Chrome Launch Parameters**:
+   ```bash
+   --audio-output-channels=2     # Stereo output
+   --audio-input-channels=1      # Mono input
+   --enable-exclusive-audio      # Better isolation
+   ```
+
+### Testing Chrome Isolation
+The `test_intercom_virtual_devices.py` test suite verifies:
+- Virtual devices exist and are properly configured
+- Chrome only connects to virtual devices
+- No audio streams route to HDMI
+- USB device detection is specific to intercom hardware
+- Loopback modules maintain low latency
+- Service recovery after USB disconnection
+
 ## Future Enhancements
 
 ### Potential Improvements
@@ -291,6 +341,8 @@ pactl list clients | grep chrome
 2. Per-stream priority management
 3. Advanced echo cancellation
 4. Spatial audio support
+5. WirePlumber Chrome-specific policies
+6. Automatic USB device recovery with udev rules
 
 ### Known Limitations
 1. Requires PipeWire 0.3.65+ 
