@@ -4,6 +4,9 @@
 configure_system() {
     log "Creating system configuration script..."
     
+    # Ensure tmp directory exists (debootstrap should create it but let's be safe)
+    mkdir -p /mnt/usb/tmp
+    
     # Create the main configuration script that will run in chroot
     cat > /mnt/usb/tmp/configure-system.sh << 'EOFSCRIPT'
 #!/bin/bash

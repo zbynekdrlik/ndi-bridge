@@ -104,8 +104,8 @@ run_chroot_setup() {
     export DEBIAN_FRONTEND=noninteractive
     export USB_DEVICE  # Pass USB device to chroot
     
-    # Run setup script
-    chroot /mnt/usb /tmp/configure-system.sh 2>&1 | \
+    # Run setup script with bash explicitly
+    chroot /mnt/usb /bin/bash /tmp/configure-system.sh 2>&1 | \
         while IFS= read -r line; do
             # Filter out verbose package installation output and known warnings
             if [[ ! "$line" =~ ^(Get:|Fetched|Reading|Building|Selecting|Preparing|Unpacking|Setting) ]] && \
