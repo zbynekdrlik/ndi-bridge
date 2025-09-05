@@ -49,8 +49,12 @@ setup_virtual_devices() {
     # Check if virtual microphone exists (it's created as a sink whose monitor is the source)
     if ! pactl list sinks short | grep -q "intercom-microphone"; then
         echo "Creating virtual microphone device..."
-        # The virtual microphone is already created by the config file
-        # But if it doesn't exist, we skip - config handles it
+        pactl load-module module-null-sink \
+            sink_name=intercom-microphone \
+            sink_properties="device.description='Intercom Microphone (Virtual)' device.nick='Intercom Microphone'" \
+            rate=48000 \
+            channels=2 \
+            channel_map=front-left,front-right
     fi
 }
 

@@ -266,6 +266,9 @@ env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
     --disable-dev-shm-usage \
     --autoplay-policy=no-user-gesture-required \
     --audio-buffer-size=2048 \
+    --audio-output-channels=2 \
+    --audio-input-channels=1 \
+    --enable-exclusive-audio \
     --user-data-dir=$PROFILE_DIR \
     --new-window \
     "$URL" &
