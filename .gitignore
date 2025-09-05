@@ -90,3 +90,11 @@ test-report.html
 tests/test-report.html
 *.coverage
 htmlcov/
+# Test output files
+test-results-*.txt
+test-run-*.log
+full-test-run.log
+test-*.log
+*.pyc
+__pycache__/
+.pytest_cache/
