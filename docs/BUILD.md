@@ -181,14 +181,10 @@ cmake -DCMAKE_BUILD_TYPE=Release \
 
 After building, test with:
 ```bash
-# List available devices
-./ndi-capture --list
+# Test basic functionality
+./ndi-capture --version
 
-# Test with first device
-./ndi-capture
-
-# Test with specific device
-./ndi-capture /dev/video0
+# For complete testing procedures, see docs/TESTING.md
 ```
 
 ## Creating a Release Build

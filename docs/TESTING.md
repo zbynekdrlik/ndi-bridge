@@ -244,10 +244,10 @@ Tests are tagged with markers for selective execution:
 
 ### Test Infrastructure Issues:
 
-If tests are failing due to infrastructure problems, see:
-- [TEST_INFRASTRUCTURE_REQUIREMENTS.md](TEST_INFRASTRUCTURE_REQUIREMENTS.md) - Hardware requirements
-- [PIPEWIRE.md](PIPEWIRE.md) - Audio system architecture
-- Device logs: `ssh root@DEVICE_IP "journalctl -f"`
+If tests are failing due to infrastructure problems:
+- See [PIPEWIRE.md](PIPEWIRE.md) - Audio system architecture  
+- Check device logs: `ssh root@DEVICE_IP "journalctl -f"`
+- Verify hardware requirements (USB devices, HDMI displays, network)
 
 ## Advanced Usage
 
@@ -294,11 +294,10 @@ If tests are failing due to infrastructure problems, see:
 
 ## Legacy Test Scripts (Deprecated)
 
-The following scripts exist but are **DEPRECATED** - use test-device.sh instead:
+The following approaches are **DEPRECATED** - use test-device.sh instead:
 
-- `tests/run_test.py` - Use `./tests/test-device.sh` instead
-- Any shell scripts in `tests/` - Use `./tests/test-device.sh` instead
-- Direct pytest commands - Use `./tests/test-device.sh` instead
+- Any direct pytest commands - Use `./tests/test-device.sh` instead
+- Custom test scripts - Use `./tests/test-device.sh` instead
 
 ## Writing New Tests
 
