@@ -1,0 +1,41 @@
+#!/bin/bash
+# Media Bridge Audio Watchdog - Temporary workaround for Chrome audio routing
+# This constantly fixes Chrome grabbing wrong audio devices
+# REMOVE THIS when Chrome runs as non-root user (Issue #33)
+
+echo "Audio Watchdog Starting - Fixing Chrome audio routing every 5 seconds"
+echo "This is a TEMPORARY workaround until Chrome runs as non-root user"
+
+while true; do
+    # Find all Chrome sink inputs and move to intercom-speaker
+    chrome_inputs=$(pactl list sink-inputs 2>/dev/null | grep -B15 'application.name = "Chrome"' | grep 'Sink Input #' | grep -o '[0-9]*')
+    
+    for input in $chrome_inputs; do
+        # Get current sink
+        current_sink=$(pactl list sink-inputs short 2>/dev/null | grep "^$input" | cut -f2)
+        # Get intercom-speaker ID
+        speaker_sink=$(pactl list sinks short 2>/dev/null | grep intercom-speaker | cut -f1)
+        
+        if [ -n "$speaker_sink" ] && [ "$current_sink" != "$speaker_sink" ]; then
+            echo "[$(date +%H:%M:%S)] Moving Chrome output $input from sink $current_sink to intercom-speaker (sink $speaker_sink)"
+            pactl move-sink-input "$input" intercom-speaker 2>/dev/null && echo "  ✓ Moved successfully"
+        fi
+    done
+    
+    # Find all Chrome source outputs and move to intercom-microphone  
+    chrome_outputs=$(pactl list source-outputs 2>/dev/null | grep -B15 'application.name = ".*Chrome.*"' | grep 'Source Output #' | grep -o '[0-9]*')
+    
+    for output in $chrome_outputs; do
+        # Get current source
+        current_source=$(pactl list source-outputs short 2>/dev/null | grep "^$output" | cut -f2)
+        # Get intercom-microphone ID
+        mic_source=$(pactl list sources short 2>/dev/null | grep "intercom-microphone" | grep -v monitor | cut -f1 | head -1)
+        
+        if [ -n "$mic_source" ] && [ "$current_source" != "$mic_source" ]; then
+            echo "[$(date +%H:%M:%S)] Moving Chrome input $output from source $current_source to intercom-microphone (source $mic_source)"
+            pactl move-source-output "$output" intercom-microphone 2>/dev/null && echo "  ✓ Moved successfully"
+        fi
+    done
+    
+    sleep 5
+done

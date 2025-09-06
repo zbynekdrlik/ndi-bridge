@@ -1,5 +1,24 @@
 # Unified PipeWire Architecture
 
+## ⚠️ CRITICAL: SINK vs SOURCE Terminology
+
+**NEVER CONFUSE THESE AGAIN (common mistake made 1000+ times!):**
+- **SINK = OUTPUT = SPEAKER** (audio destination, where sound goes TO)
+  - Chrome's "Speaker" dropdown shows SINKS
+  - Created with: `module-null-sink`
+  - Examples: `intercom-speaker`, HDMI outputs, USB headphones
+  
+- **SOURCE = INPUT = MICROPHONE** (audio origin, where sound comes FROM)
+  - Chrome's "Microphone" dropdown shows SOURCES
+  - Created with: `module-remap-source`, `module-virtual-source`
+  - Examples: `intercom-microphone-source`, USB mic, capture devices
+
+- **MONITOR** = Special SOURCE that captures a SINK's output
+  - Every SINK has a `.monitor` SOURCE
+  - Example: `intercom-speaker.monitor` captures speaker output
+
+**Common Error**: Creating microphone as SINK → Chrome sees it in Speaker list!
+
 ## Executive Summary
 The unified PipeWire architecture (v2.2.6) implements a system-wide audio solution for Media Bridge. This is necessary because Ubuntu/Debian do NOT provide system-wide PipeWire services - only user session services that refuse to run as root (`ConditionUser=!root`). This document describes our custom implementation for embedded/headless systems.
 

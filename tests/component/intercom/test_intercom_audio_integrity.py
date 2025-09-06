@@ -96,16 +96,13 @@ class TestIntercomAudioIntegrity:
 
     def test_loopback_modules_correctly_configured(self, host):
         """Test that loopback modules are correctly set up and not duplicated."""
-        modules = host.run("pactl list modules")
+        modules = host.run("pactl list modules short | grep module-loopback")
         
-        # Count loopback modules
+        # Parse loopback modules
         loopback_configs = []
-        for line in modules.stdout.split('\n'):
-            if 'module-loopback' in line:
-                # Get the next line which has the configuration
-                idx = modules.stdout.index(line)
-                config_section = modules.stdout[idx:idx+500]  # Get config section
-                loopback_configs.append(config_section)
+        for line in modules.stdout.strip().split('\n'):
+            if line:
+                loopback_configs.append(line)
         
         # Should have exactly 2 loopback modules when USB connected
         usb_connected = host.run("lsusb | grep -E 'CSCTEK|0573:1573'").exit_status == 0
@@ -127,7 +124,7 @@ class TestIntercomAudioIntegrity:
                         "Speaker loopback not routed to USB output!"
                     )
                 
-                if 'sink=intercom-microphone' in config:
+                if 'sink=intercom-mic-sink' in config:
                     has_usb_to_mic = True
                     assert 'CSCTEK' in config or 'usb' in config.lower(), (
                         "Microphone loopback not sourced from USB input!"
@@ -200,22 +197,26 @@ class TestIntercomAudioIntegrity:
         if chrome_audio.exit_status != 0:
             pytest.skip("Chrome not producing audio - need manual verification")
         
-        # 2. Check loopback modules are passing audio (not suspended)
-        modules = host.run("pactl list modules | grep -A5 module-loopback | grep state")
-        
-        # 3. Check USB device is receiving audio
-        usb_sink_status = host.run(
-            "pactl list sinks | grep -A10 'CSCTEK\\|usb.*0573' | grep State"
+        # 2. Check loopback modules exist and are configured
+        loopback_count = host.run("pactl list modules short | grep module-loopback | wc -l")
+        assert int(loopback_count.stdout.strip()) >= 2, (
+            f"Expected at least 2 loopback modules, found {loopback_count.stdout.strip()}"
         )
         
-        if usb_sink_status.stdout and 'RUNNING' in usb_sink_status.stdout:
-            # Audio is actively flowing
-            pass
-        elif usb_sink_status.stdout and 'IDLE' in usb_sink_status.stdout:
-            # Audio path exists but no audio currently
-            print("Audio path configured but no active audio stream")
-        else:
-            assert False, "USB audio device not receiving any audio!"
+        # 3. Check USB device state (may be IDLE or RUNNING)
+        usb_sink_status = host.run(
+            "pactl list sinks short | grep -E 'CSCTEK|0573'"
+        )
+        
+        assert usb_sink_status.exit_status == 0, (
+            "USB audio device not found! Intercom cannot work without USB headset."
+        )
+        
+        # Check if sink is properly configured (RUNNING or IDLE is OK)
+        sink_state = usb_sink_status.stdout.split('\t')[-1] if '\t' in usb_sink_status.stdout else ''
+        assert sink_state in ['RUNNING', 'IDLE'], (
+            f"USB audio device in unexpected state: {sink_state}"
+        )
 
     def test_chrome_device_selection_in_vdo_ninja(self, host):
         """Test that Chrome has correct devices selected in VDO.Ninja settings."""
@@ -274,3 +275,120 @@ class TestIntercomAudioIntegrity:
                         assert 'hdmi' not in sink_name.stdout.lower(), (
                             f"SECURITY: Intercom audio going to HDMI! {sink_name.stdout}"
                         )
+    
+    def test_chrome_only_uses_virtual_devices(self, host):
+        """Test that Chrome is ONLY connected to virtual devices, not hardware."""
+        # Check Chrome sink-inputs (audio outputs)
+        chrome_outputs = host.run("pactl list sink-inputs | grep -B10 'application.name.*Chrome' | grep 'Sink:'")
+        
+        if chrome_outputs.exit_status == 0:
+            for line in chrome_outputs.stdout.split('\n'):
+                if 'Sink:' in line:
+                    sink_id = line.split('#')[1].strip() if '#' in line else line.split(':')[1].strip()
+                    # Get sink name
+                    sink_info = host.run(f"pactl list sinks short | awk '$1=={sink_id}'")
+                    if sink_info.stdout:
+                        sink_name = sink_info.stdout.split('\t')[1] if '\t' in sink_info.stdout else ''
+                        # Chrome should ONLY use intercom-speaker
+                        assert sink_name == 'intercom-speaker', (
+                            f"Chrome using wrong sink! Expected 'intercom-speaker', got '{sink_name}'\n"
+                            f"This means Chrome can access hardware directly (security violation)"
+                        )
+        
+        # Check Chrome source-outputs (audio inputs)
+        chrome_inputs = host.run("pactl list source-outputs | grep -B10 'application.name.*Chrome' | grep 'Source:'")
+        
+        if chrome_inputs.exit_status == 0:
+            for line in chrome_inputs.stdout.split('\n'):
+                if 'Source:' in line:
+                    source_id = line.split('#')[1].strip() if '#' in line else line.split(':')[1].strip()
+                    # Get source name
+                    source_info = host.run(f"pactl list sources short | awk '$1=={source_id}'")
+                    if source_info.stdout:
+                        source_name = source_info.stdout.split('\t')[1] if '\t' in source_info.stdout else ''
+                        # Chrome should ONLY use intercom-microphone
+                        assert source_name == 'intercom-microphone', (
+                            f"Chrome using wrong source! Expected 'intercom-microphone', got '{source_name}'\n"
+                            f"This means Chrome can access hardware directly (security violation)"
+                        )
+    
+    def test_ndi_display_uses_hdmi_not_virtual(self, host):
+        """Test that ndi-display outputs to HDMI, not virtual devices."""
+        # Check if ndi-display is running
+        ndi_display = host.run("pgrep -f '/opt/media-bridge/ndi-display'")
+        if ndi_display.exit_status != 0:
+            pytest.skip("ndi-display not running")
+        
+        # Get all sink inputs and check for ndi-display
+        all_inputs = host.run("pactl list sink-inputs")
+        
+        # Check if ndi-display has audio output
+        ndi_found = False
+        ndi_sink_id = None
+        
+        # Split by sink inputs and check each
+        for section in all_inputs.stdout.split('Sink Input #'):
+            if 'node.name = "ndi-display"' in section or 'media.name = "ndi-display"' in section:
+                ndi_found = True
+                # Extract sink ID from this section
+                for line in section.split('\n'):
+                    if 'Sink:' in line:
+                        ndi_sink_id = line.split(':')[1].strip()
+                        break
+                break
+        
+        # CRITICAL: ndi-display MUST have audio output if it's running
+        assert ndi_found, (
+            "ndi-display is running but has NO audio output stream!\n"
+            "This means ndi-display audio is completely broken.\n"
+            "Check if NDI stream has audio or if PipeWire connection failed."
+        )
+        
+        # Check which sink it's using
+        if ndi_sink_id:
+            sink_info = host.run(f"pactl list sinks short | awk '$1=={ndi_sink_id}'")
+            if sink_info.stdout:
+                sink_name = sink_info.stdout.split('\t')[1] if '\t' in sink_info.stdout else ''
+                # ndi-display should use HDMI output
+                assert 'hdmi' in sink_name.lower(), (
+                    f"ndi-display NOT using HDMI! Using '{sink_name}' instead.\n"
+                    f"Audio won't play on monitor speakers!"
+                )
+                # Should NOT use virtual devices
+                assert 'intercom' not in sink_name.lower(), (
+                    f"ndi-display wrongly using intercom devices: '{sink_name}'"
+                )
+    
+    def test_default_sink_not_intercom_speaker(self, host):
+        """Test that system default sink is NOT intercom-speaker (breaks ndi-display)."""
+        default_sink = host.run("pactl info | grep 'Default Sink:' | cut -d: -f2").stdout.strip()
+        
+        assert default_sink != 'intercom-speaker', (
+            f"System default sink is 'intercom-speaker'! This breaks ndi-display audio.\n"
+            f"Default should be HDMI or other hardware output, not virtual device.\n"
+            f"Current default: {default_sink}"
+        )
+        
+        # Ideally default should be HDMI for ndi-display
+        if 'hdmi' not in default_sink.lower():
+            print(f"WARNING: Default sink '{default_sink}' is not HDMI. ndi-display might not have audio.")
+    
+    def test_virtual_devices_are_correct_type(self, host):
+        """Test that virtual devices are created as correct type (sink vs source)."""
+        # Check that intercom-speaker is a SINK
+        speaker_sink = host.run("pactl list sinks short | grep intercom-speaker")
+        assert speaker_sink.exit_status == 0, "intercom-speaker not found as SINK"
+        
+        # Check that intercom-microphone is a SOURCE (not sink!)
+        mic_source = host.run(r"pactl list sources short | grep -E '^[0-9]+\s+intercom-microphone\s'")
+        assert mic_source.exit_status == 0, (
+            "intercom-microphone not found as SOURCE! "
+            "It might be created as sink which makes Chrome see it in wrong dropdown"
+        )
+        
+        # Verify intercom-microphone is NOT in sinks list (common mistake)
+        mic_as_sink = host.run(r"pactl list sinks short | grep -E '^[0-9]+\s+intercom-microphone\s'")
+        assert mic_as_sink.exit_status != 0, (
+            "CRITICAL: intercom-microphone exists as SINK! Should be SOURCE only.\n"
+            "This causes Chrome to see microphone in Speaker dropdown!"
+        )

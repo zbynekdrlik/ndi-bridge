@@ -2,17 +2,27 @@
 
 **SINGLE SOURCE OF TRUTH for Intercom Functionality**
 
-## Critical Issue Status (2025-09-06)
+## Critical Issue Status (2025-09-06) - WORKAROUND APPLIED
 
-**⚠️ CRITICAL BUG: Chrome sees ALL hardware devices instead of only virtual devices**
+**⚠️ ROOT CAUSE: Chrome running as root bypasses ALL audio isolation attempts**
 
-**Symptom**: Chrome device list shows:
-- USB Audio devices directly (WRONG)
-- HDMI outputs (WRONG)  
-- Multiple "Intercom" entries (WRONG)
-- Should ONLY show: `intercom-microphone` and `intercom-speaker`
+**Current Status**:
+- Virtual devices created correctly (intercom-speaker SINK, intercom-microphone SOURCE)
+- Chrome constantly grabs HDMI output (system default) instead of virtual devices
+- `media-bridge-audio-watchdog` script running to force Chrome back every 10 seconds
+- This is a BAND-AID, not a solution!
 
-**Impact**: Intercom completely non-functional - no audio input/output
+**Temporary Workaround (Currently Active)**:
+- Watchdog script `/usr/local/bin/media-bridge-audio-watchdog` forces Chrome to virtual devices
+- Runs every 10 seconds to fix Chrome grabbing wrong audio
+- Logs to `/var/log/audio-watchdog.log`
+- MUST BE REMOVED when proper fix is implemented
+
+**PERMANENT FIX REQUIRED** (GitHub Issue #33):
+1. Create dedicated 'intercom' user with restricted permissions
+2. Configure PipeWire/WirePlumber to ONLY show virtual devices to that user
+3. Run Chrome as 'intercom' user, not root
+4. Remove watchdog script once Chrome can't see hardware devices
 
 ## Architecture Overview
 
@@ -138,13 +148,40 @@ pactl list modules | grep loopback
 ps aux | grep chrome | grep -o -- '--[^ ]*audio[^ ]*'
 ```
 
+## ⚠️ CRITICAL: SINK vs SOURCE - NEVER CONFUSE THESE AGAIN!
+
+### PipeWire/PulseAudio Terminology (MEMORIZE THIS!)
+
+**SINK = OUTPUT = SPEAKER** (audio goes IN, sound comes OUT)
+- Examples: Speakers, headphones, HDMI output
+- Chrome OUTPUTS audio to a SINK
+- Created with: `module-null-sink`, `module-ladspa-sink`
+- Shows in Chrome's "Speaker" dropdown
+
+**SOURCE = INPUT = MICROPHONE** (sound goes IN, audio comes OUT as data)
+- Examples: Microphones, line-in, capture devices  
+- Chrome INPUTS audio from a SOURCE
+- Created with: `module-virtual-source`, `module-remap-source`
+- Shows in Chrome's "Microphone" dropdown
+
+**MONITOR** = Special SOURCE that captures SINK output
+- Every SINK has a `.monitor` SOURCE
+- Example: `intercom-speaker.monitor` captures what's playing on `intercom-speaker`
+- Used for recording what's playing
+
+### Common Mistakes (STOP DOING THESE!)
+❌ Creating microphone as SINK - Chrome sees it as speaker!
+❌ Using sink commands for sources or vice versa
+❌ Confusing monitor (source) with sink
+✅ ALWAYS: Microphone = SOURCE, Speaker = SINK
+
 ## Solution Requirements
 
 ### What Must Be Fixed
 
 1. **intercom-microphone must be a SOURCE, not a SINK**
    - Current: Created as sink, Chrome sees it as speaker
-   - Fix: Use `module-virtual-source` or configure monitor properly
+   - Fix: Use `module-remap-source` to create proper SOURCE
    - Result: Chrome sees one speaker, one microphone
 
 2. **Hardware devices must be hidden from Chrome** (but NOT from ndi-display!)
