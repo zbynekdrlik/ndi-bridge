@@ -2,6 +2,30 @@
 
 **SINGLE SOURCE OF TRUTH for all testing procedures and commands.**
 
+## ⚠️ CRITICAL DEVELOPMENT RULE: TEST-FIRST REQUIREMENT
+
+**ANY bug fix or feature implementation MUST follow this strict process:**
+
+1. **FIRST: Write tests that FAIL and demonstrate the bug**
+   - Tests must catch the actual issue (not pass with weakened assertions)
+   - Tests must verify real functionality (not just check if something exists)
+   - Tests must be comprehensive enough to prevent regression
+
+2. **SECOND: Implement the fix**
+   - Fix must make the tests pass without weakening them
+   - Fix must not break other tests
+
+3. **THIRD: Verify ALL tests pass (100% success required)**
+   - Run complete test suite, not just the new tests
+   - No skipping tests to "save time"
+   - No marking tests as "known limitation" without fixing
+
+**VIOLATIONS OF THIS RULE:**
+- Writing fixes without tests first = REJECTED
+- Weakening tests to make them pass = REJECTED  
+- Skipping failing tests = REJECTED
+- Claiming "working" with failing tests = FALSE
+
 ## Critical Rule: Always Use test-device.sh
 
 **NEVER run pytest directly!** Always use `test-device.sh` as the entry point for all testing.
