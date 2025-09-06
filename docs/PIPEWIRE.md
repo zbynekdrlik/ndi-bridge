@@ -1,5 +1,24 @@
 # Unified PipeWire Architecture
 
+## ⚠️ CRITICAL: SINK vs SOURCE Terminology
+
+**NEVER CONFUSE THESE AGAIN (common mistake made 1000+ times!):**
+- **SINK = OUTPUT = SPEAKER** (audio destination, where sound goes TO)
+  - Chrome's "Speaker" dropdown shows SINKS
+  - Created with: `module-null-sink`
+  - Examples: `intercom-speaker`, HDMI outputs, USB headphones
+  
+- **SOURCE = INPUT = MICROPHONE** (audio origin, where sound comes FROM)
+  - Chrome's "Microphone" dropdown shows SOURCES
+  - Created with: `module-remap-source`, `module-virtual-source`
+  - Examples: `intercom-microphone-source`, USB mic, capture devices
+
+- **MONITOR** = Special SOURCE that captures a SINK's output
+  - Every SINK has a `.monitor` SOURCE
+  - Example: `intercom-speaker.monitor` captures speaker output
+
+**Common Error**: Creating microphone as SINK → Chrome sees it in Speaker list!
+
 ## Executive Summary
 The unified PipeWire architecture (v2.2.6) implements a system-wide audio solution for Media Bridge. This is necessary because Ubuntu/Debian do NOT provide system-wide PipeWire services - only user session services that refuse to run as root (`ConditionUser=!root`). This document describes our custom implementation for embedded/headless systems.
 
@@ -30,12 +49,14 @@ The unified PipeWire architecture (v2.2.6) implements a system-wide audio soluti
 - `pipewire-pulse-system.service` - PulseAudio compatibility
 - `wireplumber-system.service` - Session/policy management
 
-### 3. Virtual Audio Devices
+### 3. Virtual Audio Devices (Security Critical)
 Created persistent virtual devices for Chrome isolation:
 - `intercom-speaker` - Virtual speaker for Chrome output
-- `intercom-microphone` - Virtual microphone for Chrome input
-- Prevents Chrome from locking physical USB devices
-- Managed by `media-bridge-audio-manager`
+- `intercom-microphone` - Virtual microphone sink (monitor used as source)
+- **SECURITY**: Prevents Chrome from accessing HDMI or USB hardware directly
+- **IMPLEMENTATION**: Both devices are null sinks (microphone monitor acts as source)
+- Managed by `media-bridge-audio-manager` with dynamic loopback routing
+- **USB Detection**: Specific to CSCTEK/Zoran device (USB ID 0573:1573)
 
 ### 4. Configuration Files
 
@@ -85,6 +106,13 @@ user-runtime-dir@0.service (MUST start first)
 2. PipeWire → Virtual Devices (intercom-speaker/microphone)
 3. Chrome ← Virtual Devices (isolated from hardware)
 4. NDI Display → PipeWire → HDMI Audio (per display)
+
+### Virtual Device Best Practices
+1. **Always create as null sinks**: Both speaker and microphone are sinks
+2. **Use monitor for input**: Microphone sink's monitor becomes the source
+3. **Set proper media.class**: Use `Audio/Sink`, not `Audio/Source/Virtual`
+4. **Configure loopback modules**: Connect virtual to hardware with low latency
+5. **Verify with pactl**: Check sinks, sources, and modules after creation
 
 ### Low Latency Configuration
 - Quantum: 256 samples (5.33ms @ 48kHz)
@@ -284,6 +312,185 @@ pactl list clients | grep chrome
 - Internal audio paths changed
 - Developer tools must use system paths
 
+## Device Filtering and Access Control (NEW DISCOVERY)
+
+### PipeWire CAN Filter Device Enumeration Per Client
+
+**Critical Finding**: PipeWire's permission system supports hiding devices from specific clients through object-level READ permissions. This capability has been confirmed but is not currently implemented in our setup.
+
+### How PipeWire Permission System Works
+
+1. **Permission Types**:
+   - **R (Read)**: Object is visible and enumerable by the client
+   - **W (Write)**: Client can modify the object  
+   - **X (Execute)**: Client can call methods on the object
+   - **M (Metadata)**: Client can set metadata
+
+2. **Key Principle**: 
+   > "A client can not see an object unless it has READ permissions"
+   
+   This means PipeWire can completely hide devices from client enumeration by not granting R permission.
+
+3. **Access Control Flow**:
+   ```
+   Client connects → check_access event → Access module sets initial permissions 
+   → Session manager sets object-specific permissions → Client only sees objects with R permission
+   ```
+
+### Why Chrome Currently Sees All Devices
+
+Despite PipeWire's capability, Chrome sees all devices because:
+
+1. **Chrome runs as root** and gets "unrestricted" access by default
+2. **WirePlumber isn't configured** to restrict Chrome's permissions  
+3. **The Access module grants all permissions** to root clients
+4. **No per-object permissions** are set for Chrome
+
+### Proper Solution (To Be Implemented - See GitHub Issue)
+
+For **strict audio isolation for ALL applications**, we should:
+
+1. **Configure WirePlumber with application-specific access rules**:
+   ```lua
+   -- /etc/wireplumber/main.lua.d/60-strict-audio-isolation.lua
+   access.rules = [
+     -- Chrome/VDO.Ninja - only virtual intercom devices
+     {
+       matches = [
+         { application.process.binary = "chrome" }
+       ]
+       actions = {
+         update-props = {
+           ["pipewire.access"] = "restricted"
+           ["default.permissions"] = ""  -- No permissions by default
+           ["media.role"] = "intercom"
+         }
+       }
+     },
+     -- ndi-display - only HDMI output
+     {
+       matches = [
+         { application.name = "ndi-display" }
+       ]
+       actions = {
+         update-props = {
+           ["pipewire.access"] = "restricted"
+           ["default.permissions"] = ""
+           ["media.role"] = "hdmi-output"
+         }
+       }
+     },
+     -- ndi-capture - only capture devices
+     {
+       matches = [
+         { application.name = "ndi-capture" }
+       ]
+       actions = {
+         update-props = {
+           ["pipewire.access"] = "restricted"
+           ["default.permissions"] = ""
+           ["media.role"] = "capture"
+         }
+       }
+     },
+     -- Default: deny all
+     {
+       matches = [
+         { application.name = "*" }
+       ]
+       actions = {
+         update-props = {
+           ["pipewire.access"] = "restricted"
+           ["default.permissions"] = ""
+         }
+       }
+     }
+   ]
+   ```
+
+2. **Session manager script to enforce strict isolation**:
+   ```bash
+   # Grant permissions based on media.role
+   # Chrome gets ONLY virtual devices
+   pw-cli set-permissions <chrome-id> <intercom-speaker-id> rx
+   pw-cli set-permissions <chrome-id> <intercom-microphone-id> rx
+   
+   # ndi-display gets ONLY HDMI
+   pw-cli set-permissions <ndi-display-id> <hdmi-sink-id> rwx
+   
+   # ndi-capture gets ONLY capture devices
+   pw-cli set-permissions <ndi-capture-id> <capture-source-id> rwx
+   
+   # Hardware devices invisible to unauthorized apps!
+   ```
+
+3. **Result**: 
+   - Each application sees ONLY its authorized devices
+   - Complete isolation between applications
+   - Hardware devices hidden from unauthorized apps
+   - No accidental cross-routing possible
+
+### Evidence This Works
+
+From Mozilla bug 1844020:
+> "We are not able to enumerate camera devices without permissions when PipeWire is used"
+
+This confirms PipeWire successfully prevents device enumeration when permissions are not granted.
+
+### Current Workaround vs Proper Solution
+
+**Current Workaround (Temporary)**:
+- Watchdog script moves Chrome streams every 5 seconds
+- Chrome still sees all devices in dropdown
+- Reactive approach - fixes after the fact
+
+**Proper Solution (To Be Implemented)**:
+- Chrome only sees virtual devices in dropdown
+- Hardware devices completely hidden from enumeration
+- Proactive approach - prevents at permission level
+- No watchdog needed
+
+## Chrome Audio Security Architecture
+
+### Critical Security Requirements (Issue #114)
+**NEVER allow Chrome audio to play on HDMI outputs** - This is a critical security requirement for the intercom system.
+
+### Implementation Details
+1. **Virtual Device Isolation**:
+   - Chrome ONLY sees `intercom-speaker` and `intercom-microphone`
+   - Hardware devices (USB, HDMI) are never exposed to Chrome
+   - WirePlumber policies can further restrict access (optional)
+
+2. **Loopback Module Routing**:
+   - Virtual speaker → USB output (CSCTEK device only)
+   - USB input → Virtual microphone sink
+   - Chrome uses microphone monitor as source
+   - Latency: 5ms for real-time communication
+
+3. **Device Detection Specificity**:
+   ```bash
+   # Intercom USB device detection (not generic USB audio)
+   CSCTEK USB Audio and HID
+   USB ID: 0573:1573
+   Alternative name: Zoran Co. Personal Media Division
+   ```
+
+4. **Chrome Launch Parameters**:
+   ```bash
+   --audio-output-channels=2     # Stereo output
+   --audio-input-channels=1      # Mono input
+   --enable-exclusive-audio      # Better isolation
+   ```
+
+### Testing Chrome Isolation
+The `test_intercom_virtual_devices.py` test suite verifies:
+- Virtual devices exist and are properly configured
+- Chrome only connects to virtual devices
+- No audio streams route to HDMI
+- USB device detection is specific to intercom hardware
+- Loopback modules maintain low latency
+- Service recovery after USB disconnection
+
 ## Future Enhancements
 
 ### Potential Improvements
@@ -291,6 +498,8 @@ pactl list clients | grep chrome
 2. Per-stream priority management
 3. Advanced echo cancellation
 4. Spatial audio support
+5. WirePlumber Chrome-specific policies
+6. Automatic USB device recovery with udev rules
 
 ### Known Limitations
 1. Requires PipeWire 0.3.65+ 

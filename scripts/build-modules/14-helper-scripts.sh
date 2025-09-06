@@ -35,6 +35,28 @@ install_helper_scripts() {
             fi
         done
         
+        # Install audio manager and its service
+        if [ -f "$HELPER_DIR/media-bridge-audio-manager" ]; then
+            cp "$HELPER_DIR/media-bridge-audio-manager" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-manager
+            log "Audio manager installed"
+        fi
+        
+        if [ -f "$HELPER_DIR/media-bridge-audio-manager.service" ]; then
+            cp "$HELPER_DIR/media-bridge-audio-manager.service" /mnt/usb/etc/systemd/system/
+        fi
+        
+        # Install audio watchdog (temporary fix for Chrome running as root - Issue #33)
+        if [ -f "$HELPER_DIR/media-bridge-audio-watchdog" ]; then
+            cp "$HELPER_DIR/media-bridge-audio-watchdog" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-watchdog
+            log "Audio watchdog installed (temporary fix for Issue #33)"
+        fi
+        
+        if [ -f "$HELPER_DIR/media-bridge-audio-watchdog.service" ]; then
+            cp "$HELPER_DIR/media-bridge-audio-watchdog.service" /mnt/usb/etc/systemd/system/
+        fi
+        
         if [ -f "$HELPER_DIR/media-bridge-intercom.service" ]; then
             cp "$HELPER_DIR/media-bridge-intercom.service" /mnt/usb/etc/systemd/system/
         fi

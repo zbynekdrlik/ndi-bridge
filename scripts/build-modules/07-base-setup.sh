@@ -56,9 +56,9 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl mask grub-initrd-fallback.service 2>/dev/null || true
 fi
 
-# Install and configure systemd-resolved for proper DHCP DNS handling
+# Install essential tools and systemd-resolved for proper DHCP DNS handling
 apt-get update -qq
-apt-get install -y -qq --no-install-recommends systemd-resolved
+apt-get install -y -qq --no-install-recommends systemd-resolved rsync
 
 # Enable systemd-resolved
 if command -v systemctl >/dev/null 2>&1; then

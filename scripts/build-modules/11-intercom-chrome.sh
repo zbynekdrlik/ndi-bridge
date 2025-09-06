@@ -48,6 +48,16 @@ systemctl enable pipewire-system.service 2>/dev/null || true
 systemctl enable pipewire-pulse-system.service 2>/dev/null || true
 systemctl enable wireplumber-system.service 2>/dev/null || true
 
+# Enable audio manager service if it exists
+if [ -f /etc/systemd/system/media-bridge-audio-manager.service ]; then
+    systemctl enable media-bridge-audio-manager.service 2>/dev/null || true
+    echo "Audio manager service enabled"
+fi
+
+# Enable audio watchdog (temporary fix for Chrome running as root - Issue #33)
+systemctl enable media-bridge-audio-watchdog.service 2>/dev/null || true
+echo "Audio watchdog enabled (temporary workaround for Issue #33)"
+
 echo "Chrome and Media Bridge intercom installation complete"
 
 CHROME_EOF

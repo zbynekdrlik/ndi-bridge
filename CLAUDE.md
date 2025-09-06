@@ -29,7 +29,17 @@
 4. **ALWAYS link to docs/** from README.md when referencing detailed information
 5. **Architecture documents are MANDATORY** - must be updated with ANY architectural changes
 
-### PipeWire Specific Rule
+### Audio System Documentation Rules (CRITICAL)
+
+**1. Intercom System (MANDATORY READING)**
+**When working on ANY intercom functionality:**
+- **FIRST**: Read `docs/INTERCOM.md` completely
+- **THEN**: Analyze current implementation against documentation
+- **UPDATE**: `docs/INTERCOM.md` with ANY changes
+- **TEST**: Manually verify with real headset, not just automated tests
+- This is the SINGLE SOURCE OF TRUTH for intercom architecture
+
+**2. PipeWire System**
 **When modifying ANY PipeWire functionality:**
 - Update `docs/PIPEWIRE.md` IMMEDIATELY
 - This is the ONLY authoritative source for PipeWire architecture
@@ -300,17 +310,24 @@ Fixes #25"
 
 ## CRITICAL: USB Image Build Rules
 
-**ALWAYS DO:**
-1. Run from repository ROOT: `cd /mnt/c/Users/newlevel/Documents/GitHub/media-bridge`
+**BUILD PROCESS (STRICT ORDER):**
+1. Run from repository ROOT: `cd /home/newlevel/devel/ndi-bridge`
 2. Increment version: Edit `scripts/build-modules/00-variables.sh` → `BUILD_SCRIPT_VERSION`
-3. Run build: `sudo ./build-image-for-rufus.sh > build.log 2>&1 &` (MUST redirect ALL output to prevent Claude crashes)
-4. Monitor logs: `tail -f build.log` or check build-logs directory
+3. Start build: `sudo ./build-image-for-rufus.sh > build.log 2>&1 &` (NEVER use tee - crashes Claude!)
+4. Monitor: Use BashOutput tool or grep commands (NOT tail -f)
+5. Check completion: `grep "BUILD SUCCESSFUL\|ERROR\|Failed" build.log`
 
-**NEVER DO:**
-- Run build from `build/` directory (causes "file not found" errors)
-- Forget to increment version (can't identify deployed devices)
+**MONITORING BUILD (CRITICAL FOR CLAUDE):**
+```bash
+# WRONG - crashes Claude:
+sudo ./build-image-for-rufus.sh 2>&1 | tee build.log &  # NEVER DO THIS!
+tail -f build.log  # NEVER DO THIS!
 
-**Build takes 10-15 minutes. Image output: `media-bridge.img` (8GB)**
+# CORRECT - safe monitoring:
+grep "Installing\|Module\|complete" build.log | tail -10
+```
+
+**Build takes 10-15 minutes. Output: `media-bridge.img` (8GB)**
 
 ## Clean Repository Build Process
 
