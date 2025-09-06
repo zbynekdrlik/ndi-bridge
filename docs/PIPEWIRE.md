@@ -312,6 +312,144 @@ pactl list clients | grep chrome
 - Internal audio paths changed
 - Developer tools must use system paths
 
+## Device Filtering and Access Control (NEW DISCOVERY)
+
+### PipeWire CAN Filter Device Enumeration Per Client
+
+**Critical Finding**: PipeWire's permission system supports hiding devices from specific clients through object-level READ permissions. This capability has been confirmed but is not currently implemented in our setup.
+
+### How PipeWire Permission System Works
+
+1. **Permission Types**:
+   - **R (Read)**: Object is visible and enumerable by the client
+   - **W (Write)**: Client can modify the object  
+   - **X (Execute)**: Client can call methods on the object
+   - **M (Metadata)**: Client can set metadata
+
+2. **Key Principle**: 
+   > "A client can not see an object unless it has READ permissions"
+   
+   This means PipeWire can completely hide devices from client enumeration by not granting R permission.
+
+3. **Access Control Flow**:
+   ```
+   Client connects → check_access event → Access module sets initial permissions 
+   → Session manager sets object-specific permissions → Client only sees objects with R permission
+   ```
+
+### Why Chrome Currently Sees All Devices
+
+Despite PipeWire's capability, Chrome sees all devices because:
+
+1. **Chrome runs as root** and gets "unrestricted" access by default
+2. **WirePlumber isn't configured** to restrict Chrome's permissions  
+3. **The Access module grants all permissions** to root clients
+4. **No per-object permissions** are set for Chrome
+
+### Proper Solution (To Be Implemented - See GitHub Issue)
+
+For **strict audio isolation for ALL applications**, we should:
+
+1. **Configure WirePlumber with application-specific access rules**:
+   ```lua
+   -- /etc/wireplumber/main.lua.d/60-strict-audio-isolation.lua
+   access.rules = [
+     -- Chrome/VDO.Ninja - only virtual intercom devices
+     {
+       matches = [
+         { application.process.binary = "chrome" }
+       ]
+       actions = {
+         update-props = {
+           ["pipewire.access"] = "restricted"
+           ["default.permissions"] = ""  -- No permissions by default
+           ["media.role"] = "intercom"
+         }
+       }
+     },
+     -- ndi-display - only HDMI output
+     {
+       matches = [
+         { application.name = "ndi-display" }
+       ]
+       actions = {
+         update-props = {
+           ["pipewire.access"] = "restricted"
+           ["default.permissions"] = ""
+           ["media.role"] = "hdmi-output"
+         }
+       }
+     },
+     -- ndi-capture - only capture devices
+     {
+       matches = [
+         { application.name = "ndi-capture" }
+       ]
+       actions = {
+         update-props = {
+           ["pipewire.access"] = "restricted"
+           ["default.permissions"] = ""
+           ["media.role"] = "capture"
+         }
+       }
+     },
+     -- Default: deny all
+     {
+       matches = [
+         { application.name = "*" }
+       ]
+       actions = {
+         update-props = {
+           ["pipewire.access"] = "restricted"
+           ["default.permissions"] = ""
+         }
+       }
+     }
+   ]
+   ```
+
+2. **Session manager script to enforce strict isolation**:
+   ```bash
+   # Grant permissions based on media.role
+   # Chrome gets ONLY virtual devices
+   pw-cli set-permissions <chrome-id> <intercom-speaker-id> rx
+   pw-cli set-permissions <chrome-id> <intercom-microphone-id> rx
+   
+   # ndi-display gets ONLY HDMI
+   pw-cli set-permissions <ndi-display-id> <hdmi-sink-id> rwx
+   
+   # ndi-capture gets ONLY capture devices
+   pw-cli set-permissions <ndi-capture-id> <capture-source-id> rwx
+   
+   # Hardware devices invisible to unauthorized apps!
+   ```
+
+3. **Result**: 
+   - Each application sees ONLY its authorized devices
+   - Complete isolation between applications
+   - Hardware devices hidden from unauthorized apps
+   - No accidental cross-routing possible
+
+### Evidence This Works
+
+From Mozilla bug 1844020:
+> "We are not able to enumerate camera devices without permissions when PipeWire is used"
+
+This confirms PipeWire successfully prevents device enumeration when permissions are not granted.
+
+### Current Workaround vs Proper Solution
+
+**Current Workaround (Temporary)**:
+- Watchdog script moves Chrome streams every 5 seconds
+- Chrome still sees all devices in dropdown
+- Reactive approach - fixes after the fact
+
+**Proper Solution (To Be Implemented)**:
+- Chrome only sees virtual devices in dropdown
+- Hardware devices completely hidden from enumeration
+- Proactive approach - prevents at permission level
+- No watchdog needed
+
 ## Chrome Audio Security Architecture
 
 ### Critical Security Requirements (Issue #114)
