@@ -7,10 +7,21 @@ echo "Audio Watchdog Starting - Fixing Chrome audio routing every 5 seconds"
 echo "This is a TEMPORARY workaround until Chrome runs as non-root user"
 
 while true; do
-    # Find all Chrome sink inputs and move to intercom-speaker
-    # Use awk to reliably find Chrome sink inputs
+    # Find ONLY Chrome sink inputs (not ndi-display!) and move to intercom-speaker
+    # Parse each sink input section completely before deciding
     chrome_inputs=$(pactl list sink-inputs 2>/dev/null | \
-        awk '/Sink Input #/{id=$3} /application.name = "Chrome"/{gsub("#","",id); print id}')
+        awk 'BEGIN{RS="Sink Input #"; FS="\n"}
+             NR>1 {
+                 id=$1
+                 gsub(/[^0-9]/,"",id)
+                 is_chrome=0
+                 is_ndi=0
+                 for(i=1;i<=NF;i++) {
+                     if($i ~ /application.name = "Chrome"/) is_chrome=1
+                     if($i ~ /node.name = "ndi-display"/) is_ndi=1
+                 }
+                 if(is_chrome && !is_ndi) print id
+             }')
     
     for input in $chrome_inputs; do
         # Get current sink
