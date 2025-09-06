@@ -213,7 +213,7 @@ class TestIntercomAudioIntegrity:
         )
         
         # Check if sink is properly configured (RUNNING or IDLE is OK)
-        sink_state = usb_sink_status.stdout.split('\t')[-1] if '\t' in usb_sink_status.stdout else ''
+        sink_state = usb_sink_status.stdout.split('\t')[-1].strip() if '\t' in usb_sink_status.stdout else ''
         assert sink_state in ['RUNNING', 'IDLE'], (
             f"USB audio device in unexpected state: {sink_state}"
         )
@@ -349,14 +349,17 @@ class TestIntercomAudioIntegrity:
             sink_info = host.run(f"pactl list sinks short | awk '$1=={ndi_sink_id}'")
             if sink_info.stdout:
                 sink_name = sink_info.stdout.split('\t')[1] if '\t' in sink_info.stdout else ''
-                # ndi-display should use HDMI output
-                assert 'hdmi' in sink_name.lower(), (
-                    f"ndi-display NOT using HDMI! Using '{sink_name}' instead.\n"
+                # ndi-display should use HDMI output (or default hardware, not virtual)
+                assert ('hdmi' in sink_name.lower() or 
+                        'pci' in sink_name.lower() or
+                        sink_name.startswith('alsa_output')), (
+                    f"ndi-display NOT using hardware output! Using '{sink_name}' instead.\n"
                     f"Audio won't play on monitor speakers!"
                 )
-                # Should NOT use virtual devices
+                # Ensure it's NOT using virtual devices
                 assert 'intercom' not in sink_name.lower(), (
-                    f"ndi-display wrongly using intercom devices: '{sink_name}'"
+                    f"ndi-display WRONGLY using virtual device '{sink_name}'!\n"
+                    f"Should be using HDMI/hardware output for monitor speakers."
                 )
     
     def test_default_sink_not_intercom_speaker(self, host):

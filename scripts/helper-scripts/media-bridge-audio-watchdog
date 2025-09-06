@@ -8,7 +8,9 @@ echo "This is a TEMPORARY workaround until Chrome runs as non-root user"
 
 while true; do
     # Find all Chrome sink inputs and move to intercom-speaker
-    chrome_inputs=$(pactl list sink-inputs 2>/dev/null | grep -B15 'application.name = "Chrome"' | grep 'Sink Input #' | grep -o '[0-9]*')
+    # Use awk to reliably find Chrome sink inputs
+    chrome_inputs=$(pactl list sink-inputs 2>/dev/null | \
+        awk '/Sink Input #/{id=$3} /application.name = "Chrome"/{gsub("#","",id); print id}')
     
     for input in $chrome_inputs; do
         # Get current sink
@@ -23,7 +25,8 @@ while true; do
     done
     
     # Find all Chrome source outputs and move to intercom-microphone  
-    chrome_outputs=$(pactl list source-outputs 2>/dev/null | grep -B15 'application.name = ".*Chrome.*"' | grep 'Source Output #' | grep -o '[0-9]*')
+    chrome_outputs=$(pactl list source-outputs 2>/dev/null | \
+        awk '/Source Output #/{id=$3} /application.name.*Chrome/{gsub("#","",id); print id}')
     
     for output in $chrome_outputs; do
         # Get current source
