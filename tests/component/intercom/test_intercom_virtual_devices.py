@@ -13,29 +13,42 @@ class TestIntercomVirtualDevices:
     """Test virtual device implementation and isolation."""
 
     def test_virtual_devices_exist_in_pipewire(self, host):
-        """Test that virtual devices exist in PipeWire."""
+        """Test that virtual devices exist AND are correctly configured in PipeWire."""
         sinks = host.run("pactl list sinks short")
         assert sinks.exit_status == 0, "Failed to list sinks"
         
-        # Check for virtual speaker sink
+        sources = host.run("pactl list sources short")
+        assert sources.exit_status == 0, "Failed to list sources"
+        
+        # Check for virtual speaker sink (this is correct)
         assert "intercom-speaker" in sinks.stdout, (
             "Virtual intercom-speaker device not found in PipeWire sinks"
         )
         
-        # Check for virtual microphone sink
-        assert "intercom-microphone" in sinks.stdout, (
-            "Virtual intercom-microphone device not found in PipeWire sinks"
-        )
+        # CRITICAL FIX: The microphone should be either:
+        # 1. A proper virtual SOURCE (not a sink!) named intercom-microphone or intercom-microphone-source
+        # 2. If using sink+monitor pattern, the sink should be hidden and only monitor visible
         
-        # Check that monitor sources exist for the virtual sinks
-        sources = host.run("pactl list sources short")
-        assert sources.exit_status == 0, "Failed to list sources"
+        # Check what we actually have
+        has_mic_sink = "intercom-microphone" in sinks.stdout
+        has_mic_source = "intercom-microphone-source" in sources.stdout
+        has_mic_monitor = "intercom-microphone.monitor" in sources.stdout
         
-        assert "intercom-speaker.monitor" in sources.stdout, (
-            "intercom-speaker monitor source not found"
-        )
-        assert "intercom-microphone.monitor" in sources.stdout, (
-            "intercom-microphone monitor source not found"
+        # Determine if configuration is correct
+        if has_mic_sink and not has_mic_source:
+            # This is the CURRENT BROKEN state - microphone is a sink!
+            assert False, (
+                "CRITICAL BUG: intercom-microphone is configured as a SINK!\n"
+                "This causes Chrome to see it as a second 'Intercom' speaker.\n"
+                "Chrome sees: 2 Intercom speakers, 0 Intercom microphones.\n"
+                "Fix: Use module-virtual-source or properly configure the monitor."
+            )
+        
+        # We need SOME microphone source for Chrome
+        assert has_mic_source or has_mic_monitor, (
+            "No microphone source available for Chrome!\n"
+            f"Need either intercom-microphone-source or intercom-microphone.monitor\n"
+            f"Available sources: {sources.stdout}"
         )
 
     def test_loopback_modules_active_with_usb(self, host):
@@ -74,6 +87,64 @@ class TestIntercomVirtualDevices:
         else:
             pytest.skip("No CSCTEK USB audio device connected")
 
+    def test_chrome_device_enumeration_is_correct(self, host):
+        """Test what devices Chrome can actually enumerate (not just what it's connected to)."""
+        # Chrome enumerates ALL devices it can see, not just what it's using
+        # This is the critical test that was missing!
+        
+        sinks = host.run("pactl list sinks short")
+        sources = host.run("pactl list sources short")
+        
+        # Parse all sinks (speakers) Chrome can see
+        all_sinks = []
+        for line in sinks.stdout.split('\n'):
+            if line.strip():
+                parts = line.split('\t')
+                if len(parts) >= 2:
+                    all_sinks.append(parts[1])
+        
+        # Parse all sources (microphones) Chrome can see - excluding monitors
+        all_sources = []
+        for line in sources.stdout.split('\n'):
+            if line.strip() and '.monitor' not in line:
+                parts = line.split('\t')
+                if len(parts) >= 2:
+                    all_sources.append(parts[1])
+        
+        # CRITICAL: Check what Chrome sees
+        
+        # 1. Chrome should NOT see hardware audio devices directly
+        hardware_sinks = [s for s in all_sinks if s.startswith('alsa_')]
+        hardware_sources = [s for s in all_sources if s.startswith('alsa_')]
+        
+        assert len(hardware_sinks) == 0, (
+            f"CRITICAL: Chrome can see {len(hardware_sinks)} hardware speaker(s)!\n"
+            f"Hardware devices visible: {hardware_sinks}\n"
+            f"These should be hidden from Chrome!"
+        )
+        
+        assert len(hardware_sources) == 0, (
+            f"CRITICAL: Chrome can see {len(hardware_sources)} hardware microphone(s)!\n"
+            f"Hardware devices visible: {hardware_sources}\n"
+            f"These should be hidden from Chrome!"
+        )
+        
+        # 2. Chrome should see exactly ONE intercom speaker
+        intercom_sinks = [s for s in all_sinks if 'intercom' in s.lower()]
+        assert len(intercom_sinks) == 1, (
+            f"Wrong number of intercom speakers visible to Chrome!\n"
+            f"Expected: 1 (intercom-speaker)\n"
+            f"Found: {intercom_sinks}"
+        )
+        
+        # 3. Chrome should see exactly ONE intercom microphone source
+        intercom_sources = [s for s in all_sources if 'intercom' in s.lower()]
+        assert len(intercom_sources) >= 1, (
+            f"No intercom microphone visible to Chrome!\n"
+            f"Expected: intercom-microphone-source\n"
+            f"Found sources: {intercom_sources}"
+        )
+    
     def test_chrome_only_connects_to_virtual_devices(self, host):
         """Test Chrome ONLY connects to virtual devices, not hardware."""
         # Check if Chrome is running

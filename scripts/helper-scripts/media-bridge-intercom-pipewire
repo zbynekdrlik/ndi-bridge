@@ -269,6 +269,9 @@ env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
     --audio-output-channels=2 \
     --audio-input-channels=1 \
     --enable-exclusive-audio \
+    --use-fake-ui-for-media-stream \
+    --enable-features=AudioServiceSandbox \
+    --disable-features=AudioServiceOutOfProcess \
     --user-data-dir=$PROFILE_DIR \
     --new-window \
     "$URL" &
