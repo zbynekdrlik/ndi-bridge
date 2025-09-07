@@ -1,0 +1,130 @@
+#!/bin/bash
+# Media Bridge Intercom - Fixed for mediabridge user
+# Properly handles DISPLAY and environment setup
+
+set -e
+
+# Configuration
+FULL_HOSTNAME=$(hostname)
+HOSTNAME=${FULL_HOSTNAME#media-bridge-}
+ROOM="${VDO_ROOM:-nl_interkom}"
+PROFILE_DIR="/var/lib/mediabridge/.chrome-profile"
+DISPLAY_NUM=88
+
+echo "=== Media Bridge Intercom Starting ==="
+echo "Device: $HOSTNAME"
+echo "Room: $ROOM"
+echo "User: $(whoami)"
+
+# Cleanup function
+cleanup() {
+    echo "Cleaning up processes..."
+    pkill -f "google-chrome" 2>/dev/null || true
+    pkill -f "x11vnc" 2>/dev/null || true
+    pkill -f "Xvfb" 2>/dev/null || true
+    rm -f /tmp/.X${DISPLAY_NUM}-lock 2>/dev/null || true
+}
+
+# Clean up first
+cleanup
+
+# Start Xvfb and wait for it to be ready
+echo "Starting virtual display..."
+rm -f /tmp/.X${DISPLAY_NUM}-lock
+
+# Start Xvfb with explicit error handling
+Xvfb :${DISPLAY_NUM} -screen 0 1280x720x24 -ac -nolisten tcp 2>/tmp/xvfb.log &
+XVFB_PID=$!
+
+# Wait for X server to be ready
+for i in {1..10}; do
+    if [ -e /tmp/.X${DISPLAY_NUM}-lock ]; then
+        echo "X server ready"
+        break
+    fi
+    if ! kill -0 $XVFB_PID 2>/dev/null; then
+        echo "ERROR: Xvfb died. Check /tmp/xvfb.log"
+        cat /tmp/xvfb.log
+        exit 1
+    fi
+    echo "Waiting for X server... (attempt $i)"
+    sleep 1
+done
+
+# Export display for all child processes
+export DISPLAY=:${DISPLAY_NUM}
+echo "DISPLAY set to: $DISPLAY"
+
+# Start VNC server (optional, for debugging)
+echo "Starting VNC server on port 5999..."
+x11vnc -display :${DISPLAY_NUM} -nopw -forever -shared -rfbport 5999 > /tmp/x11vnc.log 2>&1 &
+VNC_PID=$!
+
+# Set audio environment
+export XDG_RUNTIME_DIR=/run/user/999
+export PULSE_SERVER=unix:/run/user/999/pulse/native
+export HOME=/var/lib/mediabridge
+
+# Wait for PulseAudio to be ready
+echo "Checking audio system..."
+for i in {1..10}; do
+    if pactl info >/dev/null 2>&1; then
+        echo "PulseAudio ready"
+        break
+    fi
+    echo "Waiting for PulseAudio... (attempt $i)"
+    sleep 1
+done
+
+# Create Chrome profile with permissions
+echo "Setting up Chrome profile..."
+mkdir -p $PROFILE_DIR/Default
+cat > $PROFILE_DIR/Default/Preferences << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+
+# VDO.Ninja URL
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&novideo&autostart&sl&st&mobile&fb"
+
+echo "Starting Chrome..."
+echo "URL: $URL"
+
+# Run Chrome (no sandbox needed for mediabridge user)
+/usr/bin/google-chrome \
+    --no-first-run \
+    --no-default-browser-check \
+    --disable-setuid-sandbox \
+    --disable-gpu \
+    --disable-dev-shm-usage \
+    --autoplay-policy=no-user-gesture-required \
+    --audio-buffer-size=2048 \
+    --user-data-dir=$PROFILE_DIR \
+    --new-window \
+    "$URL" &
+
+CHROME_PID=$!
+
+echo "Chrome started with PID $CHROME_PID"
+echo "VNC access: $(hostname -I | awk '{print $1}'):5999"
+
+# Wait for Chrome
+wait $CHROME_PID
+echo "Chrome has exited"
+
+# Cleanup
+cleanup

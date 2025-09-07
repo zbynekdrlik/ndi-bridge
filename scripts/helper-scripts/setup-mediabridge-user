@@ -1,0 +1,195 @@
+#!/bin/bash
+# Setup mediabridge user for all Media Bridge services
+# This script creates and configures the mediabridge user with proper permissions
+
+set -e
+
+# Configuration
+MEDIABRIDGE_UID=999
+MEDIABRIDGE_USER="mediabridge"
+MEDIABRIDGE_HOME="/var/lib/mediabridge"
+MEDIABRIDGE_RUNTIME="/run/user/${MEDIABRIDGE_UID}"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then 
+    echo "This script must be run as root"
+    exit 1
+fi
+
+# Create mediabridge user if it doesn't exist
+if ! id -u "$MEDIABRIDGE_USER" >/dev/null 2>&1; then
+    log "Creating mediabridge user with UID ${MEDIABRIDGE_UID}..."
+    useradd \
+        --system \
+        --uid "$MEDIABRIDGE_UID" \
+        --create-home \
+        --home-dir "$MEDIABRIDGE_HOME" \
+        --shell /bin/bash \
+        --comment "Media Bridge System User" \
+        --groups audio,video,pipewire \
+        "$MEDIABRIDGE_USER"
+    
+    log "User created successfully"
+else
+    log "User $MEDIABRIDGE_USER already exists"
+    # Ensure user is in correct groups
+    usermod -a -G audio,video,pipewire "$MEDIABRIDGE_USER" 2>/dev/null || true
+fi
+
+# Create pipewire group if it doesn't exist
+if ! getent group pipewire >/dev/null 2>&1; then
+    log "Creating pipewire group..."
+    groupadd --system pipewire
+fi
+
+# Add mediabridge to pipewire group
+usermod -a -G pipewire "$MEDIABRIDGE_USER"
+
+# Create necessary directories
+log "Creating directory structure..."
+mkdir -p "$MEDIABRIDGE_HOME/.config/pipewire"
+mkdir -p "$MEDIABRIDGE_HOME/.config/wireplumber"
+mkdir -p "$MEDIABRIDGE_HOME/.local/share"
+mkdir -p "$MEDIABRIDGE_HOME/.local/state"
+mkdir -p "$MEDIABRIDGE_HOME/.cache"
+mkdir -p "$MEDIABRIDGE_HOME/tmp"
+
+# Create Chrome profile directory
+mkdir -p "$MEDIABRIDGE_HOME/.chrome-profile/Default"
+
+# Set ownership
+chown -R "$MEDIABRIDGE_USER:$MEDIABRIDGE_USER" "$MEDIABRIDGE_HOME"
+
+# Enable lingering for the user (allows services to run without login)
+log "Enabling systemd lingering for $MEDIABRIDGE_USER..."
+loginctl enable-linger "$MEDIABRIDGE_USER" 2>/dev/null || true
+
+# Create runtime directory structure (will be created by systemd normally)
+log "Setting up runtime directory template..."
+mkdir -p "/etc/tmpfiles.d"
+cat > "/etc/tmpfiles.d/mediabridge.conf" << EOF
+# Runtime directories for mediabridge user
+d /run/user/$MEDIABRIDGE_UID 0700 $MEDIABRIDGE_USER $MEDIABRIDGE_USER -
+d /run/user/$MEDIABRIDGE_UID/pulse 0700 $MEDIABRIDGE_USER $MEDIABRIDGE_USER -
+d /run/user/$MEDIABRIDGE_UID/pipewire 0700 $MEDIABRIDGE_USER $MEDIABRIDGE_USER -
+EOF
+
+# Apply tmpfiles configuration
+systemd-tmpfiles --create /etc/tmpfiles.d/mediabridge.conf
+
+# Setup Chrome preferences with VDO.Ninja permissions pre-granted
+log "Setting up Chrome profile with permissions..."
+cat > "$MEDIABRIDGE_HOME/.chrome-profile/Default/Preferences" << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766142668061",
+            "setting": 1
+          }
+        },
+        "media_stream_camera": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766150219890",
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+
+# Set proper ownership for Chrome profile
+chown -R "$MEDIABRIDGE_USER:$MEDIABRIDGE_USER" "$MEDIABRIDGE_HOME/.chrome-profile"
+
+# Configure realtime capabilities for audio
+log "Setting up realtime capabilities..."
+cat > /etc/security/limits.d/mediabridge.conf << EOF
+# Realtime capabilities for mediabridge user
+@pipewire   - rtprio  95
+@pipewire   - nice    -19
+@pipewire   - memlock unlimited
+
+$MEDIABRIDGE_USER   - rtprio  95
+$MEDIABRIDGE_USER   - nice    -19
+$MEDIABRIDGE_USER   - memlock unlimited
+EOF
+
+# Create environment file for services
+log "Creating environment configuration..."
+mkdir -p /etc/mediabridge
+cat > /etc/mediabridge/environment << EOF
+# Environment variables for mediabridge services
+USER=$MEDIABRIDGE_USER
+HOME=$MEDIABRIDGE_HOME
+XDG_RUNTIME_DIR=$MEDIABRIDGE_RUNTIME
+XDG_CONFIG_HOME=$MEDIABRIDGE_HOME/.config
+XDG_DATA_HOME=$MEDIABRIDGE_HOME/.local/share
+XDG_STATE_HOME=$MEDIABRIDGE_HOME/.local/state
+XDG_CACHE_HOME=$MEDIABRIDGE_HOME/.cache
+PULSE_RUNTIME_PATH=$MEDIABRIDGE_RUNTIME/pulse
+PIPEWIRE_RUNTIME_DIR=$MEDIABRIDGE_RUNTIME
+EOF
+
+# Create a script to test audio as mediabridge user
+cat > "$MEDIABRIDGE_HOME/test-audio.sh" << 'TEST_SCRIPT'
+#!/bin/bash
+export XDG_RUNTIME_DIR="/run/user/999"
+export PULSE_RUNTIME_PATH="$XDG_RUNTIME_DIR/pulse"
+export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
+
+echo "Testing PipeWire connection as mediabridge user..."
+echo "Runtime directory: $XDG_RUNTIME_DIR"
+echo ""
+
+if [ -S "$XDG_RUNTIME_DIR/pipewire-0" ]; then
+    echo "✓ PipeWire socket exists"
+else
+    echo "✗ PipeWire socket not found"
+fi
+
+if [ -S "$XDG_RUNTIME_DIR/pulse/native" ]; then
+    echo "✓ PulseAudio socket exists"
+else
+    echo "✗ PulseAudio socket not found"
+fi
+
+echo ""
+echo "Testing PulseAudio connection..."
+pactl info 2>&1 | grep -E "Server Name|Server Version|Default" || echo "Failed to connect"
+
+echo ""
+echo "Available sinks:"
+pactl list sinks short 2>/dev/null || echo "No sinks available"
+
+echo ""
+echo "Available sources:"
+pactl list sources short 2>/dev/null || echo "No sources available"
+TEST_SCRIPT
+
+chmod +x "$MEDIABRIDGE_HOME/test-audio.sh"
+chown "$MEDIABRIDGE_USER:$MEDIABRIDGE_USER" "$MEDIABRIDGE_HOME/test-audio.sh"
+
+log "Mediabridge user setup complete!"
+log ""
+log "User details:"
+log "  Username: $MEDIABRIDGE_USER"
+log "  UID: $MEDIABRIDGE_UID"
+log "  Home: $MEDIABRIDGE_HOME"
+log "  Runtime: $MEDIABRIDGE_RUNTIME"
+log "  Groups: audio, video, pipewire"
+log ""
+log "Next steps:"
+log "  1. Update PipeWire services to run as $MEDIABRIDGE_USER"
+log "  2. Update all Media Bridge services to use $MEDIABRIDGE_USER"
+log "  3. Test audio access: su - $MEDIABRIDGE_USER -c './test-audio.sh'"

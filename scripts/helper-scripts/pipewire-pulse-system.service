@@ -6,14 +6,16 @@ BindsTo=pipewire-system.service
 
 [Service]
 Type=simple
-User=root
-Environment="XDG_RUNTIME_DIR=/run/user/0"
-Environment="PULSE_RUNTIME_PATH=/run/user/0/pulse"
-Environment="XDG_CACHE_HOME=/var/cache/pipewire-pulse"
-Environment="HOME=/root"
-Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
-ExecStartPre=/bin/mkdir -p /run/user/0/pulse
-ExecStartPre=/bin/mkdir -p /var/cache/pipewire-pulse
+User=mediabridge
+Group=audio
+SupplementaryGroups=video pipewire
+Environment="XDG_RUNTIME_DIR=/run/user/999"
+Environment="PULSE_RUNTIME_PATH=/run/user/999/pulse"
+Environment="XDG_CACHE_HOME=/var/lib/mediabridge/.cache/pipewire-pulse"
+Environment="HOME=/var/lib/mediabridge"
+Environment="PIPEWIRE_RUNTIME_DIR=/run/user/999"
+ExecStartPre=/bin/mkdir -p /run/user/999/pulse
+ExecStartPre=/bin/mkdir -p /var/lib/mediabridge/.cache/pipewire-pulse
 ExecStart=/usr/bin/pipewire-pulse
 Restart=always
 RestartSec=5

@@ -1,24 +1,27 @@
 [Unit]
 Description=Media Bridge Intercom Service
-After=network-online.target pipewire-system.service pipewire-pulse-system.service wireplumber-system.service
+After=network-online.target pipewire-system.service pipewire-pulse-system.service
 Wants=network-online.target
-Requires=pipewire-system.service pipewire-pulse-system.service wireplumber-system.service
+Requires=pipewire-system.service pipewire-pulse-system.service
 
 [Service]
 Type=simple
-User=root
+TimeoutStartSec=300
+# Run as mediabridge user with all services unified
+User=mediabridge
+Group=audio
+SupplementaryGroups=video pipewire
 
-# Pre-start cleanup
-ExecStartPre=-/bin/bash -c 'pkill -9 -f chrome 2>/dev/null || true'
-ExecStartPre=-/bin/bash -c 'pkill -9 -f x11vnc 2>/dev/null || true'
-ExecStartPre=-/bin/bash -c 'pkill -9 -f Xvfb 2>/dev/null || true'
-ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock /tmp/chrome-vdo-profile/Singleton* 2>/dev/null || true'
-ExecStartPre=/bin/sleep 3
+# Environment variables for mediabridge user
+Environment="HOME=/var/lib/mediabridge"
+Environment="XDG_RUNTIME_DIR=/run/user/999"
+Environment="PULSE_RUNTIME_PATH=/run/user/999/pulse"
+Environment="PULSE_SERVER=unix:/run/user/999/pulse/native"
 
-# Setup virtual audio devices
-ExecStartPre=/usr/local/bin/media-bridge-audio-manager setup
+# Setup virtual audio devices (run as root)
+ExecStartPre=+/usr/local/bin/media-bridge-audio-manager setup
 
-# Start the service (auto-selects PipeWire or PulseAudio)
+# Start the service as intercom user
 ExecStart=/usr/local/bin/media-bridge-intercom-launcher
 
 # Stop cleanup
