@@ -67,16 +67,16 @@ def test_wireplumber_system_service_running(host):
 
 def test_pipewire_runtime_directory_exists(host):
     """Test that PipeWire runtime directory exists."""
-    # System-wide PipeWire runs as root (UID 0)
-    runtime_dir = host.file("/run/user/0")
+    # System-wide PipeWire runs as mediabridge (UID 999)
+    runtime_dir = host.file("/run/user/999")
     assert runtime_dir.exists, "PipeWire runtime directory not found"
 
 
 def test_pipewire_socket_exists(host):
     """Test that PipeWire socket exists."""
-    # Check for root user's PipeWire socket
-    socket = host.file("/run/user/0/pipewire-0")
-    assert socket.exists, "PipeWire socket not found at /run/user/0/pipewire-0"
+    # Check for mediabridge user's PipeWire socket
+    socket = host.file("/run/user/999/pipewire-0")
+    assert socket.exists, "PipeWire socket not found at /run/user/999/pipewire-0"
 
 
 def test_pipewire_pulse_socket_exists(host):

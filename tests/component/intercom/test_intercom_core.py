@@ -50,14 +50,14 @@ class TestIntercomCore:
         # Check runtime directory environment
         result = host.run("systemctl show media-bridge-intercom -p Environment")
         if "XDG_RUNTIME_DIR" in result.stdout:
-            assert "/run/user/0" in result.stdout, "Intercom not using system PipeWire runtime"
+            assert "/run/user/999" in result.stdout, "Intercom not using system PipeWire runtime"
     
     def test_intercom_pipewire_script_uses_system_runtime(self, host):
         """Test that intercom PipeWire script uses system runtime."""
         script = host.file("/usr/local/bin/media-bridge-intercom-pipewire")
         if script.exists:
             content = script.content_string
-            assert "XDG_RUNTIME_DIR=/run/user/0" in content, "Script not using system runtime"
+            assert "XDG_RUNTIME_DIR=/run/user/999" in content, "Script not using system runtime"
             assert "export XDG_RUNTIME_DIR" in content, "Runtime dir not exported"
     
     def test_intercom_launcher_script_exists(self, host):

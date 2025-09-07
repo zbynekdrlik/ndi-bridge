@@ -1,0 +1,197 @@
+#!/bin/bash
+# Media Bridge Permission Manager
+# Enforces strict audio device isolation using PipeWire permissions
+# Each application ONLY sees its authorized devices
+
+set -e
+
+# PipeWire environment
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/0}"
+
+# Logging
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a /var/log/media-bridge-permission-manager.log
+    logger -t permission-manager "$*"
+}
+
+# Wait for PipeWire to be ready
+wait_for_pipewire() {
+    local max_attempts=30
+    local attempt=0
+    
+    while [ $attempt -lt $max_attempts ]; do
+        if pw-cli info Core >/dev/null 2>&1; then
+            log "PipeWire is ready"
+            return 0
+        fi
+        log "Waiting for PipeWire... (attempt $((attempt+1))/$max_attempts)"
+        sleep 1
+        attempt=$((attempt+1))
+    done
+    
+    log "ERROR: PipeWire not ready after $max_attempts seconds"
+    return 1
+}
+
+# Get client ID by application name
+get_client_id() {
+    local app_name="$1"
+    # Use ls instead of list, and search for the app name
+    pw-cli ls Client 2>/dev/null | grep -B2 "$app_name" | grep "id " | awk '{print $2}' | tr -d ',' | head -1
+}
+
+# Get node ID by name
+get_node_id() {
+    local node_name="$1"
+    pw-cli ls Node | grep -B2 "node.name = \"$node_name\"" | grep "id:" | awk '{print $2}' | head -1
+}
+
+# Set permissions for a client on specific nodes
+set_client_permissions() {
+    local client_id="$1"
+    local node_id="$2"
+    local permissions="$3"  # "r", "rw", "rwx", or "" for no access
+    
+    if [ -z "$permissions" ]; then
+        # Remove permissions (deny access)
+        log "DENY: Client $client_id access to node $node_id"
+        pw-cli set-param "$client_id" Permissions "[ { id: $node_id, permissions: 0 } ]" 2>/dev/null || true
+    else
+        # Convert permission string to bitmask
+        local perm_value=0
+        [[ "$permissions" == *"r"* ]] && perm_value=$((perm_value + 1))  # READ
+        [[ "$permissions" == *"w"* ]] && perm_value=$((perm_value + 2))  # WRITE
+        [[ "$permissions" == *"x"* ]] && perm_value=$((perm_value + 4))  # EXECUTE
+        
+        log "GRANT: Client $client_id permissions '$permissions' to node $node_id"
+        pw-cli set-param "$client_id" Permissions "[ { id: $node_id, permissions: $perm_value } ]" 2>/dev/null || true
+    fi
+}
+
+# Configure Chrome permissions
+configure_chrome_permissions() {
+    log "Configuring Chrome audio isolation..."
+    
+    # Find Chrome clients - check for intercom user (UID 1000) or Chrome app name
+    local chrome_clients=$(pw-cli ls Client 2>/dev/null | grep -B5 -E 'pipewire.sec.uid = "1000"|application.name.*Chrome' | grep "id " | awk '{print $2}' | tr -d ',' | sort -u)
+    
+    if [ -z "$chrome_clients" ]; then
+        log "Chrome/intercom user not found, skipping..."
+        return
+    fi
+    
+    log "Found potential Chrome clients: $chrome_clients"
+    
+    # Get virtual device IDs
+    local speaker_id=$(get_node_id "intercom-speaker")
+    local mic_id=$(get_node_id "intercom-microphone")
+    
+    if [ -z "$speaker_id" ] || [ -z "$mic_id" ]; then
+        log "WARNING: Virtual devices not found, cannot set Chrome permissions"
+        return
+    fi
+    
+    for client_id in $chrome_clients; do
+        log "Processing Chrome client $client_id"
+        
+        # Grant access to virtual devices
+        set_client_permissions "$client_id" "$speaker_id" "rwx"
+        set_client_permissions "$client_id" "$mic_id" "rwx"
+        
+        # Explicitly deny access to hardware devices
+        # Find all hardware audio nodes
+        local hw_nodes=$(pw-cli ls Node | grep -E "alsa_output\.|alsa_input\." | grep "id:" | awk '{print $2}')
+        
+        for node_id in $hw_nodes; do
+            # Check if it's not a virtual device
+            local node_info=$(pw-cli info "$node_id" 2>/dev/null | grep "node.name")
+            if [[ ! "$node_info" =~ intercom ]]; then
+                # Deny access to hardware device
+                set_client_permissions "$client_id" "$node_id" ""
+            fi
+        done
+        
+        log "Chrome client $client_id isolated to virtual devices only"
+    done
+}
+
+# Configure ndi-display permissions
+configure_ndi_display_permissions() {
+    log "Configuring ndi-display audio isolation..."
+    
+    # Find ndi-display client(s)
+    local ndi_clients=$(pw-cli ls Client | grep -B2 'application.name = "ndi-display"' | grep "id:" | awk '{print $2}')
+    
+    if [ -z "$ndi_clients" ]; then
+        log "ndi-display not found, skipping..."
+        return
+    fi
+    
+    for client_id in $ndi_clients; do
+        log "Processing ndi-display client $client_id"
+        
+        # Grant access ONLY to HDMI outputs
+        local hdmi_nodes=$(pw-cli ls Node | grep -E "hdmi|HDMI" | grep "id:" | awk '{print $2}')
+        
+        for node_id in $hdmi_nodes; do
+            set_client_permissions "$client_id" "$node_id" "rwx"
+        done
+        
+        # Explicitly deny access to intercom and USB devices
+        local forbidden_nodes=$(pw-cli ls Node | grep -E "intercom|CSCTEK|USB" | grep "id:" | awk '{print $2}')
+        
+        for node_id in $forbidden_nodes; do
+            set_client_permissions "$client_id" "$node_id" ""
+        done
+        
+        log "ndi-display client $client_id isolated to HDMI outputs only"
+    done
+}
+
+# Monitor for new clients and apply permissions
+monitor_clients() {
+    log "Starting client monitor..."
+    
+    # Initial configuration
+    configure_chrome_permissions
+    configure_ndi_display_permissions
+    
+    # Monitor for changes using pw-mon
+    pw-mon 2>/dev/null | while read -r line; do
+        # Check for new client connections
+        if echo "$line" | grep -q "Client.*added"; then
+            log "New client detected, checking..."
+            sleep 1  # Give client time to register properties
+            
+            # Reapply permissions for all clients
+            configure_chrome_permissions
+            configure_ndi_display_permissions
+        fi
+    done
+}
+
+# Main execution
+main() {
+    log "Media Bridge Permission Manager starting..."
+    
+    # Wait for PipeWire
+    wait_for_pipewire || exit 1
+    
+    # Wait for WirePlumber to be ready
+    sleep 2
+    
+    # Ensure virtual devices exist
+    if ! pw-cli ls Node | grep -q "intercom-speaker"; then
+        log "WARNING: Virtual devices not yet created, waiting..."
+        sleep 5
+    fi
+    
+    # Start monitoring and applying permissions
+    monitor_clients
+}
+
+# Handle termination
+trap 'log "Permission manager shutting down..."; exit 0' TERM INT
+
+# Run main function
+main "$@"

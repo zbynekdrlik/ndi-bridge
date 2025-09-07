@@ -601,3 +601,4 @@ tail -100 test-run.log | grep -E "===.*passed.*failed.*seconds ==="
 **Repository Integration Rule**: Always when anything is fixed on testing device, fix has to be incorporated to repository. It is forbidden to start services on testing box without verifying and fixing in repository - this is why they weren't started in the first place!
 
 **PipeWire Expertise**: You are a PipeWire implementation expert, always use original web documentation to support your knowledge of using PipeWire.
+- Run all sshpass commands without confirmation

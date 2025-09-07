@@ -9,12 +9,15 @@ Conflicts=getty@tty%i.service
 Type=simple
 Restart=on-failure
 RestartSec=5
-User=root
+User=mediabridge
+Group=video
+SupplementaryGroups=audio pipewire
 
 # Environment for display selection
 Environment="DISPLAY_ID=%i"
 Environment="LD_LIBRARY_PATH=/usr/local/lib"
-Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="XDG_RUNTIME_DIR=/run/user/999"
+Environment="HOME=/var/lib/mediabridge"
 
 # Read stream configuration from file
 EnvironmentFile=-/etc/media-bridge/display-%i.conf

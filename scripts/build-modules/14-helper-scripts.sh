@@ -21,9 +21,12 @@ install_helper_scripts() {
             chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom
         fi
         
-        # Copy launcher (PipeWire only, no fallback)
-        if [ -f "$HELPER_DIR/media-bridge-intercom-launcher" ]; then
-            cp "$HELPER_DIR/media-bridge-intercom-launcher" /mnt/usb/usr/local/bin/
+        # Copy launcher (fixed version for mediabridge user)
+        if [ -f "$HELPER_DIR/media-bridge-intercom-fixed" ]; then
+            cp "$HELPER_DIR/media-bridge-intercom-fixed" /mnt/usb/usr/local/bin/media-bridge-intercom-launcher
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom-launcher
+        elif [ -f "$HELPER_DIR/media-bridge-intercom-launcher-isolated" ]; then
+            cp "$HELPER_DIR/media-bridge-intercom-launcher-isolated" /mnt/usb/usr/local/bin/media-bridge-intercom-launcher
             chmod +x /mnt/usb/usr/local/bin/media-bridge-intercom-launcher
         fi
         
@@ -46,15 +49,15 @@ install_helper_scripts() {
             cp "$HELPER_DIR/media-bridge-audio-manager.service" /mnt/usb/etc/systemd/system/
         fi
         
-        # Install audio watchdog (temporary fix for Chrome running as root - Issue #33)
-        if [ -f "$HELPER_DIR/media-bridge-audio-watchdog" ]; then
-            cp "$HELPER_DIR/media-bridge-audio-watchdog" /mnt/usb/usr/local/bin/
-            chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-watchdog
-            log "Audio watchdog installed (temporary fix for Issue #33)"
+        # Install permission manager for strict audio isolation
+        if [ -f "$HELPER_DIR/media-bridge-permission-manager" ]; then
+            cp "$HELPER_DIR/media-bridge-permission-manager" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-permission-manager
+            log "Permission manager installed for audio isolation"
         fi
         
-        if [ -f "$HELPER_DIR/media-bridge-audio-watchdog.service" ]; then
-            cp "$HELPER_DIR/media-bridge-audio-watchdog.service" /mnt/usb/etc/systemd/system/
+        if [ -f "$HELPER_DIR/media-bridge-permission-manager.service" ]; then
+            cp "$HELPER_DIR/media-bridge-permission-manager.service" /mnt/usb/etc/systemd/system/
         fi
         
         if [ -f "$HELPER_DIR/media-bridge-intercom.service" ]; then
@@ -95,6 +98,24 @@ install_helper_scripts() {
         if [ -f "$HELPER_DIR/media-bridge-audio-manager" ]; then
             cp "$HELPER_DIR/media-bridge-audio-manager" /mnt/usb/usr/local/bin/
             chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-manager
+        fi
+        
+        # Install mediabridge user setup script
+        if [ -f "$HELPER_DIR/setup-mediabridge-user" ]; then
+            cp "$HELPER_DIR/setup-mediabridge-user" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/setup-mediabridge-user
+        fi
+        
+        # Install ALSA device loader for when WirePlumber is unavailable
+        if [ -f "$HELPER_DIR/load-alsa-devices.sh" ]; then
+            cp "$HELPER_DIR/load-alsa-devices.sh" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/load-alsa-devices.sh
+        fi
+        
+        # Install WirePlumber headless configuration
+        if [ -f "$HELPER_DIR/wireplumber-headless.conf" ]; then
+            mkdir -p /mnt/usb/etc/wireplumber/wireplumber.conf.d
+            cp "$HELPER_DIR/wireplumber-headless.conf" /mnt/usb/etc/wireplumber/wireplumber.conf.d/99-headless.conf
         fi
         
         

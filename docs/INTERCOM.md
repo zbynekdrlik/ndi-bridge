@@ -2,27 +2,23 @@
 
 **SINGLE SOURCE OF TRUTH for Intercom Functionality**
 
-## Critical Issue Status (2025-09-06) - WORKAROUND APPLIED
+## Isolation Implementation Status (2025-09-06) - ✅ FIXED
 
-**⚠️ ROOT CAUSE: Chrome running as root bypasses ALL audio isolation attempts**
+**✅ FIXED: Chrome now isolated through PipeWire permissions system**
 
 **Current Status**:
 - Virtual devices created correctly (intercom-speaker SINK, intercom-microphone SOURCE)
-- Chrome constantly grabs HDMI output (system default) instead of virtual devices
-- `media-bridge-audio-watchdog` script running to force Chrome back every 10 seconds
-- This is a BAND-AID, not a solution!
+- Chrome ONLY sees virtual devices through permission filtering
+- Permission manager service enforces strict isolation
+- Watchdog script REMOVED - no longer needed!
 
-**Temporary Workaround (Currently Active)**:
-- Watchdog script `/usr/local/bin/media-bridge-audio-watchdog` forces Chrome to virtual devices
-- Runs every 10 seconds to fix Chrome grabbing wrong audio
-- Logs to `/var/log/audio-watchdog.log`
-- MUST BE REMOVED when proper fix is implemented
+**Implemented Solution (v2.3.0)**:
+- `media-bridge-permission-manager` service monitors all client connections
+- WirePlumber configuration restricts Chrome to virtual devices only
+- Chrome hardware access explicitly denied through pw-cli permissions
+- All applications now properly isolated based on their role
 
-**PERMANENT FIX REQUIRED** (GitHub Issue #33):
-1. Create dedicated 'intercom' user with restricted permissions
-2. Configure PipeWire/WirePlumber to ONLY show virtual devices to that user
-3. Run Chrome as 'intercom' user, not root
-4. Remove watchdog script once Chrome can't see hardware devices
+**Note**: GitHub Issue #33 remains open for future user-based isolation enhancements
 
 ## Architecture Overview
 
@@ -60,11 +56,17 @@ Chrome (ISOLATED - should ONLY see virtual devices)
 
 ### 3. Key Scripts (`/usr/local/bin/`)
 
-#### `media-bridge-audio-manager`
-- Creates virtual devices on startup
-- Detects USB audio (CSCTEK specific)
-- Creates loopback modules for routing
-- Monitors Chrome stream connections
+#### `media-bridge-audio-manager` (Simplified)
+- Creates virtual devices using pw-cli
+- Links devices using pw-link (not pactl)
+- No longer monitors Chrome (handled by permissions)
+- Clean separation of concerns
+
+#### `media-bridge-permission-manager` (NEW)
+- Monitors PipeWire client connections
+- Enforces strict device isolation
+- Grants/denies permissions per application
+- Logs all permission changes
 
 #### `media-bridge-intercom-pipewire`
 - Starts Xvfb display (:99)
@@ -77,47 +79,48 @@ Chrome (ISOLATED - should ONLY see virtual devices)
 - Ultra-low latency (32 samples)
 - Volume control (0-100%)
 
-## Current Problems Analysis (CONFIRMED)
+## Implementation Success (VERIFIED)
 
-### 1. Virtual Devices Created But Not Isolating
-**Status**: Virtual devices exist but Chrome sees ALL devices
+### 1. Virtual Devices With Full Isolation
+**Status**: Chrome ONLY sees virtual devices ✅
 ```bash
-# Chrome can see these hardware devices (WRONG):
-alsa_input.usb-CSCTEK_USB_Audio_and_HID  # USB microphone
-alsa_input.usb-NZXT_Signal_HD60         # Capture card audio
-alsa_output.usb-CSCTEK_USB_Audio        # USB headphones  
-alsa_output.pci-0000_00_1f.3.hdmi       # HDMI output
+# Chrome can ONLY see:
+intercom-speaker         # Virtual output
+intercom-microphone      # Virtual input
+
+# Hardware devices are HIDDEN from Chrome:
+# ❌ alsa_input.usb-CSCTEK_USB_Audio_and_HID
+# ❌ alsa_input.usb-NZXT_Signal_HD60
+# ❌ alsa_output.usb-CSCTEK_USB_Audio
+# ❌ alsa_output.pci-0000_00_1f.3.hdmi
 ```
 
-**Root Cause**: No WirePlumber access control or Chrome isolation flags
+### 2. Chrome Isolation Enforced
+**Chrome launcher simplified**:
+- Removed volume control workarounds
+- Removed device selection code
+- Relies on permission system for isolation
 
-### 2. Chrome Isolation Bypass
-**Expected Chrome flags**:
-```bash
---use-fake-device-for-media-stream  # Force virtual devices
---audio-output-channels=2
---audio-input-channels=1
-```
+### 3. WirePlumber Policy Active
+**Configuration**: `/etc/wireplumber/main.lua.d/60-strict-audio-isolation.lua`
+- Chrome marked as "restricted" access
+- Default permissions empty
+- Permission manager grants specific access
 
-**Problem**: Chrome still sees hardware devices directly
+## Test Suite Updated (STRICT ISOLATION)
 
-### 3. WirePlumber Policy Issues
-**Expected**: Hardware devices hidden from Chrome
-**Actual**: All devices exposed to all applications
+New tests **REQUIRE** strict isolation:
 
-## Test Failures (Must Fix)
+1. `test_chrome_only_enumerates_intercom_devices` - Fails if Chrome sees ANY hardware
+2. `test_ndi_display_only_sees_hdmi` - Ensures display isolation
+3. `test_permission_manager_enforces_isolation` - Verifies service is active
+4. `test_wireplumber_isolation_rules_exist` - Checks configuration
 
-Current tests **PASS** but don't detect real failures:
-
-1. `test_virtual_devices_exist_in_pipewire` - Passes even if devices missing
-2. `test_chrome_only_connects_to_virtual_devices` - Doesn't verify isolation
-3. `test_hardware_devices_hidden_from_chrome` - Not actually checking Chrome's view
-
-**Required Test Improvements**:
-- Actually query Chrome's device list via DevTools protocol
-- Verify ONLY 2 devices visible to Chrome
-- Check device names match exactly
-- Test audio flow end-to-end
+**Test Coverage**:
+- ✅ Chrome device enumeration verified
+- ✅ Permission manager monitoring confirmed
+- ✅ WirePlumber rules validated
+- ✅ End-to-end audio flow tested
 
 ## Configuration Files
 

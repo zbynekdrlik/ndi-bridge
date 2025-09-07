@@ -40,22 +40,22 @@ def test_single_pipewire_instance(host):
     assert count <= 3, f"Too many PipeWire instances: {count}"
 
 
-def test_no_user_pipewire_instances(host):
-    """Test that no user-level PipeWire instances are running."""
-    # Check for PipeWire processes not running as root
-    result = host.run("ps aux | grep pipewire | grep -v root | grep -v grep")
-    assert result.stdout.strip() == "", "Found non-root PipeWire processes"
+def test_pipewire_runs_as_mediabridge(host):
+    """Test that PipeWire instances are running as mediabridge user."""
+    # Check for PipeWire processes running as mediabridge
+    result = host.run("ps aux | grep pipewire | grep mediabridge | grep -v grep")
+    assert result.stdout.strip() != "", "PipeWire not running as mediabridge user"
 
 
 def test_xdg_runtime_dir_configured(host):
     """Test that XDG_RUNTIME_DIR is properly configured."""
     result = host.run("systemctl show pipewire-system -p Environment")
-    assert "XDG_RUNTIME_DIR=/run/user/0" in result.stdout
+    assert "XDG_RUNTIME_DIR=/run/user/999" in result.stdout
 
 
 def test_pulse_socket_exists(host):
     """Test that PulseAudio socket exists for compatibility."""
-    socket = host.file("/run/user/0/pulse/native")
+    socket = host.file("/run/user/999/pulse/native")
     assert socket.exists, "PulseAudio socket not found"
 
 
@@ -185,8 +185,8 @@ def test_pipewire_custom_config_exists(host):
 
 def test_pipewire_sockets_created(host):
     """Test that PipeWire creates its own sockets."""
-    socket0 = host.file("/run/user/0/pipewire-0")
-    socket_mgr = host.file("/run/user/0/pipewire-0-manager")
+    socket0 = host.file("/run/user/999/pipewire-0")
+    socket_mgr = host.file("/run/user/999/pipewire-0-manager")
     
     assert socket0.exists, "PipeWire socket not created"
     assert socket_mgr.exists, "PipeWire manager socket not created"
@@ -212,8 +212,8 @@ def test_no_bindsto_preventing_restarts(host):
 
 def test_pipewire_socket_permissions(host):
     """Test that PipeWire sockets have correct permissions."""
-    if host.file("/run/user/0/pipewire-0").exists:
-        result = host.run("stat -c '%a' /run/user/0/pipewire-0")
+    if host.file("/run/user/999/pipewire-0").exists:
+        result = host.run("stat -c '%a' /run/user/999/pipewire-0")
         perms = result.stdout.strip()
         # PipeWire creates sockets with 755 or 666
         assert perms in ["755", "666"], f"Unexpected socket permissions: {perms}"

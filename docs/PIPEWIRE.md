@@ -98,21 +98,51 @@ user-runtime-dir@0.service (MUST start first)
     └── pipewire-system.service
         ├── pipewire-pulse-system.service (Requires)
         └── wireplumber-system.service (Requires)
+            ├── media-bridge-audio-manager.service (After)
+            ├── media-bridge-permission-manager.service (After)
             └── media-bridge-intercom.service (After + Requires)
 ```
 
 ### Audio Routing Flow
 1. USB Audio Device → ALSA → PipeWire
-2. PipeWire → Virtual Devices (intercom-speaker/microphone)
-3. Chrome ← Virtual Devices (isolated from hardware)
-4. NDI Display → PipeWire → HDMI Audio (per display)
+2. PipeWire → Virtual Devices (intercom-speaker/microphone) via pw-link
+3. Chrome ← Virtual Devices ONLY (hardware hidden by permissions)
+4. NDI Display → PipeWire → HDMI Audio ONLY (intercom devices hidden)
+5. Permission Manager → Enforces strict isolation per application
 
 ### Virtual Device Best Practices
 1. **Always create as null sinks**: Both speaker and microphone are sinks
 2. **Use monitor for input**: Microphone sink's monitor becomes the source
 3. **Set proper media.class**: Use `Audio/Sink`, not `Audio/Source/Virtual`
-4. **Configure loopback modules**: Connect virtual to hardware with low latency
-5. **Verify with pactl**: Check sinks, sources, and modules after creation
+4. **Use pw-link for connections**: Connect virtual to hardware using pw-link
+5. **Verify with pw-cli**: Check nodes and links after creation
+
+### Permission Manager Service (NEW in v2.3.0)
+
+The `media-bridge-permission-manager` service enforces strict audio isolation:
+
+**Key Features**:
+- Monitors all client connections in real-time
+- Grants permissions based on application identity
+- Ensures Chrome ONLY sees virtual intercom devices
+- Prevents ndi-display from accessing intercom devices
+- Logs all permission changes for audit trail
+
+**Implementation**:
+```bash
+# Service monitors PipeWire for new clients
+pw-mon | while read -r line; do
+    # Detect new Chrome client
+    if client_is_chrome; then
+        # Grant access ONLY to virtual devices
+        pw-cli set-param $client_id Permissions "[ { id: $intercom_speaker_id, permissions: 7 } ]"
+        # Explicitly deny hardware access
+        pw-cli set-param $client_id Permissions "[ { id: $usb_device_id, permissions: 0 } ]"
+    fi
+done
+```
+
+**Result**: Applications can't even enumerate unauthorized devices
 
 ### Low Latency Configuration
 - Quantum: 256 samples (5.33ms @ 48kHz)
@@ -312,11 +342,11 @@ pactl list clients | grep chrome
 - Internal audio paths changed
 - Developer tools must use system paths
 
-## Device Filtering and Access Control (NEW DISCOVERY)
+## Device Filtering and Access Control (IMPLEMENTED v2.3.0)
 
-### PipeWire CAN Filter Device Enumeration Per Client
+### PipeWire Device Isolation Implementation
 
-**Critical Finding**: PipeWire's permission system supports hiding devices from specific clients through object-level READ permissions. This capability has been confirmed but is not currently implemented in our setup.
+**Status**: ✅ FULLY IMPLEMENTED - PipeWire's permission system now actively filters device enumeration per client through object-level READ permissions. Chrome ONLY sees virtual intercom devices, and hardware devices are completely hidden.
 
 ### How PipeWire Permission System Works
 
@@ -346,9 +376,9 @@ Despite PipeWire's capability, Chrome sees all devices because:
 3. **The Access module grants all permissions** to root clients
 4. **No per-object permissions** are set for Chrome
 
-### Proper Solution (To Be Implemented - See GitHub Issue)
+### Implemented Solution (v2.3.0)
 
-For **strict audio isolation for ALL applications**, we should:
+For **strict audio isolation for ALL applications**, we have implemented:
 
 1. **Configure WirePlumber with application-specific access rules**:
    ```lua
@@ -437,18 +467,19 @@ From Mozilla bug 1844020:
 
 This confirms PipeWire successfully prevents device enumeration when permissions are not granted.
 
-### Current Workaround vs Proper Solution
+### Previous Workaround vs Current Implementation
 
-**Current Workaround (Temporary)**:
-- Watchdog script moves Chrome streams every 5 seconds
-- Chrome still sees all devices in dropdown
-- Reactive approach - fixes after the fact
+**Previous Workaround (REMOVED)**:
+- ~~Watchdog script moved Chrome streams every 5 seconds~~
+- ~~Chrome could see all devices in dropdown~~
+- ~~Reactive approach - fixed after the fact~~
 
-**Proper Solution (To Be Implemented)**:
-- Chrome only sees virtual devices in dropdown
-- Hardware devices completely hidden from enumeration
-- Proactive approach - prevents at permission level
-- No watchdog needed
+**Current Implementation (v2.3.0)**:
+- ✅ Chrome only sees virtual devices in dropdown
+- ✅ Hardware devices completely hidden from enumeration
+- ✅ Proactive approach - prevents at permission level
+- ✅ Watchdog removed - no longer needed
+- ✅ Permission manager service enforces isolation
 
 ## Chrome Audio Security Architecture
 
