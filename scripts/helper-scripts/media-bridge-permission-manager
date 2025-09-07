@@ -5,8 +5,8 @@
 
 set -e
 
-# PipeWire environment
-export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/0}"
+# PipeWire environment - use mediabridge user runtime dir
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/999}"
 
 # Logging
 log() {
@@ -72,8 +72,8 @@ set_client_permissions() {
 configure_chrome_permissions() {
     log "Configuring Chrome audio isolation..."
     
-    # Find Chrome clients - check for intercom user (UID 1000) or Chrome app name
-    local chrome_clients=$(pw-cli ls Client 2>/dev/null | grep -B5 -E 'pipewire.sec.uid = "1000"|application.name.*Chrome' | grep "id " | awk '{print $2}' | tr -d ',' | sort -u)
+    # Find Chrome clients - check for mediabridge user (UID 999) or Chrome app name
+    local chrome_clients=$(pw-cli ls Client 2>/dev/null | grep -B5 -E 'pipewire.sec.uid = "999"|application.name.*Chrome' | grep "id " | awk '{print $2}' | tr -d ',' | sort -u)
     
     if [ -z "$chrome_clients" ]; then
         log "Chrome/intercom user not found, skipping..."
