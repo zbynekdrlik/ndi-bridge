@@ -198,9 +198,24 @@ sudo -u mediabridge bash -c 'export XDG_RUNTIME_DIR=/run/user/999; pactl list so
 - Audio device isolation NOT enforced ✗
 
 ### Recommendations
-1. Implement proper access control before production
-2. Consider separate user for Chrome if true isolation required
+1. **Upgrade to PipeWire 1.4.7** for proper isolation (script provided)
+2. Use pw-container for Chrome sandboxing after upgrade
 3. Monitor and audit audio stream connections
+
+## PipeWire 1.4.7 Upgrade Path
+
+An upgrade script is available at `scripts/helper-scripts/upgrade-pipewire-latest.sh` that:
+- Builds PipeWire 1.4.7 from source with security features
+- Installs pw-container tool for application isolation
+- Configures security contexts for Chrome
+- Provides TRUE device isolation (Chrome only sees virtual devices)
+
+After upgrade, Chrome would run as:
+```bash
+pw-container --context=chrome --filter="media.class=*/Virtual" -- chromium-browser
+```
+
+This eliminates the current limitation where Chrome can see all devices.
 
 ## References
 - [PipeWire Documentation](https://docs.pipewire.org/)
