@@ -4,9 +4,9 @@
 
 set -e
 
-# PipeWire environment - use system PipeWire
-# Always connect to system PipeWire instance regardless of user
-export XDG_RUNTIME_DIR="/run/user/0"
+# PipeWire environment - use mediabridge user's runtime
+# Connect to mediabridge's PipeWire instance
+export XDG_RUNTIME_DIR="/run/user/999"
 
 # Function to wait for PipeWire
 wait_for_pipewire() {
