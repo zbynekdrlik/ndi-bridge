@@ -69,7 +69,8 @@ export DISPLAY=:$DISPLAY_NUM
 # Start VNC server for remote monitoring
 echo "Starting VNC server on port 5999..."
 # Use setsid to completely detach VNC from this process group
-setsid x11vnc -noshm -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+# -noshm prevents shared memory issues in containers/limited environments
+setsid x11vnc -noshm -noxrecord -noxfixes -noxdamage -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
 sleep 2
 echo "VNC server detached and running"
 
@@ -95,22 +96,22 @@ echo "Checking PipeWire audio system..."
 # With unified PipeWire, configuration is done at build time
 # No dynamic configuration changes needed here
 
-# Check if system PipeWire is running (REQUIRED)
-if ! systemctl is-active --quiet pipewire-system.service; then
-    echo "ERROR: System-wide PipeWire service is not running!"
-    echo "Starting system PipeWire services..."
-    systemctl start pipewire-system.service pipewire-pulse-system.service wireplumber-system.service
+# Check if user session PipeWire is running (REQUIRED)
+if ! sudo -u mediabridge systemctl --user is-active --quiet pipewire.service; then
+    echo "ERROR: User session PipeWire service is not running!"
+    echo "Starting user session PipeWire services..."
+    sudo -u mediabridge systemctl --user start pipewire.service pipewire-pulse.service wireplumber.service
     sleep 3
     
     # Check again
-    if ! systemctl is-active --quiet pipewire-system.service; then
-        echo "ERROR: Failed to start system PipeWire services"
-        echo "Please check: systemctl status pipewire-system.service"
+    if ! sudo -u mediabridge systemctl --user is-active --quiet pipewire.service; then
+        echo "ERROR: Failed to start user session PipeWire services"
+        echo "Please check: sudo -u mediabridge systemctl --user status pipewire.service"
         exit 1
     fi
 fi
 
-echo "Using system-wide PipeWire service"
+echo "Using user session PipeWire service"
 PIPEWIRE_PID=""
 PULSE_PID=""
 WIREPLUMBER_PID=""
@@ -130,7 +131,7 @@ done
 if [ ! -S "$XDG_RUNTIME_DIR/pulse/native" ]; then
     echo "ERROR: PulseAudio socket not created at $XDG_RUNTIME_DIR/pulse/native"
     echo "System PipeWire may not be configured correctly"
-    echo "Please check: systemctl status pipewire-pulse-system.service"
+    echo "Please check: sudo -u mediabridge systemctl --user status pipewire-pulse.service"
     exit 1
 fi
 

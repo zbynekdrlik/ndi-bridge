@@ -60,7 +60,7 @@ start_display() {
     # Optional: Start VNC for monitoring
     if [ "${ENABLE_VNC:-true}" = "true" ]; then
         echo "Starting VNC server on port 5999..."
-        x11vnc -noshm -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+        x11vnc -noshm -noxrecord -noxfixes -noxdamage -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
     fi
 }
 

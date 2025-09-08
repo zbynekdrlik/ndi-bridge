@@ -1,13 +1,12 @@
 [Unit]
 Description=Media Bridge Intercom Service
-After=network-online.target pipewire-system.service pipewire-pulse-system.service
+After=network-online.target
 Wants=network-online.target
-Requires=pipewire-system.service pipewire-pulse-system.service
 
 [Service]
 Type=simple
 TimeoutStartSec=300
-# Run as mediabridge user with all services unified
+# Run as mediabridge user
 User=mediabridge
 Group=audio
 SupplementaryGroups=video pipewire
@@ -18,10 +17,10 @@ Environment="XDG_RUNTIME_DIR=/run/user/999"
 Environment="PULSE_RUNTIME_PATH=/run/user/999/pulse"
 Environment="PULSE_SERVER=unix:/run/user/999/pulse/native"
 
-# Setup virtual audio devices (run as root)
-ExecStartPre=+/usr/local/bin/media-bridge-audio-manager setup
+# Setup virtual audio devices (run as mediabridge)
+ExecStartPre=/usr/local/bin/media-bridge-audio-manager setup
 
-# Start the service as intercom user
+# Start the service
 ExecStart=/usr/local/bin/media-bridge-intercom-launcher
 
 # Stop cleanup

@@ -9,7 +9,7 @@ FULL_HOSTNAME=$(hostname)
 HOSTNAME=${FULL_HOSTNAME#media-bridge-}
 ROOM="${VDO_ROOM:-nl_interkom}"
 PROFILE_DIR="/var/lib/mediabridge/.chrome-profile"
-DISPLAY_NUM=88
+DISPLAY_NUM=99
 
 echo "=== Media Bridge Intercom Starting ==="
 echo "Device: $HOSTNAME"
@@ -57,7 +57,7 @@ echo "DISPLAY set to: $DISPLAY"
 
 # Start VNC server (optional, for debugging)
 echo "Starting VNC server on port 5999..."
-x11vnc -display :${DISPLAY_NUM} -nopw -forever -shared -rfbport 5999 > /tmp/x11vnc.log 2>&1 &
+x11vnc -noshm -noxrecord -noxfixes -noxdamage -display :${DISPLAY_NUM} -nopw -forever -shared -rfbport 5999 > /tmp/x11vnc.log 2>&1 &
 VNC_PID=$!
 
 # Set audio environment

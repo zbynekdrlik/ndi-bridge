@@ -30,6 +30,21 @@
 
 **NEVER run pytest directly!** Always use `test-device.sh` as the entry point for all testing.
 
+### ⚠️ CRITICAL: Test Execution Behavior
+
+**test-device.sh RUNS ALL TESTS BY DEFAULT - IT DOES NOT STOP ON FIRST FAILURE!**
+
+- **CONTINUES THROUGH ALL TESTS**: Even if tests fail, it continues to run the entire suite
+- **NO EARLY EXIT**: There is no `--maxfail` or `-x` flag by default
+- **COMPLETE RESULTS**: You will see ALL passes and failures, not just the first failure
+- **AUTO-RETRY**: Failed tests are automatically retried 3 times for network issues
+
+**IMPLICATIONS FOR DEVELOPERS:**
+1. **NEVER claim "tests are working" without checking the FINAL summary**
+2. **ALWAYS look for the summary line**: `X failed, Y passed, Z skipped`
+3. **If you see ANY failures, the feature is NOT working**
+4. **Run with --collect-only first to see how many tests SHOULD run**
+
 The test-device.sh script:
 - Handles SSH host key changes (critical for reflashed devices) 
 - Sets up authentication automatically
