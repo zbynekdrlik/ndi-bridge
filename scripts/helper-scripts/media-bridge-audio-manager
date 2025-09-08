@@ -65,9 +65,41 @@ create_virtual_devices() {
     echo "Virtual devices created"
 }
 
+# Function to load ALSA devices
+load_alsa_devices() {
+    echo "Loading ALSA devices into PipeWire..."
+    
+    # Check for USB audio device
+    if aplay -l | grep -q "USB Audio"; then
+        echo "Found USB Audio device, loading into PipeWire..."
+        
+        # Load USB audio card (card 1 is typically USB)
+        pactl load-module module-alsa-card device_id=1 \
+            tsched=yes tsched_buffer_size=32768 \
+            tsched_buffer_watermark=16384 || echo "USB audio card may already be loaded"
+        
+        # Wait for devices to appear
+        sleep 1
+        
+        # Create proper sink and source names
+        pactl load-module module-alsa-sink device=hw:1,0 \
+            sink_name=usb_audio_sink \
+            sink_properties=device.description=USB-Audio-Output || echo "USB sink may exist"
+            
+        pactl load-module module-alsa-source device=hw:1,0 \
+            source_name=usb_audio_source \
+            source_properties=device.description=USB-Audio-Input || echo "USB source may exist"
+            
+        echo "USB Audio devices loaded"
+    fi
+}
+
 # Function to setup audio routing
 setup_audio_routing() {
     echo "Setting up audio routing..."
+    
+    # First load ALSA devices
+    load_alsa_devices
     
     # Create loopback from USB input to virtual mic sink
     if pactl list sources short | grep -q usb_audio_source; then
