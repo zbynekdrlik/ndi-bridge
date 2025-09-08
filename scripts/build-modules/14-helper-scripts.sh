@@ -15,6 +15,13 @@ install_helper_scripts() {
         chmod +x /mnt/usb/usr/local/bin/media-bridge-*
         chmod +x /mnt/usb/usr/local/bin/ndi-display-*
         
+        # Install PipeWire verification script (for build verification)
+        if [ -f "$HELPER_DIR/media-bridge-verify-pipewire" ]; then
+            cp "$HELPER_DIR/media-bridge-verify-pipewire" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-verify-pipewire
+            log "PipeWire verification script installed"
+        fi
+        
         # Copy Media Bridge intercom scripts and service (PipeWire only)
         if [ -f "$HELPER_DIR/media-bridge-intercom-pipewire" ]; then
             cp "$HELPER_DIR/media-bridge-intercom-pipewire" /mnt/usb/usr/local/bin/media-bridge-intercom

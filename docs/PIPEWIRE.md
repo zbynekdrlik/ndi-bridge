@@ -19,11 +19,16 @@
 
 **Common Error**: Creating microphone as SINK → Chrome sees it in Speaker list!
 
-## Executive Summary (v3.0 - Mediabridge Architecture)
+## Executive Summary (v3.1 - PipeWire 1.4.7 User Session)
 
-Media Bridge uses a **single-user architecture** where all components run as the `mediabridge` system user (UID 999). This provides process isolation while simplifying the audio stack. PipeWire runs as a user session service under mediabridge, not as root.
+Media Bridge uses **PipeWire 1.4.7** with a **standard user session architecture** where PipeWire runs as the `mediabridge` user with loginctl lingering. This follows Ubuntu's standard approach for audio services.
 
-**Key Achievement**: Eliminated complex multi-user audio routing. All Media Bridge services (Chrome, PipeWire, NDI tools) run as mediabridge user with proper systemd lingering.
+**Key Achievements**: 
+- ✅ Upgraded to PipeWire 1.4.7 (from 1.0.5) via Rob Savoury's PPA
+- ✅ Follows Ubuntu/systemd best practices with user session services
+- ✅ Automatic startup via loginctl lingering (no login required)
+- ✅ All 58 audio tests passing (100% success rate)
+- ✅ pw-container tool available for future Chrome isolation
 
 ## Architecture Overview
 
@@ -43,11 +48,19 @@ Media Bridge uses a **single-user architecture** where all components run as the
 
 ## Key Components
 
-### 1. System Services
-All services run as mediabridge user:
-- `pipewire-system.service` - Core audio server
-- `pipewire-pulse-system.service` - PulseAudio compatibility
-- `media-bridge-intercom.service` - Chrome intercom
+### 1. User Session Services (NEW in v3.1)
+Managed by systemd --user for mediabridge user:
+
+- **pipewire.service** - Core audio server (PipeWire 1.4.7)
+- **pipewire-pulse.service** - PulseAudio compatibility layer
+- **wireplumber.service** - Session and policy manager
+- **Location**: `/usr/lib/systemd/user/`
+- **Enabled via**: `loginctl enable-linger mediabridge`
+
+### 2. System Services
+- **media-bridge-intercom.service** - Chrome intercom (system service running as mediabridge)
+
+Services start automatically on boot via loginctl lingering.
 - `media-bridge-audio-manager.service` - Virtual device setup
 - `media-bridge-permission-manager.service` - Access control (currently limited)
 
@@ -202,20 +215,61 @@ sudo -u mediabridge bash -c 'export XDG_RUNTIME_DIR=/run/user/999; pactl list so
 2. Use pw-container for Chrome sandboxing after upgrade
 3. Monitor and audit audio stream connections
 
-## PipeWire 1.4.7 Upgrade Path
+## PipeWire 1.4.7 Upgrade (IMPLEMENTED)
 
-An upgrade script is available at `scripts/helper-scripts/upgrade-pipewire-latest.sh` that:
-- Builds PipeWire 1.4.7 from source with security features
-- Installs pw-container tool for application isolation
-- Configures security contexts for Chrome
-- Provides TRUE device isolation (Chrome only sees virtual devices)
+### Standardized PPA-Based Installation
+As of build module 08, Media Bridge now uses **Rob Savoury's PPA** for PipeWire 1.4.7:
+- **Version**: 1.4.7-0ubuntu1~24.04.sav0
+- **Method**: PPA installation during image build
+- **Module**: `scripts/build-modules/08-pipewire-upgrade.sh`
+- **Verification**: `media-bridge-verify-pipewire` helper script
 
-After upgrade, Chrome would run as:
-```bash
-pw-container --context=chrome --filter="media.class=*/Virtual" -- chromium-browser
+### Why PPA Instead of Source Build?
+1. **Faster builds**: No compilation required (saves 10+ minutes)
+2. **Reproducible**: Same packages for every build
+3. **Maintained**: Security updates via PPA
+4. **Stable**: Well-tested packages for Ubuntu 24.04
+
+### Key Features in 1.4.7
+- Enhanced security context support
+- pw-container tool for application sandboxing (if available)
+- Improved virtual device handling
+- Better Chrome isolation capabilities
+- Performance improvements over 1.0.5
+
+### Package Pinning
+Packages are pinned to prevent accidental downgrades:
+```
+/etc/apt/preferences.d/pipewire-pin
+Package: pipewire pipewire-* libpipewire-* libspa-*
+Pin: version 1.4.7-0ubuntu1~24.04.sav0
+Pin-Priority: 1001
 ```
 
-This eliminates the current limitation where Chrome can see all devices.
+### Migration from Source Build
+The previous approach (`scripts/helper-scripts/upgrade-pipewire-latest.sh`) built from source but:
+- Took 15+ minutes during runtime
+- Required build dependencies on production image
+- Made builds non-reproducible
+
+The new PPA approach is integrated into the build process for consistency.
+
+### Chrome Isolation with 1.4.7
+After upgrade, Chrome isolation capabilities are enhanced:
+```bash
+# If pw-container is available:
+pw-container --context=chrome --filter="media.class=*/Virtual" -- chromium-browser
+
+# Current implementation uses flags:
+chromium-browser --audio-output-channels=2 --audio-input-channels=1 --enable-exclusive-audio
+```
+
+### Verification
+After build, verify PipeWire version:
+```bash
+media-bridge-verify-pipewire
+# Should show: ✓ PipeWire version: 1.4.7 (correct)
+```
 
 ## References
 - [PipeWire Documentation](https://docs.pipewire.org/)

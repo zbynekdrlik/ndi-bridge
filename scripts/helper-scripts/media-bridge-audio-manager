@@ -1,11 +1,18 @@
 #!/bin/bash
-# Media Bridge Audio Manager - Fixed for mediabridge user
-# Creates virtual devices and links them using pactl
+# Media Bridge Audio Manager - User Session Version
+# Creates virtual devices using the mediabridge user's PipeWire session
 
 set -e
 
-# PipeWire environment - use mediabridge user's runtime
-export XDG_RUNTIME_DIR="/run/user/999"
+# Always run as mediabridge user if started as root
+if [ "$(id -u)" = "0" ]; then
+    exec sudo -u mediabridge "$0" "$@"
+fi
+
+# PipeWire environment
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+export PIPEWIRE_RUNTIME_DIR="$XDG_RUNTIME_DIR"
+export PULSE_RUNTIME_PATH="$XDG_RUNTIME_DIR/pulse"
 
 # Function to wait for PipeWire
 wait_for_pipewire() {

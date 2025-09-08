@@ -70,9 +70,14 @@ echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] https://d
 apt-get update -qq 2>&1 | head -10
 apt-get install -y -qq google-chrome-stable 2>&1 | head -30
 
-# Install PipeWire audio system with PulseAudio utilities
-echo "Installing PipeWire audio system..."
-apt-get install -y -qq pipewire pipewire-alsa pipewire-pulse wireplumber pulseaudio-utils 2>&1 | head -20
+# Check if PipeWire 1.4.7 was already installed by module 08
+if [ -f /tmp/pipewire-1.4.7-installed ]; then
+    echo "PipeWire 1.4.7 already installed by module 08"
+else
+    # Fallback: Install standard PipeWire if module 08 didn't run
+    echo "Installing PipeWire audio system (fallback)..."
+    apt-get install -y -qq pipewire pipewire-alsa pipewire-pulse wireplumber pulseaudio-utils 2>&1 | head -20
+fi
 
 # Install ALSA utilities for testing
 echo "Installing ALSA utilities..."

@@ -43,14 +43,14 @@ pw-cli list-objects | grep -E "node.name|media.name|application.name" | grep -B2
 echo ""
 echo "=== All audio devices Chrome can potentially see ==="
 # List all sources and sinks that applications can see
-pactl list sources short
+sudo -u mediabridge pactl list sources short
 echo "---"
-pactl list sinks short
+sudo -u mediabridge pactl list sinks short
 
 echo ""
 echo "=== Chrome's current connections ==="
-pactl list sink-inputs | grep -A 10 -i chrome || echo "No Chrome sink inputs"
-pactl list source-outputs | grep -A 10 -i chrome || echo "No Chrome source outputs"
+sudo -u mediabridge pactl list sink-inputs | grep -A 10 -i chrome || echo "No Chrome sink inputs"
+sudo -u mediabridge pactl list source-outputs | grep -A 10 -i chrome || echo "No Chrome source outputs"
 """
         
         # Write and execute the test script
@@ -160,9 +160,9 @@ pactl list source-outputs | grep -A 10 -i chrome || echo "No Chrome source outpu
     
     def test_virtual_devices_present_for_chrome(self, host):
         """Test that virtual devices are present for Chrome to use."""
-        # Get what Chrome can potentially see
-        sinks = host.run("pactl list sinks short")
-        sources = host.run("pactl list sources short | grep -v '.monitor$'")
+        # Get what Chrome can potentially see (run as mediabridge user with user session PipeWire)
+        sinks = host.run("sudo -u mediabridge pactl list sinks short")
+        sources = host.run("sudo -u mediabridge pactl list sources short | grep -v '.monitor$'")
         
         # Check that virtual devices exist
         assert "intercom-speaker" in sinks.stdout, (
@@ -181,7 +181,7 @@ pactl list source-outputs | grep -A 10 -i chrome || echo "No Chrome source outpu
     
     def test_pipewire_virtual_device_priority(self, host):
         """Test virtual devices have highest priority to be default."""
-        sinks = host.run("pactl list sinks | grep -E 'Name:|Priority:'")
+        sinks = host.run("sudo -u mediabridge pactl list sinks | grep -E 'Name:|Priority:'")
         
         # Parse sink priorities
         current_sink = None
@@ -204,7 +204,7 @@ pactl list source-outputs | grep -A 10 -i chrome || echo "No Chrome source outpu
                     )
         
         # Same for microphone
-        sources = host.run("pactl list sources | grep -E 'Name:|Priority:'")
+        sources = host.run("sudo -u mediabridge pactl list sources | grep -E 'Name:|Priority:'")
         current_source = None
         source_priorities = {}
         

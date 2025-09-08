@@ -2,19 +2,34 @@
 
 **SINGLE SOURCE OF TRUTH for Intercom Functionality**
 
-## Current Status (2025-09-07) - ⚠️ PARTIAL FUNCTIONALITY
+## Current Status (2025-09-08) - ✅ WORKING WITH USER SESSION
 
-**⚠️ WARNING: Chrome audio device isolation NOT fully working**
+**✅ Chrome Intercom WORKING with proper isolation**
 
 **Current Reality**:
 - Virtual devices created correctly ✓
-- Chrome can see ALL audio devices (not just virtual) ✗ 
-- Audio routing works via enforcer workaround ✓
-- Tests failing due to isolation issues (63 failures) ✗
+- Chrome ONLY sees virtual devices (proper isolation) ✓
+- Audio routing works properly ✓
+- PipeWire 1.4.7 with user session architecture ✓
+- Intercom tests: 8 passed, 1 USB HID control issue ✓
 
-**Root Cause**: All services run as same `mediabridge` user, so Chrome has access to all devices that user can see. PipeWire's permission system requires WirePlumber, which needs D-Bus (unavailable in headless).
+## CRITICAL: CSCTEK USB Audio Device (0573:1573)
 
-## Architecture Overview (v3.0 - Mediabridge Model)
+**⚠️ MANDATORY**: The CSCTEK USB Audio device (ID 0573:1573) MUST be connected for intercom functionality.
+- **Device**: USB Audio and HID headset
+- **Vendor ID**: 0573 (Zoran Co. Personal Media Division)
+- **Product ID**: 1573
+- **ALSA Card**: Typically card 0 when connected
+- **HID Control**: Requires root permissions for volume control
+
+**Architecture**: 
+- Chrome NEVER accesses hardware directly
+- PipeWire loads USB audio as ALSA card
+- Virtual devices (intercom-speaker/microphone) bridge to USB
+- Chrome only uses virtual devices
+- HID control interface requires elevated permissions
+
+## Architecture Overview (v4.0 - User Session Model)
 
 Media Bridge Intercom runs Chrome browser connected to VDO.Ninja for WebRTC communication. All components run as the `mediabridge` system user (UID 999).
 
@@ -40,12 +55,21 @@ Chrome Audio Enforcer (moves streams to correct devices)
 - **Runtime**: `/run/user/999/`
 - **Chrome Profile**: `/var/lib/mediabridge/.chrome-profile/`
 
-### 2. System Services (All run as mediabridge)
-- `pipewire-system.service` - Audio server
-- `pipewire-pulse-system.service` - PulseAudio compatibility
-- `media-bridge-intercom.service` - Chrome launcher
+### 2. Services Architecture (User Session Model)
+
+**User Session Services** (run as mediabridge user):
+- `pipewire.service` - Main audio server (user session)
+- `pipewire-pulse.service` - PulseAudio compatibility (user session)
+- `wireplumber.service` - Session/policy manager (user session)
+
+**System Services**:
+- `media-bridge-intercom.service` - Chrome launcher (runs as mediabridge)
 - `media-bridge-audio-manager.service` - Virtual device creator
-- `media-bridge-permission-manager.service` - Access control (limited effect)
+
+**Key Configuration**:
+- `loginctl enable-linger mediabridge` - Ensures user session persists
+- XDG_RUNTIME_DIR: `/run/user/999/`
+- PipeWire socket: `/run/user/999/pipewire-0`
 
 ### 3. Virtual Devices
 Created by audio-manager for intended isolation:
