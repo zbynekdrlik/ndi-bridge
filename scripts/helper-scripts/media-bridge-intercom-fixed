@@ -98,8 +98,9 @@ cat > $PROFILE_DIR/Default/Preferences << 'PREFS'
 }
 PREFS
 
-# VDO.Ninja URL
-URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&novideo&autostart&sl&st&mobile&fb"
+# VDO.Ninja URL with audio device constraints
+# Add constraints to try to select virtual devices
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&novideo&autostart&sl&st&mobile&fb&ad=intercom-microphone&pd=intercom-speaker"
 
 echo "Starting Chrome..."
 echo "URL: $URL"
@@ -113,6 +114,9 @@ echo "URL: $URL"
     --disable-dev-shm-usage \
     --autoplay-policy=no-user-gesture-required \
     --audio-buffer-size=2048 \
+    --use-fake-ui-for-media-stream \
+    --enable-exclusive-audio \
+    --audio-output-channels=2 \
     --user-data-dir=$PROFILE_DIR \
     --new-window \
     "$URL" &
