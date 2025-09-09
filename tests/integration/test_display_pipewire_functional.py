@@ -9,14 +9,14 @@ import time
 
 
 def test_display_uses_system_pipewire(host):
-    """Test that ndi-display uses the unified system-wide PipeWire."""
-    # Check that global environment sets runtime dir
-    result = host.run("grep XDG_RUNTIME_DIR /etc/environment")
-    assert "/run/user/0" in result.stdout, "System not configured with XDG_RUNTIME_DIR"
+    """Test that ndi-display uses the unified PipeWire instance."""
+    # Check that PipeWire is running for mediabridge user
+    result = host.run("systemctl --user -M mediabridge@ is-active pipewire")
+    assert "active" in result.stdout, "PipeWire not active for mediabridge user"
     
-    # Verify display service depends on PipeWire
-    result = host.run("systemctl cat 'ndi-display@.service' | grep After")
-    assert "pipewire-system.service" in result.stdout, "Display not ordered after PipeWire"
+    # Verify display service can access PipeWire
+    result = host.run("sudo -u mediabridge pactl info 2>/dev/null | grep 'Server Name'")
+    assert "PulseAudio" in result.stdout or "PipeWire" in result.stdout, "PipeWire not accessible"
 
 
 @pytest.mark.integration
@@ -177,7 +177,7 @@ def test_display_pipewire_client_registration(host):
         time.sleep(3)
         
         # Check if ndi-display appears in PipeWire clients
-        result = host.run("pactl list clients | grep -i 'ndi-display\\|media-bridge' || echo 'not-found'")
+        result = host.run("sudo -u mediabridge pactl list clients | grep -i 'ndi-display\\|media-bridge' || echo 'not-found'")
     finally:
         # Always kill the test process and clean up
         host.run("kill $(cat /tmp/ndi.pid) 2>/dev/null || true")
@@ -334,7 +334,7 @@ def test_display_pipewire_hdmi_sink_selection(host):
     print("="*60)
     
     # Get available HDMI sinks
-    result = host.run("pactl list sinks short | grep -i hdmi")
+    result = host.run("sudo -u mediabridge pactl list sinks short | grep -i hdmi")
     print("Available HDMI sinks:")
     print(result.stdout)
     
