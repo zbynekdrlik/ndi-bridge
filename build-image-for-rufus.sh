@@ -148,15 +148,62 @@ if [ $BUILD_STATUS -eq 0 ]; then
     echo ""
     echo "BUILD SUCCESSFUL!"
     echo "Image created: $IMAGE_FILE"
-    echo "You can now write this image to USB using:"
-    echo "  - Rufus on Windows"
-    echo "  - dd on Linux: dd if=$IMAGE_FILE of=/dev/sdX bs=4M status=progress"
-    echo "Log saved to: $LOG_FILE"
     
-    # Show image info
+    # Run automated verification using pytest suite
     echo ""
-    echo "Image information:"
-    ls -lh "$IMAGE_FILE"
+    echo "Running automated image verification..."
+    echo "========================================"
+    
+    # Export image path for tests
+    export USB_IMAGE="$IMAGE_FILE"
+    
+    # Run critical bootability tests
+    echo "Verifying bootability and critical components..."
+    if python3 -m pytest tests/build/test_usb_image_verification.py -v -s --tb=short -m critical 2>&1 | tee verification.log; then
+        echo ""
+        echo "✅ IMAGE VERIFICATION PASSED"
+        echo "The image is bootable and ready for deployment!"
+        echo ""
+        echo "You can now write this image to USB using:"
+        echo "  - Rufus on Windows (recommended)"
+        echo "  - dd on Linux: sudo dd if=$IMAGE_FILE of=/dev/sdX bs=4M status=progress conv=fsync"
+        echo ""
+        echo "Logs saved:"
+        echo "  - Build log: $LOG_FILE"
+        echo "  - Verification: verification.log"
+        
+        # Show image info
+        echo ""
+        echo "Image details:"
+        ls -lh "$IMAGE_FILE"
+        echo ""
+        
+        # Append verification summary to build log
+        echo "" >> "$LOG_FILE"
+        echo "=== VERIFICATION PASSED ===" >> "$LOG_FILE"
+        grep -E "PASSED|passed" verification.log | tail -5 >> "$LOG_FILE"
+    else
+        echo ""
+        echo "❌ IMAGE VERIFICATION FAILED"
+        echo "The image has critical issues and may not boot!"
+        echo ""
+        echo "Review the test output above to identify issues."
+        echo "Common problems:"
+        echo "  - Missing EFI bootloader (grub-install not run)"
+        echo "  - Missing kernel or initramfs"
+        echo "  - Services not enabled"
+        echo ""
+        echo "Logs saved:"
+        echo "  - Build log: $LOG_FILE"
+        echo "  - Verification: verification.log"
+        
+        # Append failure to build log
+        echo "" >> "$LOG_FILE"
+        echo "=== VERIFICATION FAILED ===" >> "$LOG_FILE"
+        grep -E "FAILED|ERROR|CRITICAL" verification.log | head -10 >> "$LOG_FILE"
+        
+        exit 1
+    fi
 else
     echo ""
     echo "BUILD FAILED! Check log for errors: $LOG_FILE"

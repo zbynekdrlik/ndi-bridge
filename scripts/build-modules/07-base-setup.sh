@@ -16,6 +16,14 @@ EOFHOSTS
 # Set root password
 echo "root:${ROOT_PASSWORD}" | chpasswd
 
+# Create mediabridge user for PipeWire audio system (UID 999)
+echo "Creating mediabridge user for PipeWire..."
+useradd -m -u 999 -g users -G audio,video -s /bin/bash -d /var/lib/mediabridge mediabridge || echo "User mediabridge already exists"
+echo "mediabridge:mediabridge" | chpasswd
+# Ensure home directory exists with correct permissions
+mkdir -p /var/lib/mediabridge
+chown -R mediabridge:users /var/lib/mediabridge
+
 # Disable power button shutdown
 mkdir -p /etc/systemd/logind.conf.d/
 cat > /etc/systemd/logind.conf.d/00-disable-power-key.conf << 'EOFPOWERKEY'
