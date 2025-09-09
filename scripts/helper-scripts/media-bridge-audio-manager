@@ -8,7 +8,7 @@ set -e
 wait_for_pipewire() {
     echo "Waiting for PipeWire to be ready..."
     for i in {1..30}; do
-        if pactl info >/dev/null 2>&1; then
+        if sudo -u mediabridge pactl info >/dev/null 2>&1; then
             echo "PipeWire is ready"
             return 0
         fi
@@ -23,16 +23,16 @@ cleanup_duplicates() {
     echo "Cleaning up duplicate virtual devices..."
     
     # Remove ALL existing virtual device modules first
-    for module in $(pactl list modules short | grep -E "intercom-speaker|intercom-mic-blackhole|intercom-microphone" | awk '{print $1}'); do
+    for module in $(sudo -u mediabridge pactl list modules short | grep -E "intercom-speaker|intercom-mic-blackhole|intercom-microphone" | awk '{print $1}'); do
         echo "Removing duplicate module: $module"
-        pactl unload-module "$module" 2>/dev/null || true
+        sudo -u mediabridge pactl unload-module "$module" 2>/dev/null || true
     done
     
     # Also remove any remap-source modules for intercom
-    for module in $(pactl list modules short | grep "module-remap-source" | awk '{print $1}'); do
-        if pactl list modules | grep -A5 "Module #$module" | grep -q "intercom"; then
+    for module in $(sudo -u mediabridge pactl list modules short | grep "module-remap-source" | awk '{print $1}'); do
+        if sudo -u mediabridge pactl list modules | grep -A5 "Module #$module" | grep -q "intercom"; then
             echo "Removing remap module: $module"
-            pactl unload-module "$module" 2>/dev/null || true
+            sudo -u mediabridge pactl unload-module "$module" 2>/dev/null || true
         fi
     done
 }
@@ -46,7 +46,7 @@ create_virtual_devices() {
     
     # Create virtual speaker (sink) - Chrome outputs here
     echo "Creating virtual speaker (blackhole sink)..."
-    SPEAKER_ID=$(pactl load-module module-null-sink \
+    SPEAKER_ID=$(sudo -u mediabridge pactl load-module module-null-sink \
         sink_name=intercom-speaker \
         sink_properties="device.description='Intercom-Speaker' \
                        node.exclusive=true \
@@ -58,7 +58,7 @@ create_virtual_devices() {
     # Create virtual microphone as a PROPER SOURCE (not a sink!)
     echo "Creating virtual microphone as proper source..."
     # First create a null sink for the microphone audio to go nowhere
-    BLACKHOLE_ID=$(pactl load-module module-null-sink \
+    BLACKHOLE_ID=$(sudo -u mediabridge pactl load-module module-null-sink \
         sink_name=intercom-mic-blackhole \
         sink_properties="device.description='Mic-Blackhole' \
                        node.hidden=true \
@@ -68,7 +68,7 @@ create_virtual_devices() {
     
     # Then create a virtual source that Chrome will use
     # This is a TRUE source, not a sink pretending to be a source
-    MIC_ID=$(pactl load-module module-remap-source \
+    MIC_ID=$(sudo -u mediabridge pactl load-module module-remap-source \
         source_name=intercom-microphone \
         master=intercom-mic-blackhole.monitor \
         source_properties="device.description='Intercom-Microphone' \
@@ -87,27 +87,27 @@ setup_static_routing() {
     echo "Setting up static audio routing..."
     
     # Find the CSCTEK USB audio device
-    USB_SINK=$(pactl list sinks short | grep -E "alsa_output.*CSCTEK|alsa_output.*usb.*0573.*1573" | awk '{print $2}' | head -1)
-    USB_SOURCE=$(pactl list sources short | grep -E "alsa_input.*CSCTEK|alsa_input.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    USB_SINK=$(sudo -u mediabridge pactl list sinks short | grep -E "alsa_output.*CSCTEK|alsa_output.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    USB_SOURCE=$(sudo -u mediabridge pactl list sources short | grep -E "alsa_input.*CSCTEK|alsa_input.*usb.*0573.*1573" | awk '{print $2}' | head -1)
     
     # CRITICAL: Set USB as default sink to prevent HDMI routing
     if [ -n "$USB_SINK" ]; then
         echo "Setting default sink to USB (not HDMI): $USB_SINK"
-        pactl set-default-sink "$USB_SINK"
+        sudo -u mediabridge pactl set-default-sink "$USB_SINK"
     else
         echo "WARNING: No USB sink found, using intercom-mic-blackhole as default"
-        pactl set-default-sink "intercom-mic-blackhole"
+        sudo -u mediabridge pactl set-default-sink "intercom-mic-blackhole"
     fi
     
     # Set default source to virtual microphone
     echo "Setting default source to virtual microphone"
-    pactl set-default-source "intercom-microphone"
+    sudo -u mediabridge pactl set-default-source "intercom-microphone"
     
     # Create STATIC loopback from USB input to virtual microphone
     if [ -n "$USB_SOURCE" ]; then
-        if ! pactl list modules short | grep -q "source=$USB_SOURCE.*sink=intercom-mic-blackhole"; then
+        if ! sudo -u mediabridge pactl list modules short | grep -q "source=$USB_SOURCE.*sink=intercom-mic-blackhole"; then
             echo "Creating STATIC USB to virtual mic routing..."
-            pactl load-module module-loopback \
+            sudo -u mediabridge pactl load-module module-loopback \
                 source=$USB_SOURCE \
                 sink=intercom-mic-blackhole \
                 source_dont_move=true \
@@ -122,9 +122,9 @@ setup_static_routing() {
     
     # Create STATIC loopback from virtual speaker to USB output
     if [ -n "$USB_SINK" ]; then
-        if ! pactl list modules short | grep -q "source=intercom-speaker.monitor.*sink=$USB_SINK"; then
+        if ! sudo -u mediabridge pactl list modules short | grep -q "source=intercom-speaker.monitor.*sink=$USB_SINK"; then
             echo "Creating STATIC virtual speaker to USB routing..."
-            pactl load-module module-loopback \
+            sudo -u mediabridge pactl load-module module-loopback \
                 source=intercom-speaker.monitor \
                 sink=$USB_SINK \
                 source_dont_move=true \
@@ -145,19 +145,19 @@ setup_self_monitor() {
     local enable="${1:-disable}"
     local volume="${2:-50}"
     
-    USB_SINK=$(pactl list sinks short | grep -E "alsa_output.*CSCTEK|alsa_output.*usb.*0573.*1573" | awk '{print $2}' | head -1)
-    USB_SOURCE=$(pactl list sources short | grep -E "alsa_input.*CSCTEK|alsa_input.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    USB_SINK=$(sudo -u mediabridge pactl list sinks short | grep -E "alsa_output.*CSCTEK|alsa_output.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    USB_SOURCE=$(sudo -u mediabridge pactl list sources short | grep -E "alsa_input.*CSCTEK|alsa_input.*usb.*0573.*1573" | awk '{print $2}' | head -1)
     
     if [ "$enable" = "enable" ] && [ -n "$USB_SINK" ] && [ -n "$USB_SOURCE" ]; then
         echo "Enabling self-monitoring with zero latency..."
         
         # Remove existing monitor if any
-        pactl list modules short | grep "Self-Monitor" | awk '{print $1}' | while read id; do
-            pactl unload-module "$id" 2>/dev/null || true
+        sudo -u mediabridge pactl list modules short | grep "Self-Monitor" | awk '{print $1}' | while read id; do
+            sudo -u mediabridge pactl unload-module "$id" 2>/dev/null || true
         done
         
         # Create zero-latency monitor
-        pactl load-module module-loopback \
+        sudo -u mediabridge pactl load-module module-loopback \
             source=$USB_SOURCE \
             sink=$USB_SINK \
             latency_msec=0 \
@@ -171,16 +171,16 @@ setup_self_monitor() {
         
         # Set monitor volume
         sleep 0.5
-        monitor_id=$(pactl list sink-inputs short | grep "Self-Monitor" | awk '{print $1}' | head -1)
+        monitor_id=$(sudo -u mediabridge pactl list sink-inputs short | grep "Self-Monitor" | awk '{print $1}' | head -1)
         if [ -n "$monitor_id" ]; then
-            pactl set-sink-input-volume "$monitor_id" "${volume}%"
+            sudo -u mediabridge pactl set-sink-input-volume "$monitor_id" "${volume}%"
         fi
         
         echo "Self-monitoring enabled at ${volume}% volume"
     else
         echo "Disabling self-monitoring..."
-        pactl list modules short | grep "Self-Monitor" | awk '{print $1}' | while read id; do
-            pactl unload-module "$id" 2>/dev/null || true
+        sudo -u mediabridge pactl list modules short | grep "Self-Monitor" | awk '{print $1}' | while read id; do
+            sudo -u mediabridge pactl unload-module "$id" 2>/dev/null || true
         done
         echo "Self-monitoring disabled"
     fi
@@ -191,32 +191,32 @@ enforce_chrome_routing() {
     echo "Enforcing Chrome audio routing to virtual devices..."
     
     # Find all Chrome audio streams
-    for stream in $(pactl list sink-inputs short | awk '{print $1}'); do
-        app=$(pactl list sink-inputs | grep -A20 "Sink Input #$stream" | grep "application.name" | cut -d'"' -f2)
+    for stream in $(sudo -u mediabridge pactl list sink-inputs short | awk '{print $1}'); do
+        app=$(sudo -u mediabridge pactl list sink-inputs | grep -A20 "Sink Input #$stream" | grep "application.name" | cut -d'"' -f2)
         if [[ "$app" == *"Chrome"* ]] || [[ "$app" == *"chrome"* ]]; then
-            current_sink=$(pactl list sink-inputs | grep -A5 "Sink Input #$stream" | grep "Sink:" | awk '{print $2}')
+            current_sink=$(sudo -u mediabridge pactl list sink-inputs | grep -A5 "Sink Input #$stream" | grep "Sink:" | awk '{print $2}')
             
             # Force Chrome to virtual speaker
             if [ "$current_sink" != "intercom-speaker" ]; then
                 echo "Moving Chrome output stream $stream to virtual speaker"
-                pactl move-sink-input "$stream" intercom-speaker
+                sudo -u mediabridge pactl move-sink-input "$stream" intercom-speaker
                 
                 # Set properties to prevent moving
-                pactl set-sink-input-mute "$stream" 0
+                sudo -u mediabridge pactl set-sink-input-mute "$stream" 0
             fi
         fi
     done
     
     # Same for Chrome input streams
-    for stream in $(pactl list source-outputs short | awk '{print $1}'); do
-        app=$(pactl list source-outputs | grep -A20 "Source Output #$stream" | grep "application.name" | cut -d'"' -f2)
+    for stream in $(sudo -u mediabridge pactl list source-outputs short | awk '{print $1}'); do
+        app=$(sudo -u mediabridge pactl list source-outputs | grep -A20 "Source Output #$stream" | grep "application.name" | cut -d'"' -f2)
         if [[ "$app" == *"Chrome"* ]] || [[ "$app" == *"chrome"* ]]; then
-            current_source=$(pactl list source-outputs | grep -A5 "Source Output #$stream" | grep "Source:" | awk '{print $2}')
+            current_source=$(sudo -u mediabridge pactl list source-outputs | grep -A5 "Source Output #$stream" | grep "Source:" | awk '{print $2}')
             
             # Force Chrome to virtual microphone
             if [ "$current_source" != "intercom-microphone" ]; then
                 echo "Moving Chrome input stream $stream to virtual microphone"
-                pactl move-source-output "$stream" intercom-microphone
+                sudo -u mediabridge pactl move-source-output "$stream" intercom-microphone
             fi
         fi
     done
@@ -227,9 +227,9 @@ cleanup_devices() {
     echo "Cleaning up all virtual devices and loopbacks..."
     
     # First remove loopback modules
-    for module in $(pactl list modules short | grep "module-loopback" | awk '{print $1}'); do
+    for module in $(sudo -u mediabridge pactl list modules short | grep "module-loopback" | awk '{print $1}'); do
         echo "Removing loopback module: $module"
-        pactl unload-module "$module" 2>/dev/null || true
+        sudo -u mediabridge pactl unload-module "$module" 2>/dev/null || true
     done
     
     # Then remove virtual devices
@@ -244,32 +244,32 @@ verify_setup() {
     echo "=== Verification ==="
     
     echo "Default Devices:"
-    echo "  Sink: $(pactl get-default-sink)"
-    echo "  Source: $(pactl get-default-source)"
+    echo "  Sink: $(sudo -u mediabridge pactl get-default-sink)"
+    echo "  Source: $(sudo -u mediabridge pactl get-default-source)"
     
     echo ""
     echo "Virtual Devices:"
-    pactl list sinks short | grep -E "intercom-speaker|blackhole" || echo "  No virtual sinks found"
-    pactl list sources short | grep -E "intercom-microphone" | grep -v monitor || echo "  No virtual sources found"
+    sudo -u mediabridge pactl list sinks short | grep -E "intercom-speaker|blackhole" || echo "  No virtual sinks found"
+    sudo -u mediabridge pactl list sources short | grep -E "intercom-microphone" | grep -v monitor || echo "  No virtual sources found"
     
     echo ""
     echo "Loopback Modules:"
-    pactl list modules short | grep module-loopback || echo "  No loopback modules found"
+    sudo -u mediabridge pactl list modules short | grep module-loopback || echo "  No loopback modules found"
     
     echo ""
     echo "Chrome Streams:"
-    pactl list sink-inputs short | grep -i chrome || echo "  No Chrome output streams"
-    pactl list source-outputs short | grep -i chrome || echo "  No Chrome input streams"
+    sudo -u mediabridge pactl list sink-inputs short | grep -i chrome || echo "  No Chrome output streams"
+    sudo -u mediabridge pactl list source-outputs short | grep -i chrome || echo "  No Chrome input streams"
     
     echo ""
     echo "CRITICAL CHECK - Audio on HDMI:"
-    hdmi_sink=$(pactl list sinks short | grep hdmi | awk '{print $1}' | head -1)
+    hdmi_sink=$(sudo -u mediabridge pactl list sinks short | grep hdmi | awk '{print $1}' | head -1)
     if [ -n "$hdmi_sink" ]; then
-        hdmi_inputs=$(pactl list sink-inputs short | awk -v sink="$hdmi_sink" '$2 == sink {print $1}')
+        hdmi_inputs=$(sudo -u mediabridge pactl list sink-inputs short | awk -v sink="$hdmi_sink" '$2 == sink {print $1}')
         if [ -n "$hdmi_inputs" ]; then
             echo "  WARNING: Audio streams on HDMI: $hdmi_inputs"
             for input in $hdmi_inputs; do
-                pactl list sink-inputs | grep -A10 "Sink Input #$input" | grep -E "media.name|application.name"
+                sudo -u mediabridge pactl list sink-inputs | grep -A10 "Sink Input #$input" | grep -E "media.name|application.name"
             done
         else
             echo "  ✓ No audio on HDMI"

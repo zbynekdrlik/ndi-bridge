@@ -18,11 +18,14 @@ echo "root:${ROOT_PASSWORD}" | chpasswd
 
 # Create mediabridge user for PipeWire audio system (UID 999)
 echo "Creating mediabridge user for PipeWire..."
-useradd -m -u 999 -g users -G audio,video -s /bin/bash -d /var/lib/mediabridge mediabridge || echo "User mediabridge already exists"
+# Create mediabridge group first (using GID 1001 to avoid conflicts with systemd-journal)
+groupadd -g 1001 mediabridge || echo "Group mediabridge already exists"
+# Create user with mediabridge as primary group
+useradd -m -u 999 -g mediabridge -G audio,video -s /bin/bash -d /var/lib/mediabridge mediabridge || echo "User mediabridge already exists"
 echo "mediabridge:mediabridge" | chpasswd
 # Ensure home directory exists with correct permissions
 mkdir -p /var/lib/mediabridge
-chown -R mediabridge:users /var/lib/mediabridge
+chown -R mediabridge:mediabridge /var/lib/mediabridge
 
 # Disable power button shutdown
 mkdir -p /etc/systemd/logind.conf.d/
