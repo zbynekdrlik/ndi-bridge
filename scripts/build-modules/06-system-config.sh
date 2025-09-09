@@ -165,7 +165,8 @@ echo "Timezone configured: $(timedatectl show --property=Timezone --value 2>/dev
 # Configure global environment for mediabridge user
 echo "Configuring global environment..."
 echo "XDG_RUNTIME_DIR=/run/user/999" >> /etc/environment
-echo "Global XDG_RUNTIME_DIR configured for mediabridge user"
+echo "PULSE_SERVER=unix:/run/user/999/pulse/native" >> /etc/environment
+echo "Global XDG_RUNTIME_DIR and PULSE_SERVER configured for mediabridge user"
 
 # Create version file for system identification
 echo "Creating version file..."
