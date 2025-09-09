@@ -147,19 +147,27 @@ echo "Configuring virtual audio devices..."
 VIRTUAL_SINK="intercom-speaker"
 VIRTUAL_SOURCE="intercom-microphone"  # This is a source, not a monitor
 
-# Check if virtual devices exist
+# Check if virtual devices exist but don't set as system defaults
+# Chrome will be explicitly routed to these devices
 if pactl list sinks short | grep -q "$VIRTUAL_SINK"; then
-    echo "Setting default output to: $VIRTUAL_SINK"
-    pactl set-default-sink "$VIRTUAL_SINK"
+    echo "Virtual speaker found: $VIRTUAL_SINK"
+    # Don't set as system default - that breaks ndi-display
 else
     echo "WARNING: Virtual speaker device not found"
 fi
 
 if pactl list sources short | grep -q "$VIRTUAL_SOURCE"; then
-    echo "Setting default input to: $VIRTUAL_SOURCE"
-    pactl set-default-source "$VIRTUAL_SOURCE"
+    echo "Virtual microphone found: $VIRTUAL_SOURCE"
+    # Don't set as system default either
 else
-    echo "WARNING: Virtual microphone monitor not found"
+    echo "WARNING: Virtual microphone not found"
+fi
+
+# Set system defaults to hardware devices for other applications
+HDMI_SINK=$(pactl list sinks short | grep hdmi | awk '{print $2}' | head -1)
+if [ -n "$HDMI_SINK" ]; then
+    echo "Setting system default sink to HDMI: $HDMI_SINK"
+    pactl set-default-sink "$HDMI_SINK"
 fi
 
 # Find actual USB devices for hardware volume control
@@ -254,7 +262,13 @@ fi
 echo "Starting Chrome..."
 echo "URL: $URL"
 
-# Run Chrome directly (pw-container integration to be implemented)
+# Run Chrome with PipeWire isolation
+# Set environment to only show virtual devices
+export PIPEWIRE_REMOTE="unix:/run/user/999/pipewire-0"
+export PIPEWIRE_NODE="intercom-speaker"
+export PULSE_SINK="intercom-speaker"
+export PULSE_SOURCE="intercom-microphone"
+
 /usr/bin/google-chrome \
     --no-first-run \
     --no-default-browser-check \

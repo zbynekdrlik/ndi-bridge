@@ -47,26 +47,17 @@ create_virtual_devices() {
             rate=48000 channels=2
     fi
     
-    if pactl list sinks short | grep -q "intercom-microphone-sink"; then
-        echo "Virtual microphone sink already exists"
-    else
-        echo "Creating virtual microphone sink..."
-        pactl load-module module-null-sink \
-            sink_name=intercom-microphone-sink \
-            sink_properties=device.description=Intercom-Microphone-Sink \
-            rate=48000 channels=2
-    fi
-    
-    if pactl list sources short | grep -q "intercom-microphone-source"; then
+    # Create virtual microphone as SOURCE (not sink!)
+    if pactl list sources short | grep -q "intercom-microphone"; then
         echo "Virtual microphone source already exists"
     else
         echo "Creating virtual microphone source..."
         pactl load-module module-null-sink \
             media.class=Audio/Source/Virtual \
-            sink_name=intercom-microphone-source \
+            sink_name=intercom-microphone \
             channels=1 \
             channel_map=mono \
-            sink_properties=device.description=Intercom-Microphone-Source
+            sink_properties=device.description=Intercom-Microphone
     fi
     
     echo "Virtual devices created"
@@ -74,40 +65,9 @@ create_virtual_devices() {
 
 # Function to load ALSA devices
 load_alsa_devices() {
-    echo "Loading ALSA devices into PipeWire..."
-    
-    # Check for USB audio device
-    if aplay -l | grep -q "USB Audio"; then
-        echo "Found USB Audio device, checking if already loaded..."
-        
-        # Check if hardware device actually exists before loading
-        if [ -e "/dev/snd/controlC1" ]; then
-            # Only load if not already present to prevent duplicates
-            if ! pactl list sinks short | grep -q "usb_audio_sink"; then
-                echo "Loading USB audio sink..."
-                pactl load-module module-alsa-sink device=hw:1,0 \
-                    sink_name=usb_audio_sink \
-                    sink_properties=device.description=USB-Audio-Output 2>/dev/null || echo "Failed to load USB sink - device may not support playback"
-            else
-                echo "USB audio sink already loaded"
-            fi
-            
-            if ! pactl list sources short | grep -q "usb_audio_source"; then
-                echo "Loading USB audio source..."
-                pactl load-module module-alsa-source device=hw:1,0 \
-                    source_name=usb_audio_source \
-                    source_properties=device.description=USB-Audio-Input 2>/dev/null || echo "Failed to load USB source - device may not support capture"
-            else
-                echo "USB audio source already loaded"
-            fi
-        else
-            echo "USB Audio device found in aplay but hardware not accessible"
-        fi
-        
-        echo "USB Audio device processing complete"
-    else
-        echo "No USB Audio device found (this is normal for testing without hardware)"
-    fi
+    # PipeWire automatically handles ALSA devices through wireplumber
+    # We don't need to manually load them
+    echo "ALSA devices handled automatically by PipeWire/WirePlumber"
 }
 
 # Function to setup audio routing
@@ -117,13 +77,18 @@ setup_audio_routing() {
     # First load ALSA devices
     load_alsa_devices
     
-    # Create loopback from USB input to virtual mic sink (only if not already exists)
-    if pactl list sources short | grep -q usb_audio_source; then
-        if ! pactl list modules short | grep -q "source=usb_audio_source.*sink=intercom-microphone-sink"; then
-            echo "Linking USB microphone to virtual microphone..."
+    # Find the CSCTEK USB audio device
+    USB_SINK=$(pactl list sinks short | grep -E "alsa_output.*CSCTEK|alsa_output.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    USB_SOURCE=$(pactl list sources short | grep -E "alsa_input.*CSCTEK|alsa_input.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    
+    # Create loopback from USB input to virtual microphone (Chrome will use this)
+    if [ -n "$USB_SOURCE" ]; then
+        if ! pactl list modules short | grep -q "source=$USB_SOURCE.*sink=intercom-microphone"; then
+            echo "Linking USB microphone ($USB_SOURCE) to virtual microphone..."
+            # Route hardware mic to our virtual source that Chrome uses
             pactl load-module module-loopback \
-                source=usb_audio_source \
-                sink=intercom-microphone-sink \
+                source=$USB_SOURCE \
+                sink=intercom-microphone \
                 latency_msec=5
         else
             echo "USB to virtual mic loopback already exists"
@@ -132,13 +97,13 @@ setup_audio_routing() {
         echo "No USB microphone found (normal for testing)"
     fi
     
-    # Create loopback from virtual speaker to USB output (only if not already exists)
-    if pactl list sinks short | grep -q usb_audio_sink; then
-        if ! pactl list modules short | grep -q "source=intercom-speaker.monitor.*sink=usb_audio_sink"; then
-            echo "Linking virtual speaker to USB output..."
+    # Create loopback from virtual speaker to USB output
+    if [ -n "$USB_SINK" ]; then
+        if ! pactl list modules short | grep -q "source=intercom-speaker.monitor.*sink=$USB_SINK"; then
+            echo "Linking virtual speaker to USB output ($USB_SINK)..."
             pactl load-module module-loopback \
                 source=intercom-speaker.monitor \
-                sink=usb_audio_sink \
+                sink=$USB_SINK \
                 latency_msec=5
         else
             echo "Virtual speaker to USB loopback already exists"
@@ -156,11 +121,11 @@ verify_setup() {
     echo "=== Verification ==="
     
     echo "Virtual Sinks:"
-    pactl list sinks short | grep -E "intercom-speaker|intercom-mic-sink" || echo "No virtual sinks found"
+    pactl list sinks short | grep -E "intercom-speaker|intercom-microphone" || echo "No virtual sinks found"
     
     echo ""
     echo "Virtual Sources:"
-    pactl list sources short | grep -E "intercom-microphone|intercom-mic-sink.monitor" || echo "No virtual sources found"
+    pactl list sources short | grep -E "intercom-microphone|intercom-speaker.monitor" || echo "No virtual sources found"
     
     echo ""
     echo "Loopback Modules:"
@@ -207,11 +172,41 @@ case "${1:-setup}" in
     verify)
         verify_setup
         ;;
+    chrome)
+        echo "=== Configuring Chrome Audio Routing ==="
+        # Find Chrome audio streams and route them to virtual devices
+        
+        # Route Chrome output to intercom-speaker
+        for stream in $(pactl list sink-inputs short | grep -E "Chrome|Chromium" | awk '{print $1}'); do
+            echo "Moving Chrome output stream $stream to intercom-speaker"
+            pactl move-sink-input "$stream" intercom-speaker
+        done
+        
+        # Route Chrome input from intercom-microphone  
+        for stream in $(pactl list source-outputs short | grep -E "Chrome|Chromium" | awk '{print $1}'); do
+            echo "Moving Chrome input stream $stream to intercom-microphone"
+            pactl move-source-output "$stream" intercom-microphone
+        done
+        
+        # Also check by application name
+        pactl list source-outputs | grep -B10 "application.name.*Chrome" | grep "Source Output #" | sed 's/Source Output #//' | while read id; do
+            echo "Moving Chrome input stream $id to intercom-microphone"
+            pactl move-source-output "$id" intercom-microphone 2>/dev/null || true
+        done
+        
+        pactl list sink-inputs | grep -B10 "application.name.*Chrome" | grep "Sink Input #" | sed 's/Sink Input #//' | while read id; do
+            echo "Moving Chrome output stream $id to intercom-speaker"
+            pactl move-sink-input "$id" intercom-speaker 2>/dev/null || true
+        done
+        
+        echo "Chrome audio routing configured"
+        ;;
     *)
-        echo "Usage: $0 {setup|cleanup|verify}"
+        echo "Usage: $0 {setup|cleanup|verify|chrome}"
         echo "  setup   - Create virtual devices and routing"
         echo "  cleanup - Remove virtual devices"
         echo "  verify  - Check current setup"
+        echo "  chrome  - Configure Chrome audio routing"
         exit 1
         ;;
 esac

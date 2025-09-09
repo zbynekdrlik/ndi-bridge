@@ -1,15 +1,17 @@
 [Unit]
 Description=X11VNC Server for Intercom
 After=media-bridge-intercom.service
-BindsTo=media-bridge-intercom.service
+Wants=media-bridge-intercom.service
 
 [Service]
 Type=simple
 User=root
 Environment="DISPLAY=:99"
-ExecStart=/usr/bin/x11vnc -noshm -noxrecord -noxfixes -noxdamage -display :99 -nopw -forever -shared -rfbport 5999
+ExecStartPre=/bin/bash -c 'until xdpyinfo -display :99 >/dev/null 2>&1; do sleep 1; done'
+ExecStart=/usr/bin/x11vnc -noshm -noxrecord -noxfixes -noxdamage -display :99 -nopw -forever -shared -rfbport 5999 -loop
 Restart=always
 RestartSec=3
+StartLimitInterval=0
 
 [Install]
 WantedBy=multi-user.target
