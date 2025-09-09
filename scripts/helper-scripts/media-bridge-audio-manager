@@ -4,15 +4,14 @@
 
 set -e
 
-# Always run as mediabridge user if started as root
+# Always run as mediabridge user for proper socket access
 if [ "$(id -u)" = "0" ]; then
     exec sudo -u mediabridge "$0" "$@"
 fi
 
-# PipeWire environment
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-export PIPEWIRE_RUNTIME_DIR="$XDG_RUNTIME_DIR"
-export PULSE_RUNTIME_PATH="$XDG_RUNTIME_DIR/pulse"
+# Connect to mediabridge user PipeWire session  
+export XDG_RUNTIME_DIR="/run/user/999"
+export PULSE_SERVER="unix:/run/user/999/pulse/native"
 
 # Function to wait for PipeWire
 wait_for_pipewire() {
@@ -117,26 +116,34 @@ setup_audio_routing() {
     # First load ALSA devices
     load_alsa_devices
     
-    # Create loopback from USB input to virtual mic sink
+    # Create loopback from USB input to virtual mic sink (only if not already exists)
     if pactl list sources short | grep -q usb_audio_source; then
-        echo "Linking USB microphone to virtual microphone..."
-        pactl load-module module-loopback \
-            source=usb_audio_source \
-            sink=intercom-mic-sink \
-            latency_msec=5 || echo "USB to virtual mic loopback may already exist"
+        if ! pactl list modules short | grep -q "source=usb_audio_source.*sink=intercom-mic-sink"; then
+            echo "Linking USB microphone to virtual microphone..."
+            pactl load-module module-loopback \
+                source=usb_audio_source \
+                sink=intercom-mic-sink \
+                latency_msec=5
+        else
+            echo "USB to virtual mic loopback already exists"
+        fi
     else
-        echo "WARNING: USB microphone not found"
+        echo "No USB microphone found (normal for testing)"
     fi
     
-    # Create loopback from virtual speaker to USB output
+    # Create loopback from virtual speaker to USB output (only if not already exists)
     if pactl list sinks short | grep -q usb_audio_sink; then
-        echo "Linking virtual speaker to USB output..."
-        pactl load-module module-loopback \
-            source=intercom-speaker.monitor \
-            sink=usb_audio_sink \
-            latency_msec=5 || echo "Virtual speaker to USB loopback may already exist"
+        if ! pactl list modules short | grep -q "source=intercom-speaker.monitor.*sink=usb_audio_sink"; then
+            echo "Linking virtual speaker to USB output..."
+            pactl load-module module-loopback \
+                source=intercom-speaker.monitor \
+                sink=usb_audio_sink \
+                latency_msec=5
+        else
+            echo "Virtual speaker to USB loopback already exists"
+        fi
     else
-        echo "WARNING: USB output device not found"
+        echo "No USB output device found (normal for testing)"
     fi
     
     echo "Audio routing complete"

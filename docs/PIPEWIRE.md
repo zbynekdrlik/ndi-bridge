@@ -19,6 +19,14 @@
 
 **Common Error**: Creating microphone as SINK → Chrome sees it in Speaker list!
 
+## CRITICAL DEVELOPMENT RULE: Official Documentation Verification
+
+**MANDATORY**: ALL PipeWire/WirePlumber configuration changes MUST be verified against official documentation:
+- https://docs.pipewire.org/ (PipeWire official docs)
+- https://pipewire.pages.freedesktop.org/wireplumber/ (WirePlumber official docs)
+- NO configuration should be implemented without verifying syntax and approach in official sources
+- ALWAYS test configuration changes incrementally to avoid breaking working systems
+
 ## Executive Summary (v3.1 - PipeWire 1.4.7 User Session)
 
 Media Bridge uses **PipeWire 1.4.7** with a **standard user session architecture** where PipeWire runs as the `mediabridge` user with loginctl lingering. This follows Ubuntu's standard approach for audio services.
