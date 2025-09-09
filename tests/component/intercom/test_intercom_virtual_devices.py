@@ -75,9 +75,9 @@ class TestIntercomVirtualDevices:
             )
             
             # USB input to virtual microphone loopback
-            # Updated: Now using intercom-microphone-sink as intermediate
-            assert "sink=intercom-microphone-sink" in module_details.stdout, (
-                "Missing loopback from USB input to virtual microphone sink"
+            # Now using intercom-microphone as the sink
+            assert "sink=intercom-microphone" in module_details.stdout, (
+                "Missing loopback from USB input to virtual microphone"
             )
         else:
             pytest.skip("No CSCTEK USB audio device connected")
