@@ -43,8 +43,8 @@ trap cleanup INT TERM
 FULL_HOSTNAME=$(hostname)
 HOSTNAME=${FULL_HOSTNAME#media-bridge-}  # Remove prefix if exists
 ROOM="${VDO_ROOM:-nl_interkom}"
-# Chrome uses mediabridge user's profile
-PROFILE_DIR="/var/lib/mediabridge/.chrome-profile"
+# Chrome uses tmp directory for profile (as expected by tests)
+PROFILE_DIR="/tmp/chrome"
 DISPLAY_NUM=99
 
 echo "=== Media Bridge Intercom Starting (PipeWire) ==="

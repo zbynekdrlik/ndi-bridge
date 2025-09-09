@@ -57,15 +57,15 @@ create_virtual_devices() {
             rate=48000 channels=2
     fi
     
-    if pactl list sources short | grep -q "output.intercom-microphone\|intercom-microphone"; then
+    if pactl list sources short | grep -q "intercom-microphone"; then
         echo "Virtual microphone already exists"
     else
         echo "Creating virtual microphone source..."
-        pactl load-module module-virtual-source \
-            source_name=intercom-microphone \
-            master=intercom-mic-sink.monitor \
-            source_properties=device.description=Intercom-Microphone \
-            rate=48000 channels=2
+        pactl load-module module-null-sink \
+            media.class=Audio/Source/Virtual \
+            sink_name=intercom-microphone \
+            channel_map=front-left,front-right \
+            sink_properties=device.description=Intercom-Microphone
     fi
     
     echo "Virtual devices created"

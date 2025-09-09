@@ -17,7 +17,21 @@
   - Every SINK has a `.monitor` SOURCE
   - Example: `intercom-speaker.monitor` captures speaker output
 
-**Common Error**: Creating microphone as SINK → Chrome sees it in Speaker list!
+**CRITICAL COMMON ERROR (SOLVED MULTIPLE TIMES)**: Creating microphone as SINK → Chrome sees it in Speaker list!
+
+**SOLUTION**: Always verify device types with `pw-cli list-objects | grep media.class`:
+- `media.class = "Audio/Sink"` → Chrome Speaker dropdown
+- `media.class = "Audio/Source"` → Chrome Microphone dropdown
+
+**Correct Implementation**:
+- `intercom-speaker` → `module-null-sink` → Creates proper SINK for Chrome output
+- `intercom-microphone` → `module-virtual-source` → Creates proper SOURCE for Chrome input (verify with pw-cli!)
+
+**Debug Commands**:
+```bash
+# Verify device types (run this after every change)
+sudo -u mediabridge pw-cli list-objects | grep -A3 "intercom-speaker\|intercom-microphone"
+```
 
 ## CRITICAL DEVELOPMENT RULE: Official Documentation Verification
 
