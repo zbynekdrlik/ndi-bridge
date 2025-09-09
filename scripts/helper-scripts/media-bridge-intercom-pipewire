@@ -163,12 +163,8 @@ else
     echo "WARNING: Virtual microphone not found"
 fi
 
-# Set system defaults to hardware devices for other applications
-HDMI_SINK=$(pactl list sinks short | grep hdmi | awk '{print $2}' | head -1)
-if [ -n "$HDMI_SINK" ]; then
-    echo "Setting system default sink to HDMI: $HDMI_SINK"
-    pactl set-default-sink "$HDMI_SINK"
-fi
+# Don't set HDMI as default - it causes security issues with intercom audio
+# Leave defaults as-is or set to virtual devices to prevent audio leakage
 
 # Find actual USB devices for hardware volume control
 USB_SINK=$(pactl list sinks short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)

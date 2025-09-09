@@ -106,6 +106,7 @@ tests/
 │   ├── core/          # System basics, services, version (38 tests)
 │   ├── display/       # DRM/KMS, HDMI, NDI receiver (28 tests)
 │   ├── helpers/       # Helper scripts, menu system (67 tests)
+│   ├── intercom/      # Chrome intercom functionality (145 tests)
 │   ├── network/       # Networking, mDNS, time sync (31 tests)
 │   └── timesync/      # PTP, NTP, time coordination (18 tests)
 ├── integration/       # Multi-component functional tests (89 tests)
@@ -116,6 +117,14 @@ tests/
 │   ├── test_boot_sequence.py           # Boot process validation
 │   └── test_system_resources.py        # Performance/memory
 ```
+
+### Known Test Limitations (Current State)
+
+**Intercom Tests (137/145 passing - 94.5% pass rate):**
+- Chrome device enumeration tests fail (Chrome sees all devices, not just virtual)
+- Tests correctly detect this issue but isolation not yet implemented
+- Audio routing works despite enumeration issue
+- Self-monitoring functionality verified working
 
 ### Test Execution Philosophy
 

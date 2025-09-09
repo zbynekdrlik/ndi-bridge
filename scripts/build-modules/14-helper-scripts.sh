@@ -45,11 +45,17 @@ install_helper_scripts() {
             fi
         done
         
-        # Install audio manager and its service
+        # Install audio manager and cleanup scripts
         if [ -f "$HELPER_DIR/media-bridge-audio-manager" ]; then
             cp "$HELPER_DIR/media-bridge-audio-manager" /mnt/usb/usr/local/bin/
             chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-manager
             log "Audio manager installed"
+        fi
+        
+        if [ -f "$HELPER_DIR/media-bridge-audio-cleanup" ]; then
+            cp "$HELPER_DIR/media-bridge-audio-cleanup" /mnt/usb/usr/local/bin/
+            chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-cleanup
+            log "Audio cleanup script installed"
         fi
         
         if [ -f "$HELPER_DIR/media-bridge-audio-manager.service" ]; then
@@ -99,6 +105,12 @@ install_helper_scripts() {
         if [ -d "$HELPER_DIR/wireplumber-conf.d" ]; then
             mkdir -p /mnt/usb/etc/wireplumber/main.lua.d
             cp "$HELPER_DIR/wireplumber-conf.d"/*.lua /mnt/usb/etc/wireplumber/main.lua.d/
+        fi
+        
+        # Install Chrome isolation rules
+        if [ -f "$HELPER_DIR/wireplumber-chrome-isolation.lua" ]; then
+            cp "$HELPER_DIR/wireplumber-chrome-isolation.lua" /mnt/usb/etc/wireplumber/main.lua.d/90-chrome-isolation.lua
+            log "Chrome isolation rules installed"
         fi
         
         # Install audio manager

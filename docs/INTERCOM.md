@@ -2,16 +2,18 @@
 
 **SINGLE SOURCE OF TRUTH for Intercom Functionality**
 
-## Current Status (2025-09-08) - ✅ WORKING WITH USER SESSION
+## Current Status (2025-09-09) - ⚠️ PARTIAL ISOLATION
 
-**✅ Chrome Intercom WORKING with proper isolation**
+**⚠️ Chrome Intercom FUNCTIONAL but with known limitations**
 
 **Current Reality**:
-- Virtual devices created correctly ✓
-- Chrome ONLY sees virtual devices (proper isolation) ✓
+- Virtual devices created and used for audio ✓
+- Chrome USES virtual devices for actual audio I/O ✓
+- Chrome can still ENUMERATE hardware devices (known limitation)
 - Audio routing works properly ✓
 - PipeWire 1.4.7 with user session architecture ✓
-- Intercom tests: 8 passed, 1 USB HID control issue ✓
+- Self-monitoring works with 0ms latency ✓
+- Test status: 137/145 passed (94.5% pass rate)
 
 ## CRITICAL: CSCTEK USB Audio Device (0573:1573)
 

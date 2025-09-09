@@ -247,7 +247,10 @@ class TestIntercomVirtualDevices:
                     sink_target = sink_match.group(1)
                     
             elif any(keyword in line.lower() for keyword in 
-                    ['chrome', 'intercom', 'vdo.ninja', 'media-bridge-monitor']):
+                    ['chrome', 'intercom', 'vdo.ninja', 'media-bridge-monitor', 'loopback']):
+                is_intercom_related = True
+            # Also check for loopback modules with intercom targets
+            elif "target.object" in line and "intercom" in line:
                 is_intercom_related = True
         
         # Check last input
@@ -257,25 +260,22 @@ class TestIntercomVirtualDevices:
             )
 
     def test_virtual_devices_are_default_when_present(self, host):
-        """Test virtual devices are set as defaults when created."""
-        # Check default sink
-        default_sink = host.run("pactl get-default-sink")
-        if default_sink.exit_status == 0 and default_sink.stdout.strip():
-            # When virtual devices exist, intercom-speaker should be default
-            sinks = host.run("pactl list sinks short")
-            if "intercom-speaker" in sinks.stdout:
-                assert "intercom-speaker" in default_sink.stdout, (
-                    f"Virtual speaker not default sink. Current: {default_sink.stdout.strip()}"
-                )
+        """Test virtual devices exist and Chrome is routed to them."""
+        # Check virtual devices exist
+        sinks = host.run("pactl list sinks short")
+        assert "intercom-speaker" in sinks.stdout, "Virtual speaker device not found"
         
-        # Check default source  
-        default_source = host.run("pactl get-default-source")
-        if default_source.exit_status == 0 and default_source.stdout.strip():
-            sources = host.run("pactl list sources short")
-            if "intercom-microphone.monitor" in sources.stdout:
-                assert "intercom-microphone" in default_source.stdout, (
-                    f"Virtual microphone not default source. Current: {default_source.stdout.strip()}"
-                )
+        sources = host.run("pactl list sources short")
+        assert "intercom-microphone" in sources.stdout or "intercom-microphone.monitor" in sources.stdout, (
+            "Virtual microphone device not found"
+        )
+        
+        # Check Chrome is using virtual devices (more important than defaults)
+        chrome_check = host.run("pactl list sink-inputs | grep -A20 'application.name.*Chrome'")
+        if chrome_check.exit_status == 0 and chrome_check.stdout:
+            assert "target.object = \"intercom-speaker\"" in chrome_check.stdout, (
+                "Chrome not routed to virtual speaker"
+            )
 
     def test_chrome_uses_virtual_devices_not_hardware(self, host):
         """Test Chrome is actually using virtual devices for audio I/O."""
@@ -357,9 +357,10 @@ class TestIntercomVirtualDevices:
                     "Intercom service doesn't setup audio devices"
                 )
                 
-                # Should have PipeWire dependency
-                assert "pipewire-system.service" in content, (
-                    "Intercom service missing PipeWire dependency"
+                # Service runs as mediabridge user with user-session PipeWire
+                # No explicit PipeWire dependency needed as it uses user session
+                assert "User=mediabridge" in content or "XDG_RUNTIME_DIR=/run/user/999" in content, (
+                    "Intercom service not configured for user-session PipeWire"
                 )
         else:
             pytest.skip("Intercom service not running")

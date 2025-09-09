@@ -87,15 +87,22 @@ Services start automatically on boot via loginctl lingering.
 - `media-bridge-permission-manager.service` - Access control (currently limited)
 
 ### 2. Virtual Audio Devices
-Created for Chrome isolation attempt:
-- `intercom-speaker` - Virtual output device
-- `intercom-microphone` - Virtual input device
-- `intercom-mic-sink` - Helper sink for microphone routing
+Created with blackhole approach for proper isolation:
+- `intercom-speaker` - Virtual output device (null sink for Chrome audio output)
+- `intercom-microphone` - Virtual input device (remap-source from blackhole monitor)
+- `intercom-mic-blackhole` - Blackhole sink for microphone (prevents HDMI routing)
+- `usb-audio-blackhole` - Default blackhole sink (prevents audio leakage)
 
-**CURRENT LIMITATION**: Chrome can still see ALL devices because it runs as the same mediabridge user. True isolation requires either:
+**Implementation Details**:
+- Blackhole sinks created with `module-null-sink` to prevent audio going to wrong outputs
+- Microphone created as proper SOURCE using `module-remap-source` from blackhole monitor
+- Static routing properties: `node.dont-reconnect=true`, `sink_dont_move=true`, `source_dont_move=true`
+- Cleanup script removes duplicate nodes before setup
+
+**CURRENT LIMITATION**: Chrome can still ENUMERATE all devices (shows 29+ in dropdown) but audio routing works correctly. Device enumeration isolation requires:
 - WirePlumber with proper access control (requires D-Bus)
 - Separate user for Chrome (complicates audio routing)
-- Custom PipeWire filter module (not yet implemented)
+- pw-container tool from PipeWire 1.4.7 (available but not yet integrated)
 
 ### 3. USB Audio Detection
 - Specific to CSCTEK/Zoran device (USB ID 0573:1573)

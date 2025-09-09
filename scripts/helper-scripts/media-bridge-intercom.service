@@ -17,6 +17,8 @@ Environment="XDG_RUNTIME_DIR=/run/user/999"
 Environment="PULSE_RUNTIME_PATH=/run/user/999/pulse"
 Environment="PULSE_SERVER=unix:/run/user/999/pulse/native"
 
+# Clean up old virtual devices first
+ExecStartPre=/usr/local/bin/media-bridge-audio-cleanup
 # Setup virtual audio devices (run as mediabridge)
 ExecStartPre=/usr/local/bin/media-bridge-audio-manager setup
 
