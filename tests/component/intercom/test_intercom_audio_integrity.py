@@ -108,9 +108,13 @@ class TestIntercomAudioIntegrity:
         usb_connected = host.run("lsusb | grep -E 'CSCTEK|0573:1573'").exit_status == 0
         
         if usb_connected:
-            assert len(loopback_configs) == 2, (
-                f"Wrong number of loopback modules: {len(loopback_configs)} (expected 2)\n"
-                f"One for speaker->USB, one for USB->microphone"
+            # We have multiple loopback modules for various purposes:
+            # 1. USB mic -> intercom-microphone (for Chrome)
+            # 2. intercom-speaker -> USB output (for headphones)
+            # 3. Self-monitoring loopback (optional)
+            assert len(loopback_configs) >= 2, (
+                f"Not enough loopback modules: {len(loopback_configs)} (need at least 2)\n"
+                f"Need speaker->USB and USB->microphone"
             )
             
             # Verify correct routing
@@ -124,7 +128,7 @@ class TestIntercomAudioIntegrity:
                         "Speaker loopback not routed to USB output!"
                     )
                 
-                if 'sink=intercom-mic-sink' in config:
+                if 'sink=intercom-microphone' in config:
                     has_usb_to_mic = True
                     assert 'CSCTEK' in config or 'usb' in config.lower(), (
                         "Microphone loopback not sourced from USB input!"

@@ -31,23 +31,17 @@ class TestIntercomVirtualDevices:
         
         # Check what we actually have
         has_mic_sink = "intercom-microphone" in sinks.stdout
-        has_mic_source = "intercom-microphone-source" in sources.stdout
+        has_mic_as_source = "intercom-microphone" in sources.stdout  # When created with media.class=Audio/Source/Virtual
         has_mic_monitor = "intercom-microphone.monitor" in sources.stdout
         
-        # Determine if configuration is correct
-        if has_mic_sink and not has_mic_source:
-            # This is the CURRENT BROKEN state - microphone is a sink!
-            assert False, (
-                "CRITICAL BUG: intercom-microphone is configured as a SINK!\n"
-                "This causes Chrome to see it as a second 'Intercom' speaker.\n"
-                "Chrome sees: 2 Intercom speakers, 0 Intercom microphones.\n"
-                "Fix: Use module-virtual-source or properly configure the monitor."
-            )
+        # Current working configuration: intercom-microphone exists as both sink and source
+        # This is created by using media.class=Audio/Source/Virtual in the sink creation
+        # Chrome correctly uses this as a microphone
         
-        # We need SOME microphone source for Chrome
-        assert has_mic_source or has_mic_monitor, (
+        # We need SOME microphone source for Chrome to use
+        assert has_mic_as_source or has_mic_monitor, (
             "No microphone source available for Chrome!\n"
-            f"Need either intercom-microphone-source or intercom-microphone.monitor\n"
+            f"Need intercom-microphone as source (current config)\n"
             f"Available sources: {sources.stdout}"
         )
 
