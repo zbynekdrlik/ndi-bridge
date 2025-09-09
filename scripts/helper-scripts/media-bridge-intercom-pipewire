@@ -254,7 +254,7 @@ fi
 echo "Starting Chrome..."
 echo "URL: $URL"
 
-# Run Chrome directly as root (isolation handled by WirePlumber)
+# Run Chrome directly (pw-container integration to be implemented)
 /usr/bin/google-chrome \
     --no-first-run \
     --no-default-browser-check \

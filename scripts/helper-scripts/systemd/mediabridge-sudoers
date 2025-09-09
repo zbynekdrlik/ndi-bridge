@@ -1,0 +1,5 @@
+# Sudoers configuration for mediabridge user
+# Allows mediabridge user to manage systemctl for user services
+# Required for intercom service to check PipeWire status
+
+mediabridge ALL=(ALL) NOPASSWD: /usr/bin/systemctl

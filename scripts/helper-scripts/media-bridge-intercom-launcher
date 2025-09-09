@@ -9,9 +9,14 @@ if ! command -v pipewire &> /dev/null || ! command -v wireplumber &> /dev/null; 
 fi
 
 # Wait for user session PipeWire to be ready
+# The service runs as mediabridge user already, so check directly
+export XDG_RUNTIME_DIR="/run/user/999"
+export USER="mediabridge"
+export HOME="/var/lib/mediabridge"
+
 for i in {1..10}; do
-    if sudo -u mediabridge systemctl --user is-active --quiet pipewire.service && \
-       sudo -u mediabridge systemctl --user is-active --quiet pipewire-pulse.service; then
+    if systemctl --user is-active --quiet pipewire.service && \
+       systemctl --user is-active --quiet pipewire-pulse.service; then
         echo "User session PipeWire is ready"
         break
     fi

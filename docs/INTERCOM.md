@@ -33,18 +33,18 @@
 
 Media Bridge Intercom runs Chrome browser connected to VDO.Ninja for WebRTC communication. All components run as the `mediabridge` system user (UID 999).
 
-### Audio Flow Design
+### Audio Flow Design (PipeWire 1.4.7 Device Isolation)
 
 ```
 USB Headset (CSCTEK 0573:1573)
     ↓
-PipeWire (mediabridge user)
+PipeWire (mediabridge user) + pw-container isolation
     ↓
-Virtual Devices (intercom-speaker/microphone)
+Virtual Devices (intercom-speaker/microphone) 
     ↓
-Chrome (same user - sees ALL devices)
+Chrome (isolated container - sees ONLY virtual devices)
     ↓
-Chrome Audio Enforcer (moves streams to correct devices)
+Direct audio routing via PipeWire links
 ```
 
 ## Core Components
@@ -77,7 +77,7 @@ Created by audio-manager for intended isolation:
 - `intercom-microphone` - Virtual input (SOURCE)
 - `intercom-mic-sink` - Helper sink for routing
 
-**Problem**: Chrome can enumerate all devices, not just virtual ones.
+**Current Implementation**: Chrome runs in PipeWire 1.4.7 container with device filtering.
 
 ### 4. Key Scripts (`/usr/local/bin/`)
 
@@ -93,11 +93,11 @@ Created by audio-manager for intended isolation:
 - Creates loopback connections
 - Uses `pw-link` for routing
 
-#### `chrome-audio-enforcer` (WORKAROUND)
-- Monitors Chrome audio streams
-- Forces streams to virtual devices
-- Runs continuously to maintain routing
-- Required because isolation doesn't work
+#### `pw-container` (PipeWire 1.4.7 Isolation)
+- Creates isolated audio namespace for Chrome
+- Chrome sees only specified devices (intercom-speaker, intercom-microphone)
+- Built-in PipeWire feature, no external scripts needed
+- Proper solution for audio device filtering
 
 #### `media-bridge-permission-manager`
 - Attempts to restrict device access

@@ -78,26 +78,35 @@ load_alsa_devices() {
     
     # Check for USB audio device
     if aplay -l | grep -q "USB Audio"; then
-        echo "Found USB Audio device, loading into PipeWire..."
+        echo "Found USB Audio device, checking if already loaded..."
         
-        # Load USB audio card (card 1 is typically USB)
-        pactl load-module module-alsa-card device_id=1 \
-            tsched=yes tsched_buffer_size=32768 \
-            tsched_buffer_watermark=16384 || echo "USB audio card may already be loaded"
-        
-        # Wait for devices to appear
-        sleep 1
-        
-        # Create proper sink and source names
-        pactl load-module module-alsa-sink device=hw:1,0 \
-            sink_name=usb_audio_sink \
-            sink_properties=device.description=USB-Audio-Output || echo "USB sink may exist"
+        # Check if hardware device actually exists before loading
+        if [ -e "/dev/snd/controlC1" ]; then
+            # Only load if not already present to prevent duplicates
+            if ! pactl list sinks short | grep -q "usb_audio_sink"; then
+                echo "Loading USB audio sink..."
+                pactl load-module module-alsa-sink device=hw:1,0 \
+                    sink_name=usb_audio_sink \
+                    sink_properties=device.description=USB-Audio-Output 2>/dev/null || echo "Failed to load USB sink - device may not support playback"
+            else
+                echo "USB audio sink already loaded"
+            fi
             
-        pactl load-module module-alsa-source device=hw:1,0 \
-            source_name=usb_audio_source \
-            source_properties=device.description=USB-Audio-Input || echo "USB source may exist"
-            
-        echo "USB Audio devices loaded"
+            if ! pactl list sources short | grep -q "usb_audio_source"; then
+                echo "Loading USB audio source..."
+                pactl load-module module-alsa-source device=hw:1,0 \
+                    source_name=usb_audio_source \
+                    source_properties=device.description=USB-Audio-Input 2>/dev/null || echo "Failed to load USB source - device may not support capture"
+            else
+                echo "USB audio source already loaded"
+            fi
+        else
+            echo "USB Audio device found in aplay but hardware not accessible"
+        fi
+        
+        echo "USB Audio device processing complete"
+    else
+        echo "No USB Audio device found (this is normal for testing without hardware)"
     fi
 }
 

@@ -81,6 +81,33 @@ EOF
 
 echo "✓ PipeWire packages pinned to prevent upgrades"
 
+# Configure systemd overrides for PipeWire system service
+echo "Configuring PipeWire system service resource limits..."
+mkdir -p /etc/systemd/system/pipewire-system.service.d
+
+# Create override file for file descriptor limits
+cat > /etc/systemd/system/pipewire-system.service.d/override.conf << 'LIMIT_EOF'
+# PipeWire System Service Override
+# Increases file descriptor limits for multimedia testing
+# Fixes "Too many open files" errors during extensive test runs
+
+[Service]
+# Increase file descriptor limits for PipeWire system service
+# Default limit (1024) is insufficient for multimedia operations with many clients
+LimitNOFILE=32768
+LimitNOFILESoft=16384
+
+# Additional resource limits for stable operation
+LimitNPROC=32768
+LimitMEMLOCK=infinity
+
+# Restart policy for reliability during testing
+Restart=on-failure
+RestartSec=5s
+LIMIT_EOF
+
+echo "✓ PipeWire system service resource limits configured"
+
 # Create marker file for other modules
 touch /tmp/pipewire-1.4.7-installed
 
