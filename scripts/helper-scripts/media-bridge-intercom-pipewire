@@ -68,11 +68,11 @@ export DISPLAY=:$DISPLAY_NUM
 
 # Start VNC server for remote monitoring
 echo "Starting VNC server on port 5999..."
-# Use setsid to completely detach VNC from this process group
-# -noshm prevents shared memory issues in containers/limited environments
-setsid x11vnc -noshm -noxrecord -noxfixes -noxdamage -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
-sleep 2
-echo "VNC server detached and running"
+# Start VNC server as part of service group (run in background with &, no setsid)
+x11vnc -noshm -noxrecord -noxfixes -noxdamage -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+VNC_PID=$!
+sleep 3
+echo "VNC server started on port 5999 (PID: $VNC_PID)"
 
 # Setup runtime directory for mediabridge user
 export XDG_RUNTIME_DIR=/run/user/999
