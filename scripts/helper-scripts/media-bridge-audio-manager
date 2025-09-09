@@ -47,25 +47,26 @@ create_virtual_devices() {
             rate=48000 channels=2
     fi
     
-    if pactl list sinks short | grep -q intercom-mic-sink; then
-        echo "Virtual mic sink already exists"
+    if pactl list sinks short | grep -q "intercom-microphone-sink"; then
+        echo "Virtual microphone sink already exists"
     else
         echo "Creating virtual microphone sink..."
         pactl load-module module-null-sink \
-            sink_name=intercom-mic-sink \
-            sink_properties=device.description=Intercom-Mic-Sink \
+            sink_name=intercom-microphone-sink \
+            sink_properties=device.description=Intercom-Microphone-Sink \
             rate=48000 channels=2
     fi
     
-    if pactl list sources short | grep -q "intercom-microphone"; then
-        echo "Virtual microphone already exists"
+    if pactl list sources short | grep -q "intercom-microphone-source"; then
+        echo "Virtual microphone source already exists"
     else
         echo "Creating virtual microphone source..."
         pactl load-module module-null-sink \
             media.class=Audio/Source/Virtual \
-            sink_name=intercom-microphone \
-            channel_map=front-left,front-right \
-            sink_properties=device.description=Intercom-Microphone
+            sink_name=intercom-microphone-source \
+            channels=1 \
+            channel_map=mono \
+            sink_properties=device.description=Intercom-Microphone-Source
     fi
     
     echo "Virtual devices created"
@@ -118,11 +119,11 @@ setup_audio_routing() {
     
     # Create loopback from USB input to virtual mic sink (only if not already exists)
     if pactl list sources short | grep -q usb_audio_source; then
-        if ! pactl list modules short | grep -q "source=usb_audio_source.*sink=intercom-mic-sink"; then
+        if ! pactl list modules short | grep -q "source=usb_audio_source.*sink=intercom-microphone-sink"; then
             echo "Linking USB microphone to virtual microphone..."
             pactl load-module module-loopback \
                 source=usb_audio_source \
-                sink=intercom-mic-sink \
+                sink=intercom-microphone-sink \
                 latency_msec=5
         else
             echo "USB to virtual mic loopback already exists"
