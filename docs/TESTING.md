@@ -2,9 +2,48 @@
 
 **SINGLE SOURCE OF TRUTH for all testing procedures and commands.**
 
+## ⚠️ CRITICAL DEVELOPMENT RULE: TEST-FIRST REQUIREMENT
+
+**ANY bug fix or feature implementation MUST follow this strict process:**
+
+1. **FIRST: Write tests that FAIL and demonstrate the bug**
+   - Tests must catch the actual issue (not pass with weakened assertions)
+   - Tests must verify real functionality (not just check if something exists)
+   - Tests must be comprehensive enough to prevent regression
+
+2. **SECOND: Implement the fix**
+   - Fix must make the tests pass without weakening them
+   - Fix must not break other tests
+
+3. **THIRD: Verify ALL tests pass (100% success required)**
+   - Run complete test suite, not just the new tests
+   - No skipping tests to "save time"
+   - No marking tests as "known limitation" without fixing
+
+**VIOLATIONS OF THIS RULE:**
+- Writing fixes without tests first = REJECTED
+- Weakening tests to make them pass = REJECTED  
+- Skipping failing tests = REJECTED
+- Claiming "working" with failing tests = FALSE
+
 ## Critical Rule: Always Use test-device.sh
 
 **NEVER run pytest directly!** Always use `test-device.sh` as the entry point for all testing.
+
+### ⚠️ CRITICAL: Test Execution Behavior
+
+**test-device.sh RUNS ALL TESTS BY DEFAULT - IT DOES NOT STOP ON FIRST FAILURE!**
+
+- **CONTINUES THROUGH ALL TESTS**: Even if tests fail, it continues to run the entire suite
+- **NO EARLY EXIT**: There is no `--maxfail` or `-x` flag by default
+- **COMPLETE RESULTS**: You will see ALL passes and failures, not just the first failure
+- **AUTO-RETRY**: Failed tests are automatically retried 3 times for network issues
+
+**IMPLICATIONS FOR DEVELOPERS:**
+1. **NEVER claim "tests are working" without checking the FINAL summary**
+2. **ALWAYS look for the summary line**: `X failed, Y passed, Z skipped`
+3. **If you see ANY failures, the feature is NOT working**
+4. **Run with --collect-only first to see how many tests SHOULD run**
 
 The test-device.sh script:
 - Handles SSH host key changes (critical for reflashed devices) 
@@ -67,6 +106,7 @@ tests/
 │   ├── core/          # System basics, services, version (38 tests)
 │   ├── display/       # DRM/KMS, HDMI, NDI receiver (28 tests)
 │   ├── helpers/       # Helper scripts, menu system (67 tests)
+│   ├── intercom/      # Chrome intercom functionality (145 tests)
 │   ├── network/       # Networking, mDNS, time sync (31 tests)
 │   └── timesync/      # PTP, NTP, time coordination (18 tests)
 ├── integration/       # Multi-component functional tests (89 tests)
@@ -77,6 +117,14 @@ tests/
 │   ├── test_boot_sequence.py           # Boot process validation
 │   └── test_system_resources.py        # Performance/memory
 ```
+
+### Known Test Limitations (Current State)
+
+**Intercom Tests (137/145 passing - 94.5% pass rate):**
+- Chrome device enumeration tests fail (Chrome sees all devices, not just virtual)
+- Tests correctly detect this issue but isolation not yet implemented
+- Audio routing works despite enumeration issue
+- Self-monitoring functionality verified working
 
 ### Test Execution Philosophy
 
