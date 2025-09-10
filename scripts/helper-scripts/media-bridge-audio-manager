@@ -7,9 +7,10 @@
 
 set -e
 
-# PipeWire environment
-export XDG_RUNTIME_DIR=/run/user/0
-export PULSE_RUNTIME_PATH=/run/user/0/pulse
+# PipeWire environment (user mode with socket bind mount)
+export XDG_RUNTIME_DIR=/run/pipewire
+export PIPEWIRE_RUNTIME_DIR=/run/pipewire
+export PULSE_RUNTIME_PATH=/run/pipewire/pulse
 
 # Function to wait for PipeWire
 wait_for_pipewire() {

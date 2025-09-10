@@ -5,8 +5,16 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=mediabridge
+Group=audio
 Restart=always
 RestartSec=5
+
+# Environment for PipeWire socket access (if needed for audio capture)
+Environment="XDG_RUNTIME_DIR=/run/pipewire"
+Environment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"
+Environment="LD_LIBRARY_PATH=/usr/local/lib"
+
 ExecStart=/opt/media-bridge/run.sh
 StandardOutput=journal
 StandardError=journal

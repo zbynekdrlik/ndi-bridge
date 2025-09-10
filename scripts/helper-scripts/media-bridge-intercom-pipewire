@@ -25,9 +25,9 @@ cleanup() {
     rm -f /tmp/.X99-lock 2>/dev/null || true
     rm -rf /tmp/.com.google.Chrome.* 2>/dev/null || true
     rm -rf /tmp/chrome-* 2>/dev/null || true
-    rm -f /tmp/chrome-vdo-profile/SingletonLock 2>/dev/null || true
-    rm -f /tmp/chrome-vdo-profile/SingletonCookie 2>/dev/null || true
-    rm -f /tmp/chrome-vdo-profile/SingletonSocket 2>/dev/null || true
+    rm -f /var/lib/mediabridge/chrome-profile/SingletonLock 2>/dev/null || true
+    rm -f /var/lib/mediabridge/chrome-profile/SingletonCookie 2>/dev/null || true
+    rm -f /var/lib/mediabridge/chrome-profile/SingletonSocket 2>/dev/null || true
     
     # Wait for processes to die
     sleep 3
@@ -47,7 +47,7 @@ trap cleanup INT TERM
 FULL_HOSTNAME=$(hostname)
 HOSTNAME=${FULL_HOSTNAME#media-bridge-}  # Remove prefix if exists
 ROOM="${VDO_ROOM:-nl_interkom}"
-PROFILE_DIR="/tmp/chrome-vdo-profile"
+PROFILE_DIR="/var/lib/mediabridge/chrome-profile"
 DISPLAY_NUM=99
 
 echo "=== Media Bridge Intercom Starting (PipeWire) ==="
@@ -72,8 +72,10 @@ setsid x11vnc -noshm -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999
 sleep 2
 echo "VNC server detached and running"
 
-# Setup runtime directory and PulseAudio directory
-export XDG_RUNTIME_DIR=/run/user/0
+# Setup runtime directory and PulseAudio directory (user mode with socket bind mount)
+export XDG_RUNTIME_DIR=/run/pipewire
+export PIPEWIRE_RUNTIME_DIR=/run/pipewire
+export PULSE_RUNTIME_PATH=/run/pipewire/pulse
 mkdir -p $XDG_RUNTIME_DIR
 mkdir -p $XDG_RUNTIME_DIR/pulse
 
