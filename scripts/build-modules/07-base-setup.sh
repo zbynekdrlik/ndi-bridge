@@ -13,6 +13,30 @@ cat > /etc/hosts << EOFHOSTS
 127.0.1.1 media-bridge
 EOFHOSTS
 
+# Generate unique machine-id on first boot
+# This ensures each device gets unique DHCP client ID if DUID is ever used
+# Also prevents duplicate machine-id issues when cloning images
+cat > /etc/systemd/system/generate-machine-id.service << 'EOFMACHINEID'
+[Unit]
+Description=Generate unique machine ID on first boot
+Before=systemd-networkd.service
+ConditionPathExists=!/etc/machine-id-generated
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c 'rm -f /etc/machine-id /var/lib/dbus/machine-id && systemd-machine-id-setup && touch /etc/machine-id-generated'
+
+[Install]
+WantedBy=sysinit.target
+EOFMACHINEID
+
+# Enable the service to run on first boot
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl enable generate-machine-id.service 2>/dev/null || true
+fi
+
 # Set root password
 echo "root:${ROOT_PASSWORD}" | chpasswd
 
