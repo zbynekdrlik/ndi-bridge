@@ -11,10 +11,15 @@ SERVICE_START_FILE="/var/run/media-bridge/capture_start_time"
 # Main collection loop
 while true; do
     # 1. Get current FPS from last metrics entry (only if recent)
+    # Try journal first, fall back to log file if journal not available
     METRICS_LINE=$(journalctl -u ndi-capture -n 200 --no-pager 2>/dev/null | grep "METRICS|" | tail -1)
+    if [ -z "$METRICS_LINE" ] && [ -f /var/log/media-bridge/ndi-capture.log ]; then
+        METRICS_LINE=$(tail -200 /var/log/media-bridge/ndi-capture.log | grep "METRICS|" | tail -1)
+    fi
     if [ -n "$METRICS_LINE" ]; then
         # Extract timestamp and check if recent (within 5 seconds)
-        METRICS_TIME=$(echo "$METRICS_LINE" | cut -d' ' -f1-3)
+        # Format is: [2025-09-10 20:02:39.577] METRICS|...
+        METRICS_TIME=$(echo "$METRICS_LINE" | sed 's/^\[\(.*\)\].*/\1/')
         if [ -n "$METRICS_TIME" ]; then
             METRICS_EPOCH=$(date -d "$METRICS_TIME" +%s 2>/dev/null || echo "0")
             NOW_EPOCH=$(date +%s)
@@ -55,7 +60,11 @@ while true; do
     fi
     
     # 2. Get 10-minute FPS history and calculate average
+    # Try journal first, fall back to log file if journal not available
     FPS_HISTORY=$(journalctl -u ndi-capture --since "10 minutes ago" --no-pager 2>/dev/null | grep "METRICS|" | sed -n 's/.*FPS:\([0-9.]*\).*/\1/p')
+    if [ -z "$FPS_HISTORY" ] && [ -f /var/log/media-bridge/ndi-capture.log ]; then
+        FPS_HISTORY=$(tail -600 /var/log/media-bridge/ndi-capture.log | grep "METRICS|" | sed -n 's/.*FPS:\([0-9.]*\).*/\1/p')
+    fi
     if [ -n "$FPS_HISTORY" ]; then
         # Calculate average
         AVG_FPS=$(echo "$FPS_HISTORY" | awk '{sum+=$1; count++} END {if(count>0) printf "%.2f", sum/count; else print "0"}')
