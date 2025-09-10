@@ -69,6 +69,10 @@ UseDNS=yes
 ClientIdentifier=mac
 # Use link-layer (MAC) for DUID if ever needed
 DUIDType=link-layer
+# Send hostname for visibility in router, but use MAC for client ID
+SendHostname=true
+# IAID must be set to ensure consistent identification
+IAID=0
 EOFBR0
 
 # Enable services (use different methods based on what's available)
