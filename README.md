@@ -1,17 +1,17 @@
 # Media Bridge
 
-[![Version](https://img.shields.io/badge/version-2.1.6-blue.svg)](https://github.com/zbynekdrlik/media-bridge/releases)
+[![Version](https://img.shields.io/badge/version-2.2.7-blue.svg)](https://github.com/zbynekdrlik/media-bridge/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Media Bridge is a high-performance, ultra-low-latency tool that bridges video capture devices to NDI (Network Device Interface) streams. It enables seamless integration of HDMI capture cards, webcams, and professional video equipment into IP-based video workflows.
 
-## 🚀 Latest Updates (v2.1.6)
+## 🚀 Latest Updates (v2.2.7)
 
-- **VDO.Ninja Intercom**: Bidirectional audio communication for remote production
+- **VDO.Ninja Intercom**: Full-duplex audio communication (see [docs/INTERCOM.md](docs/INTERCOM.md))
+- **Unified PipeWire Audio**: System-wide audio management (see [docs/PIPEWIRE.md](docs/PIPEWIRE.md))
+- **Virtual Audio Isolation**: Chrome audio security via virtual devices
 - **8GB Image Size**: Expanded from 4GB to support Chrome and additional features
-- **Fixed Boot Issues**: USB systems now boot properly with correct partition layout
-- **Fixed TTY2 Display**: Welcome screen shows with proper colors and auto-refresh
 - **USB Hot-plug Recovery**: Automatic recovery when USB capture devices are disconnected/reconnected
 - **Bootable USB Appliance**: Ready-to-deploy Linux system with auto-starting Media Bridge
 - **Improved Stability**: Enhanced error handling and frame monitoring
@@ -19,7 +19,7 @@ Media Bridge is a high-performance, ultra-low-latency tool that bridges video ca
 
 ## Features
 
-### Current Features (v2.1.6)
+### Current Features (v2.2.7)
 - ✅ **USB Hot-plug Recovery** - Automatically restarts when devices disconnect/reconnect
 - ✅ **Bootable USB System** - Complete Linux appliance for dedicated Media Bridge boxes
 - ✅ **Ultra-low latency pipeline** with multi-threading (Linux)
