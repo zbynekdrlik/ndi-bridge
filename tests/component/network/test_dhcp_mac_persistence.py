@@ -38,10 +38,24 @@ def test_bridge_has_consistent_mac(host):
     bridge_mac = bridge_mac_match.group(1)
     
     # Get first ethernet interface MAC
-    eth_info = host.run("ip link show | grep -E 'eth0|enp' | head -1")
+    # First get the interface name, then get its MAC in a separate command
+    eth_info = host.run("ip link show eth0 2>/dev/null || ip link show enp1s0 2>/dev/null || ip link show | grep -E 'eth|enp' | head -1 | cut -d: -f2 | cut -d' ' -f2")
     assert eth_info.rc == 0, "Failed to find ethernet interface"
     
-    eth_mac_match = re.search(r'link/ether ([0-9a-f:]+)', eth_info.stdout)
+    # If we got just the interface name, get its details
+    if 'link/ether' not in eth_info.stdout:
+        # We have an interface name, get its MAC
+        iface_name = eth_info.stdout.strip()
+        if iface_name:
+            eth_details = host.run(f"ip link show {iface_name}")
+            eth_mac_match = re.search(r'link/ether ([0-9a-f:]+)', eth_details.stdout)
+        else:
+            # Try to get eth0 directly
+            eth_details = host.run("ip link show eth0")
+            eth_mac_match = re.search(r'link/ether ([0-9a-f:]+)', eth_details.stdout)
+    else:
+        eth_mac_match = re.search(r'link/ether ([0-9a-f:]+)', eth_info.stdout)
+    
     assert eth_mac_match, "Could not extract ethernet MAC address"
     eth_mac = eth_mac_match.group(1)
     
