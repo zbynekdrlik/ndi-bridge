@@ -5,6 +5,16 @@ All notable changes to the Media Bridge project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **DHCP IP Persistence** (#105):
+  - Fixed IP address changing on reboot despite same hardware MAC
+  - Configured systemd-networkd to use MAC address for DHCP client ID
+  - Added unique machine-id generation on first boot
+  - IP now persists across reboots and hostname changes
+  - Router still sees device hostname for identification
+
 ## [2.1.6] - 2025-07-21
 
 ### Added
