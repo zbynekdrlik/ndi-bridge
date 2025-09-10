@@ -134,6 +134,12 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl mask ModemManager 2>/dev/null || true
     systemctl mask whoopsie 2>/dev/null || true
     systemctl mask snapd 2>/dev/null || true
+    
+    # Disable ext4 filesystem check services (not needed on Btrfs-only system)
+    systemctl disable e2scrub_all.timer 2>/dev/null || true
+    systemctl disable e2scrub_reap.service 2>/dev/null || true
+    systemctl mask e2scrub_all.timer 2>/dev/null || true
+    systemctl mask e2scrub_reap.service 2>/dev/null || true
 fi
 
 EOFBASE

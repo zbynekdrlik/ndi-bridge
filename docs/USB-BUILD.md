@@ -51,12 +51,11 @@ cd ..
 
 2. **Create Bootable USB**
 ```bash
-# Replace /dev/sdX with your USB device (use lsblk to find it)
-# This wrapper script provides automatic logging
-sudo ./build-usb-with-log.sh /dev/sdX
+# Creates an 8GB image file (media-bridge.img) that can be written to USB
+sudo ./build-image.sh
 
-# Or run directly without logging:
-# sudo ./scripts/build-ndi-usb-modular.sh /dev/sdX
+# Write to USB using Rufus on Windows or dd on Linux:
+# dd if=media-bridge.img of=/dev/sdX bs=4M status=progress
 ```
 
 3. **Wait for Build**
@@ -173,10 +172,10 @@ NDI_NAME=""            # Empty = use hostname
 To build multiple USB drives:
 ```bash
 # First USB (with automatic logging)
-sudo ./build-usb-with-log.sh /dev/sdb
+sudo ./build-image.sh
 
-# Second USB (with automatic logging)
-sudo ./build-usb-with-log.sh /dev/sdc
+# Write the image to USB drives
+dd if=media-bridge.img of=/dev/sdc bs=4M status=progress
 
 # Each build creates a timestamped log in build-logs/
 # Monitor progress with: tail -f build-logs/usb-build-*.log
