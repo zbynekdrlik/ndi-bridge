@@ -144,6 +144,13 @@ install_build_deps() {
         "grub2-common"
         "grub-pc-bin"
         "grub-efi-amd64-bin"
+        "grub-efi-amd64"
+        "efibootmgr"
+        "gdisk"
+        "squashfs-tools"
+        "systemd-container"
+        "arch-install-scripts"
+        "qemu-user-static"
         "dos2unix"
     )
     
@@ -355,7 +362,10 @@ install_python_test_deps() {
     
     # Install pytest and related packages
     log_info "Installing pytest framework and dependencies..."
-    pip3 install --user pytest pytest-xdist pytest-timeout testinfra pyyaml python-dotenv
+    pip3 install --user pytest pytest-xdist pytest-timeout testinfra pyyaml python-dotenv pytest-html
+    
+    # Install as root too for build verification
+    $SUDO pip3 install --break-system-packages pytest pytest-xdist pytest-timeout testinfra pyyaml python-dotenv pytest-html 2>/dev/null || true
     
     # Verify installation
     if python3 -m pytest --version > /dev/null 2>&1; then
