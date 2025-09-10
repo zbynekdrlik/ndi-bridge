@@ -38,7 +38,7 @@ if [ $# -ne 1 ]; then
     echo ""
     echo "This will set:"
     echo "  - Hostname to: media-bridge-cam1"
-    echo "  - Short alias: cam1.local"
+    echo "  - mDNS to: media-bridge-cam1.local"
     echo "  - NDI name to: cam1"
     exit 1
 fi
@@ -52,19 +52,27 @@ fi
 # Convert to lowercase for consistency
 NEW_NAME=$(echo "$NEW_NAME" | tr '[:upper:]' '[:lower:]')
 
-# Build full hostname
-FULL_HOSTNAME="media-bridge-${NEW_NAME}"
+# Store original name for NDI (can have underscores)
+NDI_NAME="$NEW_NAME"
+
+# Convert underscores to hyphens for hostname (RFC 952 compliance)
+# Hostnames cannot contain underscores
+HOSTNAME_SAFE=$(echo "$NEW_NAME" | tr '_' '-')
+
+# Build full hostname (using sanitized name)
+FULL_HOSTNAME="media-bridge-${HOSTNAME_SAFE}"
 
 log "Setting device name to: $NEW_NAME"
 log "Full hostname will be: $FULL_HOSTNAME"
-log "Short alias will be: ${NEW_NAME}.local"
+log "Short alias will be: ${HOSTNAME_SAFE}.local"
+log "NDI name will be: $NDI_NAME"
 
 # Update hostname
 echo "$FULL_HOSTNAME" > /etc/hostname
-sed -i "s/127.0.1.1.*/127.0.1.1 $FULL_HOSTNAME $NEW_NAME/" /etc/hosts
+sed -i "s/127.0.1.1.*/127.0.1.1 $FULL_HOSTNAME $HOSTNAME_SAFE/" /etc/hosts
 
-# Update NDI configuration
-sed -i "s/NDI_NAME=.*/NDI_NAME=\"$NEW_NAME\"/" /etc/media-bridge/config
+# Update NDI configuration (keep original name with underscores)
+sed -i "s/NDI_NAME=.*/NDI_NAME=\"$NDI_NAME\"/" /etc/media-bridge/config
 
 # Update Avahi configuration with new hostname
 if [ -f /etc/avahi/avahi-daemon.conf ]; then
@@ -77,7 +85,7 @@ cat > /etc/avahi/services/media-bridge-alias.service << EOFALIAS
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <service-group>
-  <name>${NEW_NAME}</name>
+  <name>${HOSTNAME_SAFE}</name>
   <service>
     <type>_device-info._tcp</type>
     <subtype>_ndi._sub._device-info._tcp</subtype>
@@ -97,13 +105,13 @@ cat > /etc/avahi/services/media-bridge-http.service << EOFHTTPSERVICE
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
 <service-group>
-  <name>${NEW_NAME} Configuration</name>
+  <name>${HOSTNAME_SAFE} Configuration</name>
   <service>
     <type>_http._tcp</type>
     <port>80</port>
     <txt-record>path=/</txt-record>
     <txt-record>product=Media Bridge</txt-record>
-    <txt-record>name=${NEW_NAME}</txt-record>
+    <txt-record>name=${HOSTNAME_SAFE}</txt-record>
   </service>
 </service-group>
 EOFHTTPSERVICE
@@ -126,41 +134,67 @@ if systemctl is-active --quiet avahi-daemon; then
     log "Restarting Avahi daemon..."
     systemctl restart avahi-daemon
     
-    # Create and start avahi-alias service for short hostname
-    log "Setting up mDNS alias for ${NEW_NAME}.local..."
+    # Setup short alias using dynamic IP discovery
+    log "Setting up mDNS short alias for ${HOSTNAME_SAFE}.local..."
     
     # Kill any existing avahi-publish processes
     pkill -f "avahi-publish.*\.local" 2>/dev/null || true
     
-    # Get the bridge IP
+    # Copy the publish-alias script if it doesn't exist
+    if [ ! -f /usr/local/bin/media-bridge-publish-alias ]; then
+        cat > /usr/local/bin/media-bridge-publish-alias << 'EOFWRAPPER'
+#!/bin/bash
+# Dynamically discover bridge IP and publish mDNS alias
+
+ALIAS_NAME="$1"
+
+if [ -z "$ALIAS_NAME" ]; then
+    echo "Error: No alias name provided" >&2
+    exit 1
+fi
+
+# Wait for network to be ready
+for i in {1..30}; do
     BRIDGE_IP=$(ip -4 addr show br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
-    
     if [ -n "$BRIDGE_IP" ]; then
-        # Create systemd service for persistent alias
-        cat > /etc/systemd/system/avahi-alias.service << EOFALIASSERVICE
+        break
+    fi
+    sleep 1
+done
+
+if [ -z "$BRIDGE_IP" ]; then
+    echo "Error: Could not determine bridge IP address" >&2
+    exit 1
+fi
+
+echo "Publishing mDNS alias: ${ALIAS_NAME}.local -> ${BRIDGE_IP}"
+exec /usr/bin/avahi-publish -a -R "${ALIAS_NAME}.local" "${BRIDGE_IP}"
+EOFWRAPPER
+        chmod +x /usr/local/bin/media-bridge-publish-alias
+    fi
+    
+    # Create systemd service for persistent alias
+    cat > /etc/systemd/system/avahi-alias.service << EOFALIASSERVICE
 [Unit]
-Description=Avahi mDNS hostname alias for ${NEW_NAME}
+Description=Avahi mDNS short hostname alias for ${HOSTNAME_SAFE}
 After=avahi-daemon.service network-online.target
 Wants=avahi-daemon.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/avahi-publish -a -R ${NEW_NAME}.local ${BRIDGE_IP}
+ExecStart=/usr/local/bin/media-bridge-publish-alias ${HOSTNAME_SAFE}
 Restart=always
 RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
 EOFALIASSERVICE
-        
-        systemctl daemon-reload
-        systemctl enable avahi-alias.service
-        systemctl restart avahi-alias.service
-        
-        log "mDNS alias service configured for ${NEW_NAME}.local -> ${BRIDGE_IP}"
-    else
-        warn "Could not determine bridge IP address, alias service not configured"
-    fi
+    
+    systemctl daemon-reload
+    systemctl enable avahi-alias.service
+    systemctl restart avahi-alias.service
+    
+    log "mDNS configured: ${FULL_HOSTNAME}.local and ${HOSTNAME_SAFE}.local"
 fi
 
 # Show success
@@ -168,17 +202,17 @@ log "Device name successfully changed!"
 echo ""
 echo -e "${CYAN}Summary:${NC}"
 echo "  Hostname:      $FULL_HOSTNAME"
-echo "  Short alias:   ${NEW_NAME}.local"
-echo "  NDI Name:      $NEW_NAME"
+echo "  Short alias:   ${HOSTNAME_SAFE}.local"
+echo "  NDI Name:      $NDI_NAME"
 echo ""
 echo -e "${CYAN}Network Access:${NC}"
 echo "  - ping ${FULL_HOSTNAME}.local"
-echo "  - ping ${NEW_NAME}.local"
+echo "  - ping ${HOSTNAME_SAFE}.local"
 echo ""
 echo -e "${CYAN}Web Interface:${NC}"
 echo "  - http://${FULL_HOSTNAME}.local"
-echo "  - http://${NEW_NAME}.local"
+echo "  - http://${HOSTNAME_SAFE}.local"
 echo "  Username: admin, Password: newlevel"
 echo ""
-echo "The device will now appear as '$NEW_NAME' in NDI sources."
+echo "The device will now appear as '$NDI_NAME' in NDI sources."
 echo "You may need to refresh your NDI receiver application."
