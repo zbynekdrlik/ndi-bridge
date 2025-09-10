@@ -18,6 +18,7 @@ source "$SCRIPT_DIR/build-modules/05-debootstrap.sh"
 source "$SCRIPT_DIR/build-modules/06-system-config.sh"
 source "$SCRIPT_DIR/build-modules/07-base-setup.sh"
 source "$SCRIPT_DIR/build-modules/08-network.sh"
+source "$SCRIPT_DIR/build-modules/08a-pipewire-upgrade.sh"
 source "$SCRIPT_DIR/build-modules/09-ndi-capture-service.sh"
 source "$SCRIPT_DIR/build-modules/10-ndi-display-service.sh"
 source "$SCRIPT_DIR/build-modules/11-intercom-chrome.sh"
@@ -74,6 +75,7 @@ assemble_configuration() {
     configure_system
     setup_base_system
     configure_network
+    configure_pipewire_upgrade
     configure_time_sync
     configure_ndi_service
     configure_ndi_display_service
