@@ -64,6 +64,15 @@ RouteMetric=10
 UseDomains=yes
 # Use DHCP-provided DNS (systemd-resolved will handle fallback)
 UseDNS=yes
+# CRITICAL: Use MAC address for DHCP client ID instead of DUID
+# This ensures consistent IP addresses across reboots
+ClientIdentifier=mac
+# Use link-layer (MAC) for DUID if ever needed
+DUIDType=link-layer
+# Send hostname for visibility in router, but use MAC for client ID
+SendHostname=true
+# IAID must be set to ensure consistent identification
+IAID=0
 EOFBR0
 
 # Enable services (use different methods based on what's available)
