@@ -168,12 +168,16 @@ echo -e "${BLUE}Total tests in suite: $TOTAL_TESTS${NC}"
 if [ $# -eq 0 ]; then
     echo -e "${BLUE}Executing: ALL tests (complete suite)${NC}"
     echo -e "${BLUE}Expected runtime: 5-10 minutes${NC}"
-    TEST_ARGS=("$SCRIPT_DIR" "--maxfail=0")
+    TEST_ARGS=("$SCRIPT_DIR")
 else
     echo -e "${BLUE}Executing: Custom test selection${NC}"
     echo -e "${BLUE}Arguments: $*${NC}"
     TEST_ARGS=("$@")
 fi
+
+# CRITICAL: Always add --maxfail=0 to ensure ALL tests run
+# This prevents pytest from stopping on first failure
+TEST_ARGS+=("--maxfail=0")
 
 echo -e "${BLUE}Authentication: $AUTH_METHOD${NC}"
 echo -e "${BLUE}Auto-retry: Enabled (3 attempts for network issues)${NC}"

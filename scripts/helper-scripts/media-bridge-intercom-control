@@ -4,27 +4,50 @@
 
 set -e
 
-# PipeWire/PulseAudio environment
-export XDG_RUNTIME_DIR=/run/user/0
-export PULSE_RUNTIME_PATH=/run/user/0/pulse
+# PipeWire/PulseAudio environment - use mediabridge user
+export XDG_RUNTIME_DIR=/run/user/999
+export PULSE_RUNTIME_PATH=/run/user/999/pulse
 
 # Suppress PulseAudio cookie warnings
 export PULSE_COOKIE=/tmp/.pulse-cookie
 
 # Function to get USB audio devices - FIXED to CSCTEK USB HID
 get_usb_audio_devices() {
-    # HARDCODED for CSCTEK USB Audio and HID device
-    # This ensures intercom always uses the correct device
-    local usb_sink=$(pactl list sinks short 2>&1 | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
-    local usb_source=$(pactl list sources short 2>&1 | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    # Look for USB Audio devices - multiple possible names
+    # The device may appear as "CSCTEK_USB_Audio_and_HID" or "USB_Audio_and_HID" or just "USB_Audio"
+    # Try intercom virtual devices first, then fall back to any USB audio device
     
-    # No fallback - only use CSCTEK device
+    # First try virtual devices (these should be preferred)
+    local usb_sink=$(sudo -u mediabridge pactl list sinks short 2>&1 | grep "intercom-speaker" | grep -v monitor | awk '{print $2}' | head -1)
+    local usb_source=$(sudo -u mediabridge pactl list sources short 2>&1 | grep "intercom-microphone" | grep -v monitor | awk '{print $2}' | head -1)
+    
+    # If no virtual devices, try USB audio devices with various patterns
     if [ -z "$usb_sink" ]; then
-        echo "ERROR: CSCTEK USB Audio HID device not found (output)" >&2
+        usb_sink=$(sudo -u mediabridge pactl list sinks short 2>&1 | grep -E "CSCTEK|USB.*Audio|USB.*HID" | grep -v monitor | awk '{print $2}' | head -1)
     fi
     
     if [ -z "$usb_source" ]; then
-        echo "ERROR: CSCTEK USB Audio HID device not found (input)" >&2
+        usb_source=$(sudo -u mediabridge pactl list sources short 2>&1 | grep -E "CSCTEK|USB.*Audio|USB.*HID" | grep -v monitor | awk '{print $2}' | head -1)
+    fi
+    
+    # If still no devices, check if audio manager needs to load them
+    if [ -z "$usb_sink" ] && [ -z "$usb_source" ]; then
+        # Try to trigger audio manager to load devices
+        systemctl restart media-bridge-audio-manager 2>/dev/null || true
+        sleep 2
+        
+        # Try again after restart
+        usb_sink=$(sudo -u mediabridge pactl list sinks short 2>&1 | grep -E "intercom-speaker|CSCTEK|USB.*Audio" | grep -v monitor | awk '{print $2}' | head -1)
+        usb_source=$(sudo -u mediabridge pactl list sources short 2>&1 | grep -E "intercom-microphone|CSCTEK|USB.*Audio" | grep -v monitor | awk '{print $2}' | head -1)
+    fi
+    
+    # Report errors only if still not found
+    if [ -z "$usb_sink" ]; then
+        echo "ERROR: No USB Audio or intercom virtual device found (output)" >&2
+    fi
+    
+    if [ -z "$usb_source" ]; then
+        echo "ERROR: No USB Audio or intercom virtual device found (input)" >&2
     fi
     
     echo "$usb_sink $usb_source"
@@ -38,16 +61,16 @@ case "$1" in
         usb_source="${devices[1]}"
         
         if [ -n "$usb_sink" ]; then
-            output_vol=$(pactl get-sink-volume "$usb_sink" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%')
-            output_muted=$(pactl get-sink-mute "$usb_sink" 2>/dev/null | grep -o 'yes\|no')
+            output_vol=$(sudo -u mediabridge pactl get-sink-volume "$usb_sink" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%')
+            output_muted=$(sudo -u mediabridge pactl get-sink-mute "$usb_sink" 2>/dev/null | grep -o 'yes\|no')
         else
             output_vol=50
             output_muted="no"
         fi
         
         if [ -n "$usb_source" ]; then
-            input_vol=$(pactl get-source-volume "$usb_source" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%')
-            input_muted=$(pactl get-source-mute "$usb_source" 2>/dev/null | grep -o 'yes\|no')
+            input_vol=$(sudo -u mediabridge pactl get-source-volume "$usb_source" 2>/dev/null | grep -o '[0-9]*%' | head -1 | tr -d '%')
+            input_muted=$(sudo -u mediabridge pactl get-source-mute "$usb_source" 2>/dev/null | grep -o 'yes\|no')
         else
             input_vol=50
             input_muted="no"
@@ -80,10 +103,10 @@ EOF
         
         if [ "$2" = "output" ]; then
             device="${devices[0]}"
-            [ -n "$device" ] && pactl set-sink-volume "$device" "${volume}%" 2>/dev/null
+            [ -n "$device" ] && sudo -u mediabridge pactl set-sink-volume "$device" "${volume}%" 2>/dev/null
         elif [ "$2" = "input" ]; then
             device="${devices[1]}"
-            [ -n "$device" ] && pactl set-source-volume "$device" "${volume}%" 2>/dev/null
+            [ -n "$device" ] && sudo -u mediabridge pactl set-source-volume "$device" "${volume}%" 2>/dev/null
         else
             echo "Invalid target: $2"
             exit 1
@@ -102,16 +125,16 @@ EOF
         
         case "$2" in
             output)
-                [ -n "${devices[0]}" ] && pactl set-sink-mute "${devices[0]}" 1 2>/dev/null
+                [ -n "${devices[0]}" ] && sudo -u mediabridge pactl set-sink-mute "${devices[0]}" 1 2>/dev/null
                 echo "Output muted"
                 ;;
             input)
-                [ -n "${devices[1]}" ] && pactl set-source-mute "${devices[1]}" 1 2>/dev/null
+                [ -n "${devices[1]}" ] && sudo -u mediabridge pactl set-source-mute "${devices[1]}" 1 2>/dev/null
                 echo "Input muted"
                 ;;
             both)
-                [ -n "${devices[0]}" ] && pactl set-sink-mute "${devices[0]}" 1 2>/dev/null
-                [ -n "${devices[1]}" ] && pactl set-source-mute "${devices[1]}" 1 2>/dev/null
+                [ -n "${devices[0]}" ] && sudo -u mediabridge pactl set-sink-mute "${devices[0]}" 1 2>/dev/null
+                [ -n "${devices[1]}" ] && sudo -u mediabridge pactl set-source-mute "${devices[1]}" 1 2>/dev/null
                 echo "Both muted"
                 ;;
             *)
@@ -131,16 +154,16 @@ EOF
         
         case "$2" in
             output)
-                [ -n "${devices[0]}" ] && pactl set-sink-mute "${devices[0]}" 0 2>/dev/null
+                [ -n "${devices[0]}" ] && sudo -u mediabridge pactl set-sink-mute "${devices[0]}" 0 2>/dev/null
                 echo "Output unmuted"
                 ;;
             input)
-                [ -n "${devices[1]}" ] && pactl set-source-mute "${devices[1]}" 0 2>/dev/null
+                [ -n "${devices[1]}" ] && sudo -u mediabridge pactl set-source-mute "${devices[1]}" 0 2>/dev/null
                 echo "Input unmuted"
                 ;;
             both)
-                [ -n "${devices[0]}" ] && pactl set-sink-mute "${devices[0]}" 0 2>/dev/null
-                [ -n "${devices[1]}" ] && pactl set-source-mute "${devices[1]}" 0 2>/dev/null
+                [ -n "${devices[0]}" ] && sudo -u mediabridge pactl set-sink-mute "${devices[0]}" 0 2>/dev/null
+                [ -n "${devices[1]}" ] && sudo -u mediabridge pactl set-source-mute "${devices[1]}" 0 2>/dev/null
                 echo "Both unmuted"
                 ;;
             *)
@@ -161,22 +184,22 @@ EOF
         case "$2" in
             output)
                 if [ -n "${devices[0]}" ]; then
-                    pactl set-sink-mute "${devices[0]}" toggle 2>/dev/null
+                    sudo -u mediabridge pactl set-sink-mute "${devices[0]}" toggle 2>/dev/null
                     echo "Output toggled"
                 fi
                 ;;
             input)
                 if [ -n "${devices[1]}" ]; then
-                    pactl set-source-mute "${devices[1]}" toggle 2>/dev/null
+                    sudo -u mediabridge pactl set-source-mute "${devices[1]}" toggle 2>/dev/null
                     echo "Input toggled"
                 fi
                 ;;
             both)
                 if [ -n "${devices[0]}" ]; then
-                    pactl set-sink-mute "${devices[0]}" toggle 2>/dev/null
+                    sudo -u mediabridge pactl set-sink-mute "${devices[0]}" toggle 2>/dev/null
                 fi
                 if [ -n "${devices[1]}" ]; then
-                    pactl set-source-mute "${devices[1]}" toggle 2>/dev/null
+                    sudo -u mediabridge pactl set-source-mute "${devices[1]}" toggle 2>/dev/null
                 fi
                 echo "Both toggled"
                 ;;

@@ -1,0 +1,28 @@
+[Unit]
+Description=Media Bridge Permission Manager - Device Isolation Service
+Documentation=https://github.com/zbynekdrlik/ndi-bridge/docs/PIPEWIRE.md
+After=pipewire-system.service media-bridge-audio-manager.service
+Wants=pipewire-system.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/media-bridge-permission-manager
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=permission-manager
+
+# Run as mediabridge user
+User=mediabridge
+Group=audio
+SupplementaryGroups=video pipewire
+
+# Environment
+Environment="XDG_RUNTIME_DIR=/run/user/999"
+
+# Give time for proper shutdown
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

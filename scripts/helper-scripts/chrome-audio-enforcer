@@ -1,0 +1,64 @@
+#!/bin/bash
+# Chrome Audio Enforcer - Forces Chrome streams to virtual devices
+# Required because Chrome device isolation doesn't work properly
+
+LOGFILE="/var/log/media-bridge/chrome-audio-enforcer.log"
+USER="mediabridge"
+RUNTIME_DIR="/run/user/999"
+
+# Ensure log directory exists
+mkdir -p "$(dirname "$LOGFILE")"
+
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOGFILE"
+}
+
+# Set proper environment for mediabridge user
+export XDG_RUNTIME_DIR="$RUNTIME_DIR"
+export USER="$USER"
+export HOME="/var/lib/mediabridge"
+
+log_message "Chrome Audio Enforcer starting..."
+log_message "Monitoring Chrome audio streams and enforcing virtual device usage"
+
+while true; do
+    # Get Chrome process PIDs
+    CHROME_PIDS=$(pgrep -f "chrome.*vdo.ninja" 2>/dev/null || true)
+    
+    if [ -n "$CHROME_PIDS" ]; then
+        for pid in $CHROME_PIDS; do
+            # Check if Chrome has audio streams
+            STREAMS=$(runuser -u mediabridge -- pw-cli list-objects | grep -A10 -B5 "application.process.id.*$pid" | grep -E "node.name|media.class" || true)
+            
+            if [ -n "$STREAMS" ]; then
+                # Force Chrome output streams to intercom-speaker
+                runuser -u mediabridge -- pactl list short sink-inputs 2>/dev/null | while read line; do
+                    SINK_INPUT_ID=$(echo "$line" | cut -d$'\t' -f1)
+                    APP_NAME=$(echo "$line" | cut -d$'\t' -f4)
+                    
+                    if [[ "$APP_NAME" == *"Chrome"* ]]; then
+                        # Move to virtual speaker
+                        if runuser -u mediabridge -- pactl move-sink-input "$SINK_INPUT_ID" "intercom-speaker" 2>/dev/null; then
+                            log_message "Moved Chrome output stream $SINK_INPUT_ID to intercom-speaker"
+                        fi
+                    fi
+                done
+                
+                # Force Chrome input streams to intercom-microphone  
+                runuser -u mediabridge -- pactl list short source-outputs 2>/dev/null | while read line; do
+                    SOURCE_OUTPUT_ID=$(echo "$line" | cut -d$'\t' -f1)
+                    APP_NAME=$(echo "$line" | cut -d$'\t' -f4)
+                    
+                    if [[ "$APP_NAME" == *"Chrome"* ]]; then
+                        # Move to virtual microphone
+                        if runuser -u mediabridge -- pactl move-source-output "$SOURCE_OUTPUT_ID" "output.intercom-microphone" 2>/dev/null; then
+                            log_message "Moved Chrome input stream $SOURCE_OUTPUT_ID to intercom-microphone"
+                        fi
+                    fi
+                done
+            fi
+        done
+    fi
+    
+    sleep 5
+done

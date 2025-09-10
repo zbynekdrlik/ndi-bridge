@@ -1,27 +1,30 @@
 [Unit]
 Description=PipeWire System Service
-After=sound.target pipewire-system.socket systemd-tmpfiles-setup.service user-runtime-dir@0.service
+After=sound.target pipewire-system.socket systemd-tmpfiles-setup.service user-runtime-dir@999.service
 Before=media-bridge-intercom.service ndi-display@0.service ndi-display@1.service ndi-display@2.service
-Requires=pipewire-system.socket user-runtime-dir@0.service
+Requires=pipewire-system.socket user-runtime-dir@999.service
 Wants=systemd-tmpfiles-setup.service
 
 [Service]
 Type=simple
-User=root
-Environment="XDG_RUNTIME_DIR=/run/user/0"
-Environment="PIPEWIRE_RUNTIME_DIR=/run/user/0"
-Environment="XDG_STATE_HOME=/var/lib/pipewire"
-Environment="XDG_CACHE_HOME=/var/cache/pipewire"
-Environment="HOME=/root"
-ExecStartPre=/bin/mkdir -p /run/user/0
-ExecStartPre=/bin/mkdir -p /run/user/0/pulse
-ExecStartPre=/bin/mkdir -p /var/lib/pipewire
-ExecStartPre=/bin/mkdir -p /var/cache/pipewire
+User=mediabridge
+Group=audio
+SupplementaryGroups=video pipewire
+Environment="XDG_RUNTIME_DIR=/run/user/999"
+Environment="PIPEWIRE_RUNTIME_DIR=/run/user/999"
+Environment="XDG_STATE_HOME=/var/lib/mediabridge/.local/state"
+Environment="XDG_CACHE_HOME=/var/lib/mediabridge/.cache"
+Environment="HOME=/var/lib/mediabridge"
+ExecStartPre=/bin/mkdir -p /run/user/999
+ExecStartPre=/bin/mkdir -p /run/user/999/pulse
+ExecStartPre=/bin/mkdir -p /var/lib/mediabridge/.local/state
+ExecStartPre=/bin/mkdir -p /var/lib/mediabridge/.cache
 # Ensure correct permissions
-ExecStartPre=/bin/chmod 700 /run/user/0
+ExecStartPre=/bin/chmod 700 /run/user/999
+ExecStartPre=/bin/chown mediabridge:mediabridge /run/user/999
 ExecStart=/usr/bin/pipewire -c /etc/pipewire/pipewire-system.conf
 # Log socket status for debugging
-ExecStartPost=/bin/bash -c 'sleep 3; ls -la /run/user/0/pipewire* 2>&1 | logger -t pipewire-socket-check'
+ExecStartPost=/bin/bash -c 'sleep 3; ls -la /run/user/999/pipewire* 2>&1 | logger -t pipewire-socket-check'
 Restart=always
 RestartSec=5
 # High priority for audio processing

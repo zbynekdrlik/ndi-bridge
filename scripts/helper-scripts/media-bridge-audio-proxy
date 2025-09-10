@@ -1,0 +1,21 @@
+#!/bin/bash
+# Audio proxy service for intercom user
+# Creates a proxy socket that forwards to system PipeWire
+
+set -e
+
+PROXY_SOCKET="/run/user/1000/pulse/native"
+SYSTEM_SOCKET="/run/user/0/pulse/native"
+
+echo "Starting audio proxy for intercom user..."
+
+# Create runtime directory for intercom user
+mkdir -p /run/user/1000/pulse
+chown -R intercom:intercom /run/user/1000
+
+# Use socat to create a proxy socket
+# This allows the intercom user to connect to their own socket
+# which then forwards to the system socket
+exec socat -d -d \
+    UNIX-LISTEN:$PROXY_SOCKET,fork,mode=666,user=intercom \
+    UNIX-CONNECT:$SYSTEM_SOCKET

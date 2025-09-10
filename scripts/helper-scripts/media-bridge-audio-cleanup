@@ -1,0 +1,43 @@
+#!/bin/bash
+# Complete PipeWire node cleanup - removes ALL virtual device nodes
+
+echo "=== Complete PipeWire Virtual Device Cleanup ==="
+
+# First unload all loopback modules
+echo "Removing loopback modules..."
+for id in $(pactl list modules short | grep module-loopback | awk '{print $1}'); do
+    pactl unload-module $id 2>/dev/null
+done
+
+# Unload all virtual device modules
+echo "Removing virtual device modules..."
+for id in $(pactl list modules short | grep -E "module-null-sink|module-remap-source|module-virtual" | awk '{print $1}'); do
+    pactl unload-module $id 2>/dev/null
+done
+
+# NOW DESTROY THE ACTUAL NODES - this is what was missing!
+echo "Destroying orphaned PipeWire nodes..."
+
+# Destroy all intercom-speaker nodes
+for id in $(pw-cli ls Node | grep intercom-speaker | grep -o 'id:[0-9]*' | cut -d: -f2); do
+    echo "Destroying intercom-speaker node $id"
+    pw-cli destroy $id 2>/dev/null
+done
+
+# Destroy all intercom-mic-blackhole nodes  
+for id in $(pw-cli ls Node | grep intercom-mic-blackhole | grep -o 'id:[0-9]*' | cut -d: -f2); do
+    echo "Destroying intercom-mic-blackhole node $id"
+    pw-cli destroy $id 2>/dev/null
+done
+
+# Destroy all intercom-microphone nodes
+for id in $(pw-cli ls Node | grep intercom-microphone | grep -o 'id:[0-9]*' | cut -d: -f2); do
+    echo "Destroying intercom-microphone node $id"
+    pw-cli destroy $id 2>/dev/null
+done
+
+echo "Cleanup complete. Current state:"
+echo "Sinks with 'intercom':"
+pactl list sinks short | grep intercom || echo "  None"
+echo "Sources with 'intercom':"
+pactl list sources short | grep intercom | grep -v monitor || echo "  None"

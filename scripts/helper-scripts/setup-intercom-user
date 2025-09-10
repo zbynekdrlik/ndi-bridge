@@ -1,0 +1,148 @@
+#!/bin/bash
+# Setup intercom user for Chrome audio isolation
+# This script creates and configures the intercom user with proper permissions
+
+set -e
+
+# Configuration
+INTERCOM_UID=1000
+INTERCOM_USER="intercom"
+INTERCOM_HOME="/home/intercom"
+INTERCOM_RUNTIME="/run/user/${INTERCOM_UID}"
+
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+# Check if running as root
+if [ "$EUID" -ne 0 ]; then 
+    echo "This script must be run as root"
+    exit 1
+fi
+
+# Create intercom user if it doesn't exist
+if ! id -u "$INTERCOM_USER" >/dev/null 2>&1; then
+    log "Creating intercom user with UID ${INTERCOM_UID}..."
+    useradd \
+        --uid "$INTERCOM_UID" \
+        --create-home \
+        --home-dir "$INTERCOM_HOME" \
+        --shell /bin/bash \
+        --comment "Media Bridge Intercom User" \
+        --groups audio,video \
+        "$INTERCOM_USER"
+    
+    log "User created successfully"
+else
+    log "User $INTERCOM_USER already exists"
+    # Ensure user is in correct groups
+    usermod -a -G audio,video "$INTERCOM_USER"
+fi
+
+# Create necessary directories
+log "Creating directory structure..."
+mkdir -p "$INTERCOM_HOME/.chrome-profile"
+mkdir -p "$INTERCOM_HOME/tmp"
+mkdir -p "$INTERCOM_HOME/.config/systemd/user"
+mkdir -p "$INTERCOM_HOME/.local/share"
+mkdir -p "$INTERCOM_HOME/.local/state"
+
+# Set ownership
+chown -R "$INTERCOM_USER:$INTERCOM_USER" "$INTERCOM_HOME"
+
+# Enable lingering for the user (allows services to run without login)
+log "Enabling systemd lingering for $INTERCOM_USER..."
+loginctl enable-linger "$INTERCOM_USER"
+
+# Create runtime directory structure
+log "Setting up runtime directory..."
+mkdir -p "$INTERCOM_RUNTIME"
+chown "$INTERCOM_USER:$INTERCOM_USER" "$INTERCOM_RUNTIME"
+chmod 700 "$INTERCOM_RUNTIME"
+
+# Create PipeWire/PulseAudio directories
+mkdir -p "$INTERCOM_RUNTIME/pulse"
+mkdir -p "$INTERCOM_RUNTIME/pipewire"
+chown -R "$INTERCOM_USER:$INTERCOM_USER" "$INTERCOM_RUNTIME"
+
+# Create a sudoers entry for service management (optional)
+if [ ! -f /etc/sudoers.d/intercom ]; then
+    log "Creating sudoers entry for service management..."
+    cat > /etc/sudoers.d/intercom << EOF
+# Allow intercom user to manage its own services
+$INTERCOM_USER ALL=(root) NOPASSWD: /bin/systemctl restart media-bridge-intercom
+$INTERCOM_USER ALL=(root) NOPASSWD: /bin/systemctl stop media-bridge-intercom
+$INTERCOM_USER ALL=(root) NOPASSWD: /bin/systemctl start media-bridge-intercom
+EOF
+    chmod 440 /etc/sudoers.d/intercom
+fi
+
+# Setup Chrome preferences with VDO.Ninja permissions pre-granted
+log "Setting up Chrome profile with permissions..."
+mkdir -p "$INTERCOM_HOME/.chrome-profile/Default"
+cat > "$INTERCOM_HOME/.chrome-profile/Default/Preferences" << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766142668061",
+            "setting": 1
+          }
+        },
+        "media_stream_camera": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766150219890",
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+
+# Set proper ownership for Chrome profile
+chown -R "$INTERCOM_USER:$INTERCOM_USER" "$INTERCOM_HOME/.chrome-profile"
+
+# Create Xauthority file for X11 access
+log "Setting up X11 authorization..."
+touch "$INTERCOM_HOME/.Xauthority"
+chown "$INTERCOM_USER:$INTERCOM_USER" "$INTERCOM_HOME/.Xauthority"
+chmod 600 "$INTERCOM_HOME/.Xauthority"
+
+# Create a script to test audio as intercom user
+cat > "$INTERCOM_HOME/test-audio.sh" << 'TEST_SCRIPT'
+#!/bin/bash
+export XDG_RUNTIME_DIR="/run/user/1000"
+export PULSE_RUNTIME_PATH="$XDG_RUNTIME_DIR/pulse"
+export PULSE_SERVER="unix:$XDG_RUNTIME_DIR/pulse/native"
+
+echo "Testing PipeWire connection as intercom user..."
+pactl info
+echo ""
+echo "Available sinks:"
+pactl list sinks short
+echo ""
+echo "Available sources:"
+pactl list sources short
+TEST_SCRIPT
+
+chmod +x "$INTERCOM_HOME/test-audio.sh"
+chown "$INTERCOM_USER:$INTERCOM_USER" "$INTERCOM_HOME/test-audio.sh"
+
+log "Intercom user setup complete!"
+log ""
+log "User details:"
+log "  Username: $INTERCOM_USER"
+log "  UID: $INTERCOM_UID"
+log "  Home: $INTERCOM_HOME"
+log "  Runtime: $INTERCOM_RUNTIME"
+log "  Groups: audio, video"
+log ""
+log "To test audio access, run:"
+log "  su - $INTERCOM_USER -c './test-audio.sh'"

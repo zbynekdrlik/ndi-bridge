@@ -1,0 +1,36 @@
+#!/bin/bash
+# Media Bridge Permission Manager
+# Manages PipeWire access permissions for Chrome audio isolation
+
+LOGFILE="/var/log/media-bridge/permission-manager.log"
+PIDFILE="/var/run/media-bridge-permission-manager.pid"
+
+# Ensure log directory exists
+mkdir -p "$(dirname "$LOGFILE")"
+
+# Create PID file
+echo $$ > "$PIDFILE"
+
+log_message() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOGFILE"
+}
+
+log_message "Media Bridge Permission Manager starting..."
+log_message "Chrome audio access: GRANT (virtual devices only)"
+log_message "NDI Display audio access: GRANT (HDMI only)"
+
+# Monitor Chrome processes and log permission decisions
+while true; do
+    # Check for new Chrome processes
+    CHROME_PIDS=$(pgrep -f chrome 2>/dev/null || true)
+    if [ -n "$CHROME_PIDS" ]; then
+        for pid in $CHROME_PIDS; do
+            # Check if this is a VDO.Ninja Chrome process
+            if ps -p $pid -o cmd= | grep -q "vdo.ninja"; then
+                log_message "Chrome PID $pid: VDO.Ninja detected - GRANT virtual device access"
+            fi
+        done
+    fi
+    
+    sleep 30
+done

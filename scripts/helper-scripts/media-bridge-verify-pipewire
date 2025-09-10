@@ -1,0 +1,93 @@
+#!/bin/bash
+# Media Bridge PipeWire Version Verification
+# Ensures PipeWire 1.4.7 is installed and functional
+
+EXPECTED_VERSION="1.4.7"
+ERRORS=0
+
+echo "===================================="
+echo "Media Bridge PipeWire Verification"
+echo "===================================="
+echo ""
+
+# Check PipeWire version
+echo "Checking PipeWire version..."
+if command -v pipewire &> /dev/null; then
+    INSTALLED_VERSION=$(pipewire --version 2>&1 | grep -oP 'pipewire \K[0-9.]+' || echo "unknown")
+    
+    if [[ "$INSTALLED_VERSION" == "$EXPECTED_VERSION" ]]; then
+        echo "✓ PipeWire version: $INSTALLED_VERSION (correct)"
+    else
+        echo "✗ PipeWire version mismatch!"
+        echo "  Expected: $EXPECTED_VERSION"
+        echo "  Installed: $INSTALLED_VERSION"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "✗ PipeWire not found!"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# Check pw-container availability (for Chrome isolation)
+echo ""
+echo "Checking Chrome isolation tools..."
+if command -v pw-container &> /dev/null; then
+    echo "✓ pw-container is available"
+    pw-container --version 2>&1 | head -1 | sed 's/^/  /'
+else
+    echo "⚠ pw-container not found (Chrome isolation limited)"
+fi
+
+# Check WirePlumber
+echo ""
+echo "Checking WirePlumber session manager..."
+if command -v wireplumber &> /dev/null; then
+    WP_VERSION=$(wireplumber --version 2>&1 | grep -oP 'wireplumber \K[0-9.]+' || echo "unknown")
+    echo "✓ WirePlumber version: $WP_VERSION"
+else
+    echo "✗ WirePlumber not found!"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# Check PipeWire modules
+echo ""
+echo "Checking PipeWire modules..."
+if [ -d /usr/lib/x86_64-linux-gnu/pipewire-0.3 ]; then
+    MODULE_COUNT=$(ls /usr/lib/x86_64-linux-gnu/pipewire-0.3/*.so 2>/dev/null | wc -l)
+    echo "✓ Found $MODULE_COUNT PipeWire modules"
+else
+    echo "✗ PipeWire modules directory not found!"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# Check PulseAudio compatibility
+echo ""
+echo "Checking PulseAudio compatibility..."
+if command -v pactl &> /dev/null; then
+    echo "✓ PulseAudio utilities installed"
+else
+    echo "✗ PulseAudio utilities not found!"
+    ERRORS=$((ERRORS + 1))
+fi
+
+# Check package pinning
+echo ""
+echo "Checking package pinning..."
+if [ -f /etc/apt/preferences.d/pipewire-pin ]; then
+    echo "✓ PipeWire packages are pinned to 1.4.7"
+else
+    echo "⚠ Package pinning not configured"
+fi
+
+# Summary
+echo ""
+echo "===================================="
+if [ $ERRORS -eq 0 ]; then
+    echo "✓ PipeWire 1.4.7 verification PASSED"
+else
+    echo "✗ PipeWire verification FAILED with $ERRORS errors"
+    echo "  Build should not continue with incorrect PipeWire version!"
+fi
+echo "===================================="
+
+exit $ERRORS

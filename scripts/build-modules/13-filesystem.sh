@@ -44,11 +44,12 @@ echo "Installing GRUB bootloader..."
 echo "Installing GRUB..."
 grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=NDIBRIDGE --removable 2>&1 | head -50
 
-# Configure GRUB with custom theme and colors
+# Configure GRUB for zero-delay boot (appliance mode)
 cat > /etc/default/grub << EOFGRUB
 GRUB_DEFAULT=0
 GRUB_TIMEOUT=0
-GRUB_TIMEOUT_STYLE=menu
+# CRITICAL: Use 'hidden' not 'menu' - 'menu' shows menu even with 0 timeout!
+GRUB_TIMEOUT_STYLE=hidden
 GRUB_DISTRIBUTOR="Media Bridge"
 GRUB_CMDLINE_LINUX_DEFAULT="modprobe.blacklist=iwlwifi,iwldvm,iwlmvm,mac80211,cfg80211 net.ifnames=0"
 GRUB_CMDLINE_LINUX=""

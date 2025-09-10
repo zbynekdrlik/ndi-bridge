@@ -1,0 +1,82 @@
+#!/bin/bash
+# Chrome wrapper that runs Chrome with restricted permissions
+# This wrapper is called by the intercom service running as root
+
+set -e
+
+# Configuration
+FULL_HOSTNAME=$(hostname)
+HOSTNAME=${FULL_HOSTNAME#media-bridge-}
+ROOM="${VDO_ROOM:-nl_interkom}"
+PROFILE_DIR="/home/intercom/.chrome-profile"
+URL="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&novideo&autostart&sl&st&mobile&fb"
+
+# Setup environment for Chrome
+export DISPLAY="${DISPLAY:-:99}"
+export XDG_RUNTIME_DIR=/run/user/0
+export PULSE_SERVER=unix:/run/user/0/pulse/native
+export HOME=/home/intercom
+
+# Ensure profile directory exists with correct permissions
+mkdir -p $PROFILE_DIR/Default
+chown -R intercom:intercom $PROFILE_DIR
+
+# Setup Chrome preferences if not exists
+if [ ! -f "$PROFILE_DIR/Default/Preferences" ]; then
+    cat > $PROFILE_DIR/Default/Preferences << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766142668061",
+            "setting": 1
+          }
+        },
+        "media_stream_camera": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766150219890",
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+    chown intercom:intercom $PROFILE_DIR/Default/Preferences
+fi
+
+echo "Starting Chrome as intercom user (UID 1000)..."
+echo "URL: $URL"
+
+# Run Chrome with reduced privileges but keep audio access
+# Use setpriv to drop to intercom user but keep capabilities
+exec setpriv --reuid=intercom --regid=intercom --init-groups --inh-caps=-all "
+    export DISPLAY='$DISPLAY'
+    export XDG_RUNTIME_DIR='$XDG_RUNTIME_DIR'
+    export PULSE_SERVER='$PULSE_SERVER'
+    export HOME='$HOME'
+    
+    /usr/bin/google-chrome \
+        --no-first-run \
+        --no-default-browser-check \
+        --no-sandbox \
+        --disable-gpu \
+        --disable-dev-shm-usage \
+        --autoplay-policy=no-user-gesture-required \
+        --audio-buffer-size=2048 \
+        --audio-output-channels=2 \
+        --audio-input-channels=1 \
+        --enable-exclusive-audio \
+        --use-fake-ui-for-media-stream \
+        --enable-features=AudioServiceSandbox \
+        --disable-features=AudioServiceOutOfProcess \
+        --user-data-dir='$PROFILE_DIR' \
+        --new-window \
+        '$URL'
+"

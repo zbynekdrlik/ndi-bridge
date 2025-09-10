@@ -1,245 +1,326 @@
 #!/bin/bash
-#
-# Media Bridge Audio Manager
-# Manages audio device routing and virtual device connections
-# Ensures proper isolation between intercom (USB) and display (HDMI)
-#
+# Media Bridge Audio Manager v2 - Strict Isolation Architecture
+# Implements proper PipeWire static routing with no audio leakage
 
 set -e
 
-# PipeWire environment
-export XDG_RUNTIME_DIR=/run/user/0
-export PULSE_RUNTIME_PATH=/run/user/0/pulse
-
 # Function to wait for PipeWire
 wait_for_pipewire() {
-    local max_attempts=30
-    local attempt=0
-    
-    while [ $attempt -lt $max_attempts ]; do
+    echo "Waiting for PipeWire to be ready..."
+    for i in {1..30}; do
         if pactl info >/dev/null 2>&1; then
-            # Also wait for WirePlumber to be ready
-            sleep 2
+            echo "PipeWire is ready"
             return 0
         fi
-        echo "Waiting for PipeWire... (attempt $((attempt+1))/$max_attempts)"
         sleep 1
-        attempt=$((attempt+1))
     done
-    
-    echo "ERROR: PipeWire not available after $max_attempts attempts"
+    echo "ERROR: PipeWire not ready after 30 seconds"
     return 1
 }
 
-# Function to setup virtual devices
-setup_virtual_devices() {
-    echo "Setting up virtual audio devices..."
+# Function to cleanup duplicate virtual devices
+cleanup_duplicates() {
+    echo "Cleaning up duplicate virtual devices..."
     
-    # Check if virtual devices exist
-    if ! pactl list sinks short | grep -q "intercom-speaker"; then
-        echo "Creating virtual speaker device..."
-        pactl load-module module-null-sink \
-            sink_name=intercom-speaker \
-            sink_properties="device.description='Intercom Speaker (Virtual)' device.nick='Intercom Speaker'" \
-            rate=48000 \
-            channels=2 \
-            channel_map=front-left,front-right
-    fi
+    # Remove ALL existing virtual device modules first
+    for module in $(pactl list modules short | grep -E "intercom-speaker|intercom-mic-blackhole|intercom-microphone" | awk '{print $1}'); do
+        echo "Removing duplicate module: $module"
+        pactl unload-module "$module" 2>/dev/null || true
+    done
     
-    # Check if virtual microphone exists (it's created as a sink whose monitor is the source)
-    if ! pactl list sinks short | grep -q "intercom-microphone"; then
-        echo "Creating virtual microphone device..."
-        # The virtual microphone is already created by the config file
-        # But if it doesn't exist, we skip - config handles it
-    fi
+    # Also remove any remap-source modules for intercom
+    for module in $(pactl list modules short | grep "module-remap-source" | awk '{print $1}'); do
+        if pactl list modules | grep -A5 "Module #$module" | grep -q "intercom"; then
+            echo "Removing remap module: $module"
+            pactl unload-module "$module" 2>/dev/null || true
+        fi
+    done
 }
 
-# Function to link virtual devices to USB hardware
-link_to_usb() {
-    echo "Linking virtual devices to USB audio..."
+# Function to create virtual devices with proper isolation
+create_virtual_devices() {
+    echo "Creating virtual audio devices with strict isolation..."
     
-    # Find CSCTEK USB audio devices
-    USB_SINK=$(pactl list sinks short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
-    USB_SOURCE=$(pactl list sources short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    # ALWAYS cleanup first to prevent duplicates
+    cleanup_duplicates
     
-    if [ -z "$USB_SINK" ] || [ -z "$USB_SOURCE" ]; then
-        echo "WARNING: CSCTEK USB Audio device not found"
-        echo "Intercom audio will not work until USB device is connected"
-        return 1
-    fi
+    # Create virtual speaker (sink) - Chrome outputs here
+    echo "Creating virtual speaker (blackhole sink)..."
+    SPEAKER_ID=$(pactl load-module module-null-sink \
+        sink_name=intercom-speaker \
+        sink_properties="device.description='Intercom-Speaker' \
+                       node.exclusive=true \
+                       node.dont-reconnect=true \
+                       object.linger=1" \
+        rate=48000 channels=2)
+    echo "Created intercom-speaker with module ID: $SPEAKER_ID"
     
-    echo "Found USB devices: sink=$USB_SINK, source=$USB_SOURCE"
+    # Create virtual microphone as a PROPER SOURCE (not a sink!)
+    echo "Creating virtual microphone as proper source..."
+    # First create a null sink for the microphone audio to go nowhere
+    BLACKHOLE_ID=$(pactl load-module module-null-sink \
+        sink_name=intercom-mic-blackhole \
+        sink_properties="device.description='Mic-Blackhole' \
+                       node.hidden=true \
+                       object.linger=1" \
+        rate=48000 channels=1)
+    echo "Created mic-blackhole with module ID: $BLACKHOLE_ID"
     
-    # Create loopback from virtual speaker to USB output
-    if ! pactl list modules short | grep -q "source=intercom-speaker.monitor sink=$USB_SINK"; then
-        echo "Creating loopback: Virtual Speaker -> USB Output"
-        pactl load-module module-loopback \
-            source=intercom-speaker.monitor \
-            sink="$USB_SINK" \
-            latency_msec=5 \
-            adjust_time=0 \
-            rate=48000
-    fi
+    # Then create a virtual source that Chrome will use
+    # This is a TRUE source, not a sink pretending to be a source
+    MIC_ID=$(pactl load-module module-remap-source \
+        source_name=intercom-microphone \
+        master=intercom-mic-blackhole.monitor \
+        source_properties="device.description='Intercom-Microphone' \
+                         media.class=Audio/Source/Virtual \
+                         node.exclusive=true \
+                         node.dont-reconnect=true \
+                         object.linger=1" \
+        channel_map=mono)
+    echo "Created intercom-microphone with module ID: $MIC_ID"
     
-    # Create loopback from USB input to virtual microphone sink
-    if ! pactl list modules short | grep -q "source=$USB_SOURCE sink=intercom-microphone"; then
-        echo "Creating loopback: USB Input -> Virtual Microphone"
-        pactl load-module module-loopback \
-            source="$USB_SOURCE" \
-            sink=intercom-microphone \
-            latency_msec=5 \
-            adjust_time=0 \
-            rate=48000
-    fi
-    
-    # Set virtual devices as defaults
-    pactl set-default-sink intercom-speaker || true
-    # The virtual microphone monitor will be the source
-    pactl set-default-source intercom-microphone.monitor || true
-    
-    echo "Virtual devices linked to USB hardware successfully"
+    echo "Virtual devices created with isolation"
 }
 
-# Function to setup self-monitoring with ultra-low latency
-setup_self_monitoring() {
-    local enable=${1:-false}
-    local volume=${2:-50}
+# Function to setup static audio routing
+setup_static_routing() {
+    echo "Setting up static audio routing..."
     
-    if [ "$enable" = "true" ]; then
-        echo "Setting up self-monitoring with ultra-low latency..."
-        
-        # Use the existing monitor script which handles the low-latency loopback
-        /usr/local/bin/media-bridge-intercom-monitor enable "$volume"
+    # Find the CSCTEK USB audio device
+    USB_SINK=$(pactl list sinks short | grep -E "alsa_output.*CSCTEK|alsa_output.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    USB_SOURCE=$(pactl list sources short | grep -E "alsa_input.*CSCTEK|alsa_input.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    
+    # CRITICAL: Set USB as default sink to prevent HDMI routing
+    if [ -n "$USB_SINK" ]; then
+        echo "Setting default sink to USB (not HDMI): $USB_SINK"
+        pactl set-default-sink "$USB_SINK"
     else
+        echo "WARNING: No USB sink found, using intercom-mic-blackhole as default"
+        pactl set-default-sink "intercom-mic-blackhole"
+    fi
+    
+    # Set default source to virtual microphone
+    echo "Setting default source to virtual microphone"
+    # Wait for virtual microphone to be ready and use its ID
+    for i in {1..10}; do
+        MIC_ID=$(pactl list sources short | grep -E "intercom-microphone\s" | grep -v monitor | head -1 | awk '{print $1}')
+        if [ -n "$MIC_ID" ]; then
+            echo "Virtual microphone ready (ID: $MIC_ID), setting as default"
+            pactl set-default-source "$MIC_ID" || echo "Warning: Failed to set default source"
+            break
+        fi
+        echo "Waiting for virtual microphone... ($i/10)"
+        sleep 0.5
+    done
+    if [ -z "$MIC_ID" ]; then
+        echo "WARNING: Virtual microphone not found after 5 seconds"
+    fi
+    
+    # Create STATIC loopback from USB input to virtual microphone
+    if [ -n "$USB_SOURCE" ]; then
+        if ! pactl list modules short | grep -q "source=$USB_SOURCE.*sink=intercom-mic-blackhole"; then
+            echo "Creating STATIC USB to virtual mic routing..."
+            pactl load-module module-loopback \
+                source=$USB_SOURCE \
+                sink=intercom-mic-blackhole \
+                source_dont_move=true \
+                sink_dont_move=true \
+                latency_msec=1 \
+                adjust_time=0 \
+                sink_input_properties="media.name='USB-to-VirtualMic' \
+                                      node.dont-reconnect=true \
+                                      node.exclusive=true"
+        fi
+    fi
+    
+    # Create STATIC loopback from virtual speaker to USB output
+    if [ -n "$USB_SINK" ]; then
+        if ! pactl list modules short | grep -q "source=intercom-speaker.monitor.*sink=$USB_SINK"; then
+            echo "Creating STATIC virtual speaker to USB routing..."
+            pactl load-module module-loopback \
+                source=intercom-speaker.monitor \
+                sink=$USB_SINK \
+                source_dont_move=true \
+                sink_dont_move=true \
+                latency_msec=1 \
+                adjust_time=0 \
+                sink_input_properties="media.name='VirtualSpeaker-to-USB' \
+                                      node.dont-reconnect=true \
+                                      node.exclusive=true"
+        fi
+    fi
+    
+    echo "Static routing configured"
+}
+
+# Function to setup self-monitoring with zero latency
+setup_self_monitor() {
+    local enable="${1:-disable}"
+    local volume="${2:-50}"
+    
+    USB_SINK=$(pactl list sinks short | grep -E "alsa_output.*CSCTEK|alsa_output.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    USB_SOURCE=$(pactl list sources short | grep -E "alsa_input.*CSCTEK|alsa_input.*usb.*0573.*1573" | awk '{print $2}' | head -1)
+    
+    if [ "$enable" = "enable" ] && [ -n "$USB_SINK" ] && [ -n "$USB_SOURCE" ]; then
+        echo "Enabling self-monitoring with zero latency..."
+        
+        # Remove existing monitor if any
+        pactl list modules short | grep "Self-Monitor" | awk '{print $1}' | while read id; do
+            pactl unload-module "$id" 2>/dev/null || true
+        done
+        
+        # Create zero-latency monitor
+        pactl load-module module-loopback \
+            source=$USB_SOURCE \
+            sink=$USB_SINK \
+            latency_msec=0 \
+            adjust_time=0 \
+            source_dont_move=true \
+            sink_dont_move=true \
+            sink_input_properties="media.name='Self-Monitor' \
+                                  application.name='Media-Bridge-Monitor' \
+                                  node.dont-reconnect=true \
+                                  node.exclusive=false"
+        
+        # Set monitor volume
+        sleep 0.5
+        monitor_id=$(pactl list sink-inputs short | grep "Self-Monitor" | awk '{print $1}' | head -1)
+        if [ -n "$monitor_id" ]; then
+            pactl set-sink-input-volume "$monitor_id" "${volume}%"
+        fi
+        
+        echo "Self-monitoring enabled at ${volume}% volume"
+    else
+        echo "Disabling self-monitoring..."
+        pactl list modules short | grep "Self-Monitor" | awk '{print $1}' | while read id; do
+            pactl unload-module "$id" 2>/dev/null || true
+        done
         echo "Self-monitoring disabled"
-        /usr/local/bin/media-bridge-intercom-monitor disable
     fi
 }
 
-# Function to configure Chrome audio
-configure_chrome_audio() {
-    echo "Configuring Chrome audio streams..."
+# Function to enforce Chrome routing
+enforce_chrome_routing() {
+    echo "Enforcing Chrome audio routing to virtual devices..."
     
-    # Find Chrome audio streams
+    # Find all Chrome audio streams
     for stream in $(pactl list sink-inputs short | awk '{print $1}'); do
         app=$(pactl list sink-inputs | grep -A20 "Sink Input #$stream" | grep "application.name" | cut -d'"' -f2)
-        if [[ "$app" == *"chrome"* ]] || [[ "$app" == *"Chrome"* ]]; then
-            echo "Moving Chrome output stream $stream to virtual speaker"
-            pactl move-sink-input "$stream" intercom-speaker 2>/dev/null || true
+        if [[ "$app" == *"Chrome"* ]] || [[ "$app" == *"chrome"* ]]; then
+            current_sink=$(pactl list sink-inputs | grep -A5 "Sink Input #$stream" | grep "Sink:" | awk '{print $2}')
+            
+            # Force Chrome to virtual speaker
+            if [ "$current_sink" != "intercom-speaker" ]; then
+                echo "Moving Chrome output stream $stream to virtual speaker"
+                pactl move-sink-input "$stream" intercom-speaker
+                
+                # Set properties to prevent moving
+                pactl set-sink-input-mute "$stream" 0
+            fi
         fi
     done
     
+    # Same for Chrome input streams
     for stream in $(pactl list source-outputs short | awk '{print $1}'); do
         app=$(pactl list source-outputs | grep -A20 "Source Output #$stream" | grep "application.name" | cut -d'"' -f2)
-        if [[ "$app" == *"chrome"* ]] || [[ "$app" == *"Chrome"* ]]; then
-            echo "Moving Chrome input stream $stream to virtual microphone"
-            pactl move-source-output "$stream" intercom-microphone.monitor 2>/dev/null || true
+        if [[ "$app" == *"Chrome"* ]] || [[ "$app" == *"chrome"* ]]; then
+            current_source=$(pactl list source-outputs | grep -A5 "Source Output #$stream" | grep "Source:" | awk '{print $2}')
+            
+            # Force Chrome to virtual microphone
+            if [ "$current_source" != "intercom-microphone" ]; then
+                echo "Moving Chrome input stream $stream to virtual microphone"
+                pactl move-source-output "$stream" intercom-microphone
+            fi
         fi
     done
 }
 
-# Function to setup HDMI for displays
-setup_hdmi_audio() {
-    local display_id=$1
+# Function to cleanup all virtual devices
+cleanup_devices() {
+    echo "Cleaning up all virtual devices and loopbacks..."
     
-    if [ -z "$display_id" ]; then
-        echo "Setting up all HDMI audio outputs..."
-        # Find all HDMI sinks and ensure they're configured
-        for sink in $(pactl list sinks short | grep -E "hdmi|HDMI" | awk '{print $2}'); do
-            echo "Configuring HDMI sink: $sink"
-            pactl set-sink-volume "$sink" 100% 2>/dev/null || true
-        done
-    else
-        # Setup specific display
-        /usr/local/bin/ndi-display-audio-setup "$display_id"
+    # First remove loopback modules
+    for module in $(pactl list modules short | grep "module-loopback" | awk '{print $1}'); do
+        echo "Removing loopback module: $module"
+        pactl unload-module "$module" 2>/dev/null || true
+    done
+    
+    # Then remove virtual devices
+    cleanup_duplicates
+    
+    echo "Cleanup complete"
+}
+
+# Function to verify setup
+verify_setup() {
+    echo ""
+    echo "=== Verification ==="
+    
+    echo "Default Devices:"
+    echo "  Sink: $(pactl get-default-sink)"
+    echo "  Source: $(pactl get-default-source)"
+    
+    echo ""
+    echo "Virtual Devices:"
+    pactl list sinks short | grep -E "intercom-speaker|blackhole" || echo "  No virtual sinks found"
+    pactl list sources short | grep -E "intercom-microphone" | grep -v monitor || echo "  No virtual sources found"
+    
+    echo ""
+    echo "Loopback Modules:"
+    pactl list modules short | grep module-loopback || echo "  No loopback modules found"
+    
+    echo ""
+    echo "Chrome Streams:"
+    pactl list sink-inputs short | grep -i chrome || echo "  No Chrome output streams"
+    pactl list source-outputs short | grep -i chrome || echo "  No Chrome input streams"
+    
+    echo ""
+    echo "CRITICAL CHECK - Audio on HDMI:"
+    hdmi_sink=$(pactl list sinks short | grep hdmi | awk '{print $1}' | head -1)
+    if [ -n "$hdmi_sink" ]; then
+        hdmi_inputs=$(pactl list sink-inputs short | awk -v sink="$hdmi_sink" '$2 == sink {print $1}')
+        if [ -n "$hdmi_inputs" ]; then
+            echo "  WARNING: Audio streams on HDMI: $hdmi_inputs"
+            for input in $hdmi_inputs; do
+                pactl list sink-inputs | grep -A10 "Sink Input #$input" | grep -E "media.name|application.name"
+            done
+        else
+            echo "  ✓ No audio on HDMI"
+        fi
     fi
 }
 
-# Function to monitor and maintain connections
-monitor_connections() {
-    echo "Monitoring audio connections..."
-    
-    while true; do
-        # Check if USB device disappeared and reappeared
-        USB_CHECK=$(pactl list sinks short | grep -c "CSCTEK_USB_Audio_and_HID" || true)
-        if [ "$USB_CHECK" -eq 0 ]; then
-            echo "USB audio device disconnected, waiting for reconnection..."
-            sleep 5
-            continue
-        fi
-        
-        # Check if virtual devices still exist
-        if ! pactl list sinks short | grep -q "intercom-speaker"; then
-            echo "Virtual devices lost, recreating..."
-            setup_virtual_devices
-            link_to_usb
-        fi
-        
-        # Re-route Chrome streams if needed
-        configure_chrome_audio
-        
-        sleep 30
-    done
-}
-
-# Main command processing
+# Main logic
 case "${1:-setup}" in
     setup)
-        echo "=== Media Bridge Audio Manager ==="
-        if ! wait_for_pipewire; then
-            echo "WARNING: PipeWire not ready, but continuing..."
-        fi
-        setup_virtual_devices
-        link_to_usb || true
-        setup_hdmi_audio || true
-        echo "Audio setup complete"
-        exit 0  # Always exit successfully to not block service startup
+        echo "=== Media Bridge Audio Manager v2 - Static Routing Setup ==="
+        wait_for_pipewire || exit 1
+        create_virtual_devices
+        setup_static_routing
+        verify_setup
         ;;
-        
-    monitor)
-        echo "Starting audio connection monitor..."
-        monitor_connections
+    cleanup)
+        echo "=== Media Bridge Audio Manager v2 - Cleanup ==="
+        cleanup_devices
         ;;
-        
+    verify)
+        verify_setup
+        ;;
     chrome)
-        echo "Configuring Chrome audio..."
-        wait_for_pipewire
-        configure_chrome_audio
+        echo "=== Enforcing Chrome Audio Routing ==="
+        enforce_chrome_routing
         ;;
-        
-    hdmi)
-        echo "Setting up HDMI audio..."
-        wait_for_pipewire
-        setup_hdmi_audio "$2"
+    monitor)
+        echo "=== Self-Monitor Control ==="
+        setup_self_monitor "$2" "$3"
         ;;
-        
-    status)
-        echo "=== Audio System Status ==="
-        echo ""
-        echo "PipeWire Services:"
-        systemctl is-active pipewire-system.service || echo "pipewire-system: inactive"
-        systemctl is-active pipewire-pulse-system.service || echo "pipewire-pulse-system: inactive"
-        systemctl is-active wireplumber-system.service || echo "wireplumber-system: inactive"
-        echo ""
-        echo "Virtual Devices:"
-        pactl list sinks short | grep -E "intercom-speaker" || echo "No virtual speaker"
-        pactl list sources short | grep -E "intercom-mic" || echo "No virtual microphone"
-        echo ""
-        echo "USB Devices:"
-        pactl list sinks short | grep -E "CSCTEK" || echo "No CSCTEK USB device"
-        echo ""
-        echo "HDMI Devices:"
-        pactl list sinks short | grep -E "hdmi|HDMI" || echo "No HDMI devices"
-        ;;
-        
     *)
-        echo "Usage: $0 {setup|monitor|chrome|hdmi [display_id]|status}"
-        echo ""
-        echo "  setup   - Initial setup of virtual devices and routing"
-        echo "  monitor - Continuously monitor and maintain connections"
-        echo "  chrome  - Configure Chrome audio streams"
-        echo "  hdmi    - Setup HDMI audio (optionally for specific display)"
-        echo "  status  - Show current audio system status"
+        echo "Usage: $0 {setup|cleanup|verify|chrome|monitor [enable|disable] [volume]}"
+        echo "  setup   - Create virtual devices and static routing"
+        echo "  cleanup - Remove all virtual devices"
+        echo "  verify  - Check current setup and routing"
+        echo "  chrome  - Force Chrome to use virtual devices"
+        echo "  monitor - Control self-monitoring (enable/disable) with optional volume"
         exit 1
         ;;
 esac

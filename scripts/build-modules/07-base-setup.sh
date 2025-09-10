@@ -16,6 +16,17 @@ EOFHOSTS
 # Set root password
 echo "root:${ROOT_PASSWORD}" | chpasswd
 
+# Create mediabridge user for PipeWire audio system (UID 999)
+echo "Creating mediabridge user for PipeWire..."
+# Create mediabridge group first (using GID 1001 to avoid conflicts with systemd-journal)
+groupadd -g 1001 mediabridge || echo "Group mediabridge already exists"
+# Create user with mediabridge as primary group
+useradd -m -u 999 -g mediabridge -G audio,video -s /bin/bash -d /var/lib/mediabridge mediabridge || echo "User mediabridge already exists"
+echo "mediabridge:mediabridge" | chpasswd
+# Ensure home directory exists with correct permissions
+mkdir -p /var/lib/mediabridge
+chown -R mediabridge:mediabridge /var/lib/mediabridge
+
 # Disable power button shutdown
 mkdir -p /etc/systemd/logind.conf.d/
 cat > /etc/systemd/logind.conf.d/00-disable-power-key.conf << 'EOFPOWERKEY'
@@ -56,9 +67,9 @@ if command -v systemctl >/dev/null 2>&1; then
     systemctl mask grub-initrd-fallback.service 2>/dev/null || true
 fi
 
-# Install and configure systemd-resolved for proper DHCP DNS handling
+# Install essential tools and systemd-resolved for proper DHCP DNS handling
 apt-get update -qq
-apt-get install -y -qq --no-install-recommends systemd-resolved
+apt-get install -y -qq --no-install-recommends systemd-resolved rsync
 
 # Enable systemd-resolved
 if command -v systemctl >/dev/null 2>&1; then

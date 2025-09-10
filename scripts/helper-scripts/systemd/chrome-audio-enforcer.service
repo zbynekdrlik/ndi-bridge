@@ -1,0 +1,15 @@
+[Unit]
+Description=Chrome Audio Enforcer
+After=media-bridge-intercom.service pipewire-system.service
+Wants=media-bridge-intercom.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/chrome-audio-enforcer
+Restart=on-failure
+RestartSec=3
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

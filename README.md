@@ -6,12 +6,12 @@
 
 Media Bridge is a high-performance, ultra-low-latency tool that bridges video capture devices to NDI (Network Device Interface) streams. It enables seamless integration of HDMI capture cards, webcams, and professional video equipment into IP-based video workflows.
 
-## 🚀 Latest Updates (v2.1.6)
+## 🚀 Latest Updates (v2.2.7)
 
-- **VDO.Ninja Intercom**: Bidirectional audio communication for remote production
+- **VDO.Ninja Intercom**: Full-duplex audio communication (see [docs/INTERCOM.md](docs/INTERCOM.md))
+- **Unified PipeWire Audio**: System-wide audio management (see [docs/PIPEWIRE.md](docs/PIPEWIRE.md))
+- **Virtual Audio Isolation**: Chrome audio security via virtual devices
 - **8GB Image Size**: Expanded from 4GB to support Chrome and additional features
-- **Fixed Boot Issues**: USB systems now boot properly with correct partition layout
-- **Fixed TTY2 Display**: Welcome screen shows with proper colors and auto-refresh
 - **USB Hot-plug Recovery**: Automatic recovery when USB capture devices are disconnected/reconnected
 - **Bootable USB Appliance**: Ready-to-deploy Linux system with auto-starting Media Bridge
 - **Improved Stability**: Enhanced error handling and frame monitoring

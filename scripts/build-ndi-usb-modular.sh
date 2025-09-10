@@ -18,6 +18,8 @@ source "$SCRIPT_DIR/build-modules/05-debootstrap.sh"
 source "$SCRIPT_DIR/build-modules/06-system-config.sh"
 source "$SCRIPT_DIR/build-modules/07-base-setup.sh"
 source "$SCRIPT_DIR/build-modules/08-network.sh"
+source "$SCRIPT_DIR/build-modules/08a-pipewire-upgrade.sh"
+source "$SCRIPT_DIR/build-modules/10a-pipewire-user-session.sh"
 source "$SCRIPT_DIR/build-modules/09-ndi-capture-service.sh"
 source "$SCRIPT_DIR/build-modules/10-ndi-display-service.sh"
 source "$SCRIPT_DIR/build-modules/11-intercom-chrome.sh"
@@ -74,6 +76,8 @@ assemble_configuration() {
     configure_system
     setup_base_system
     configure_network
+    configure_pipewire_upgrade
+    configure_pipewire_user_session
     configure_time_sync
     configure_ndi_service
     configure_ndi_display_service
@@ -99,8 +103,8 @@ run_chroot_setup() {
     mount --bind /dev/pts /mnt/usb/dev/pts
     mount --bind /proc /mnt/usb/proc
     mount --bind /sys /mnt/usb/sys
-    # CRITICAL: Bind mount EFI partition so grub-install can access it
-    mount --bind /mnt/usb/boot/efi /mnt/usb/boot/efi
+    # EFI partition is already mounted at /mnt/usb/boot/efi by mount_filesystems()
+    # No additional bind mount needed - chroot will have access to it
     
     # Set up environment to reduce warnings
     export DEBIAN_FRONTEND=noninteractive
@@ -118,7 +122,6 @@ run_chroot_setup() {
         done
     
     # Unmount
-    umount /mnt/usb/boot/efi  # Unmount bind-mounted EFI
     umount /mnt/usb/dev/pts
     umount /mnt/usb/dev
     umount /mnt/usb/proc

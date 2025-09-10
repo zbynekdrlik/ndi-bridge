@@ -1,0 +1,173 @@
+#!/bin/bash
+# Media Bridge Intercom Launcher - With PipeWire Isolation
+# Chrome will ONLY see virtual intercom devices due to permissions
+
+set -e
+
+# Configuration
+FULL_HOSTNAME=$(hostname)
+HOSTNAME=${FULL_HOSTNAME#media-bridge-}  # Remove prefix if exists
+ROOM="${VDO_ROOM:-nl_interkom}"
+PROFILE_DIR="/tmp/chrome-vdo-profile"
+DISPLAY_NUM=99
+
+echo "=== Media Bridge Intercom Starting (Isolated) ==="
+echo "Device: $HOSTNAME"
+echo "Room: $ROOM"
+
+# Cleanup function
+cleanup() {
+    echo "Cleaning up Chrome and Xvfb..."
+    pkill -9 -f "chrome" 2>/dev/null || true
+    pkill -9 -f "x11vnc" 2>/dev/null || true
+    pkill -9 -f "Xvfb" 2>/dev/null || true
+    rm -f /tmp/.X${DISPLAY_NUM}-lock 2>/dev/null || true
+    rm -rf /tmp/chrome-* 2>/dev/null || true
+}
+
+# Trap exit signals
+trap cleanup INT TERM
+
+# Initial cleanup
+cleanup
+
+# Wait for PipeWire services
+wait_for_services() {
+    echo "Waiting for audio services..."
+    local attempts=0
+    while [ $attempts -lt 10 ]; do
+        if systemctl is-active --quiet pipewire-system.service && \
+           systemctl is-active --quiet wireplumber-system.service && \
+           systemctl is-active --quiet media-bridge-audio-manager.service && \
+           systemctl is-active --quiet media-bridge-permission-manager.service; then
+            echo "All services ready"
+            return 0
+        fi
+        echo "Waiting for services... (attempt $((attempts+1)))"
+        sleep 2
+        attempts=$((attempts+1))
+    done
+    echo "WARNING: Some services may not be ready"
+}
+
+# Start virtual display
+start_display() {
+    echo "Starting virtual display..."
+    Xvfb :$DISPLAY_NUM -screen 0 1280x720x24 -ac > /dev/null 2>&1 &
+    export DISPLAY=:$DISPLAY_NUM
+    sleep 2
+    
+    # Optional: Start VNC for monitoring
+    if [ "${ENABLE_VNC:-true}" = "true" ]; then
+        echo "Starting VNC server on port 5999..."
+        x11vnc -noshm -noxrecord -noxfixes -noxdamage -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999 > /var/log/x11vnc.log 2>&1 &
+    fi
+}
+
+# Setup Chrome profile with pre-granted permissions
+setup_chrome_profile() {
+    echo "Setting up Chrome profile..."
+    mkdir -p $PROFILE_DIR/Default
+    
+    # Create preferences with VDO.Ninja permissions pre-granted
+    cat > $PROFILE_DIR/Default/Preferences << 'PREFS'
+{
+  "profile": {
+    "content_settings": {
+      "exceptions": {
+        "media_stream_mic": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766142668061",
+            "setting": 1
+          }
+        },
+        "media_stream_camera": {
+          "https://vdo.ninja:443,*": {
+            "last_modified": "13400766150219890",
+            "setting": 1
+          }
+        }
+      }
+    }
+  },
+  "browser": {
+    "check_default_browser": false
+  }
+}
+PREFS
+}
+
+# Launch Chrome with simplified parameters
+launch_chrome() {
+    local url="https://vdo.ninja/?room=${ROOM}&push=${HOSTNAME}&label=${HOSTNAME}&miconly&novideo&autostart&sl&st&mobile&fb"
+    
+    echo "Launching Chrome..."
+    echo "URL: $url"
+    
+    # Set PipeWire runtime directory
+    export XDG_RUNTIME_DIR=/run/user/0
+    
+    # Launch Chrome - it will only see virtual devices due to permissions
+    /usr/bin/google-chrome \
+        --no-first-run \
+        --no-default-browser-check \
+        --no-sandbox \
+        --disable-gpu \
+        --disable-dev-shm-usage \
+        --autoplay-policy=no-user-gesture-required \
+        --use-fake-ui-for-media-stream \
+        --user-data-dir=$PROFILE_DIR \
+        --new-window \
+        "$url" &
+    
+    CHROME_PID=$!
+    echo "Chrome started with PID $CHROME_PID"
+}
+
+# Monitor Chrome
+monitor_chrome() {
+    while true; do
+        if ! kill -0 $CHROME_PID 2>/dev/null; then
+            echo "Chrome process died, restarting..."
+            launch_chrome
+        fi
+        
+        # Log audio device status every 60 seconds
+        if [ $(($(date +%s) % 60)) -eq 0 ]; then
+            echo "[$(date)] Audio Status:"
+            pw-link -l | grep -i chrome | head -5
+        fi
+        
+        sleep 5
+    done
+}
+
+# Main execution
+main() {
+    # Wait for services
+    wait_for_services
+    
+    # Start display
+    start_display
+    
+    # Setup Chrome profile
+    setup_chrome_profile
+    
+    # Launch Chrome
+    launch_chrome
+    
+    # Give Chrome time to initialize
+    sleep 10
+    
+    # Verify isolation is working
+    echo "Verifying audio isolation..."
+    chrome_devices=$(pw-cli ls Node | grep -A3 'application.name = "Chrome"' | grep node.name || echo "No Chrome audio yet")
+    echo "Chrome audio nodes: $chrome_devices"
+    
+    # Monitor Chrome
+    echo "Monitoring Chrome process..."
+    monitor_chrome
+}
+
+# Run main function
+main "$@"
