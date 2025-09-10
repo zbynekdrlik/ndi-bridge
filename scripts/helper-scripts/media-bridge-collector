@@ -18,8 +18,17 @@ while true; do
     fi
     if [ -n "$METRICS_LINE" ]; then
         # Extract timestamp and check if recent (within 5 seconds)
-        # Format is: [2025-09-10 20:02:39.577] METRICS|...
-        METRICS_TIME=$(echo "$METRICS_LINE" | sed 's/^\[\(.*\)\].*/\1/')
+        # Handle both formats:
+        # Journal: Sep 10 21:46:21 media-bridge run.sh[156423]: [2025-09-10 21:46:21.499] METRICS|...
+        # Log file: [2025-09-10 20:02:39.577] METRICS|...
+        if echo "$METRICS_LINE" | grep -q '^\['; then
+            # Log file format - starts with [timestamp]
+            METRICS_TIME=$(echo "$METRICS_LINE" | sed 's/^\[\([^]]*\)\].*/\1/')
+        else
+            # Journal format - timestamp is after colon in brackets
+            METRICS_TIME=$(echo "$METRICS_LINE" | sed 's/.*\[\([^]]*\)\].*/\1/')
+        fi
+        
         if [ -n "$METRICS_TIME" ]; then
             METRICS_EPOCH=$(date -d "$METRICS_TIME" +%s 2>/dev/null || echo "0")
             NOW_EPOCH=$(date +%s)
