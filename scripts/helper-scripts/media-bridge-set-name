@@ -38,7 +38,7 @@ if [ $# -ne 1 ]; then
     echo ""
     echo "This will set:"
     echo "  - Hostname to: media-bridge-cam1"
-    echo "  - mDNS to: media-bridge-cam1.local"
+    echo "  - Short alias: cam1.local"
     echo "  - NDI name to: cam1"
     exit 1
 fi
@@ -65,7 +65,9 @@ FULL_HOSTNAME="media-bridge-${HOSTNAME_SAFE}"
 log "Setting device name to: $NEW_NAME"
 log "Full hostname will be: $FULL_HOSTNAME"
 log "Short alias will be: ${HOSTNAME_SAFE}.local"
-log "NDI name will be: $NDI_NAME"
+if [ "$NDI_NAME" != "$HOSTNAME_SAFE" ]; then
+    log "NDI name will be: $NDI_NAME (preserving underscores)"
+fi
 
 # Update hostname
 echo "$FULL_HOSTNAME" > /etc/hostname
@@ -134,49 +136,20 @@ if systemctl is-active --quiet avahi-daemon; then
     log "Restarting Avahi daemon..."
     systemctl restart avahi-daemon
     
-    # Setup short alias using dynamic IP discovery
-    log "Setting up mDNS short alias for ${HOSTNAME_SAFE}.local..."
+    # Create and start avahi-alias service for short hostname
+    log "Setting up mDNS alias for ${HOSTNAME_SAFE}.local..."
     
     # Kill any existing avahi-publish processes
     pkill -f "avahi-publish.*\.local" 2>/dev/null || true
     
-    # Copy the publish-alias script if it doesn't exist
-    if [ ! -f /usr/local/bin/media-bridge-publish-alias ]; then
-        cat > /usr/local/bin/media-bridge-publish-alias << 'EOFWRAPPER'
-#!/bin/bash
-# Dynamically discover bridge IP and publish mDNS alias
-
-ALIAS_NAME="$1"
-
-if [ -z "$ALIAS_NAME" ]; then
-    echo "Error: No alias name provided" >&2
-    exit 1
-fi
-
-# Wait for network to be ready
-for i in {1..30}; do
+    # Get the bridge IP
     BRIDGE_IP=$(ip -4 addr show br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
-    if [ -n "$BRIDGE_IP" ]; then
-        break
-    fi
-    sleep 1
-done
-
-if [ -z "$BRIDGE_IP" ]; then
-    echo "Error: Could not determine bridge IP address" >&2
-    exit 1
-fi
-
-echo "Publishing mDNS alias: ${ALIAS_NAME}.local -> ${BRIDGE_IP}"
-exec /usr/bin/avahi-publish -a -R "${ALIAS_NAME}.local" "${BRIDGE_IP}"
-EOFWRAPPER
-        chmod +x /usr/local/bin/media-bridge-publish-alias
-    fi
     
-    # Create systemd service for persistent alias
-    cat > /etc/systemd/system/avahi-alias.service << EOFALIASSERVICE
+    if [ -n "$BRIDGE_IP" ]; then
+        # Create systemd service for persistent alias
+        cat > /etc/systemd/system/avahi-alias.service << EOFALIASSERVICE
 [Unit]
-Description=Avahi mDNS short hostname alias for ${HOSTNAME_SAFE}
+Description=Avahi mDNS hostname alias for ${HOSTNAME_SAFE}
 After=avahi-daemon.service network-online.target
 Wants=avahi-daemon.service
 
@@ -189,12 +162,15 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOFALIASSERVICE
-    
-    systemctl daemon-reload
-    systemctl enable avahi-alias.service
-    systemctl restart avahi-alias.service
-    
-    log "mDNS configured: ${FULL_HOSTNAME}.local and ${HOSTNAME_SAFE}.local"
+        
+        systemctl daemon-reload
+        systemctl enable avahi-alias.service
+        systemctl restart avahi-alias.service
+        
+        log "mDNS alias service configured for ${HOSTNAME_SAFE}.local -> ${BRIDGE_IP}"
+    else
+        warn "Could not determine bridge IP address, alias service not configured"
+    fi
 fi
 
 # Show success
