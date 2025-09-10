@@ -102,7 +102,7 @@ make -j$(nproc)
 cd ..
 
 # Create bootable USB (requires root, with automatic logging)
-sudo ./build-usb-with-log.sh /dev/sdX  # Replace sdX with your USB device
+sudo ./build-image.sh  # Creates 8GB image file (media-bridge.img)
 ```
 
 This creates a complete Media Bridge appliance that:

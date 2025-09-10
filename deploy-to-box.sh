@@ -23,7 +23,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 # Check if image exists
 if [ ! -f "$IMAGE_FILE" ]; then
     log_error "Image file $IMAGE_FILE not found!"
-    log_info "Build an image first with: sudo ./build-image-for-rufus.sh"
+    log_info "Build an image first with: sudo ./build-image.sh"
     exit 1
 fi
 
