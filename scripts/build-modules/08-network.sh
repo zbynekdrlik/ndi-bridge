@@ -18,13 +18,11 @@ configure_network() {
 # Configure network bridge for both ethernet interfaces
 mkdir -p /etc/systemd/network
 
-# Create bridge device with no MAC address (inherit from first interface)
+# Create bridge device that inherits MAC from first interface
 cat > /etc/systemd/network/10-br0.netdev << EOFBRIDGE
 [NetDev]
 Name=br0
 Kind=bridge
-# Let kernel assign MAC from first enslaved interface
-MACAddress=none
 
 [Bridge]
 STP=false
