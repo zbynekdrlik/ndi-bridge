@@ -178,7 +178,8 @@ class TestIntercomRenameComprehensive:
         
         # Now restore using the helper script itself (as it should be used in real scenarios)
         # The helper script should handle all the system updates
-        restore_result = host.run("media-bridge-set-name USB_Capture")
+        # Use the original name that was captured at the start
+        restore_result = host.run(f"media-bridge-set-name '{original_name}'")
         assert restore_result.succeeded, "Restore with helper script should succeed"
         
         # Verify output shows intercom restart
@@ -189,15 +190,15 @@ class TestIntercomRenameComprehensive:
         
         # Verify complete restoration
         restored_hostname = host.run("hostname").stdout.strip()
-        assert restored_hostname == "media-bridge", f"Hostname should be restored to media-bridge, got {restored_hostname}"
+        assert restored_hostname == original_hostname, f"Hostname should be restored to {original_hostname}, got {restored_hostname}"
         
         # Verify avahi was restored
         avahi_restored = host.run("grep '^host-name=' /etc/avahi/avahi-daemon.conf").stdout.strip()
-        assert "host-name=media-bridge" in avahi_restored, f"Avahi should be restored, got: {avahi_restored}"
+        assert f"host-name={original_hostname}" in avahi_restored, f"Avahi should be restored, got: {avahi_restored}"
         
         # Verify NDI config was restored
         ndi_restored = host.run("grep 'NDI_NAME=' /etc/media-bridge/config").stdout.strip()
-        assert 'NDI_NAME="USB Capture"' in ndi_restored, f"NDI config should be restored, got: {ndi_restored}"
+        assert f'NDI_NAME="{original_name}"' in ndi_restored, f"NDI config should be restored to {original_name}, got: {ndi_restored}"
     
     def test_intercom_survives_reboot(self, host):
         """Test that intercom service is enabled and starts on boot."""
