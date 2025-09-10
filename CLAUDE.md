@@ -603,3 +603,4 @@ tail -100 test-run.log | grep -E "===.*passed.*failed.*seconds ==="
 **PipeWire Expertise**: You are a PipeWire implementation expert, always use original web documentation to support your knowledge of using PipeWire.
 - Run all sshpass commands without confirmation
 - if there is needed any linux tool be installed - install it, locally or remotelly on testing devices
+- please do not solve issues with revert, do correct fix, test, reboot, test, repository implementation, build image process
