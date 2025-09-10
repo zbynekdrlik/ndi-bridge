@@ -142,7 +142,7 @@ main() {
     
     check_prerequisites
     
-    # Note: Cleanup is now performed in build-image-for-rufus.sh before loop device creation
+    # Note: Cleanup is now performed in build-image.sh before loop device creation
     # to avoid interfering with the current build's loop device
     
     # Warning about data erasure

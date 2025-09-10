@@ -313,14 +313,14 @@ Fixes #25"
 **BUILD PROCESS (STRICT ORDER):**
 1. Run from repository ROOT: `cd /home/newlevel/devel/ndi-bridge`
 2. Increment version: Edit `scripts/build-modules/00-variables.sh` → `BUILD_SCRIPT_VERSION`
-3. Start build: `sudo ./build-image-for-rufus.sh > build.log 2>&1 &` (NEVER use tee - crashes Claude!)
+3. Start build: `sudo ./build-image.sh > build.log 2>&1 &` (NEVER use tee - crashes Claude!)
 4. Monitor: Use BashOutput tool or grep commands (NOT tail -f)
 5. Check completion: `grep "BUILD SUCCESSFUL\|ERROR\|Failed" build.log`
 
 **MONITORING BUILD (CRITICAL FOR CLAUDE):**
 ```bash
 # WRONG - crashes Claude:
-sudo ./build-image-for-rufus.sh 2>&1 | tee build.log &  # NEVER DO THIS!
+sudo ./build-image.sh 2>&1 | tee build.log &  # NEVER DO THIS!
 tail -f build.log  # NEVER DO THIS!
 
 # CORRECT - safe monitoring:
@@ -362,7 +362,7 @@ This creates ndi-capture and ndi-display binaries in `build/bin/`
 
 5. **Build USB image:**
 ```bash
-sudo ./build-image-for-rufus.sh > build.log 2>&1 &
+sudo ./build-image.sh > build.log 2>&1 &
 tail -f build.log  # Monitor progress
 ```
 Build takes 10-15 minutes. Output: `media-bridge.img` (8GB)

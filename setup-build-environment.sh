@@ -398,7 +398,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 
 # USB appliance creation
-sudo ./build-image-for-rufus.sh
+sudo ./build-image.sh
 ```
 
 ## Environment Requirements
@@ -439,7 +439,7 @@ main() {
     echo
     echo "Next steps:"
     echo "  1. Build NDI Capture: mkdir build && cd build && cmake .. && make"
-    echo "  2. Create USB appliance: sudo ./build-image-for-rufus.sh"
+    echo "  2. Create USB appliance: sudo ./build-image.sh"
     echo "  3. See CLAUDE.md for more details"
     echo
 }
