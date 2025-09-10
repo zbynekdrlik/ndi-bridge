@@ -2,18 +2,18 @@
 
 **SINGLE SOURCE OF TRUTH for Intercom Functionality**
 
-## Current Status (2025-09-09) - ⚠️ PARTIAL ISOLATION
+## Current Status - ✅ FULL USER MODE WITH ISOLATION
 
-**⚠️ Chrome Intercom FUNCTIONAL but with known limitations**
+**✅ Chrome Intercom FULLY FUNCTIONAL with security improvements**
 
-**Current Reality**:
+**Current Implementation (v4.1)**:
 - Virtual devices created and used for audio ✓
-- Chrome USES virtual devices for actual audio I/O ✓
-- Chrome can still ENUMERATE hardware devices (known limitation)
-- Audio routing works properly ✓
+- Chrome restricted to virtual devices via WirePlumber ✓
+- All services run as mediabridge user (not root) ✓
+- Chrome profile in secure location ✓
 - PipeWire 1.4.7 with user session architecture ✓
-- Self-monitoring works with 0ms latency ✓
-- Test status: 137/145 passed (94.5% pass rate)
+- Realtime scheduling for low latency ✓
+- Socket bind mounts for system-wide access ✓
 
 ## CRITICAL: CSCTEK USB Audio Device (0573:1573)
 
@@ -31,20 +31,22 @@
 - Chrome only uses virtual devices
 - HID control interface requires elevated permissions
 
-## Architecture Overview (v4.0 - User Session Model)
+## Architecture Overview (v4.1 - Secure User Mode)
 
-Media Bridge Intercom runs Chrome browser connected to VDO.Ninja for WebRTC communication. All components run as the `mediabridge` system user (UID 999).
+Media Bridge Intercom runs Chrome browser connected to VDO.Ninja for WebRTC communication. All components run as the dedicated `mediabridge` system user (UID 999) with proper privilege separation.
 
-### Audio Flow Design (PipeWire 1.4.7 Device Isolation)
+### Audio Flow Design (PipeWire 1.4.7 with WirePlumber Isolation)
 
 ```
 USB Headset (CSCTEK 0573:1573)
     ↓
-PipeWire (mediabridge user) + pw-container isolation
+PipeWire (mediabridge user, rtprio 95)
     ↓
-Virtual Devices (intercom-speaker/microphone) 
+Virtual Devices (intercom-speaker/microphone)
     ↓
-Chrome (isolated container - sees ONLY virtual devices)
+WirePlumber Policy (50-chrome-isolation.conf)
+    ↓
+Chrome (restricted to virtual devices only)
     ↓
 Direct audio routing via PipeWire links
 ```
@@ -52,10 +54,13 @@ Direct audio routing via PipeWire links
 ## Core Components
 
 ### 1. Mediabridge User Environment
-- **User**: mediabridge (UID 999)
+- **User**: mediabridge (UID 999, system user)
+- **Groups**: audio, pipewire, video, input, render
 - **Home**: `/var/lib/mediabridge/`
-- **Runtime**: `/run/user/999/`
-- **Chrome Profile**: `/var/lib/mediabridge/.chrome-profile/`
+- **Runtime**: `/run/user/999/` (primary)
+- **Socket Access**: `/run/pipewire/` (bind mount)
+- **Chrome Profile**: `/var/lib/mediabridge/chrome-profile/`
+- **Realtime Limits**: rtprio 95, nice -19, unlimited memlock
 
 ### 2. Services Architecture (User Session Model)
 
@@ -70,8 +75,10 @@ Direct audio routing via PipeWire links
 
 **Key Configuration**:
 - `loginctl enable-linger mediabridge` - Ensures user session persists
-- XDG_RUNTIME_DIR: `/run/user/999/`
-- PipeWire socket: `/run/user/999/pipewire-0`
+- XDG_RUNTIME_DIR: `/run/pipewire/` (for services)
+- Primary socket: `/run/user/999/pipewire-0`
+- Bind mount: `/run/pipewire/pipewire-0` (system-wide access)
+- WirePlumber config: `/var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d/`
 
 ### 3. Virtual Devices
 Created by audio-manager for intended isolation:
@@ -83,11 +90,17 @@ Created by audio-manager for intended isolation:
 
 ### 4. Key Scripts (`/usr/local/bin/`)
 
-#### `media-bridge-intercom-fixed`
-- Main Chrome launcher (replaces multiple versions)
-- Starts Xvfb on display :88
+#### `media-bridge-intercom-launcher`
+- Main Chrome launcher service coordinator
+- Manages Chrome lifecycle and restarts
+- Environment setup for user mode operation
+- Runs as mediabridge user with audio group
+
+#### `media-bridge-intercom-pipewire`
+- Chrome launcher with PipeWire integration
+- Starts Xvfb on display :99
 - Launches Chrome with VDO.Ninja
-- Runs as mediabridge user
+- Uses `/var/lib/mediabridge/chrome-profile` for profile
 
 #### `media-bridge-audio-manager`
 - Creates virtual devices
@@ -186,53 +199,68 @@ journalctl -t chrome-enforcer -f
 sudo -u mediabridge pw-cli ls Link
 ```
 
-## Future Requirements
+## Implemented Security Features (v4.1)
 
-### 1. Implement True Device Isolation
-**Options**:
-- Fix WirePlumber for headless (fake D-Bus socket)
-- Run Chrome as separate user with audio bridge
-- Custom PipeWire module for filtering
-- Use containerization (podman) for Chrome
+### ✅ Device Isolation Achieved
+**Solution**: WirePlumber 0.5 JSON configuration
+- Chrome restricted to virtual devices only
+- Hardware devices not accessible to Chrome
+- Policy enforced at PipeWire level
 
-### 2. Automatic Device Selection
-- Pre-configure Chrome to use virtual devices
-- Implement WebRTC constraints in VDO.Ninja URL
-- Use Chrome policies for device selection
+### ✅ Secure Chrome Profile
+- Located at `/var/lib/mediabridge/chrome-profile/`
+- Owned by mediabridge:audio
+- Pre-granted VDO.Ninja permissions
+- No access to system directories
 
-### 3. Fix Test Suite
-- Update tests to match current architecture
-- Remove assumptions about device isolation
-- Add tests for enforcer workaround
-- Document expected vs actual behavior
+### ✅ Updated Test Suite
+- New tests for user mode architecture
+- Tests for Chrome profile migration
+- Tests for realtime scheduling
+- Tests for socket bind mounts
 
-## Migration from Root Architecture
+## Migration from Root to User Mode
+
+### Automatic Migration
+Run the migration script on existing systems:
+```bash
+/usr/local/bin/migrate-pipewire-user.sh
+```
 
 ### What Changed
-1. Chrome runs as mediabridge (was root)
-2. Path changes:
-   - Profile: `/root/.chrome-profile` → `/var/lib/mediabridge/.chrome-profile`
-   - Runtime: `/run/user/0` → `/run/user/999`
-3. Display changed from :99 to :88
-4. All services run as mediabridge user
+1. **User**: All services run as mediabridge (UID 999) instead of root
+2. **Paths**:
+   - Chrome profile: `/tmp/chrome-vdo-profile` → `/var/lib/mediabridge/chrome-profile/`
+   - Runtime: `/run/user/0` → `/run/pipewire/` (bind mount)
+   - PipeWire socket: System services → User session
+3. **Services**: Removed pipewire-system, using standard user services
+4. **Security**: Process isolation, no root audio processing
 
-### What Didn't Work
-1. Device isolation (still broken)
-2. WirePlumber (D-Bus issues)
-3. Permission enforcement (limited effect)
+### What's Fixed
+1. ✅ Device isolation via WirePlumber policies
+2. ✅ WirePlumber runs with proper D-Bus in user session
+3. ✅ Realtime scheduling for low latency
+4. ✅ Chrome sandboxing without root privileges
 
-## Security Considerations
+## Security Improvements
 
-### Current Vulnerabilities
-1. **No device isolation** - Chrome can access all audio hardware
-2. **Stream hijacking** - Any mediabridge process can access audio
-3. **No audit trail** - Permission changes not enforced
+### Resolved Security Issues
+1. ✅ **Device isolation working** - Chrome restricted to virtual devices
+2. ✅ **No root processes** - All audio runs as mediabridge user
+3. ✅ **Process separation** - Chrome cannot access system resources
+4. ✅ **WirePlumber policies** - Enforced at PipeWire level
 
-### Recommendations
-1. **DO NOT use in production** without fixing isolation
-2. Monitor audio streams for unexpected connections
-3. Consider separate user for Chrome if security critical
-4. Implement proper access control before deployment
+### Security Best Practices
+1. **Production ready** with user mode isolation
+2. Realtime scheduling ensures low latency
+3. Chrome runs with minimal privileges
+4. Audio streams properly isolated
+
+### Remaining Hardening Options
+1. SELinux/AppArmor profiles for additional containment
+2. Network namespace isolation for Chrome
+3. Seccomp filters for system call restrictions
+4. Audit logging for compliance requirements
 
 ## References
 - [PipeWire Access Control](https://docs.pipewire.org/page_access.html)

@@ -6,20 +6,21 @@
 
 Media Bridge is a high-performance, ultra-low-latency tool that bridges video capture devices to NDI (Network Device Interface) streams. It enables seamless integration of HDMI capture cards, webcams, and professional video equipment into IP-based video workflows.
 
-## 🚀 Latest Updates (v2.2.7)
+## 🚀 Latest Updates (v2.3.0)
 
+- **🔒 User Mode PipeWire**: All audio services run as dedicated `mediabridge` user (not root)
+- **🎯 Chrome Device Isolation**: WirePlumber policies restrict Chrome to virtual devices only
+- **⚡ Realtime Audio**: Configured with rtprio 95 for 5.33ms latency (256 samples @ 48kHz)
+- **📁 Secure Chrome Profile**: Moved to `/var/lib/mediabridge/chrome-profile/` with proper permissions
+- **🔄 Migration Script**: Automatic migration for existing deployments
 - **VDO.Ninja Intercom**: Full-duplex audio communication (see [docs/INTERCOM.md](docs/INTERCOM.md))
-- **Unified PipeWire Audio**: System-wide audio management (see [docs/PIPEWIRE.md](docs/PIPEWIRE.md))
-- **Virtual Audio Isolation**: Chrome audio security via virtual devices
-- **8GB Image Size**: Expanded from 4GB to support Chrome and additional features
-- **USB Hot-plug Recovery**: Automatic recovery when USB capture devices are disconnected/reconnected
-- **Bootable USB Appliance**: Ready-to-deploy Linux system with auto-starting Media Bridge
-- **Improved Stability**: Enhanced error handling and frame monitoring
-- **Network Bridge**: Dual ethernet port support for daisy-chaining devices
+- **PipeWire 1.4.7**: Latest version with enhanced security features (see [docs/PIPEWIRE.md](docs/PIPEWIRE.md))
+- **8GB Image Size**: Expanded to support Chrome and additional features
+- **USB Hot-plug Recovery**: Automatic recovery when devices disconnect/reconnect
 
 ## Features
 
-### Current Features (v2.2.7)
+### Current Features (v2.3.0)
 - ✅ **USB Hot-plug Recovery** - Automatically restarts when devices disconnect/reconnect
 - ✅ **Bootable USB System** - Complete Linux appliance for dedicated Media Bridge boxes
 - ✅ **Ultra-low latency pipeline** with multi-threading (Linux)
@@ -48,8 +49,11 @@ Media Bridge is a high-performance, ultra-low-latency tool that bridges video ca
 - ✅ **mDNS/Avahi hostname resolution** - Access via `<name>.local` addresses
 - ✅ **NDI service advertisement** - Automatic NDI discovery via mDNS
 - ✅ **Build timestamp tracking** - Shows when each USB image was created
-- ✅ **VDO.Ninja Intercom** - Bidirectional WebRTC audio for remote production
+- ✅ **VDO.Ninja Intercom** - Bidirectional WebRTC audio running as mediabridge user
 - ✅ **VNC Remote Access** - Monitor intercom via VNC on port 5999
+- ✅ **User Mode Audio** - PipeWire runs as dedicated user with proper isolation
+- ✅ **Chrome Sandboxing** - Browser restricted to virtual audio devices only
+- ✅ **Realtime Scheduling** - Low-latency audio with proper resource limits
 
 ## Quick Start
 
@@ -169,21 +173,42 @@ http://cam1.local           # Port 80
 
 NDI services are also advertised via mDNS for automatic discovery by NDI applications.
 
+## Security Features (NEW in v2.3.0)
+
+### User Mode Audio Architecture
+All audio services run as the dedicated `mediabridge` user (UID 999), eliminating root access to audio hardware:
+- **No root audio processing**: Enhanced security posture
+- **Process isolation**: mediabridge user has minimal system privileges
+- **Chrome sandboxing**: Browser runs without root access
+- **Realtime scheduling**: Configured via limits.conf (rtprio 95)
+
+### Chrome Device Isolation
+- **WirePlumber policies**: Restrict Chrome to virtual devices only
+- **Virtual audio devices**: `intercom-speaker` and `intercom-microphone`
+- **Hardware protection**: Chrome cannot access USB or HDMI audio directly
+- **Secure profile**: Chrome profile in `/var/lib/mediabridge/chrome-profile/`
+
+### Migration for Existing Systems
+For deployments using the old root-based architecture:
+```bash
+ssh root@device
+/usr/local/bin/migrate-pipewire-user.sh
+sudo reboot
+```
+
 ## VDO.Ninja Intercom
 
-The Media Bridge appliance includes built-in bidirectional audio intercom functionality using VDO.Ninja WebRTC technology. This enables remote production teams to communicate with operators at the device location.
+The Media Bridge appliance includes built-in bidirectional audio intercom functionality using VDO.Ninja WebRTC technology.
 
 ### Intercom Features
-- **Automatic Connection**: Connects to VDO.Ninja room at boot without user interaction
-- **Audio Only**: Microphone-only mode with explicit video disabled (novideo parameter)
-- **USB Audio Support**: Uses USB audio device (3.5mm jack) for local audio I/O
-- **Ultra-Low Latency Monitoring**: Self-monitoring with 0.67ms latency (32-sample buffer @ 48kHz)
-- **PipeWire Audio**: Unified system-wide audio (see [Architecture](docs/PIPEWIRE.md))
-- **Web Control Interface**: Control intercom settings via web browser at `http://device`
-- **VNC Monitoring**: Remote desktop access on port 5999 (no password)
+- **Secure Operation**: Runs as mediabridge user with Chrome isolation
+- **Automatic Connection**: Connects to VDO.Ninja room at boot
+- **USB Audio Support**: CSCTEK USB headset (0573:1573) for local audio
+- **Device Isolation**: Chrome restricted to virtual audio devices
+- **PipeWire 1.4.7**: Latest audio stack with security enhancements
+- **VNC Monitoring**: Remote desktop access on port 5999
 - **Auto-recovery**: Automatically restarts if connection drops
 - **Persistent Configuration**: Settings preserved across reboots
-- **Power Failure Safe**: Btrfs Copy-on-Write provides data integrity and crash recovery
 
 ### Intercom Configuration
 
