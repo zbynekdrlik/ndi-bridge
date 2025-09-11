@@ -80,6 +80,7 @@ apt-get install -y -qq --no-install-recommends \
     htop \
     tmux \
     bc \
+    file \
     alsa-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Install kbd package non-interactively (needed for chvt command for console restoration)

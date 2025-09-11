@@ -81,8 +81,8 @@ install_helper_scripts() {
         # Install tmpfiles.d configuration for runtime directories
         if [ -f "$HELPER_DIR/mediabridge-tmpfiles.conf" ]; then
             mkdir -p /mnt/usb/etc/tmpfiles.d
-            cp "$HELPER_DIR/mediabridge-tmpfiles.conf" /mnt/usb/etc/tmpfiles.d/
-            chmod 644 /mnt/usb/etc/tmpfiles.d/mediabridge-tmpfiles.conf
+            cp "$HELPER_DIR/mediabridge-tmpfiles.conf" /mnt/usb/etc/tmpfiles.d/mediabridge.conf
+            chmod 644 /mnt/usb/etc/tmpfiles.d/mediabridge.conf
         fi
         
         
