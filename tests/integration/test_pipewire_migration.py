@@ -119,13 +119,22 @@ def test_post_migration_services_updated(host):
 
 
 def test_post_migration_old_services_disabled(host):
-    """Test that old system services are disabled."""
+    """Test that old system services are disabled or removed."""
     old_services = ["pipewire-system", "pipewire-pulse-system", "wireplumber-system"]
     
     for service_name in old_services:
-        service = host.service(service_name)
-        assert not service.is_enabled, f"{service_name} still enabled"
-        assert not service.is_running, f"{service_name} still running"
+        # Check if service exists
+        result = host.run(f"systemctl status {service_name}")
+        
+        # Service should either not exist (exit code 4) or be disabled
+        if result.exit_status == 4:
+            # Service doesn't exist - this is correct for new installations
+            continue
+        else:
+            # Service exists - it should be disabled
+            service = host.service(service_name)
+            assert not service.is_enabled, f"{service_name} still enabled"
+            assert not service.is_running, f"{service_name} still running"
 
 
 def test_post_migration_user_services_enabled(host):
