@@ -32,8 +32,9 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # Check arguments
-if [ $# -ne 1 ]; then
+if [ $# -eq 0 ] || [ $# -gt 1 ]; then
     echo "Usage: $0 <device-name>"
+    echo "       $0 default       (restore to default)"
     echo "Example: $0 cam1"
     echo ""
     echo "This will set:"
@@ -43,8 +44,15 @@ if [ $# -ne 1 ]; then
     exit 1
 fi
 
-# Validate name (alphanumeric, dash, underscore only)
+# Get the name argument
 NEW_NAME="$1"
+
+# Handle empty string as default restore
+if [ -z "$NEW_NAME" ]; then
+    NEW_NAME="media-bridge"
+fi
+
+# Validate name (alphanumeric, dash, underscore only) unless it's a special keyword
 if ! [[ "$NEW_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
     error "Device name must contain only letters, numbers, dashes, and underscores"
 fi
@@ -52,15 +60,25 @@ fi
 # Convert to lowercase for consistency
 NEW_NAME=$(echo "$NEW_NAME" | tr '[:upper:]' '[:lower:]')
 
-# Store original name for NDI (can have underscores)
-NDI_NAME="$NEW_NAME"
-
-# Convert underscores to hyphens for hostname (RFC 952 compliance)
-# Hostnames cannot contain underscores
-HOSTNAME_SAFE=$(echo "$NEW_NAME" | tr '_' '-')
-
-# Build full hostname (using sanitized name)
-FULL_HOSTNAME="media-bridge-${HOSTNAME_SAFE}"
+# Special handling for restoring to default
+if [ "$NEW_NAME" = "media-bridge" ] || [ "$NEW_NAME" = "" ] || [ "$NEW_NAME" = "default" ]; then
+    # Restore to default state
+    FULL_HOSTNAME="media-bridge"
+    HOSTNAME_SAFE="media-bridge"
+    NDI_NAME="USB Capture"
+    RESTORE_DEFAULT=true
+else
+    # Store original name for NDI (can have underscores)
+    NDI_NAME="$NEW_NAME"
+    
+    # Convert underscores to hyphens for hostname (RFC 952 compliance)
+    # Hostnames cannot contain underscores
+    HOSTNAME_SAFE=$(echo "$NEW_NAME" | tr '_' '-')
+    
+    # Build full hostname (using sanitized name)
+    FULL_HOSTNAME="media-bridge-${HOSTNAME_SAFE}"
+    RESTORE_DEFAULT=false
+fi
 
 log "Setting device name to: $NEW_NAME"
 log "Full hostname will be: $FULL_HOSTNAME"

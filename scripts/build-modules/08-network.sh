@@ -28,16 +28,6 @@ Kind=bridge
 STP=false
 EOFBRIDGE
 
-# Create link file to prevent systemd from generating MAC
-cat > /etc/systemd/network/10-br0.link << EOFBRLINK
-[Match]
-OriginalName=br0
-
-[Link]
-# Don't generate MAC, use kernel's default behavior
-MACAddressPolicy=none
-EOFBRLINK
-
 # Configure physical interfaces to join bridge
 cat > /etc/systemd/network/20-eth.network << EOFETH
 [Match]
@@ -73,12 +63,30 @@ SendHostname=true
 IAID=0
 EOFBR0
 
+# Create service to fix bridge MAC address
+cat > /etc/systemd/system/media-bridge-fix-mac.service << 'EOFMACFIX'
+[Unit]
+Description=Fix bridge MAC address for DHCP persistence
+After=systemd-networkd.service
+Wants=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/media-bridge-fix-mac
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+EOFMACFIX
+
 # Enable services (use different methods based on what's available)
 if command -v systemctl >/dev/null 2>&1; then
     systemctl enable systemd-networkd 2>/dev/null || true
     systemctl enable systemd-resolved 2>/dev/null || true
     # Enable Avahi for NDI discovery
     systemctl enable avahi-daemon 2>/dev/null || true
+    # Enable MAC fix service
+    systemctl enable media-bridge-fix-mac 2>/dev/null || true
 else
     # Use update-rc.d as fallback for sysvinit
     update-rc.d systemd-networkd enable 2>/dev/null || true
@@ -152,8 +160,30 @@ EOFNSS
 
 EOFNET
 
-    # No need for complex MAC generation - kernel handles it automatically!
-    # Bridge will inherit MAC from first (or lowest) enslaved interface
+    # Bridge will automatically inherit MAC from first enslaved interface
+    # This ensures DHCP client ID consistency across reboots
+    
+    # Create directory for systemd-networkd to persist DHCP leases
+    # This is the standard location where systemd-networkd expects to save leases
+    # Without this directory, leases are lost on reboot causing IP changes
+    mkdir -p "$ROOTFS_DIR/var/lib/systemd/network"
+    chown systemd-network:systemd-network "$ROOTFS_DIR/var/lib/systemd/network"
+    
+    # Create systemd-networkd override to ensure lease persistence
+    # Ubuntu 24.04 defaults to /run which is tmpfs and cleared on reboot
+    # We need to explicitly configure StateDirectory for persistence
+    mkdir -p "$ROOTFS_DIR/etc/systemd/system/systemd-networkd.service.d"
+    cat > "$ROOTFS_DIR/etc/systemd/system/systemd-networkd.service.d/lease-persistence.conf" << 'EOFLEASE'
+[Service]
+# Ensure DHCP leases are stored in persistent location
+# Without this, leases are stored in /run and lost on reboot
+StateDirectory=systemd/network
+StateDirectoryMode=0755
+# Also copy leases on shutdown to persistent location
+ExecStopPost=/bin/sh -c 'cp -p /run/systemd/netif/leases/* /var/lib/systemd/network/ 2>/dev/null || true'
+# And restore on startup
+ExecStartPre=/bin/sh -c 'mkdir -p /run/systemd/netif/leases && cp -p /var/lib/systemd/network/* /run/systemd/netif/leases/ 2>/dev/null || true'
+EOFLEASE
 }
 
 export -f configure_network

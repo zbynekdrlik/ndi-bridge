@@ -119,3 +119,47 @@ def test_bridge_uses_lowest_mac_when_multiple_interfaces(host):
     
     assert br_mac == lowest_mac, \
         f"Bridge MAC {br_mac} is not the lowest MAC {lowest_mac} from ports: {macs}"
+
+
+class TestBridgePersistence:
+    """Test that bridge configuration survives reboots."""
+    
+    def test_bridge_survives_reboot(self, host):
+        """Test that bridge configuration is persistent after reboot."""
+        # Check bridge config files exist
+        bridge_netdev = host.file("/etc/systemd/network/10-br0.netdev")
+        assert bridge_netdev.exists, "Bridge netdev configuration should exist"
+        
+        bridge_network = host.file("/etc/systemd/network/30-br0.network")
+        assert bridge_network.exists, "Bridge network configuration should exist"
+        
+        # Check services are enabled
+        fix_mac_service = host.service("media-bridge-fix-mac")
+        assert fix_mac_service.is_enabled, "MAC fix service should be enabled for boot"
+    
+    def test_dhcp_lease_persistence_directory(self, host):
+        """Test that systemd-networkd has a directory to persist DHCP leases."""
+        # Check persistent storage directory exists
+        lease_dir = host.file("/var/lib/systemd/network")
+        assert lease_dir.exists, "Persistent DHCP lease directory should exist"
+        assert lease_dir.is_directory, "Should be a directory"
+        
+        # Check ownership
+        assert lease_dir.user == "systemd-network", "Directory should be owned by systemd-network"
+        assert lease_dir.group == "systemd-network", "Directory should be owned by systemd-network group"
+        
+        # Check systemd-networkd is configured to use persistent storage
+        override = host.file("/etc/systemd/system/systemd-networkd.service.d/lease-persistence.conf")
+        assert override.exists, "systemd-networkd override for lease persistence should exist"
+        assert "StateDirectory=systemd/network" in override.content_string, \
+            "systemd-networkd should be configured to use persistent StateDirectory"
+    
+    def test_dhcp_client_id_uses_mac(self, host):
+        """Test that DHCP client ID is configured to use MAC address."""
+        # Check bridge network configuration
+        config = host.file("/etc/systemd/network/30-br0.network")
+        assert config.exists, "Bridge network config should exist"
+        
+        # Check for ClientIdentifier=mac setting
+        assert "ClientIdentifier=mac" in config.content_string, \
+            "DHCP should be configured to use MAC as client ID"

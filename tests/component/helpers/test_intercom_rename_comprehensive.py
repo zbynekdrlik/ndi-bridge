@@ -106,7 +106,11 @@ class TestIntercomRenameComprehensive:
         """Test the complete rename flow with actual device rename."""
         # Store original hostname
         original_hostname = host.run("hostname").stdout.strip()
-        original_name = original_hostname.replace("media-bridge-", "")
+        # Handle the case where hostname is just "media-bridge" without suffix
+        if original_hostname == "media-bridge":
+            original_name = ""  # Empty string will trigger default restore
+        else:
+            original_name = original_hostname.replace("media-bridge-", "")
         
         # The test should always restore to a clean state
         # We don't restore to the original because it may have been pytest99 from a previous failed test
@@ -198,7 +202,12 @@ class TestIntercomRenameComprehensive:
         
         # Verify NDI config was restored
         ndi_restored = host.run("grep 'NDI_NAME=' /etc/media-bridge/config").stdout.strip()
-        assert f'NDI_NAME="{original_name}"' in ndi_restored, f"NDI config should be restored to {original_name}, got: {ndi_restored}"
+        # When restoring to default (empty original_name), NDI_NAME should be "USB Capture"
+        if original_name == "":
+            expected_ndi = 'NDI_NAME="USB Capture"'
+        else:
+            expected_ndi = f'NDI_NAME="{original_name}"'
+        assert expected_ndi in ndi_restored, f"NDI config should be restored to {expected_ndi}, got: {ndi_restored}"
     
     def test_intercom_survives_reboot(self, host):
         """Test that intercom service is enabled and starts on boot."""
