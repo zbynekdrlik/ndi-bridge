@@ -428,10 +428,16 @@ media-bridge-set-name     # Change NDI name
 - `common/ndi_sender.h` - NDI transmission
 
 ### USB Build System (`scripts/`)
-- `build-modules/00-variables.sh` - **VERSION HERE!**
+- `build-modules/00-variables.sh` - **VERSION HERE! (BUILD_SCRIPT_VERSION)**
 - `build-modules/` - Numbered build steps (00-14)
 - `helper-scripts/` - All runtime scripts (single source of truth)
 - **NO inline scripts in build modules!**
+
+### Version Information
+**In Repository**: `scripts/build-modules/00-variables.sh` → `BUILD_SCRIPT_VERSION`
+**On Device**: 
+- `/etc/media-bridge/build-script-version` - Version number only
+- `/etc/media-bridge-version` - Full version info (version, date, timestamp, git commit)
 
 ### Web Interface
 - URL: `http://device.local/` (admin/newlevel)

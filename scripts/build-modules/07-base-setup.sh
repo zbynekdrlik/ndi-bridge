@@ -26,7 +26,8 @@ DefaultDependencies=no
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'rm -f /etc/machine-id /var/lib/dbus/machine-id && systemd-machine-id-setup && touch /etc/machine-id-generated'
+# Also clean up old journal files from build time to prevent journal access issues
+ExecStart=/bin/sh -c 'rm -f /etc/machine-id /var/lib/dbus/machine-id && rm -rf /var/log/journal/* && systemd-machine-id-setup && systemctl restart systemd-journald && touch /etc/machine-id-generated'
 
 [Install]
 WantedBy=sysinit.target
