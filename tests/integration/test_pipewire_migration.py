@@ -131,13 +131,13 @@ def test_post_migration_old_services_disabled(host):
 def test_post_migration_user_services_enabled(host):
     """Test that user services are enabled."""
     # Check if services are enabled for mediabridge user
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-enabled pipewire")
+    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus systemctl --user is-enabled pipewire")
     assert "enabled" in result.stdout, "PipeWire user service not enabled"
     
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-enabled pipewire-pulse")
+    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus systemctl --user is-enabled pipewire-pulse")
     assert "enabled" in result.stdout, "PipeWire-Pulse user service not enabled"
     
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-enabled wireplumber")
+    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus systemctl --user is-enabled wireplumber")
     assert "enabled" in result.stdout, "WirePlumber user service not enabled"
 
 
@@ -202,7 +202,7 @@ def test_migration_idempotent(host):
     time.sleep(5)
     
     # Verify PipeWire is still running
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-active pipewire")
+    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus systemctl --user is-active pipewire")
     assert "active" in result.stdout, "PipeWire not active after re-migration"
 
 

@@ -43,19 +43,19 @@ def test_loginctl_linger_enabled(host):
 def test_pipewire_user_service_running(host):
     """Test that PipeWire is running as user service."""
     # Check if pipewire is running under user session
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-active pipewire")
+    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus systemctl --user is-active pipewire")
     assert result.stdout.strip() == "active", "PipeWire user service not active"
 
 
 def test_pipewire_pulse_user_service_running(host):
     """Test that PipeWire-Pulse is running as user service."""
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-active pipewire-pulse")
+    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus systemctl --user is-active pipewire-pulse")
     assert result.stdout.strip() == "active", "PipeWire-Pulse user service not active"
 
 
 def test_wireplumber_user_service_running(host):
     """Test that WirePlumber is running as user service."""
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-active wireplumber")
+    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus systemctl --user is-active wireplumber")
     assert result.stdout.strip() == "active", "WirePlumber user service not active"
 
 
