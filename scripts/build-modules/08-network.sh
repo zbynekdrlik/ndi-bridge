@@ -169,6 +169,15 @@ EOFNET
     mkdir -p "$ROOTFS_DIR/var/lib/systemd/network"
     chown systemd-network:systemd-network "$ROOTFS_DIR/var/lib/systemd/network"
     
+    # Install tmpfiles.d configuration to ensure lease directory exists at runtime
+    mkdir -p "$ROOTFS_DIR/etc/tmpfiles.d"
+    if [ -f files/tmpfiles.d/media-bridge-network.conf ]; then
+        cp files/tmpfiles.d/media-bridge-network.conf "$ROOTFS_DIR/etc/tmpfiles.d/"
+        log "  Installed tmpfiles.d configuration for network lease persistence"
+    else
+        warn "  tmpfiles.d/media-bridge-network.conf not found"
+    fi
+    
     # Create systemd-networkd override to ensure lease persistence
     # Ubuntu 24.04 defaults to /run which is tmpfs and cleared on reboot
     # We need to explicitly configure StateDirectory for persistence
