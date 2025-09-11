@@ -92,6 +92,9 @@ mkdir -p /var/lib/mediabridge/.config/systemd/user/wireplumber.service.d
 # Create override for PipeWire to bind mount socket for system-wide access
 cat > /var/lib/mediabridge/.config/systemd/user/pipewire.service.d/override.conf << 'PIPEWIRE_OVERRIDE_EOF'
 [Service]
+# Ensure /run/pipewire exists with correct permissions
+ExecStartPre=/bin/sh -c 'mkdir -p /run/pipewire && chown mediabridge:audio /run/pipewire'
+
 # Bind mount socket for system-wide access after startup
 ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pipewire-0 /run/pipewire/pipewire-0 2>/dev/null || true'
 ExecStopPost=-/bin/umount /run/pipewire/pipewire-0
@@ -109,8 +112,11 @@ PIPEWIRE_OVERRIDE_EOF
 # Create override for PipeWire-Pulse
 cat > /var/lib/mediabridge/.config/systemd/user/pipewire-pulse.service.d/override.conf << 'PULSE_OVERRIDE_EOF'
 [Service]
+# Ensure /run/pipewire/pulse exists with correct permissions
+ExecStartPre=/bin/sh -c 'mkdir -p /run/pipewire/pulse && chown mediabridge:audio /run/pipewire/pulse'
+
 # Bind mount pulse socket for system-wide access
-ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pulse /run/pipewire/pulse 2>/dev/null || true'
+ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pulse /run/pipewire/pulse 2>/dev/null || true; chown -R mediabridge:audio /run/pipewire/pulse'
 ExecStopPost=-/bin/umount /run/pipewire/pulse
 
 # Resource limits
@@ -134,10 +140,11 @@ cat > /etc/systemd/system/user@999.service.d/override.conf << 'USER_OVERRIDE_EOF
 [Service]
 # Ensure PipeWire starts on boot for mediabridge user
 Environment="XDG_RUNTIME_DIR=/run/user/999"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus"
 
 [Unit]
-# Start after basic system is ready
-After=multi-user.target
+# No After=multi-user.target to avoid circular dependency
+# The user service will start after user-runtime-dir@999.service automatically
 USER_OVERRIDE_EOF
 
 echo "✓ PipeWire configured for user mode operation"
