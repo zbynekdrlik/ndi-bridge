@@ -1,0 +1,27 @@
+#!/bin/bash
+# Dynamically discover bridge IP and publish mDNS alias
+# This script is used by the avahi-alias systemd service
+
+ALIAS_NAME="$1"
+
+if [ -z "$ALIAS_NAME" ]; then
+    echo "Error: No alias name provided" >&2
+    exit 1
+fi
+
+# Wait for network to be ready
+for i in {1..30}; do
+    BRIDGE_IP=$(ip -4 addr show br0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    if [ -n "$BRIDGE_IP" ]; then
+        break
+    fi
+    sleep 1
+done
+
+if [ -z "$BRIDGE_IP" ]; then
+    echo "Error: Could not determine bridge IP address" >&2
+    exit 1
+fi
+
+echo "Publishing mDNS alias: ${ALIAS_NAME}.local -> ${BRIDGE_IP}"
+exec /usr/bin/avahi-publish -a -R "${ALIAS_NAME}.local" "${BRIDGE_IP}"

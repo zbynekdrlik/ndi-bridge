@@ -1,0 +1,38 @@
+#!/bin/bash
+# Fix bridge MAC address to match first ethernet interface
+# This ensures DHCP IP persistence across reboots
+
+# Wait for bridge to be created
+for i in {1..30}; do
+    if ip link show br0 >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
+# Get first ethernet interface
+FIRST_ETH=$(ip link show | grep -E '^[0-9]+: (eth|enp|eno)' | head -1 | cut -d: -f2 | tr -d ' ')
+
+if [ -z "$FIRST_ETH" ]; then
+    echo "No ethernet interface found"
+    exit 1
+fi
+
+# Get MAC of first ethernet interface
+ETH_MAC=$(ip link show "$FIRST_ETH" | grep 'link/ether' | awk '{print $2}')
+
+if [ -z "$ETH_MAC" ]; then
+    echo "Could not get MAC of $FIRST_ETH"
+    exit 1
+fi
+
+# Get current bridge MAC
+BR_MAC=$(ip link show br0 | grep 'link/ether' | awk '{print $2}')
+
+# Only set if different
+if [ "$BR_MAC" != "$ETH_MAC" ]; then
+    echo "Setting bridge MAC to $ETH_MAC (from $FIRST_ETH)"
+    ip link set br0 address "$ETH_MAC"
+else
+    echo "Bridge MAC already matches $FIRST_ETH ($ETH_MAC)"
+fi

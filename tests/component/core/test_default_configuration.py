@@ -68,16 +68,36 @@ class TestDefaultConfiguration:
         if avahi_status != "active":
             pytest.skip("Avahi daemon not running")
         
-        # Check that device responds to media-bridge.local
-        avahi_hostname = host.run("avahi-resolve -n media-bridge.local 2>/dev/null | grep -o 'media-bridge.local' || echo 'NOT_FOUND'").stdout.strip()
+        # Check configured hostname in avahi config
+        avahi_config = host.run("grep '^host-name=' /etc/avahi/avahi-daemon.conf 2>/dev/null || echo 'NOT_FOUND'").stdout.strip()
         
-        if avahi_hostname == "media-bridge.local":
-            assert True
-        elif "NOT_FOUND" in avahi_hostname:
-            # Alternative check - see what hostname avahi is advertising
-            advertised = host.run("avahi-browse -a -t -r -p 2>/dev/null | grep -o '[^;]*\\.local' | head -1 || echo 'NONE'").stdout.strip()
-            assert advertised == "media-bridge.local" or advertised == "NONE", \
-                f"Device should advertise as 'media-bridge.local', got '{advertised}'"
+        # Check system hostname
+        system_hostname = host.run("hostname").stdout.strip()
+        
+        # Determine expected hostname - if it's been renamed, it should still match pattern
+        if system_hostname == "media-bridge":
+            # Default state - should be accessible as media-bridge.local
+            expected_hostname = "media-bridge"
+        elif system_hostname.startswith("media-bridge-"):
+            # Renamed state - should be accessible as media-bridge-<name>.local
+            expected_hostname = system_hostname
+        else:
+            # Unknown state - fail the test
+            pytest.fail(f"Unexpected hostname format: {system_hostname}")
+        
+        # Check that avahi config matches system hostname
+        if avahi_config != "NOT_FOUND":
+            configured_name = avahi_config.split('=')[1]
+            # Replace underscores with hyphens for RFC compliance
+            configured_name_safe = configured_name.replace('_', '-')
+            assert configured_name_safe == expected_hostname, \
+                f"Avahi hostname '{configured_name}' doesn't match system hostname '{expected_hostname}'"
+        
+        # Verify hostname doesn't contain underscores (RFC 952 compliance)
+        assert '_' not in system_hostname, \
+            f"Hostname contains underscores which are invalid: {system_hostname}"
+        assert '_' not in avahi_config or avahi_config == "NOT_FOUND", \
+            f"Avahi hostname contains underscores which are invalid: {avahi_config}"
     
     def test_device_accessible_via_default_hostname(self, host):
         """Test that device can be pinged at media-bridge.local."""

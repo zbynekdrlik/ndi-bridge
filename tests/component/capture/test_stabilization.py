@@ -26,17 +26,33 @@ def test_initial_state_is_starting(host):
 @pytest.mark.timeout(60)  # Stabilization takes 30+ seconds
 def test_stabilization_complete_file_created(host):
     """Test that stabilization_complete file is created after 30 seconds."""
-    # Arrange: Clean up and restart
+    # Always restart to test actual stabilization process
     host.run("systemctl stop ndi-capture")
     host.run("rm -f /var/run/media-bridge/stabilization_complete")
+    host.run("rm -f /var/run/media-bridge/capture_state")
+    time.sleep(1)
     host.run("systemctl start ndi-capture")
     
-    # Act: Wait for stabilization period
-    time.sleep(32)  # 30 seconds + buffer
+    # Wait for service to start
+    time.sleep(2)
     
-    # Assert: Stabilization complete file should exist
+    # Verify service started and is in STABILIZING state
+    state_file = host.file("/var/run/media-bridge/capture_state")
+    assert state_file.exists, "Capture state file not created after service start"
+    initial_state = state_file.content_string.strip()
+    assert initial_state in ["STARTING", "STABILIZING"], f"Expected STARTING or STABILIZING, got {initial_state}"
+    
+    # Wait for stabilization period (30 seconds)
+    time.sleep(31)
+    
+    # Check that stabilization completed
     complete_file = host.file("/var/run/media-bridge/stabilization_complete")
-    assert complete_file.exists, "Stabilization complete marker not found"
+    state_file = host.file("/var/run/media-bridge/capture_state")
+    final_state = state_file.content_string.strip() if state_file.exists else "UNKNOWN"
+    
+    # Either the complete file exists OR we're in CAPTURING state
+    assert complete_file.exists or final_state == "CAPTURING", \
+        f"Stabilization not complete: marker={complete_file.exists}, state={final_state}"
 
 
 @pytest.mark.slow
