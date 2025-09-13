@@ -41,23 +41,26 @@ class TestIntercomCore:
         assert "CPUQuota=" in content, "Service should have CPU limit"
         assert "WantedBy=multi-user.target" in content, "Service should start at boot"
     
-    def test_intercom_uses_system_pipewire(self, host):
-        """Test that intercom uses unified system-wide PipeWire."""
-        # Check service dependencies
+    def test_intercom_uses_user_pipewire(self, host):
+        """Test that intercom uses user-mode PipeWire (v2.3+)."""
+        # Check service dependencies - should require user@999 instead of pipewire-system
         result = host.run("systemctl show media-bridge-intercom -p Requires")
-        assert "pipewire-system.service" in result.stdout, "Intercom doesn't require system PipeWire"
+        assert "user@999.service" in result.stdout, "Intercom should require user@999 service"
+        assert "pipewire-system.service" not in result.stdout, "Intercom should NOT require system PipeWire (migrated to user mode)"
         
-        # Check runtime directory environment
+        # Check runtime directory environment - should use /run/user/999
         result = host.run("systemctl show media-bridge-intercom -p Environment")
         if "XDG_RUNTIME_DIR" in result.stdout:
-            assert "/run/user/0" in result.stdout, "Intercom not using system PipeWire runtime"
+            assert "/run/user/999" in result.stdout, "Intercom should use user 999 PipeWire runtime"
+            assert "/run/user/0" not in result.stdout, "Intercom should NOT use root runtime (migrated to user mode)"
     
-    def test_intercom_pipewire_script_uses_system_runtime(self, host):
-        """Test that intercom PipeWire script uses system runtime."""
+    def test_intercom_pipewire_script_uses_user_runtime(self, host):
+        """Test that intercom PipeWire script uses user runtime (v2.3+)."""
         script = host.file("/usr/local/bin/media-bridge-intercom-pipewire")
         if script.exists:
             content = script.content_string
-            assert "XDG_RUNTIME_DIR=/run/user/0" in content, "Script not using system runtime"
+            assert "XDG_RUNTIME_DIR=/run/user/999" in content, "Script should use user 999 runtime"
+            assert "XDG_RUNTIME_DIR=/run/user/0" not in content, "Script should NOT use root runtime (migrated to user mode)"
             assert "export XDG_RUNTIME_DIR" in content, "Runtime dir not exported"
     
     def test_intercom_launcher_script_exists(self, host):
