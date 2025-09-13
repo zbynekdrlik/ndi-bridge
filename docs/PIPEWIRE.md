@@ -126,25 +126,24 @@ Created with blackhole approach for proper isolation:
 
 ```
 /etc/pipewire/
-├── pipewire-system.conf       # Main PipeWire config
-└── pipewire-system.conf.d/
-    ├── 10-media-bridge.conf   # Core settings
-    └── 20-virtual-devices.conf # Virtual device definitions
+└── pipewire.conf.d/
+    ├── 10-media-bridge.conf     # Core settings
+    └── 20-virtual-devices.conf  # Virtual devices
 
-/etc/wireplumber/              # Currently NOT used (D-Bus issues)
-└── main.lua.d/
-    └── *.lua                   # Isolation scripts (inactive)
+/home/mediabridge/.config/wireplumber/
+└── wireplumber.conf.d/
+    └── 50-chrome-isolation.conf # Isolation (JSON, WP 0.5)
 ```
 
 ## Service Dependencies
 
 ```
-mediabridge user (UID 999)
-├── pipewire-system.service
-│   └── pipewire-pulse-system.service
-├── media-bridge-audio-manager.service
-├── media-bridge-permission-manager.service
-└── media-bridge-intercom.service
+mediabridge user (UID ≥ 1000)
+├── pipewire.service (user)
+│   └── pipewire-pulse.service (user)
+├── wireplumber.service (user)
+├── media-bridge-intercom.service (user)
+└── ndi-display@.service (user)
 ```
 
 ## User Mode Configuration Details
@@ -213,17 +212,10 @@ Configured via `/home/mediabridge/.config/wireplumber/wireplumber.conf.d/50-chro
 
 ### Check Service Status
 ```bash
-# Check user session
-systemctl status user@999
-
-# Check PipeWire user services
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user status pipewire
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user status wireplumber
-
-# Check system services
-systemctl status media-bridge-intercom
-systemctl status ndi-display@0
-journalctl -u pipewire-system -f
+# Check user services
+sudo -u mediabridge systemctl --user status pipewire
+sudo -u mediabridge systemctl --user status wireplumber
+sudo -u mediabridge systemctl --user status media-bridge-intercom
 ```
 
 ### Verify Audio Devices
@@ -301,10 +293,9 @@ Configured via `/etc/security/limits.d/99-mediabridge.conf`:
 @audio   -  memlock    unlimited
 ```
 
-### Socket Access Control
-- Primary socket: `/run/user/999/pipewire-0` (user session)
-- Bind mount: `/run/pipewire/pipewire-0` (system-wide access)
-- Permissions: mediabridge:audio ownership
+### Socket Access
+- Primary runtime: `/run/user/<uid>/` (user session)
+- No bind-mounts are required
 
 ## PipeWire 1.4.7 Upgrade (IMPLEMENTED)
 

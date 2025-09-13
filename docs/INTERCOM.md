@@ -204,7 +204,7 @@ sudo -u mediabridge pw-cli ls Link
 - New tests for user mode architecture
 - Tests for Chrome profile migration
 - Tests for realtime scheduling
-- Tests for socket bind mounts
+- Tests focus on user session services (no bind mounts)
 
 ## Migration from Root to User Mode
 
@@ -215,10 +215,10 @@ Run the migration script on existing systems:
 ```
 
 ### What Changed
-1. **User**: All services run as mediabridge (UID 999) instead of root
+1. **User**: All services run as mediabridge (UID ≥ 1000) instead of root
 2. **Paths**:
    - Chrome profile: `/tmp/chrome-vdo-profile` → `/var/lib/mediabridge/chrome-profile/`
-   - Runtime: `/run/user/0` → `/run/pipewire/` (bind mount)
+   - Runtime: Provided by systemd user session (`/run/user/<uid>`); remove any overrides
    - PipeWire socket: System services → User session
 3. **Services**: Removed pipewire-system, using standard user services
 4. **Security**: Process isolation, no root audio processing
