@@ -169,6 +169,69 @@ USER_OVERRIDE_EOF
 
 echo "✓ PipeWire configured for user mode operation"
 
+# Configure WirePlumber for virtual device creation in user mode
+echo "Configuring WirePlumber for Chrome isolation..."
+mkdir -p /var/lib/mediabridge/.config/wireplumber/main.lua.d
+cat > /var/lib/mediabridge/.config/wireplumber/main.lua.d/51-intercom-virtual-devices.lua << 'WIREPLUMBER_CONFIG_EOF'
+-- WirePlumber configuration for Media Bridge Intercom
+-- Creates virtual devices for Chrome isolation in user mode
+
+-- Create virtual null sinks for intercom isolation
+rule = {
+  matches = {
+    {
+      { "node.name", "equals", "intercom-speaker" },
+    },
+  },
+  apply_properties = {},
+}
+
+table.insert(alsa_monitor.rules, rule)
+
+-- Load module to create virtual devices on startup
+load_module("libpipewire-module-null-sink", {
+  ["node.name"] = "intercom-speaker",
+  ["node.description"] = "Intercom Speaker (Virtual)",
+  ["media.class"] = "Audio/Sink",
+  ["audio.position"] = "FL,FR",
+  ["audio.channels"] = 2,
+  ["audio.rate"] = 48000,
+})
+
+load_module("libpipewire-module-null-sink", {
+  ["node.name"] = "intercom-microphone",
+  ["node.description"] = "Intercom Microphone (Virtual)",
+  ["media.class"] = "Audio/Sink",
+  ["audio.position"] = "FL,FR",
+  ["audio.channels"] = 2,
+  ["audio.rate"] = 48000,
+})
+
+-- Chrome audio routing policy
+-- Automatically route Chrome to virtual devices
+policy_config.policy = policy_config.policy or {}
+policy_config.policy["node.autoconnect"] = false
+policy_config.policy["rescan.disable"] = false
+policy_config.policy["move"] = {
+  ["application.process.binary"] = {
+    ["chrome"] = {
+      ["media.role"] = "Communication",
+      ["target.object"] = "intercom-speaker",
+      ["target.object.source"] = "intercom-microphone.monitor",
+    },
+    ["google-chrome"] = {
+      ["media.role"] = "Communication",
+      ["target.object"] = "intercom-speaker",
+      ["target.object.source"] = "intercom-microphone.monitor",
+    },
+  },
+}
+WIREPLUMBER_CONFIG_EOF
+
+chown -R mediabridge:audio /var/lib/mediabridge/.config
+
+echo "✓ WirePlumber configured for Chrome isolation"
+
 # Create marker file for other modules
 touch /tmp/pipewire-1.4.7-installed
 
