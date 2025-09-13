@@ -1,6 +1,6 @@
 [Unit]
 Description=Media Bridge Intercom Service
-After=network-online.target user@999.service
+After=network-online.target
 Wants=network-online.target
 # PipeWire now runs as user service, no direct dependencies
 

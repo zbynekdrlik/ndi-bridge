@@ -205,14 +205,14 @@ echo "Updating systemd service files..."
 # Update media-bridge-intercom.service
 if [ -f /etc/systemd/system/media-bridge-intercom.service ]; then
     sed -i 's|User=root|User=mediabridge|g' /etc/systemd/system/media-bridge-intercom.service
-    sed -i 's|After=.*pipewire-system.*|After=network-online.target user@999.service|g' /etc/systemd/system/media-bridge-intercom.service
+    sed -i 's|After=.*pipewire-system.*|After=network-online.target|g' /etc/systemd/system/media-bridge-intercom.service
     sed -i '/^User=mediabridge/a Group=audio\n\n# Environment for PipeWire socket access\nEnvironment="XDG_RUNTIME_DIR=/run/pipewire"\nEnvironment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"\nEnvironment="PULSE_RUNTIME_PATH=/run/pipewire/pulse"\nEnvironment="CHROME_USER_DATA_DIR=/var/lib/mediabridge/chrome-profile"' /etc/systemd/system/media-bridge-intercom.service
 fi
 
 # Update ndi-display@.service
 if [ -f /etc/systemd/system/ndi-display@.service ]; then
     sed -i 's|User=root|User=mediabridge|g' /etc/systemd/system/ndi-display@.service
-    sed -i 's|After=.*pipewire-system.*|After=network.target user@999.service|g' /etc/systemd/system/ndi-display@.service
+    sed -i 's|After=.*pipewire-system.*|After=network.target|g' /etc/systemd/system/ndi-display@.service
     sed -i '/^User=mediabridge/a Group=audio' /etc/systemd/system/ndi-display@.service
     sed -i 's|XDG_RUNTIME_DIR=/run/user/0|XDG_RUNTIME_DIR=/run/pipewire|g' /etc/systemd/system/ndi-display@.service
     sed -i '/XDG_RUNTIME_DIR/a Environment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"' /etc/systemd/system/ndi-display@.service

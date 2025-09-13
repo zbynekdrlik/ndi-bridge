@@ -124,6 +124,24 @@ LimitNOFILE=32768
 LimitNPROC=32768
 PULSE_OVERRIDE_EOF
 
+# Fix dbus.socket deadlock issue (Ubuntu desktop assumption bug)
+mkdir -p /var/lib/mediabridge/.config/systemd/user/dbus.socket.d
+cat > /var/lib/mediabridge/.config/systemd/user/dbus.socket.d/override.conf << 'DBUS_OVERRIDE_EOF'
+[Socket]
+# Remove the problematic ExecStartPost that causes deadlock
+# The systemctl command needs dbus to work, but dbus isn't started yet
+ExecStartPost=
+DBUS_OVERRIDE_EOF
+
+# Disable unnecessary desktop services for headless system user
+# These cause timeouts during user session startup
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/gpg-agent-ssh.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/gpg-agent.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/gpg-agent-browser.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/gpg-agent-extra.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/dirmngr.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/keyboxd.socket
+
 # Set proper ownership
 chown -R mediabridge:audio /var/lib/mediabridge/.config
 
@@ -141,6 +159,8 @@ cat > /etc/systemd/system/user@999.service.d/override.conf << 'USER_OVERRIDE_EOF
 # Ensure PipeWire starts on boot for mediabridge user
 Environment="XDG_RUNTIME_DIR=/run/user/999"
 Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus"
+# Extend timeout to allow all user services to start (especially gpg-agent-ssh.socket)
+TimeoutStartSec=90s
 
 [Unit]
 # No After=multi-user.target to avoid circular dependency

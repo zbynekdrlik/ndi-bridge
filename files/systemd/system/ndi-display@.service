@@ -1,6 +1,6 @@
 [Unit]
 Description=NDI Display Output %i
-After=network.target user@999.service
+After=network.target
 Wants=ndi-display-monitor.service
 Before=getty@tty%i.service
 Conflicts=getty@tty%i.service
