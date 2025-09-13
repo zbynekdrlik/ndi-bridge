@@ -39,19 +39,8 @@ install_helper_scripts() {
             cp "$HELPER_DIR/media-bridge-intercom.service" /mnt/usb/etc/systemd/system/
         fi
         
-        # Install system-wide PipeWire services
-        if [ -f "$HELPER_DIR/pipewire-system.service" ]; then
-            cp "$HELPER_DIR/pipewire-system.service" /mnt/usb/etc/systemd/system/
-        fi
-        if [ -f "$HELPER_DIR/pipewire-system.socket" ]; then
-            cp "$HELPER_DIR/pipewire-system.socket" /mnt/usb/etc/systemd/system/
-        fi
-        if [ -f "$HELPER_DIR/pipewire-pulse-system.service" ]; then
-            cp "$HELPER_DIR/pipewire-pulse-system.service" /mnt/usb/etc/systemd/system/
-        fi
-        if [ -f "$HELPER_DIR/wireplumber-system.service" ]; then
-            cp "$HELPER_DIR/wireplumber-system.service" /mnt/usb/etc/systemd/system/
-        fi
+        # Note: PipeWire now runs as user service (mediabridge user)
+        # System service files removed in favor of user mode operation
         
         # Install PipeWire configuration
         if [ -f "$HELPER_DIR/pipewire-system.conf" ]; then
@@ -66,7 +55,14 @@ install_helper_scripts() {
         # Install WirePlumber configuration
         if [ -d "$HELPER_DIR/wireplumber-conf.d" ]; then
             mkdir -p /mnt/usb/etc/wireplumber/main.lua.d
-            cp "$HELPER_DIR/wireplumber-conf.d"/*.lua /mnt/usb/etc/wireplumber/main.lua.d/
+            cp "$HELPER_DIR/wireplumber-conf.d"/*.lua /mnt/usb/etc/wireplumber/main.lua.d/ 2>/dev/null || true
+        fi
+        
+        # Install WirePlumber Chrome isolation configuration (JSON for WirePlumber 0.5)
+        if [ -f "$HELPER_DIR/50-chrome-isolation.conf" ]; then
+            mkdir -p /mnt/usb/var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d
+            cp "$HELPER_DIR/50-chrome-isolation.conf" /mnt/usb/var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d/
+            chown -R 999:999 /mnt/usb/var/lib/mediabridge/.config
         fi
         
         # Install audio manager
@@ -75,10 +71,24 @@ install_helper_scripts() {
             chmod +x /mnt/usb/usr/local/bin/media-bridge-audio-manager
         fi
         
+        # Install realtime scheduling limits for mediabridge user
+        if [ -f "$HELPER_DIR/99-mediabridge-limits.conf" ]; then
+            mkdir -p /mnt/usb/etc/security/limits.d
+            cp "$HELPER_DIR/99-mediabridge-limits.conf" /mnt/usb/etc/security/limits.d/
+            chmod 644 /mnt/usb/etc/security/limits.d/99-mediabridge-limits.conf
+        fi
+        
+        # Install tmpfiles.d configuration for runtime directories
+        if [ -f "$HELPER_DIR/mediabridge-tmpfiles.conf" ]; then
+            mkdir -p /mnt/usb/etc/tmpfiles.d
+            cp "$HELPER_DIR/mediabridge-tmpfiles.conf" /mnt/usb/etc/tmpfiles.d/mediabridge.conf
+            chmod 644 /mnt/usb/etc/tmpfiles.d/mediabridge.conf
+        fi
+        
         
         # Setup Chrome profile with VDO.Ninja permissions (pre-granted)
-        mkdir -p /mnt/usb/opt/chrome-vdo-profile/Default
-        cat > /mnt/usb/opt/chrome-vdo-profile/Default/Preferences << 'PREFS'
+        mkdir -p /mnt/usb/var/lib/mediabridge/chrome-profile/Default
+        cat > /mnt/usb/var/lib/mediabridge/chrome-profile/Default/Preferences << 'PREFS'
 {
   "profile": {
     "content_settings": {
@@ -103,6 +113,9 @@ install_helper_scripts() {
   }
 }
 PREFS
+        
+        # Set ownership for Chrome profile
+        chown -R 999:999 /mnt/usb/var/lib/mediabridge/chrome-profile
         
         # Chrome intercom is now fully installed during build
         log "Chrome intercom scripts installed"

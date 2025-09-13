@@ -81,32 +81,156 @@ EOF
 
 echo "✓ PipeWire packages pinned to prevent upgrades"
 
-# Configure systemd overrides for PipeWire system service
-echo "Configuring PipeWire system service resource limits..."
-mkdir -p /etc/systemd/system/pipewire-system.service.d
+# Configure PipeWire for user mode operation
+echo "Configuring PipeWire for user mode with mediabridge user..."
 
-# Create override file for file descriptor limits
-cat > /etc/systemd/system/pipewire-system.service.d/override.conf << 'LIMIT_EOF'
-# PipeWire System Service Override
-# Increases file descriptor limits for multimedia testing
-# Fixes "Too many open files" errors during extensive test runs
+# Create user service override directory
+mkdir -p /var/lib/mediabridge/.config/systemd/user/pipewire.service.d
+mkdir -p /var/lib/mediabridge/.config/systemd/user/pipewire-pulse.service.d
+mkdir -p /var/lib/mediabridge/.config/systemd/user/wireplumber.service.d
 
+# Create override for PipeWire to bind mount socket for system-wide access
+cat > /var/lib/mediabridge/.config/systemd/user/pipewire.service.d/override.conf << 'PIPEWIRE_OVERRIDE_EOF'
 [Service]
-# Increase file descriptor limits for PipeWire system service
-# Default limit (1024) is insufficient for multimedia operations with many clients
-LimitNOFILE=32768
-LimitNOFILESoft=16384
+# Ensure /run/pipewire exists with correct permissions
+ExecStartPre=/bin/sh -c 'mkdir -p /run/pipewire && chown mediabridge:audio /run/pipewire'
 
-# Additional resource limits for stable operation
+# Bind mount socket for system-wide access after startup
+ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pipewire-0 /run/pipewire/pipewire-0 2>/dev/null || true'
+ExecStopPost=-/bin/umount /run/pipewire/pipewire-0
+
+# Resource limits for multimedia
+LimitNOFILE=32768
 LimitNPROC=32768
 LimitMEMLOCK=infinity
 
-# Restart policy for reliability during testing
+# Restart policy for reliability
 Restart=on-failure
 RestartSec=5s
-LIMIT_EOF
+PIPEWIRE_OVERRIDE_EOF
 
-echo "✓ PipeWire system service resource limits configured"
+# Create override for PipeWire-Pulse
+cat > /var/lib/mediabridge/.config/systemd/user/pipewire-pulse.service.d/override.conf << 'PULSE_OVERRIDE_EOF'
+[Service]
+# Ensure /run/pipewire/pulse exists with correct permissions
+ExecStartPre=/bin/sh -c 'mkdir -p /run/pipewire/pulse && chown mediabridge:audio /run/pipewire/pulse'
+
+# Bind mount pulse socket for system-wide access
+ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pulse /run/pipewire/pulse 2>/dev/null || true; chown -R mediabridge:audio /run/pipewire/pulse'
+ExecStopPost=-/bin/umount /run/pipewire/pulse
+
+# Resource limits
+LimitNOFILE=32768
+LimitNPROC=32768
+PULSE_OVERRIDE_EOF
+
+# Fix dbus.socket deadlock issue (Ubuntu desktop assumption bug)
+mkdir -p /var/lib/mediabridge/.config/systemd/user/dbus.socket.d
+cat > /var/lib/mediabridge/.config/systemd/user/dbus.socket.d/override.conf << 'DBUS_OVERRIDE_EOF'
+[Socket]
+# Remove the problematic ExecStartPost that causes deadlock
+# The systemctl command needs dbus to work, but dbus isn't started yet
+ExecStartPost=
+DBUS_OVERRIDE_EOF
+
+# Disable unnecessary desktop services for headless system user
+# These cause timeouts during user session startup
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/gpg-agent-ssh.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/gpg-agent.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/gpg-agent-browser.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/gpg-agent-extra.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/dirmngr.socket
+ln -sf /dev/null /var/lib/mediabridge/.config/systemd/user/keyboxd.socket
+
+# Set proper ownership
+chown -R mediabridge:audio /var/lib/mediabridge/.config
+
+# Enable user services for mediabridge
+echo "Enabling PipeWire user services for mediabridge..."
+# Note: This may fail in chroot, but will be retried on first boot
+sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable pipewire.service 2>/dev/null || true
+sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable pipewire-pulse.service 2>/dev/null || true
+sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable wireplumber.service 2>/dev/null || true
+
+# Create systemd drop-in to ensure user session starts on boot
+mkdir -p /etc/systemd/system/user@999.service.d
+cat > /etc/systemd/system/user@999.service.d/override.conf << 'USER_OVERRIDE_EOF'
+[Service]
+# Ensure PipeWire starts on boot for mediabridge user
+Environment="XDG_RUNTIME_DIR=/run/user/999"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus"
+# Extend timeout to allow all user services to start (especially gpg-agent-ssh.socket)
+TimeoutStartSec=90s
+
+[Unit]
+# No After=multi-user.target to avoid circular dependency
+# The user service will start after user-runtime-dir@999.service automatically
+USER_OVERRIDE_EOF
+
+echo "✓ PipeWire configured for user mode operation"
+
+# Configure WirePlumber for virtual device creation in user mode
+echo "Configuring WirePlumber for Chrome isolation..."
+mkdir -p /var/lib/mediabridge/.config/wireplumber/main.lua.d
+cat > /var/lib/mediabridge/.config/wireplumber/main.lua.d/51-intercom-virtual-devices.lua << 'WIREPLUMBER_CONFIG_EOF'
+-- WirePlumber configuration for Media Bridge Intercom
+-- Creates virtual devices for Chrome isolation in user mode
+
+-- Create virtual null sinks for intercom isolation
+rule = {
+  matches = {
+    {
+      { "node.name", "equals", "intercom-speaker" },
+    },
+  },
+  apply_properties = {},
+}
+
+table.insert(alsa_monitor.rules, rule)
+
+-- Load module to create virtual devices on startup
+load_module("libpipewire-module-null-sink", {
+  ["node.name"] = "intercom-speaker",
+  ["node.description"] = "Intercom Speaker (Virtual)",
+  ["media.class"] = "Audio/Sink",
+  ["audio.position"] = "FL,FR",
+  ["audio.channels"] = 2,
+  ["audio.rate"] = 48000,
+})
+
+load_module("libpipewire-module-null-sink", {
+  ["node.name"] = "intercom-microphone",
+  ["node.description"] = "Intercom Microphone (Virtual)",
+  ["media.class"] = "Audio/Sink",
+  ["audio.position"] = "FL,FR",
+  ["audio.channels"] = 2,
+  ["audio.rate"] = 48000,
+})
+
+-- Chrome audio routing policy
+-- Automatically route Chrome to virtual devices
+policy_config.policy = policy_config.policy or {}
+policy_config.policy["node.autoconnect"] = false
+policy_config.policy["rescan.disable"] = false
+policy_config.policy["move"] = {
+  ["application.process.binary"] = {
+    ["chrome"] = {
+      ["media.role"] = "Communication",
+      ["target.object"] = "intercom-speaker",
+      ["target.object.source"] = "intercom-microphone.monitor",
+    },
+    ["google-chrome"] = {
+      ["media.role"] = "Communication",
+      ["target.object"] = "intercom-speaker",
+      ["target.object.source"] = "intercom-microphone.monitor",
+    },
+  },
+}
+WIREPLUMBER_CONFIG_EOF
+
+chown -R mediabridge:audio /var/lib/mediabridge/.config
+
+echo "✓ WirePlumber configured for Chrome isolation"
 
 # Create marker file for other modules
 touch /tmp/pipewire-1.4.7-installed

@@ -80,6 +80,7 @@ apt-get install -y -qq --no-install-recommends \
     htop \
     tmux \
     bc \
+    file \
     alsa-utils 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Install kbd package non-interactively (needed for chvt command for console restoration)
@@ -153,6 +154,41 @@ systemctl disable NetworkManager 2>/dev/null || true
 # Remove WiFi packages if they were installed
 apt-get remove -y -qq wpasupplicant wireless-tools network-manager 2>/dev/null || true
 
+# Create mediabridge user for PipeWire and services
+echo "Creating mediabridge system user..."
+# Create pipewire group first if it doesn't exist
+groupadd -r pipewire 2>/dev/null || true
+groupadd -r render 2>/dev/null || true
+groupadd -r input 2>/dev/null || true
+
+# Create mediabridge user with specific UID for consistency
+useradd --system --uid 999 --gid audio \
+        --groups pipewire,video,input,render \
+        --home /var/lib/mediabridge \
+        --shell /bin/false \
+        --comment "Media Bridge System User" \
+        mediabridge 2>/dev/null || {
+    echo "User mediabridge already exists or creation failed, continuing..."
+}
+
+# Create runtime and home directories
+mkdir -p /run/pipewire
+mkdir -p /var/lib/mediabridge
+mkdir -p /var/lib/mediabridge/.config/systemd/user
+mkdir -p /var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d
+chown mediabridge:audio /run/pipewire
+chown -R mediabridge:audio /var/lib/mediabridge
+chmod 755 /run/pipewire
+
+# Enable persistent user session for headless operation
+loginctl enable-linger mediabridge 2>/dev/null || {
+    echo "Note: loginctl not available in chroot, will be enabled on first boot"
+    mkdir -p /var/lib/systemd/linger
+    touch /var/lib/systemd/linger/mediabridge
+}
+
+echo "Media Bridge user created with UID 999"
+
 # Configure timezone to Europe/Prague (CEST)
 echo "Configuring timezone..."
 timedatectl set-timezone Europe/Prague || {
@@ -162,10 +198,13 @@ timedatectl set-timezone Europe/Prague || {
 }
 echo "Timezone configured: $(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone)"
 
-# Configure global environment for system-wide PipeWire
+# Configure global environment for PipeWire socket access
 echo "Configuring global environment..."
-echo "XDG_RUNTIME_DIR=/run/user/0" >> /etc/environment
-echo "Global XDG_RUNTIME_DIR configured for system-wide PipeWire"
+# Note: PipeWire will run as user, socket will be bind-mounted to /run/pipewire
+echo "XDG_RUNTIME_DIR=/run/pipewire" >> /etc/environment
+echo "PIPEWIRE_RUNTIME_DIR=/run/pipewire" >> /etc/environment
+echo "PULSE_RUNTIME_PATH=/run/pipewire/pulse" >> /etc/environment
+echo "Global environment configured for PipeWire user mode"
 
 # Create version file for system identification
 echo "Creating version file..."

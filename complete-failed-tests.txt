@@ -1,0 +1,58 @@
+# Full Test Results for v2.3.7 PipeWire User Migration
+
+## Summary
+- **Total Tests**: 479 
+- **Passed**: 414
+- **Failed**: 56  
+- **Skipped**: 6
+- **XFailed**: 3 (expected failures)
+- **Test Duration**: 22 minutes 5 seconds
+
+## Categorized Failures
+
+### 1. PipeWire System Service Tests (21 failures)
+These failures are EXPECTED - we migrated from system to user services:
+- test_audio_system.py (3): Old system services don't exist
+- test_unified_pipewire.py (6): System service checks obsolete
+- test_ndi_display_pipewire.py (12): Display still checking for system services
+
+### 2. Intercom Service Failures (18 failures)  
+Chrome/intercom not starting due to user session dependencies:
+- test_intercom_processes.py (8): Chrome processes not running
+- test_intercom_core.py (4): Service restart issues
+- test_intercom_integration.py (3): Integration failures
+- test_intercom_user_mode.py (2): User mode issues
+- test_intercom_rename_comprehensive.py (1): Rename functionality
+
+### 3. Helper Script Failures (10 failures)
+Renaming functionality issues:
+- test_set_name.py (6): Name setting failures
+- test_intercom_rename_comprehensive.py (3): Rename tests
+- test_bridge_mac_inheritance.py (1): Network naming
+
+### 4. Display Integration (7 failures)
+Display functionality with PipeWire:
+- test_display_pipewire_functional.py (5): PipeWire audio routing
+- test_display_functional.py (2): Display tests
+
+## Key Findings
+
+### Circular Dependencies Resolved ✅
+- user@999.service now starts correctly
+- No more ordering cycles in systemd
+- dbus.socket deadlock fixed for headless users
+- All 19 PipeWire migration tests pass
+
+### Root Cause Identified
+Ubuntu's systemd user sessions are designed for desktop environments with graphical login.
+Running system users (UID < 1000) in headless mode requires special handling:
+1. Extended timeouts for user session startup
+2. Removed problematic dbus.socket ExecStartPost
+3. Disabled unnecessary GPG agent services
+4. Careful service ordering to avoid cycles
+
+### Remaining Work
+1. Update display tests to check user services instead of system
+2. Fix intercom service dependencies for user mode
+3. Update helper scripts for new user environment
+4. Review all tests that assume system services

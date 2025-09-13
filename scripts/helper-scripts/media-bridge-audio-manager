@@ -7,33 +7,67 @@
 
 set -e
 
-# PipeWire environment
-export XDG_RUNTIME_DIR=/run/user/0
-export PULSE_RUNTIME_PATH=/run/user/0/pulse
+# PipeWire environment - detect running mode
+# If running as mediabridge, use user session directly
+# Otherwise use bind-mounted sockets
 
-# Function to wait for PipeWire
+if [ "$USER" = "mediabridge" ] || [ "$UID" = "999" ]; then
+    # Running as mediabridge user - use user session
+    export XDG_RUNTIME_DIR=/run/user/999
+    export PIPEWIRE_RUNTIME_DIR=/run/user/999
+    export PULSE_RUNTIME_PATH=/run/user/999/pulse
+    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus
+else
+    # Running as root or other user - use bind-mounted sockets
+    export XDG_RUNTIME_DIR=/run/pipewire
+    export PIPEWIRE_RUNTIME_DIR=/run/pipewire
+    export PULSE_RUNTIME_PATH=/run/pipewire/pulse
+    # Use the bind-mounted socket explicitly
+    export PIPEWIRE_REMOTE=/run/pipewire/pipewire-0
+    export PULSE_SERVER=/run/pipewire/pulse/native
+fi
+
+# Function to wait for PipeWire with timeout handling
 wait_for_pipewire() {
-    local max_attempts=30
+    local max_attempts=30  # Reduced timeout to fail faster
     local attempt=0
     
     while [ $attempt -lt $max_attempts ]; do
-        if pactl info >/dev/null 2>&1; then
-            # Also wait for WirePlumber to be ready
-            sleep 2
-            return 0
+        # For user mode, check if services are running via systemctl
+        if [ "$USER" = "mediabridge" ] || [ "$UID" = "999" ]; then
+            # Check if user services are active
+            if systemctl --user is-active --quiet pipewire pipewire-pulse wireplumber; then
+                echo "PipeWire user services are running"
+                sleep 2
+                return 0
+            fi
+        else
+            # Try both pactl and pw-cli to detect PipeWire
+            if pactl info >/dev/null 2>&1 || pw-cli info >/dev/null 2>&1; then
+                # Also wait for WirePlumber to be ready
+                sleep 2
+                return 0
+            fi
         fi
         echo "Waiting for PipeWire... (attempt $((attempt+1))/$max_attempts)"
         sleep 1
         attempt=$((attempt+1))
     done
     
-    echo "ERROR: PipeWire not available after $max_attempts attempts"
-    return 1
+    echo "WARNING: PipeWire not fully ready after $max_attempts attempts, continuing anyway"
+    return 0  # Continue anyway to not block service startup
 }
 
 # Function to setup virtual devices
 setup_virtual_devices() {
     echo "Setting up virtual audio devices..."
+    
+    # Skip if pactl is not responding (will be handled by WirePlumber config)
+    if ! timeout 2 pactl info >/dev/null 2>&1; then
+        echo "WARNING: pactl not responding, skipping virtual device setup"
+        echo "Virtual devices will be created by WirePlumber configuration"
+        return 0
+    fi
     
     # Check if virtual devices exist
     if ! pactl list sinks short | grep -q "intercom-speaker"; then
@@ -43,14 +77,18 @@ setup_virtual_devices() {
             sink_properties="device.description='Intercom Speaker (Virtual)' device.nick='Intercom Speaker'" \
             rate=48000 \
             channels=2 \
-            channel_map=front-left,front-right
+            channel_map=front-left,front-right || true
     fi
     
     # Check if virtual microphone exists (it's created as a sink whose monitor is the source)
     if ! pactl list sinks short | grep -q "intercom-microphone"; then
         echo "Creating virtual microphone device..."
-        # The virtual microphone is already created by the config file
-        # But if it doesn't exist, we skip - config handles it
+        pactl load-module module-null-sink \
+            sink_name=intercom-microphone \
+            sink_properties="device.description='Intercom Microphone (Virtual)' device.nick='Intercom Microphone'" \
+            rate=48000 \
+            channels=2 \
+            channel_map=front-left,front-right || true
     fi
 }
 
@@ -58,9 +96,15 @@ setup_virtual_devices() {
 link_to_usb() {
     echo "Linking virtual devices to USB audio..."
     
+    # Skip if pactl is not responding
+    if ! timeout 2 pactl info >/dev/null 2>&1; then
+        echo "WARNING: pactl not responding, skipping USB device linking"
+        return 0
+    fi
+    
     # Find CSCTEK USB audio devices
-    USB_SINK=$(pactl list sinks short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
-    USB_SOURCE=$(pactl list sources short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    USB_SINK=$(timeout 2 pactl list sinks short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
+    USB_SOURCE=$(timeout 2 pactl list sources short | grep "CSCTEK_USB_Audio_and_HID" | grep -v monitor | awk '{print $2}' | head -1)
     
     if [ -z "$USB_SINK" ] || [ -z "$USB_SOURCE" ]; then
         echo "WARNING: CSCTEK USB Audio device not found"

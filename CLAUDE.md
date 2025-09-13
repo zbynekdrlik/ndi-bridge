@@ -610,3 +610,5 @@ tail -100 test-run.log | grep -E "===.*passed.*failed.*seconds ==="
 - Run all sshpass commands without confirmation
 - if there is needed any linux tool be installed - install it, locally or remotelly on testing devices
 - please do not solve issues with revert, do correct fix, test, reboot, test, repository implementation, build image process
+- please do not enable or disable  any service on device when looking for issue without considering that this change change state of device and next development on device is not any more in sync with rebository and build scripts. Each step on device needs be considered as step which should be also changed in repository or needs be reverted on device to have device in same state as repository
+- each fix and change has to be tested on device, before reboot firstly, then after reboot if preserve, then after build image and deploy to device. Without this step 98% of fixes are incorrect and many times bring regressions

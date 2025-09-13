@@ -57,14 +57,16 @@ if [ -f "$VTCON_PATH" ] && [ "$(cat $VTCON_PATH)" = "1" ]; then
     /usr/local/bin/ndi-display-console-manager disable ${DISPLAY_ID} 2>&1 || true
 fi
 
-# Set up PipeWire environment
-export XDG_RUNTIME_DIR="/run/user/0"
+# Set up PipeWire environment (user mode with socket bind mount)
+export XDG_RUNTIME_DIR="/run/pipewire"
+export PIPEWIRE_RUNTIME_DIR="/run/pipewire"
+export PULSE_RUNTIME_PATH="/run/pipewire/pulse"
 mkdir -p $XDG_RUNTIME_DIR
 
-# Wait for system PipeWire if it's starting
-if ! systemctl is-active --quiet pipewire-system.service; then
-    echo "Warning: System PipeWire service not running"
-    echo "Audio output may not work. Start with: systemctl start pipewire-system.service"
+# Wait for user PipeWire if it's starting
+if ! systemctl is-active --quiet user@999.service; then
+    echo "Warning: Media Bridge user session not running"
+    echo "Audio output may not work. Start with: systemctl start user@999.service"
 else
     # Intelligently select HDMI audio output based on display ID
     sleep 1  # Give PipeWire time to enumerate devices

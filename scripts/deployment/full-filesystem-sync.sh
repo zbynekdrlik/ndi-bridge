@@ -68,7 +68,7 @@ run_ssh_command() {
 
 # Check connection to device
 log_info "Checking connection to $DEVICE_IP..."
-if ! run_ssh_command "echo 'Connected'" &>/dev/null; then
+if ! sshpass -p "$DEVICE_PASS" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 $DEVICE_USER@$DEVICE_IP "echo Connected" >/dev/null 2>&1; then
     log_error "Cannot connect to device at $DEVICE_IP"
     exit 1
 fi

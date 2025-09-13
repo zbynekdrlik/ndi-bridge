@@ -1,5 +1,5 @@
 #!/bin/bash
-# VDO.Ninja Intercom Launcher - PipeWire only
+# VDO.Ninja Intercom Launcher - PipeWire User Mode
 
 # PipeWire is required
 if ! command -v pipewire &> /dev/null || ! command -v wireplumber &> /dev/null; then
@@ -8,14 +8,29 @@ if ! command -v pipewire &> /dev/null || ! command -v wireplumber &> /dev/null; 
     exit 1
 fi
 
-# Wait for system PipeWire to be ready
-for i in {1..10}; do
-    if systemctl is-active --quiet pipewire-system.service && \
-       systemctl is-active --quiet pipewire-pulse-system.service; then
-        echo "System PipeWire is ready"
+# Set up environment for user mode PipeWire
+if [ "$USER" = "mediabridge" ] || [ "$UID" = "999" ]; then
+    # Running as mediabridge user - use user session
+    export XDG_RUNTIME_DIR=/run/user/999
+    export PIPEWIRE_RUNTIME_DIR=/run/user/999
+    export PULSE_RUNTIME_PATH=/run/user/999/pulse
+    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus
+else
+    # Running as root or other user - use bind-mounted sockets
+    export XDG_RUNTIME_DIR=/run/pipewire
+    export PIPEWIRE_RUNTIME_DIR=/run/pipewire
+    export PULSE_RUNTIME_PATH=/run/pipewire/pulse
+    export PIPEWIRE_REMOTE=/run/pipewire/pipewire-0
+    export PULSE_SERVER=/run/pipewire/pulse/native
+fi
+
+# Wait for PipeWire to be ready (user or system)
+for i in {1..30}; do
+    if pactl info >/dev/null 2>&1 || pw-cli info >/dev/null 2>&1; then
+        echo "PipeWire is ready"
         break
     fi
-    echo "Waiting for system PipeWire... (attempt $i)"
+    echo "Waiting for PipeWire... (attempt $i)"
     sleep 1
 done
 

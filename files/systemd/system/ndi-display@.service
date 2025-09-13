@@ -1,6 +1,6 @@
 [Unit]
 Description=NDI Display Output %i
-After=network.target pipewire-system.service
+After=network.target
 Wants=ndi-display-monitor.service
 Before=getty@tty%i.service
 Conflicts=getty@tty%i.service
@@ -9,12 +9,14 @@ Conflicts=getty@tty%i.service
 Type=simple
 Restart=on-failure
 RestartSec=5
-User=root
+User=mediabridge
+Group=audio
 
 # Environment for display selection
 Environment="DISPLAY_ID=%i"
 Environment="LD_LIBRARY_PATH=/usr/local/lib"
-Environment="XDG_RUNTIME_DIR=/run/user/0"
+Environment="XDG_RUNTIME_DIR=/run/pipewire"
+Environment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"
 
 # Read stream configuration from file
 EnvironmentFile=-/etc/media-bridge/display-%i.conf

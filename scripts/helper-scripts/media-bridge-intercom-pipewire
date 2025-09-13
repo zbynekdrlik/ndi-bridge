@@ -25,9 +25,9 @@ cleanup() {
     rm -f /tmp/.X99-lock 2>/dev/null || true
     rm -rf /tmp/.com.google.Chrome.* 2>/dev/null || true
     rm -rf /tmp/chrome-* 2>/dev/null || true
-    rm -f /tmp/chrome-vdo-profile/SingletonLock 2>/dev/null || true
-    rm -f /tmp/chrome-vdo-profile/SingletonCookie 2>/dev/null || true
-    rm -f /tmp/chrome-vdo-profile/SingletonSocket 2>/dev/null || true
+    rm -f /var/lib/mediabridge/chrome-profile/SingletonLock 2>/dev/null || true
+    rm -f /var/lib/mediabridge/chrome-profile/SingletonCookie 2>/dev/null || true
+    rm -f /var/lib/mediabridge/chrome-profile/SingletonSocket 2>/dev/null || true
     
     # Wait for processes to die
     sleep 3
@@ -47,7 +47,7 @@ trap cleanup INT TERM
 FULL_HOSTNAME=$(hostname)
 HOSTNAME=${FULL_HOSTNAME#media-bridge-}  # Remove prefix if exists
 ROOM="${VDO_ROOM:-nl_interkom}"
-PROFILE_DIR="/tmp/chrome-vdo-profile"
+PROFILE_DIR="/var/lib/mediabridge/chrome-profile"
 DISPLAY_NUM=99
 
 echo "=== Media Bridge Intercom Starting (PipeWire) ==="
@@ -72,8 +72,21 @@ setsid x11vnc -noshm -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999
 sleep 2
 echo "VNC server detached and running"
 
-# Setup runtime directory and PulseAudio directory
-export XDG_RUNTIME_DIR=/run/user/0
+# Setup runtime directory based on running user
+if [ "$USER" = "mediabridge" ] || [ "$UID" = "999" ]; then
+    # Running as mediabridge user - use user session
+    export XDG_RUNTIME_DIR=/run/user/999
+    export PIPEWIRE_RUNTIME_DIR=/run/user/999
+    export PULSE_RUNTIME_PATH=/run/user/999/pulse
+    export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/999/bus
+else
+    # Running as root or other user - use bind-mounted sockets
+    export XDG_RUNTIME_DIR=/run/pipewire
+    export PIPEWIRE_RUNTIME_DIR=/run/pipewire
+    export PULSE_RUNTIME_PATH=/run/pipewire/pulse
+    export PIPEWIRE_REMOTE=/run/pipewire/pipewire-0
+    export PULSE_SERVER=/run/pipewire/pulse/native
+fi
 mkdir -p $XDG_RUNTIME_DIR
 mkdir -p $XDG_RUNTIME_DIR/pulse
 
@@ -92,22 +105,32 @@ echo "Checking PipeWire audio system..."
 # With unified PipeWire, configuration is done at build time
 # No dynamic configuration changes needed here
 
-# Check if system PipeWire is running (REQUIRED)
-if ! systemctl is-active --quiet pipewire-system.service; then
-    echo "ERROR: System-wide PipeWire service is not running!"
-    echo "Starting system PipeWire services..."
-    systemctl start pipewire-system.service pipewire-pulse-system.service wireplumber-system.service
-    sleep 3
-    
-    # Check again
-    if ! systemctl is-active --quiet pipewire-system.service; then
-        echo "ERROR: Failed to start system PipeWire services"
-        echo "Please check: systemctl status pipewire-system.service"
-        exit 1
+# Check PipeWire availability
+if [ "$USER" = "mediabridge" ] || [ "$UID" = "999" ]; then
+    # Check if user session is running
+    if ! systemctl --user is-active --quiet pipewire.service; then
+        echo "ERROR: User PipeWire service is not running!"
+        echo "Starting user PipeWire services..."
+        systemctl --user start pipewire.service pipewire-pulse.service wireplumber.service
+        sleep 3
+        
+        # Check again
+        if ! systemctl --user is-active --quiet pipewire.service; then
+            echo "ERROR: Failed to start user PipeWire services"
+            echo "Please check: systemctl --user status pipewire.service"
+            exit 1
+        fi
+    fi
+    echo "Using user PipeWire service"
+else
+    # Fall back to system-wide if available
+    if systemctl is-active --quiet pipewire-system.service 2>/dev/null; then
+        echo "Using system-wide PipeWire service (legacy)"
+    else
+        echo "WARNING: No PipeWire service found, audio may not work"
     fi
 fi
 
-echo "Using system-wide PipeWire service"
 PIPEWIRE_PID=""
 PULSE_PID=""
 WIREPLUMBER_PID=""
@@ -251,24 +274,52 @@ echo "Starting Chrome..."
 echo "URL: $URL"
 
 # Start Chrome in background (not exec) so we can monitor PipeWire
-env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
-    PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse \
-    PULSE_SERVER=unix:$XDG_RUNTIME_DIR/pulse/native \
-    HOME=/tmp \
-    XDG_STATE_HOME=/tmp/.local/state \
-    XDG_DATA_HOME=/tmp/.local/share \
-    XDG_CONFIG_HOME=/tmp/.config \
-    /usr/bin/google-chrome \
-    --no-first-run \
-    --no-default-browser-check \
-    --no-sandbox \
-    --disable-gpu \
-    --disable-dev-shm-usage \
-    --autoplay-policy=no-user-gesture-required \
-    --audio-buffer-size=2048 \
-    --user-data-dir=$PROFILE_DIR \
-    --new-window \
-    "$URL" &
+# Ensure Chrome uses the right environment
+if [ "$USER" = "mediabridge" ] || [ "$UID" = "999" ]; then
+    # User mode - add DBUS for session
+    env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+        PIPEWIRE_RUNTIME_DIR=$PIPEWIRE_RUNTIME_DIR \
+        PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse \
+        PULSE_SERVER=unix:$XDG_RUNTIME_DIR/pulse/native \
+        DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS \
+        HOME=/var/lib/mediabridge \
+        XDG_STATE_HOME=/var/lib/mediabridge/.local/state \
+        XDG_DATA_HOME=/var/lib/mediabridge/.local/share \
+        XDG_CONFIG_HOME=/var/lib/mediabridge/.config \
+        /usr/bin/google-chrome \
+        --no-first-run \
+        --no-default-browser-check \
+        --no-sandbox \
+        --disable-gpu \
+        --disable-dev-shm-usage \
+        --autoplay-policy=no-user-gesture-required \
+        --audio-buffer-size=2048 \
+        --user-data-dir=$PROFILE_DIR \
+        --new-window \
+        "$URL" &
+else
+    # Root mode with bind mounts
+    env XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR \
+        PIPEWIRE_RUNTIME_DIR=$PIPEWIRE_RUNTIME_DIR \
+        PULSE_RUNTIME_PATH=$XDG_RUNTIME_DIR/pulse \
+        PULSE_SERVER=unix:$XDG_RUNTIME_DIR/pulse/native \
+        PIPEWIRE_REMOTE=$PIPEWIRE_REMOTE \
+        HOME=/tmp \
+        XDG_STATE_HOME=/tmp/.local/state \
+        XDG_DATA_HOME=/tmp/.local/share \
+        XDG_CONFIG_HOME=/tmp/.config \
+        /usr/bin/google-chrome \
+        --no-first-run \
+        --no-default-browser-check \
+        --no-sandbox \
+        --disable-gpu \
+        --disable-dev-shm-usage \
+        --autoplay-policy=no-user-gesture-required \
+        --audio-buffer-size=2048 \
+        --user-data-dir=$PROFILE_DIR \
+        --new-window \
+        "$URL" &
+fi
 
 CHROME_PID=$!
 
