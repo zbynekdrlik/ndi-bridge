@@ -1,10 +1,12 @@
 """
-Tests for unified system-wide PipeWire architecture.
+Legacy tests for the old system-wide PipeWire architecture.
 
-Verifies that intercom and ndi-display use the same PipeWire instance.
+This repository has migrated to a user-session model; skip these tests.
 """
 
 import pytest
+pytestmark = pytest.mark.skip(reason="Legacy system-wide PipeWire model replaced by user-session model")
+
 import time
 
 

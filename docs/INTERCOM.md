@@ -144,11 +144,11 @@ Failing test categories:
 navigator.mediaDevices.enumerateDevices().then(d => console.log(d))
 
 # Verify services
-systemctl status media-bridge-intercom
-systemctl status pipewire-system
+sudo -u mediabridge systemctl --user status media-bridge-intercom
+sudo -u mediabridge systemctl --user status pipewire
 
 # Check audio devices
-sudo -u mediabridge bash -c 'export XDG_RUNTIME_DIR=/run/user/999; pactl list sinks short'
+sudo -u mediabridge pactl list sinks short
 ```
 
 ### Automated Tests

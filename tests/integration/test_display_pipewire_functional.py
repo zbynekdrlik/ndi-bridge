@@ -10,7 +10,7 @@ import time
 
 def test_display_uses_user_pipewire(host):
     """Test that ndi-display user unit depends on PipeWire user services."""
-    result = host.run("systemctl --user cat 'ndi-display@.service' | grep -E 'After=|Wants='")
+    result = host.run("sudo -u mediabridge systemctl --user cat 'ndi-display@.service' | grep -E 'After=|Wants='")
     assert 'pipewire' in result.stdout.lower(), "Display user unit missing PipeWire dependencies"
 
 

@@ -26,18 +26,17 @@ def test_post_migration_user_exists(host):
     """Test that mediabridge user exists after migration."""
     user = host.user("mediabridge")
     assert user.exists, "mediabridge user not created"
-    assert user.uid == 999, f"Wrong UID: {user.uid}"
-    assert user.gid in [994, 29, 995], f"Wrong GID: {user.gid} (should be audio group)"
+    assert user.uid >= 1000, f"Wrong UID: {user.uid}"
+    assert "audio" in user.groups, "mediabridge not in audio group"
 
 
 def test_post_migration_directories(host):
     """Test that all required directories exist after migration."""
     directories = [
-        "/run/pipewire",
         "/var/lib/mediabridge",
-        "/var/lib/mediabridge/.config",
-        "/var/lib/mediabridge/.config/systemd/user",
-        "/var/lib/mediabridge/.config/wireplumber",
+        "/home/mediabridge/.config",
+        "/home/mediabridge/.config/systemd/user",
+        "/home/mediabridge/.config/wireplumber",
         "/var/lib/mediabridge/chrome-profile",
         "/var/run/ndi-display",
         "/var/run/media-bridge"
@@ -54,7 +53,6 @@ def test_post_migration_ownership(host):
     dirs_to_check = [
         ("/var/lib/mediabridge", "mediabridge", "audio"),
         ("/var/lib/mediabridge/chrome-profile", "mediabridge", "audio"),
-        ("/run/pipewire", "mediabridge", "audio"),
     ]
     
     for path, expected_user, expected_group in dirs_to_check:
@@ -80,25 +78,23 @@ def test_post_migration_tmpfiles(host):
     assert tmpfiles.exists, "tmpfiles.d configuration not created"
     
     content = tmpfiles.content_string
-    assert "/run/pipewire" in content
-    assert "/run/user/999" in content
+    # Only runtime status dirs
+    assert "/var/run/ndi-display" in content
+    assert "/var/run/media-bridge" in content
     assert "mediabridge" in content
 
 
-def test_post_migration_service_overrides(host):
-    """Test that PipeWire user service overrides are created."""
-    override = host.file("/var/lib/mediabridge/.config/systemd/user/pipewire.service.d/override.conf")
-    assert override.exists, "PipeWire service override not created"
-    
-    content = override.content_string
-    assert "mount --bind" in content, "Bind mount command not in override"
-    assert "/run/user/999/pipewire-0" in content
-    assert "/run/pipewire/pipewire-0" in content
+def test_post_migration_user_services_enabled(host):
+    """Test that PipeWire user services are enabled via wants."""
+    for unit in ("pipewire.service", "pipewire-pulse.service", "wireplumber.service"):
+        link = host.file(f"/home/mediabridge/.config/systemd/user/default.target.wants/{unit}")
+        assert link.exists, f"{unit} enable link not present"
+        assert link.is_symlink, f"{unit} enable link is not a symlink"
 
 
 def test_post_migration_wireplumber_config(host):
     """Test that WirePlumber Chrome isolation is configured."""
-    config = host.file("/var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d/50-chrome-isolation.conf")
+    config = host.file("/home/mediabridge/.config/wireplumber/wireplumber.conf.d/50-chrome-isolation.conf")
     assert config.exists, "WirePlumber Chrome config not created"
     
     content = config.content_string
@@ -106,16 +102,12 @@ def test_post_migration_wireplumber_config(host):
     assert "intercom-speaker" in content
 
 
-def test_post_migration_services_updated(host):
-    """Test that systemd services are updated."""
-    # Check intercom service
-    result = host.run("systemctl show media-bridge-intercom -p User")
-    user = result.stdout.strip().split('=')[1] if '=' in result.stdout else ""
-    assert user == "mediabridge", f"Intercom service not updated to mediabridge user: {user}"
-    
-    # Check environment
-    result = host.run("systemctl show media-bridge-intercom -p Environment")
-    assert "XDG_RUNTIME_DIR=/run/pipewire" in result.stdout
+def test_post_migration_user_units_present(host):
+    """Test that intercom user unit is installed and enabled for mediabridge."""
+    unit = host.file("/etc/systemd/user/media-bridge-intercom.service")
+    assert unit.exists, "Intercom user unit not installed"
+    link = host.file("/home/mediabridge/.config/systemd/user/default.target.wants/media-bridge-intercom.service")
+    assert link.exists, "Intercom user unit not enabled for mediabridge"
 
 
 def test_post_migration_old_services_disabled(host):
@@ -128,17 +120,14 @@ def test_post_migration_old_services_disabled(host):
         assert not service.is_running, f"{service_name} still running"
 
 
-def test_post_migration_user_services_enabled(host):
-    """Test that user services are enabled."""
-    # Check if services are enabled for mediabridge user
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-enabled pipewire")
-    assert "enabled" in result.stdout, "PipeWire user service not enabled"
-    
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-enabled pipewire-pulse")
-    assert "enabled" in result.stdout, "PipeWire-Pulse user service not enabled"
-    
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-enabled wireplumber")
-    assert "enabled" in result.stdout, "WirePlumber user service not enabled"
+def test_post_migration_user_services_active(host):
+    """Test that user services are active."""
+    result = host.run("sudo -u mediabridge systemctl --user is-active pipewire")
+    assert result.stdout.strip() == "active"
+    result = host.run("sudo -u mediabridge systemctl --user is-active pipewire-pulse")
+    assert result.stdout.strip() == "active"
+    result = host.run("sudo -u mediabridge systemctl --user is-active wireplumber")
+    assert result.stdout.strip() == "active"
 
 
 def test_post_migration_scripts_updated(host):
@@ -153,7 +142,6 @@ def test_post_migration_scripts_updated(host):
         script = host.file(script_path)
         if script.exists:
             content = script.content_string
-            assert "/run/pipewire" in content, f"{script_path} not updated to /run/pipewire"
             assert "/run/user/0" not in content, f"{script_path} still has /run/user/0"
             
             # Check for new Chrome profile path
@@ -161,15 +149,12 @@ def test_post_migration_scripts_updated(host):
                 assert "/tmp/chrome-vdo-profile" not in content, f"{script_path} still has old Chrome path"
 
 
-def test_post_migration_environment_updated(host):
-    """Test that /etc/environment is updated."""
+def test_post_migration_environment_not_overridden(host):
+    """Test that /etc/environment is not used to override XDG runtime."""
     env_file = host.file("/etc/environment")
     content = env_file.content_string
-    
-    assert "XDG_RUNTIME_DIR=/run/pipewire" in content, "XDG_RUNTIME_DIR not updated"
-    assert "PIPEWIRE_RUNTIME_DIR=/run/pipewire" in content, "PIPEWIRE_RUNTIME_DIR not added"
-    assert "PULSE_RUNTIME_PATH=/run/pipewire/pulse" in content, "PULSE_RUNTIME_PATH not added"
-    assert "/run/user/0" not in content, "Old /run/user/0 still in environment"
+    assert "/run/pipewire" not in content
+    assert "/run/user/0" not in content
 
 
 def test_post_migration_chrome_profile_moved(host):
@@ -202,7 +187,7 @@ def test_migration_idempotent(host):
     time.sleep(5)
     
     # Verify PipeWire is still running
-    result = host.run("sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-active pipewire")
+    result = host.run("sudo -u mediabridge systemctl --user is-active pipewire")
     assert "active" in result.stdout, "PipeWire not active after re-migration"
 
 

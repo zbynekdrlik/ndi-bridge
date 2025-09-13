@@ -14,24 +14,24 @@ class TestIntercomCore:
     
     def test_intercom_service_exists(self, host):
         """Test that intercom service file exists."""
-        service_file = host.file("/etc/systemd/system/media-bridge-intercom.service")
+        service_file = host.file("/etc/systemd/user/media-bridge-intercom.service")
         assert service_file.exists, "Intercom service file should exist"
         assert service_file.user == "root"
         assert service_file.group == "root"
     
     def test_intercom_service_enabled(self, host):
         """Test that intercom service is enabled."""
-        result = host.run("systemctl is-enabled media-bridge-intercom")
+        result = host.run("sudo -u mediabridge systemctl --user is-enabled media-bridge-intercom")
         assert result.stdout.strip() == "enabled", "Intercom service should be enabled"
     
     def test_intercom_service_running(self, host):
         """Test that intercom service is running."""
-        service = host.service("media-bridge-intercom")
-        assert service.is_running, "Intercom service should be running"
+        result = host.run("sudo -u mediabridge systemctl --user is-active media-bridge-intercom")
+        assert result.stdout.strip() == "active", "Intercom service should be running"
     
     def test_intercom_service_configuration(self, host):
         """Test that intercom service has correct configuration."""
-        service_file = host.file("/etc/systemd/system/media-bridge-intercom.service")
+        service_file = host.file("/etc/systemd/user/media-bridge-intercom.service")
         content = service_file.content_string
         
         # Check critical service settings
@@ -39,26 +39,20 @@ class TestIntercomCore:
         assert "RestartSec=" in content, "Service should have restart delay"
         assert "MemoryMax=" in content, "Service should have memory limit"
         assert "CPUQuota=" in content, "Service should have CPU limit"
-        assert "WantedBy=multi-user.target" in content, "Service should start at boot"
+        assert "WantedBy=default.target" in content, "User unit should start at user boot"
     
-    def test_intercom_uses_system_pipewire(self, host):
-        """Test that intercom uses unified system-wide PipeWire."""
-        # Check service dependencies
-        result = host.run("systemctl show media-bridge-intercom -p Requires")
-        assert "pipewire-system.service" in result.stdout, "Intercom doesn't require system PipeWire"
-        
-        # Check runtime directory environment
-        result = host.run("systemctl show media-bridge-intercom -p Environment")
-        if "XDG_RUNTIME_DIR" in result.stdout:
-            assert "/run/user/0" in result.stdout, "Intercom not using system PipeWire runtime"
+    def test_intercom_depends_on_user_pipewire(self, host):
+        """Test that intercom user unit depends on PipeWire user services."""
+        result = host.run("sudo -u mediabridge systemctl --user cat media-bridge-intercom.service | grep -E 'After=|Wants='")
+        assert 'pipewire' in result.stdout.lower(), "Intercom user unit missing PipeWire dependencies"
     
-    def test_intercom_pipewire_script_uses_system_runtime(self, host):
-        """Test that intercom PipeWire script uses system runtime."""
+    def test_intercom_pipewire_script_not_hardcoded_runtime(self, host):
+        """Test that intercom PipeWire script relies on user XDG runtime (no hardcoding)."""
         script = host.file("/usr/local/bin/media-bridge-intercom-pipewire")
         if script.exists:
             content = script.content_string
-            assert "XDG_RUNTIME_DIR=/run/user/0" in content, "Script not using system runtime"
-            assert "export XDG_RUNTIME_DIR" in content, "Runtime dir not exported"
+            assert "/run/user/0" not in content
+            assert "/run/pipewire" not in content
     
     def test_intercom_launcher_script_exists(self, host):
         """Test that intercom launcher script exists and is executable."""
@@ -143,15 +137,15 @@ class TestIntercomCore:
         pid_before = pid_before.split("=")[1] if "=" in pid_before else None
         
         # Restart service
-        result = host.run("systemctl restart media-bridge-intercom")
+        result = host.run("sudo -u mediabridge systemctl --user restart media-bridge-intercom")
         assert result.succeeded, "Service restart should succeed"
         
         # Wait for service to fully restart and stabilize
         time.sleep(35)
         
         # Check service is running
-        service = host.service("media-bridge-intercom")
-        assert service.is_running, "Service should be running after restart"
+        result = host.run("sudo -u mediabridge systemctl --user is-active media-bridge-intercom")
+        assert result.stdout.strip() == "active", "Service should be running after restart"
         
         # Wait for Chrome to fully start
         for _ in range(10):

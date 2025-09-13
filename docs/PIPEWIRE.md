@@ -55,25 +55,23 @@ sudo -u mediabridge pw-cli list-objects | grep -A3 "intercom-speaker\|intercom-m
 
 Media Bridge uses **PipeWire 1.4.7** running as a dedicated `mediabridge` user (UID 999) with proper user session management. This architecture improves security by eliminating root audio processing while maintaining the required 5.33ms latency.
 
-**Key Achievements**: 
+**Key Points**:
 - ✅ PipeWire runs as dedicated `mediabridge` user (not root)
 - ✅ Upgraded to PipeWire 1.4.7 via Rob Savoury's PPA
-- ✅ Ubuntu 24.04 compliant user session architecture
-- ✅ Socket bind mounts for system-wide access
+- ✅ Ubuntu 24.04 user-session architecture (systemd --user)
 - ✅ Realtime scheduling (rtprio 95) for low latency
-- ✅ WirePlumber Chrome isolation configuration
+- ✅ WirePlumber Chrome isolation configuration (user scope)
 - ✅ Migration script for existing deployments
 
 ## Architecture Overview
 
-### User Mode Architecture (v3.2)
-- **User**: `mediabridge` (UID 999, system user)
-- **Groups**: audio, pipewire, video, input, render
-- **Home**: `/var/lib/mediabridge/`
-- **Runtime**: `/run/user/999/` (primary)
-- **Socket Access**: `/run/pipewire/` (bind mount for system-wide access)
-- **Session**: Persistent via `loginctl enable-linger`
-- **Chrome Profile**: `/var/lib/mediabridge/chrome-profile/`
+### User Session Architecture (current)
+- User: `mediabridge` (UID ≥ 1000, regular user)
+- Groups: audio, video, render, input
+- Home: `/home/mediabridge/`
+- Runtime: `/run/user/<uid>/` (provided by systemd user session)
+- Session: Persistent via `loginctl enable-linger mediabridge`
+- Chrome Profile: `/var/lib/mediabridge/chrome-profile/`
 
 ### Why This Architecture?
 
@@ -85,29 +83,20 @@ Media Bridge uses **PipeWire 1.4.7** running as a dedicated `mediabridge` user (
 
 ## Key Components
 
-### 1. User Session Services
-Managed by systemd --user for mediabridge user:
+### 1. User Session Services (default Ubuntu model)
+Managed by systemd --user for the `mediabridge` user:
 
-- **pipewire.service** - Core audio server (PipeWire 1.4.7)
-  - Override: Bind mounts socket to `/run/pipewire/pipewire-0`
-- **pipewire-pulse.service** - PulseAudio compatibility layer
-  - Override: Bind mounts pulse socket to `/run/pipewire/pulse/`
-- **wireplumber.service** - Session and policy manager
-  - Configuration: Chrome isolation via JSON config
-- **Location**: `/usr/lib/systemd/user/` (standard Ubuntu packages)
-- **Overrides**: `/var/lib/mediabridge/.config/systemd/user/*/override.conf`
-- **Enabled via**: `loginctl enable-linger mediabridge`
+- pipewire.service — Core audio server
+- pipewire-pulse.service — PulseAudio compatibility layer
+- wireplumber.service — Session and policy manager
 
-### 2. System Services (Running as mediabridge)
-- **media-bridge-intercom.service** - Chrome intercom
-  - User: mediabridge
-  - Environment: XDG_RUNTIME_DIR=/run/pipewire
-- **ndi-display@.service** - NDI display output
-  - User: mediabridge
-  - Access: HDMI audio via PipeWire
-- **ndi-capture.service** - NDI capture
-  - User: mediabridge
-  - Access: V4L2 devices via video group
+Location: `/usr/lib/systemd/user/` or `/lib/systemd/user/`
+Enablement: symlinks under `/home/mediabridge/.config/systemd/user/default.target.wants/`
+
+### 2. Project User Units (running under mediabridge)
+- media-bridge-intercom.service — Chrome intercom (user unit)
+- ndi-display@.service — NDI display output (user unit)
+- ndi-capture.service — runs as system unit but does not set XDG overrides (uses standard env)
 
 ### 2. Virtual Audio Devices
 Created with blackhole approach for proper isolation:
@@ -160,20 +149,12 @@ mediabridge user (UID 999)
 
 ## User Mode Configuration Details
 
-### Service Overrides
-Located in `/var/lib/mediabridge/.config/systemd/user/*/override.conf`:
-
-**pipewire.service.d/override.conf**:
-```ini
-[Service]
-ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pipewire-0 /run/pipewire/pipewire-0'
-ExecStopPost=-/bin/umount /run/pipewire/pipewire-0
-LimitNOFILE=32768
-LimitMEMLOCK=infinity
-```
+### Service Enablement
+Enabled by creating symlinks in mediabridge's user wants directory:
+`/home/mediabridge/.config/systemd/user/default.target.wants/`
 
 ### WirePlumber Chrome Isolation
-Configured via `/var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d/50-chrome-isolation.conf`:
+Configured via `/home/mediabridge/.config/wireplumber/wireplumber.conf.d/50-chrome-isolation.conf`:
 ```json
 {
   "wireplumber.profiles": {
@@ -247,14 +228,9 @@ journalctl -u pipewire-system -f
 
 ### Verify Audio Devices
 ```bash
-# Using bind mounted socket (preferred)
-export XDG_RUNTIME_DIR=/run/pipewire
-pactl list sinks short
-pactl list sources short
-
-# Or as mediabridge user directly
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 pactl list sinks short
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 pactl list sources short
+# As mediabridge user (recommended)
+sudo -u mediabridge pactl list sinks short
+sudo -u mediabridge pactl list sources short
 ```
 
 ### Common Issues
@@ -264,7 +240,7 @@ sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 pactl list sources short
 | No audio | PipeWire not running | Check `systemctl --user -M mediabridge@ status pipewire` |
 | Chrome sees all devices | WirePlumber config not loaded | Check `/var/lib/mediabridge/.config/wireplumber/` |
 | USB audio not detected | Device permissions | Ensure mediabridge in audio group |
-| Connection refused | Socket not bind mounted | Check `/run/pipewire/pipewire-0` exists |
+| Connection refused | User session not active | Check `loginctl user-status mediabridge` and `sudo -u mediabridge systemctl --user status pipewire` |
 | Permission denied | Wrong user/group | Services must run as mediabridge:audio |
 
 ## Future Improvements Needed
@@ -304,7 +280,7 @@ This script handles:
 2. Enable linger: `loginctl enable-linger mediabridge`
 3. Move Chrome profile: `mv /tmp/chrome-vdo-profile /var/lib/mediabridge/chrome-profile`
 4. Update service files to use `User=mediabridge`
-5. Set XDG_RUNTIME_DIR=/run/pipewire in all scripts
+5. Do not override XDG_RUNTIME_DIR in scripts; use user session
 6. Create limits.conf for realtime scheduling
 7. Restart all services
 
