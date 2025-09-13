@@ -29,10 +29,7 @@ class ShellExecutor:
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env={
-                    "XDG_RUNTIME_DIR": "/run/user/0",
-                    "PULSE_RUNTIME_PATH": "/run/user/0/pulse"
-                }
+                # Inherit environment from user service (mediabridge)
             )
             
             stdout, stderr = await process.communicate()

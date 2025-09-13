@@ -1,21 +1,10 @@
 [Unit]
-Description=Media Bridge Intercom Service
-After=network-online.target user@999.service
-Wants=network-online.target
-# PipeWire now runs as user service, no direct dependencies
+Description=Media Bridge Intercom (user)
+Wants=pipewire.service pipewire-pulse.service wireplumber.service
+After=pipewire.service pipewire-pulse.service wireplumber.service
 
 [Service]
 Type=simple
-User=mediabridge
-Group=audio
-
-# Environment for PipeWire socket access
-Environment="XDG_RUNTIME_DIR=/run/pipewire"
-Environment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"
-Environment="PULSE_RUNTIME_PATH=/run/pipewire/pulse"
-
-# Chrome profile location
-Environment="CHROME_USER_DATA_DIR=/var/lib/mediabridge/chrome-profile"
 
 # Pre-start cleanup
 ExecStartPre=-/bin/bash -c 'pkill -9 -f chrome 2>/dev/null || true'
@@ -24,7 +13,7 @@ ExecStartPre=-/bin/bash -c 'pkill -9 -f Xvfb 2>/dev/null || true'
 ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock /var/lib/mediabridge/chrome-profile/Singleton* 2>/dev/null || true'
 ExecStartPre=/bin/sleep 3
 
-# Setup virtual audio devices (now runs as mediabridge)
+# Setup virtual audio devices
 ExecStartPre=/usr/local/bin/media-bridge-audio-manager setup
 
 # Start the service
@@ -50,4 +39,4 @@ StandardOutput=journal
 StandardError=journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

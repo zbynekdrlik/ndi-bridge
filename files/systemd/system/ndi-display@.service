@@ -1,28 +1,21 @@
 [Unit]
-Description=NDI Display Output %i
-After=network.target user@999.service
-Wants=ndi-display-monitor.service
-Before=getty@tty%i.service
-Conflicts=getty@tty%i.service
+Description=NDI Display Output %i (user)
+Wants=pipewire.service pipewire-pulse.service wireplumber.service
+After=pipewire.service pipewire-pulse.service wireplumber.service
 
 [Service]
 Type=simple
 Restart=on-failure
 RestartSec=5
-User=mediabridge
-Group=audio
 
 # Environment for display selection
 Environment="DISPLAY_ID=%i"
 Environment="LD_LIBRARY_PATH=/usr/local/lib"
-Environment="XDG_RUNTIME_DIR=/run/pipewire"
-Environment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"
 
 # Read stream configuration from file
 EnvironmentFile=-/etc/media-bridge/display-%i.conf
 
 # Start NDI display using launcher script (handles spaces in stream names)
-# Console management is now handled by the launcher itself
 ExecStart=/usr/local/bin/ndi-display-launcher %i
 ExecStopPost=/usr/bin/rm -f /var/run/ndi-display/display-%i.status
 ExecStopPost=/bin/sh -c 'echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true'
@@ -40,4 +33,4 @@ StandardError=journal
 SyslogIdentifier=ndi-display-%i
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target

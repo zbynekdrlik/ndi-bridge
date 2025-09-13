@@ -8,8 +8,7 @@ echo "========================================="
 echo "Media Bridge PipeWire User Migration"
 echo "========================================="
 echo ""
-echo "This script will migrate your PipeWire audio system"
-echo "from running as root to running as the mediabridge user."
+echo "This script migrates your PipeWire audio system to run as the mediabridge user via a standard systemd user session."
 echo ""
 echo "Press Ctrl+C to cancel, or Enter to continue..."
 read
@@ -24,43 +23,25 @@ systemctl stop pipewire-pulse-system 2>/dev/null || true
 systemctl stop wireplumber-system 2>/dev/null || true
 
 # Create mediabridge user if it doesn't exist
-echo "Creating mediabridge user..."
+echo "Ensuring mediabridge user exists..."
+groupadd -r pipewire 2>/dev/null || true
+groupadd -r render 2>/dev/null || true
+groupadd -r input 2>/dev/null || true
 if ! id -u mediabridge >/dev/null 2>&1; then
-    # Create required groups first
-    groupadd -r pipewire 2>/dev/null || true
-    groupadd -r render 2>/dev/null || true
-    groupadd -r input 2>/dev/null || true
-    
-    # Create mediabridge user
-    useradd --system --uid 999 --gid audio \
-            --groups pipewire,video,input,render \
-            --home /var/lib/mediabridge \
-            --shell /bin/false \
-            --comment "Media Bridge System User" \
-            mediabridge
-    echo "User mediabridge created with UID 999"
+    useradd -m -u 1001 -g audio -G pipewire,video,input,render,sudo -s /bin/bash -c "Media Bridge User" mediabridge || true
 else
-    echo "User mediabridge already exists"
-    # Ensure user is in correct groups
-    usermod -a -G pipewire,video,input,render,audio mediabridge
+    usermod -a -G pipewire,video,input,render,audio mediabridge || true
 fi
 
 # Enable persistent user session
 echo "Enabling persistent user session..."
 loginctl enable-linger mediabridge
 
-# Create directories
 echo "Creating required directories..."
-mkdir -p /run/pipewire
-mkdir -p /var/lib/mediabridge
-mkdir -p /var/lib/mediabridge/.config/systemd/user
-mkdir -p /var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d
-mkdir -p /var/run/ndi-display
-mkdir -p /var/run/media-bridge
-
-# Set ownership
-chown mediabridge:audio /run/pipewire
-chown -R mediabridge:audio /var/lib/mediabridge
+mkdir -p /home/mediabridge/.config/systemd/user/default.target.wants
+mkdir -p /home/mediabridge/.config/wireplumber/wireplumber.conf.d
+mkdir -p /var/run/ndi-display /var/run/media-bridge
+chown -R mediabridge:audio /home/mediabridge/.config
 chown mediabridge:audio /var/run/ndi-display
 chown mediabridge:audio /var/run/media-bridge
 
@@ -92,9 +73,6 @@ EOF
 echo "Creating tmpfiles.d configuration..."
 cat > /etc/tmpfiles.d/mediabridge.conf << 'EOF'
 # Runtime directories for Media Bridge
-d /run/pipewire 0755 mediabridge audio -
-d /run/user/999 0700 mediabridge audio -
-d /var/lib/mediabridge 0755 mediabridge audio -
 d /var/run/ndi-display 0755 mediabridge audio -
 d /var/run/media-bridge 0755 mediabridge audio -
 EOF
@@ -102,31 +80,17 @@ EOF
 # Apply tmpfiles configuration
 systemd-tmpfiles --create /etc/tmpfiles.d/mediabridge.conf
 
-# Create PipeWire user service overrides
-echo "Configuring PipeWire user services..."
-mkdir -p /var/lib/mediabridge/.config/systemd/user/pipewire.service.d
-cat > /var/lib/mediabridge/.config/systemd/user/pipewire.service.d/override.conf << 'EOF'
-[Service]
-ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pipewire-0 /run/pipewire/pipewire-0 2>/dev/null || true'
-ExecStopPost=-/bin/umount /run/pipewire/pipewire-0
-LimitNOFILE=32768
-LimitNPROC=32768
-LimitMEMLOCK=infinity
-Restart=on-failure
-RestartSec=5s
-EOF
-
-mkdir -p /var/lib/mediabridge/.config/systemd/user/pipewire-pulse.service.d
-cat > /var/lib/mediabridge/.config/systemd/user/pipewire-pulse.service.d/override.conf << 'EOF'
-[Service]
-ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pulse /run/pipewire/pulse 2>/dev/null || true'
-ExecStopPost=-/bin/umount /run/pipewire/pulse
-LimitNOFILE=32768
-LimitNPROC=32768
-EOF
-
-# Set ownership
-chown -R mediabridge:audio /var/lib/mediabridge/.config
+echo "Enabling PipeWire user services for mediabridge..."
+mkdir -p /home/mediabridge/.config/systemd/user/default.target.wants
+for u in pipewire.service pipewire-pulse.service wireplumber.service; do
+  if [ -f "/usr/lib/systemd/user/$u" ] || [ -f "/lib/systemd/user/$u" ]; then
+    ln -sf "/usr/lib/systemd/user/$u" \
+      "/home/mediabridge/.config/systemd/user/default.target.wants/$u" 2>/dev/null || \
+    ln -sf "/lib/systemd/user/$u" \
+      "/home/mediabridge/.config/systemd/user/default.target.wants/$u" 2>/dev/null || true
+  fi
+done
+chown -R mediabridge:audio /home/mediabridge/.config
 
 # Create WirePlumber Chrome isolation configuration
 echo "Setting up WirePlumber Chrome isolation..."
@@ -162,30 +126,13 @@ EOF
 chown -R mediabridge:audio /var/lib/mediabridge/.config
 
 # Update all helper scripts
-echo "Updating helper scripts..."
-for script in /usr/local/bin/media-bridge-*; do
-    if [ -f "$script" ]; then
-        # Update XDG_RUNTIME_DIR
-        sed -i 's|export XDG_RUNTIME_DIR=/run/user/0|export XDG_RUNTIME_DIR=/run/pipewire|g' "$script"
-        sed -i 's|XDG_RUNTIME_DIR=/run/user/0|XDG_RUNTIME_DIR=/run/pipewire|g' "$script"
-        
-        # Add new environment variables after XDG_RUNTIME_DIR
-        if grep -q "export XDG_RUNTIME_DIR=/run/pipewire" "$script"; then
-            sed -i '/export XDG_RUNTIME_DIR=\/run\/pipewire/a export PIPEWIRE_RUNTIME_DIR=/run/pipewire\nexport PULSE_RUNTIME_PATH=/run/pipewire/pulse' "$script"
-        fi
-        
-        # Update Chrome profile path
-        sed -i 's|/tmp/chrome-vdo-profile|/var/lib/mediabridge/chrome-profile|g' "$script"
-        sed -i 's|/opt/chrome-vdo-profile|/var/lib/mediabridge/chrome-profile|g' "$script"
-    fi
+echo "Updating helper scripts (removing legacy /run/pipewire usage)..."
+for script in /usr/local/bin/media-bridge-* /usr/local/bin/ndi-display-*; do
+  [ -f "$script" ] || continue
+  sed -i '/XDG_RUNTIME_DIR=\/run\/pipewire/d' "$script" 2>/dev/null || true
+  sed -i '/PIPEWIRE_RUNTIME_DIR=\/run\/pipewire/d' "$script" 2>/dev/null || true
+  sed -i '/PULSE_RUNTIME_PATH=\/run\/pipewire\/pulse/d' "$script" 2>/dev/null || true
 done
-
-# Update ndi-display-launcher
-if [ -f /usr/local/bin/ndi-display-launcher ]; then
-    sed -i 's|export XDG_RUNTIME_DIR="/run/user/0"|export XDG_RUNTIME_DIR="/run/pipewire"|g' /usr/local/bin/ndi-display-launcher
-    sed -i '/export XDG_RUNTIME_DIR/a export PIPEWIRE_RUNTIME_DIR="/run/pipewire"\nexport PULSE_RUNTIME_PATH="/run/pipewire/pulse"' /usr/local/bin/ndi-display-launcher
-    sed -i 's|pipewire-system\.service|user@999.service|g' /usr/local/bin/ndi-display-launcher
-fi
 
 # Disable old system services
 echo "Disabling old system services..."
@@ -194,65 +141,42 @@ systemctl disable pipewire-pulse-system 2>/dev/null || true
 systemctl disable wireplumber-system 2>/dev/null || true
 
 # Enable new user services
-echo "Enabling PipeWire user services..."
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable pipewire.service
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable pipewire-pulse.service
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable wireplumber.service
+echo "PipeWire user services enabled via wants symlinks"
 
 # Update systemd service files
 echo "Updating systemd service files..."
 
-# Update media-bridge-intercom.service
-if [ -f /etc/systemd/system/media-bridge-intercom.service ]; then
-    sed -i 's|User=root|User=mediabridge|g' /etc/systemd/system/media-bridge-intercom.service
-    sed -i 's|After=.*pipewire-system.*|After=network-online.target user@999.service|g' /etc/systemd/system/media-bridge-intercom.service
-    sed -i '/^User=mediabridge/a Group=audio\n\n# Environment for PipeWire socket access\nEnvironment="XDG_RUNTIME_DIR=/run/pipewire"\nEnvironment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"\nEnvironment="PULSE_RUNTIME_PATH=/run/pipewire/pulse"\nEnvironment="CHROME_USER_DATA_DIR=/var/lib/mediabridge/chrome-profile"' /etc/systemd/system/media-bridge-intercom.service
-fi
-
-# Update ndi-display@.service
-if [ -f /etc/systemd/system/ndi-display@.service ]; then
-    sed -i 's|User=root|User=mediabridge|g' /etc/systemd/system/ndi-display@.service
-    sed -i 's|After=.*pipewire-system.*|After=network.target user@999.service|g' /etc/systemd/system/ndi-display@.service
-    sed -i '/^User=mediabridge/a Group=audio' /etc/systemd/system/ndi-display@.service
-    sed -i 's|XDG_RUNTIME_DIR=/run/user/0|XDG_RUNTIME_DIR=/run/pipewire|g' /etc/systemd/system/ndi-display@.service
-    sed -i '/XDG_RUNTIME_DIR/a Environment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"' /etc/systemd/system/ndi-display@.service
-fi
-
-# Update ndi-capture.service
-if [ -f /etc/systemd/system/ndi-capture.service ]; then
-    sed -i '/^\[Service\]/a User=mediabridge\nGroup=audio\n\n# Environment for PipeWire socket access\nEnvironment="XDG_RUNTIME_DIR=/run/pipewire"\nEnvironment="PIPEWIRE_RUNTIME_DIR=/run/pipewire"\nEnvironment="LD_LIBRARY_PATH=/usr/local/lib"' /etc/systemd/system/ndi-capture.service
+echo "Installing user intercom service (if present)..."
+if [ -f /etc/systemd/user/media-bridge-intercom.service ]; then
+  ln -sf /etc/systemd/user/media-bridge-intercom.service \
+        /home/mediabridge/.config/systemd/user/default.target.wants/media-bridge-intercom.service
+  chown -R mediabridge:audio /home/mediabridge/.config
 fi
 
 # Update global environment
-echo "Updating global environment..."
-sed -i 's|XDG_RUNTIME_DIR=/run/user/0|XDG_RUNTIME_DIR=/run/pipewire|g' /etc/environment
-if ! grep -q "PIPEWIRE_RUNTIME_DIR" /etc/environment; then
-    echo "PIPEWIRE_RUNTIME_DIR=/run/pipewire" >> /etc/environment
-    echo "PULSE_RUNTIME_PATH=/run/pipewire/pulse" >> /etc/environment
-fi
+echo "Global environment unchanged (user session provides XDG_RUNTIME_DIR)"
 
 # Reload systemd
 echo "Reloading systemd configuration..."
 systemctl daemon-reload
 
 # Start user session
-echo "Starting mediabridge user session..."
-systemctl start user@999.service
+echo "Ensure mediabridge user session lingering is enabled (loginctl enable-linger mediabridge)"
 
 # Wait for PipeWire to start
 echo "Waiting for PipeWire to start..."
 sleep 5
 
 # Verify PipeWire is running
-if sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user is-active pipewire.service >/dev/null 2>&1; then
+if sudo -u mediabridge systemctl --user is-active pipewire.service >/dev/null 2>&1; then
     echo "✓ PipeWire is running as mediabridge user"
 else
-    echo "⚠ PipeWire may not be running. Check with: systemctl --user -M mediabridge@ status pipewire"
+    echo "⚠ PipeWire may not be running. Check with: sudo -u mediabridge systemctl --user status pipewire"
 fi
 
 # Start Media Bridge services
 echo "Starting Media Bridge services..."
-systemctl start media-bridge-intercom
+sudo -u mediabridge systemctl --user start media-bridge-intercom 2>/dev/null || true
 systemctl start ndi-capture 2>/dev/null || true
 
 echo ""

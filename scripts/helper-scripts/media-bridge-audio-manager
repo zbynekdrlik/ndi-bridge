@@ -7,10 +7,10 @@
 
 set -e
 
-# PipeWire environment (user mode with socket bind mount)
-export XDG_RUNTIME_DIR=/run/pipewire
-export PIPEWIRE_RUNTIME_DIR=/run/pipewire
-export PULSE_RUNTIME_PATH=/run/pipewire/pulse
+# Use user session runtime; do not override to system paths
+if [ -z "$XDG_RUNTIME_DIR" ]; then
+  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+fi
 
 # Function to wait for PipeWire
 wait_for_pipewire() {
@@ -217,10 +217,8 @@ case "${1:-setup}" in
     status)
         echo "=== Audio System Status ==="
         echo ""
-        echo "PipeWire Services:"
-        systemctl is-active pipewire-system.service || echo "pipewire-system: inactive"
-        systemctl is-active pipewire-pulse-system.service || echo "pipewire-pulse-system: inactive"
-        systemctl is-active wireplumber-system.service || echo "wireplumber-system: inactive"
+        echo "PipeWire (user) status:"
+        if pactl info >/dev/null 2>&1; then echo "OK: pactl connected"; else echo "ERROR: pactl cannot connect"; fi
         echo ""
         echo "Virtual Devices:"
         pactl list sinks short | grep -E "intercom-speaker" || echo "No virtual speaker"

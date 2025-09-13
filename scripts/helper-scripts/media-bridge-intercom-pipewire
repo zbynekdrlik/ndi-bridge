@@ -72,12 +72,10 @@ setsid x11vnc -noshm -display :$DISPLAY_NUM -nopw -forever -shared -rfbport 5999
 sleep 2
 echo "VNC server detached and running"
 
-# Setup runtime directory and PulseAudio directory (user mode with socket bind mount)
-export XDG_RUNTIME_DIR=/run/pipewire
-export PIPEWIRE_RUNTIME_DIR=/run/pipewire
-export PULSE_RUNTIME_PATH=/run/pipewire/pulse
-mkdir -p $XDG_RUNTIME_DIR
-mkdir -p $XDG_RUNTIME_DIR/pulse
+# Rely on user session runtime; if missing, derive from current UID
+if [ -z "$XDG_RUNTIME_DIR" ]; then
+    export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+fi
 
 # Create required directories in tmpfs for Chrome and WirePlumber
 mkdir -p /tmp/.local/state/wireplumber
@@ -88,34 +86,10 @@ export XDG_DATA_HOME=/tmp/.local/share
 export XDG_CONFIG_HOME=/tmp/.config
 mkdir -p $XDG_CONFIG_HOME
 
-# Ensure PipeWire system services are available
-echo "Checking PipeWire audio system..."
-
-# With unified PipeWire, configuration is done at build time
-# No dynamic configuration changes needed here
-
-# Check if system PipeWire is running (REQUIRED)
-if ! systemctl is-active --quiet pipewire-system.service; then
-    echo "ERROR: System-wide PipeWire service is not running!"
-    echo "Starting system PipeWire services..."
-    systemctl start pipewire-system.service pipewire-pulse-system.service wireplumber-system.service
-    sleep 3
-    
-    # Check again
-    if ! systemctl is-active --quiet pipewire-system.service; then
-        echo "ERROR: Failed to start system PipeWire services"
-        echo "Please check: systemctl status pipewire-system.service"
-        exit 1
-    fi
-fi
-
-echo "Using system-wide PipeWire service"
-PIPEWIRE_PID=""
-PULSE_PID=""
-WIREPLUMBER_PID=""
+echo "Checking PipeWire audio system (user session)..."
 
 # Wait for PipeWire to be ready and socket to exist  
-for i in {1..10}; do
+for i in {1..20}; do
     if [ -S "$XDG_RUNTIME_DIR/pulse/native" ] && pactl info >/dev/null 2>&1; then
         echo "PipeWire PulseAudio bridge ready"
         echo "Socket exists at: $XDG_RUNTIME_DIR/pulse/native"
@@ -128,8 +102,8 @@ done
 # Verify socket really exists
 if [ ! -S "$XDG_RUNTIME_DIR/pulse/native" ]; then
     echo "ERROR: PulseAudio socket not created at $XDG_RUNTIME_DIR/pulse/native"
-    echo "System PipeWire may not be configured correctly"
-    echo "Please check: systemctl status pipewire-pulse-system.service"
+    echo "User PipeWire may not be configured correctly"
+    echo "Please check: sudo -u mediabridge systemctl --user status pipewire pipewire-pulse wireplumber"
     exit 1
 fi
 

@@ -36,17 +36,15 @@ install_helper_scripts() {
         done
         
         if [ -f "$HELPER_DIR/media-bridge-intercom.service" ]; then
-            cp "$HELPER_DIR/media-bridge-intercom.service" /mnt/usb/etc/systemd/system/
+            # Install as user unit
+            mkdir -p /mnt/usb/etc/systemd/user
+            cp "$HELPER_DIR/media-bridge-intercom.service" /mnt/usb/etc/systemd/user/
         fi
         
         # Note: PipeWire now runs as user service (mediabridge user)
         # System service files removed in favor of user mode operation
         
-        # Install PipeWire configuration
-        if [ -f "$HELPER_DIR/pipewire-system.conf" ]; then
-            mkdir -p /mnt/usb/etc/pipewire
-            cp "$HELPER_DIR/pipewire-system.conf" /mnt/usb/etc/pipewire/
-        fi
+        # Install PipeWire configuration (global conf.d only; no system-wide daemon conf)
         if [ -d "$HELPER_DIR/pipewire-conf.d" ]; then
             mkdir -p /mnt/usb/etc/pipewire/pipewire.conf.d
             cp "$HELPER_DIR/pipewire-conf.d"/*.conf /mnt/usb/etc/pipewire/pipewire.conf.d/
@@ -60,9 +58,9 @@ install_helper_scripts() {
         
         # Install WirePlumber Chrome isolation configuration (JSON for WirePlumber 0.5)
         if [ -f "$HELPER_DIR/50-chrome-isolation.conf" ]; then
-            mkdir -p /mnt/usb/var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d
-            cp "$HELPER_DIR/50-chrome-isolation.conf" /mnt/usb/var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d/
-            chown -R 999:999 /mnt/usb/var/lib/mediabridge/.config
+            mkdir -p /mnt/usb/home/mediabridge/.config/wireplumber/wireplumber.conf.d
+            cp "$HELPER_DIR/50-chrome-isolation.conf" /mnt/usb/home/mediabridge/.config/wireplumber/wireplumber.conf.d/
+            chown -R mediabridge:audio /mnt/usb/home/mediabridge/.config
         fi
         
         # Install audio manager
@@ -115,10 +113,10 @@ install_helper_scripts() {
 PREFS
         
         # Set ownership for Chrome profile
-        chown -R 999:999 /mnt/usb/var/lib/mediabridge/chrome-profile
+        chown -R mediabridge:audio /mnt/usb/var/lib/mediabridge/chrome-profile
         
         # Chrome intercom is now fully installed during build
-        log "Chrome intercom scripts installed"
+        log "Chrome intercom scripts installed (user-mode)"
     else
         warn "Helper scripts directory not found, creating inline..."
         # If helper scripts directory doesn't exist, create them inline

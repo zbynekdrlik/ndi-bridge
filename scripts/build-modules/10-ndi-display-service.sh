@@ -23,16 +23,23 @@ configure_ndi_display_service() {
         log "  Copied display-policy.conf"
     fi
     
-    # Copy systemd service files BEFORE chroot
+    # Copy systemd user service for ndi-display BEFORE chroot
+    mkdir -p /mnt/usb/etc/systemd/user
+    if [ -f files/systemd/system/ndi-display@.service ]; then
+        cp files/systemd/system/ndi-display@.service /mnt/usb/etc/systemd/user/
+        log "  Copied ndi-display@.service (user unit)"
+    else
+        warn "  ndi-display@.service not found in files/systemd/system/"
+    fi
+    
+    # Monitor service can remain as system unit
     mkdir -p /mnt/usb/etc/systemd/system
-    for service in ndi-display@.service ndi-display-monitor.service; do
-        if [ -f files/systemd/system/$service ]; then
-            cp files/systemd/system/$service /mnt/usb/etc/systemd/system/
-            log "  Copied $service"
-        else
-            warn "  $service not found in files/systemd/system/"
-        fi
-    done
+    if [ -f files/systemd/system/ndi-display-monitor.service ]; then
+        cp files/systemd/system/ndi-display-monitor.service /mnt/usb/etc/systemd/system/
+        log "  Copied ndi-display-monitor.service"
+    else
+        warn "  ndi-display-monitor.service not found"
+    fi
     
     # Everything else happens inside chroot
     chroot /mnt/usb /bin/bash << 'EOFNDIDISPLAY'
@@ -43,7 +50,8 @@ mkdir -p /etc/media-bridge
 mkdir -p /var/run/ndi-display
 
 # Systemd service files were copied before chroot
-# ndi-display@.service and ndi-display-monitor.service are now in /etc/systemd/system/
+# ndi-display@.service installed under /etc/systemd/user/ (user unit)
+# ndi-display-monitor.service installed under /etc/systemd/system/ (system unit)
 
 # Create symlink for convenience
 ln -sf /opt/media-bridge/ndi-display /usr/local/bin/ndi-display 2>/dev/null || true
@@ -68,11 +76,13 @@ ln -sf /opt/media-bridge/ndi-display /usr/local/bin/ndi-display 2>/dev/null || t
 # systemctl isn't available in chroot, create enable symlink manually
 ln -sf /etc/systemd/system/ndi-display-monitor.service /etc/systemd/system/multi-user.target.wants/ndi-display-monitor.service
 
-# Enable all display services by default (they check config to decide if they run)
-# This eliminates the need for systemctl enable when configuring displays
+# Enable display user units for mediabridge by default (0..2)
+mkdir -p /home/mediabridge/.config/systemd/user/default.target.wants
 for i in 0 1 2; do
-    ln -sf /etc/systemd/system/ndi-display@.service /etc/systemd/system/multi-user.target.wants/ndi-display@${i}.service
+    ln -sf /etc/systemd/user/ndi-display@.service \
+          /home/mediabridge/.config/systemd/user/default.target.wants/ndi-display@${i}.service
 done
+chown -R mediabridge:audio /home/mediabridge/.config
 
 EOFNDIDISPLAY
 

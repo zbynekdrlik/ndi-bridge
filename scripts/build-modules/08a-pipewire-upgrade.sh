@@ -81,66 +81,25 @@ EOF
 
 echo "✓ PipeWire packages pinned to prevent upgrades"
 
-# Configure PipeWire for user mode operation
-echo "Configuring PipeWire for user mode with mediabridge user..."
+echo "Configuring PipeWire user services (no system-wide bind mounts)..."
 
-# Create user service override directory
-mkdir -p /var/lib/mediabridge/.config/systemd/user/pipewire.service.d
-mkdir -p /var/lib/mediabridge/.config/systemd/user/pipewire-pulse.service.d
-mkdir -p /var/lib/mediabridge/.config/systemd/user/wireplumber.service.d
+# Prepare mediabridge's user wants directory for enabling services on first boot
+mkdir -p /home/mediabridge/.config/systemd/user/default.target.wants
 
-# Create override for PipeWire to bind mount socket for system-wide access
-cat > /var/lib/mediabridge/.config/systemd/user/pipewire.service.d/override.conf << 'PIPEWIRE_OVERRIDE_EOF'
-[Service]
-# Bind mount socket for system-wide access after startup
-ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pipewire-0 /run/pipewire/pipewire-0 2>/dev/null || true'
-ExecStopPost=-/bin/umount /run/pipewire/pipewire-0
+# Enable user services by creating wants symlinks (works in chroot)
+for u in pipewire.service pipewire-pulse.service wireplumber.service; do
+  if [ -f "/usr/lib/systemd/user/$u" ] || [ -f "/lib/systemd/user/$u" ]; then
+    ln -sf "/usr/lib/systemd/user/$u" \
+      "/home/mediabridge/.config/systemd/user/default.target.wants/$u" 2>/dev/null || \
+    ln -sf "/lib/systemd/user/$u" \
+      "/home/mediabridge/.config/systemd/user/default.target.wants/$u" 2>/dev/null || true
+  fi
+done
 
-# Resource limits for multimedia
-LimitNOFILE=32768
-LimitNPROC=32768
-LimitMEMLOCK=infinity
+# Permissions
+chown -R mediabridge:audio /home/mediabridge/.config
 
-# Restart policy for reliability
-Restart=on-failure
-RestartSec=5s
-PIPEWIRE_OVERRIDE_EOF
-
-# Create override for PipeWire-Pulse
-cat > /var/lib/mediabridge/.config/systemd/user/pipewire-pulse.service.d/override.conf << 'PULSE_OVERRIDE_EOF'
-[Service]
-# Bind mount pulse socket for system-wide access
-ExecStartPost=/bin/sh -c 'sleep 1; mount --bind /run/user/999/pulse /run/pipewire/pulse 2>/dev/null || true'
-ExecStopPost=-/bin/umount /run/pipewire/pulse
-
-# Resource limits
-LimitNOFILE=32768
-LimitNPROC=32768
-PULSE_OVERRIDE_EOF
-
-# Set proper ownership
-chown -R mediabridge:audio /var/lib/mediabridge/.config
-
-# Enable user services for mediabridge
-echo "Enabling PipeWire user services for mediabridge..."
-# Note: This may fail in chroot, but will be retried on first boot
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable pipewire.service 2>/dev/null || true
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable pipewire-pulse.service 2>/dev/null || true
-sudo -u mediabridge XDG_RUNTIME_DIR=/run/user/999 systemctl --user enable wireplumber.service 2>/dev/null || true
-
-# Create systemd drop-in to ensure user session starts on boot
-mkdir -p /etc/systemd/system/user@999.service.d
-cat > /etc/systemd/system/user@999.service.d/override.conf << 'USER_OVERRIDE_EOF'
-[Service]
-# Ensure PipeWire starts on boot for mediabridge user
-Environment="XDG_RUNTIME_DIR=/run/user/999"
-
-[Unit]
-# Start after basic system is ready
-After=multi-user.target
-USER_OVERRIDE_EOF
-
-echo "✓ PipeWire configured for user mode operation"
+echo "✓ PipeWire configured as user services for mediabridge"
 
 # Create marker file for other modules
 touch /tmp/pipewire-1.4.7-installed

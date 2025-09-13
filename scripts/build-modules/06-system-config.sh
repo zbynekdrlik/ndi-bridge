@@ -62,7 +62,8 @@ apt-get install -y -qq --no-install-recommends \
     zstd \
     kbd \
     usbutils \
-    btrfs-progs 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
+    btrfs-progs \
+    dbus-user-session 2>&1 | grep -v "^Get:\|^Fetched\|^Reading\|^Building" || true
 
 # Try to install DHCP client (different package names in different Ubuntu versions)
 apt-get install -y -qq --no-install-recommends isc-dhcp-client 2>/dev/null || \
@@ -153,31 +154,26 @@ systemctl disable NetworkManager 2>/dev/null || true
 # Remove WiFi packages if they were installed
 apt-get remove -y -qq wpasupplicant wireless-tools network-manager 2>/dev/null || true
 
-# Create mediabridge user for PipeWire and services
-echo "Creating mediabridge system user..."
-# Create pipewire group first if it doesn't exist
+echo "Creating mediabridge user (regular desktop-style UID)..."
+# Ensure supplementary groups exist
 groupadd -r pipewire 2>/dev/null || true
 groupadd -r render 2>/dev/null || true
 groupadd -r input 2>/dev/null || true
 
-# Create mediabridge user with specific UID for consistency
-useradd --system --uid 999 --gid audio \
-        --groups pipewire,video,input,render \
-        --home /var/lib/mediabridge \
-        --shell /bin/false \
-        --comment "Media Bridge System User" \
-        mediabridge 2>/dev/null || {
-    echo "User mediabridge already exists or creation failed, continuing..."
-}
+# Create mediabridge as a regular user (UID >= 1000) with home and shell
+if ! id mediabridge >/dev/null 2>&1; then
+    useradd -m -u 1001 -g audio \
+            -G pipewire,video,input,render,sudo \
+            -s /bin/bash \
+            -c "Media Bridge User" \
+            mediabridge || true
+fi
 
-# Create runtime and home directories
-mkdir -p /run/pipewire
-mkdir -p /var/lib/mediabridge
-mkdir -p /var/lib/mediabridge/.config/systemd/user
-mkdir -p /var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d
-chown mediabridge:audio /run/pipewire
-chown -R mediabridge:audio /var/lib/mediabridge
-chmod 755 /run/pipewire
+# Create home config directories for user services and WirePlumber
+mkdir -p /home/mediabridge/.config/systemd/user/default.target.wants
+mkdir -p /home/mediabridge/.config/wireplumber/wireplumber.conf.d
+chown -R mediabridge:audio /home/mediabridge/.config
+chmod 700 /home/mediabridge/.config || true
 
 # Enable persistent user session for headless operation
 loginctl enable-linger mediabridge 2>/dev/null || {
@@ -185,8 +181,6 @@ loginctl enable-linger mediabridge 2>/dev/null || {
     mkdir -p /var/lib/systemd/linger
     touch /var/lib/systemd/linger/mediabridge
 }
-
-echo "Media Bridge user created with UID 999"
 
 # Configure timezone to Europe/Prague (CEST)
 echo "Configuring timezone..."
@@ -197,13 +191,7 @@ timedatectl set-timezone Europe/Prague || {
 }
 echo "Timezone configured: $(timedatectl show --property=Timezone --value 2>/dev/null || cat /etc/timezone)"
 
-# Configure global environment for PipeWire socket access
-echo "Configuring global environment..."
-# Note: PipeWire will run as user, socket will be bind-mounted to /run/pipewire
-echo "XDG_RUNTIME_DIR=/run/pipewire" >> /etc/environment
-echo "PIPEWIRE_RUNTIME_DIR=/run/pipewire" >> /etc/environment
-echo "PULSE_RUNTIME_PATH=/run/pipewire/pulse" >> /etc/environment
-echo "Global environment configured for PipeWire user mode"
+echo "Skipping global XDG_RUNTIME_DIR overrides (user session provides it)."
 
 # Create version file for system identification
 echo "Creating version file..."

@@ -1,5 +1,15 @@
 # PipeWire Audio Architecture - Mediabridge User Model
 
+Note (2025-09): This repository now uses a headless user-session architecture for PipeWire. All previous references to `/run/pipewire` bind mounts, `user@999.service`, or setting `XDG_RUNTIME_DIR=/run/pipewire` are deprecated. The authoritative model is:
+- User session: `mediabridge` (UID ≥ 1000, home `/home/mediabridge`), lingering enabled
+- Services: `pipewire`, `pipewire-pulse`, and `wireplumber` run as systemd user units for `mediabridge`
+- Runtime: Use `XDG_RUNTIME_DIR=/run/user/<uid>` implicitly from the user session; do not override it
+- Project services that use audio run as user units and depend on PipeWire user services
+
+Use official docs to validate configuration syntax and behavior:
+- PipeWire: https://docs.pipewire.org/
+- WirePlumber: https://pipewire.pages.freedesktop.org/wireplumber/
+
 ## ⚠️ CRITICAL: SINK vs SOURCE Terminology
 
 **NEVER CONFUSE THESE AGAIN (common mistake made 1000+ times!):**

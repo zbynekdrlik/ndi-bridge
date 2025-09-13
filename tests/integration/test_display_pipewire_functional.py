@@ -8,15 +8,10 @@ import pytest
 import time
 
 
-def test_display_uses_system_pipewire(host):
-    """Test that ndi-display uses the unified system-wide PipeWire."""
-    # Check that global environment sets runtime dir
-    result = host.run("grep XDG_RUNTIME_DIR /etc/environment")
-    assert "/run/user/0" in result.stdout, "System not configured with XDG_RUNTIME_DIR"
-    
-    # Verify display service depends on PipeWire
-    result = host.run("systemctl cat 'ndi-display@.service' | grep After")
-    assert "pipewire-system.service" in result.stdout, "Display not ordered after PipeWire"
+def test_display_uses_user_pipewire(host):
+    """Test that ndi-display user unit depends on PipeWire user services."""
+    result = host.run("systemctl --user cat 'ndi-display@.service' | grep -E 'After=|Wants='")
+    assert 'pipewire' in result.stdout.lower(), "Display user unit missing PipeWire dependencies"
 
 
 @pytest.mark.integration

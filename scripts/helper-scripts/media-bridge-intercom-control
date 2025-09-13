@@ -4,10 +4,10 @@
 
 set -e
 
-# PipeWire/PulseAudio environment (user mode with socket bind mount)
-export XDG_RUNTIME_DIR=/run/pipewire
-export PIPEWIRE_RUNTIME_DIR=/run/pipewire
-export PULSE_RUNTIME_PATH=/run/pipewire/pulse
+# Use user session runtime if available; do not override to system paths
+if [ -z "$XDG_RUNTIME_DIR" ]; then
+  export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+fi
 
 # Suppress PulseAudio cookie warnings
 export PULSE_COOKIE=/tmp/.pulse-cookie

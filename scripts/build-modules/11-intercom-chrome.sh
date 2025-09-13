@@ -37,18 +37,16 @@ apt-get install -y -qq alsa-utils 2>&1 | head -10
 echo "Installing Python3 for API server..."
 apt-get install -y -qq python3 python3-minimal 2>&1 | head -10
 
-# Enable Media Bridge intercom services
-echo "Enabling Media Bridge intercom services..."
-systemctl enable media-bridge-intercom.service 2>/dev/null || true
+echo "Preparing intercom user service enablement for mediabridge..."
+# Create user wants symlink so intercom auto-starts in mediabridge's user session
+mkdir -p /home/mediabridge/.config/systemd/user/default.target.wants
+if [ -f /etc/systemd/user/media-bridge-intercom.service ]; then
+  ln -sf /etc/systemd/user/media-bridge-intercom.service \
+        /home/mediabridge/.config/systemd/user/default.target.wants/media-bridge-intercom.service
+  chown -R mediabridge:audio /home/mediabridge/.config
+fi
 
-# Enable system-wide PipeWire services
-echo "Enabling system-wide PipeWire services..."
-systemctl enable pipewire-system.socket 2>/dev/null || true
-systemctl enable pipewire-system.service 2>/dev/null || true
-systemctl enable pipewire-pulse-system.service 2>/dev/null || true
-systemctl enable wireplumber-system.service 2>/dev/null || true
-
-echo "Chrome and Media Bridge intercom installation complete"
+echo "Chrome and Media Bridge intercom installation prepared (user service)"
 
 CHROME_EOF
 }

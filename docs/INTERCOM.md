@@ -2,18 +2,9 @@
 
 **SINGLE SOURCE OF TRUTH for Intercom Functionality**
 
-## Current Status - ✅ FULL USER MODE WITH ISOLATION
+## Current Status
 
-**✅ Chrome Intercom FULLY FUNCTIONAL with security improvements**
-
-**Current Implementation (v4.1)**:
-- Virtual devices created and used for audio ✓
-- Chrome restricted to virtual devices via WirePlumber ✓
-- All services run as mediabridge user (not root) ✓
-- Chrome profile in secure location ✓
-- PipeWire 1.4.7 with user session architecture ✓
-- Realtime scheduling for low latency ✓
-- Socket bind mounts for system-wide access ✓
+PipeWire and the intercom now run in a headless user-session under the `mediabridge` account (UID ≥ 1000) with lingering enabled. All references to `/run/pipewire` bind mounts are deprecated; the runtime comes from the user session (`XDG_RUNTIME_DIR=/run/user/<uid>`).
 
 ## CRITICAL: CSCTEK USB Audio Device (0573:1573)
 
@@ -33,7 +24,7 @@
 
 ## Architecture Overview (v4.1 - Secure User Mode)
 
-Media Bridge Intercom runs Chrome browser connected to VDO.Ninja for WebRTC communication. All components run as the dedicated `mediabridge` system user (UID 999) with proper privilege separation.
+Media Bridge Intercom runs Chrome connected to VDO.Ninja for WebRTC communication. All components run as the dedicated `mediabridge` user (UID ≥ 1000) with proper privilege separation and a standard systemd user session.
 
 ### Audio Flow Design (PipeWire 1.4.7 with WirePlumber Isolation)
 
@@ -54,11 +45,10 @@ Direct audio routing via PipeWire links
 ## Core Components
 
 ### 1. Mediabridge User Environment
-- **User**: mediabridge (UID 999, system user)
-- **Groups**: audio, pipewire, video, input, render
-- **Home**: `/var/lib/mediabridge/`
-- **Runtime**: `/run/user/999/` (primary)
-- **Socket Access**: `/run/pipewire/` (bind mount)
+- **User**: mediabridge (UID ≥ 1000, regular user)
+- **Groups**: audio, video, render, input
+- **Home**: `/home/mediabridge/`
+- **Runtime**: `/run/user/<uid>/` (from systemd user session)
 - **Chrome Profile**: `/var/lib/mediabridge/chrome-profile/`
 - **Realtime Limits**: rtprio 95, nice -19, unlimited memlock
 
@@ -69,16 +59,13 @@ Direct audio routing via PipeWire links
 - `pipewire-pulse.service` - PulseAudio compatibility (user session)
 - `wireplumber.service` - Session/policy manager (user session)
 
-**System Services**:
-- `media-bridge-intercom.service` - Chrome launcher (runs as mediabridge)
-- `media-bridge-audio-manager.service` - Virtual device creator
+**Project User Units**:
+- `media-bridge-intercom.service` - user unit, depends on PipeWire user services
+- `ndi-display@.service` - user unit for HDMI audio output (if used)
 
 **Key Configuration**:
 - `loginctl enable-linger mediabridge` - Ensures user session persists
-- XDG_RUNTIME_DIR: `/run/pipewire/` (for services)
-- Primary socket: `/run/user/999/pipewire-0`
-- Bind mount: `/run/pipewire/pipewire-0` (system-wide access)
-- WirePlumber config: `/var/lib/mediabridge/.config/wireplumber/wireplumber.conf.d/`
+- WirePlumber config: `/home/mediabridge/.config/wireplumber/wireplumber.conf.d/`
 
 ### 3. Virtual Devices
 Created by audio-manager for intended isolation:
