@@ -450,10 +450,10 @@ Media Bridge uses a **unified system-wide PipeWire instance** for all audio mana
 - Virtual devices isolate Chrome from hardware
 
 ### Key Components
-1. **System Services**: pipewire-system, pipewire-pulse-system, wireplumber-system
+1. **User Services**: pipewire (user), pipewire-pulse (user), wireplumber (user)
 2. **Virtual Devices**: intercom-speaker, intercom-microphone (prevents device locking)
 3. **Configuration**: `/etc/pipewire/`, `/etc/wireplumber/`
-4. **Runtime**: `/var/run/pipewire/`
+4. **Runtime**: `/run/user/<uid>/` (provided by systemd user session)
 
 ### Documentation Requirements
 **MANDATORY: When modifying ANY PipeWire-related functionality:**
@@ -485,7 +485,7 @@ For complete details, see **docs/PIPEWIRE.md** - the authoritative source for Pi
 | Scripts not updating | Removed inline scripts from 10-tty-config.sh |
 | Chrome shows no audio devices | Check virtual devices: `pactl list sources` |
 | Audio device locked | Virtual devices prevent locking - check wireplumber logs |
-| PipeWire not starting | Check service deps: `systemctl status pipewire-system wireplumber-system` |
+| PipeWire not starting | Check user services: `sudo -u mediabridge systemctl --user status pipewire wireplumber` |
 
 ## NDI Display System (v1.6.8+)
 
